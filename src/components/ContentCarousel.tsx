@@ -41,7 +41,8 @@ export default function ContentCarousel({
   };
 
   const getYear = (item: Movie | TVShow): string => {
-    const date = "release_date" in item ? item.release_date : item.first_air_date;
+    const date =
+      "release_date" in item ? item.release_date : item.first_air_date;
     return date?.split("-")[0] || "";
   };
 
@@ -129,11 +130,13 @@ export default function ContentCarousel({
                         item.original_language === "hi"
                           ? "badge-hindi"
                           : item.original_language === "en"
-                          ? "badge-english"
-                          : "bg-muted"
+                            ? "badge-english"
+                            : "bg-muted",
                       )}
                     >
-                      {item.original_language === "hi" ? "HI" : item.original_language.toUpperCase()}
+                      {item.original_language === "hi"
+                        ? "HI"
+                        : item.original_language.toUpperCase()}
                     </div>
                   </div>
 
@@ -141,7 +144,9 @@ export default function ContentCarousel({
                   <h3 className="mt-2 font-medium text-sm line-clamp-1 group-hover/card:text-primary transition-colors">
                     {getTitle(item)}
                   </h3>
-                  <p className="text-xs text-muted-foreground">{getYear(item)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {getYear(item)}
+                  </p>
                 </div>
               ))}
         </div>

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Film, Github, Twitter } from "lucide-react";
+import { Film } from "lucide-react";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -41,27 +41,13 @@ export default function Footer() {
           <div className="col-span-2 md:col-span-1">
             <Link to="/home" className="flex items-center gap-2 mb-4">
               <Film className="w-8 h-8 text-primary" />
-              <span className="text-xl font-bold text-gradient">MovieReckon</span>
+              <span className="text-xl font-bold text-gradient">
+                MovieReckon
+              </span>
             </Link>
             <p className="text-sm text-muted-foreground mb-4">
               Your personalized gateway to Bollywood & Hollywood entertainment.
             </p>
-            <div className="flex gap-4">
-              <a
-                href="#"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Twitter"
-              >
-                <Twitter className="w-5 h-5" />
-              </a>
-              <a
-                href="#"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="GitHub"
-              >
-                <Github className="w-5 h-5" />
-              </a>
-            </div>
           </div>
 
           {/* Links */}
@@ -88,17 +74,6 @@ export default function Footer() {
         <div className="mt-12 pt-8 border-t border-border flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">
             © {currentYear} MovieReckon. All rights reserved.
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Powered by{" "}
-            <a
-              href="https://www.themoviedb.org/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:underline"
-            >
-              TMDB
-            </a>
           </p>
         </div>
       </div>
