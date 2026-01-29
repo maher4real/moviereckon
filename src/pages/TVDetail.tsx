@@ -7,19 +7,24 @@ import {
   getTVShowCredits,
   getTVShowVideos,
   getSimilarTVShows,
+  getTVSeasonDetails,
   getBackdropUrl,
   getPosterUrl,
   getProfileUrl,
+  getStillUrl,
   getYouTubeTrailerUrl,
   getLanguageLabel,
   TVShowDetails,
   TVShow,
+  Episode,
 } from "@/lib/tmdb";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import BottomNav from "@/components/BottomNav";
 import ContentCarousel from "@/components/ContentCarousel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   ArrowLeft,
   Play,
@@ -30,6 +35,9 @@ import {
   Globe,
   Tv,
   X,
+  Clock,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +46,8 @@ export default function TVDetail() {
   const navigate = useNavigate();
   const { user, isLoading: userLoading, addToWatchHistory, isWatched, toggleLike, isLiked } = useUser();
   const [showTrailer, setShowTrailer] = useState(false);
+  const [selectedSeason, setSelectedSeason] = useState<number>(1);
+  const [expandedEpisode, setExpandedEpisode] = useState<number | null>(null);
 
   const tvId = Number(id);
 
@@ -76,8 +86,28 @@ export default function TVDetail() {
     enabled: !!tvId,
   });
 
+  // Fetch season details
+  const { data: seasonData, isLoading: seasonLoading } = useQuery({
+    queryKey: ["tv-season", tvId, selectedSeason],
+    queryFn: () => getTVSeasonDetails(tvId, selectedSeason),
+    enabled: !!tvId && selectedSeason > 0,
+  });
+
+  // Update selected season when TV show loads
+  useEffect(() => {
+    if (tvShow?.seasons) {
+      const firstRealSeason = tvShow.seasons.find((s) => s.season_number > 0);
+      if (firstRealSeason) {
+        setSelectedSeason(firstRealSeason.season_number);
+      }
+    }
+  }, [tvShow]);
+
   const cast = creditsData?.cast.slice(0, 10) || [];
   const trailerUrl = videosData ? getYouTubeTrailerUrl(videosData.results) : null;
+  
+  // Filter out "Specials" (season 0) from seasons list
+  const seasons = tvShow?.seasons?.filter((s) => s.season_number > 0) || [];
 
   const handleMarkWatched = () => {
     if (!tvShow) return;
@@ -99,6 +129,13 @@ export default function TVDetail() {
       title: tvShow.name,
       posterPath: tvShow.poster_path,
     });
+  };
+
+  const formatRuntime = (minutes: number | null): string => {
+    if (!minutes) return "";
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
 
   if (userLoading || tvLoading) {
@@ -138,7 +175,7 @@ export default function TVDetail() {
   const year = tvShow.first_air_date?.split("-")[0] || "";
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
       <Header />
 
       {/* Backdrop */}
@@ -295,6 +332,128 @@ export default function TVDetail() {
           </div>
         </div>
 
+        {/* Episodes Section */}
+        {seasons.length > 0 && (
+          <div className="mt-12">
+            <h2 className="text-2xl font-bold mb-6">📺 Episodes</h2>
+            
+            {/* Season Tabs */}
+            <Tabs
+              value={String(selectedSeason)}
+              onValueChange={(value) => setSelectedSeason(Number(value))}
+            >
+              <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 mb-6">
+                <TabsList className="bg-muted inline-flex w-auto">
+                  {seasons.map((season) => (
+                    <TabsTrigger key={season.season_number} value={String(season.season_number)}>
+                      Season {season.season_number}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </div>
+
+              {seasons.map((season) => (
+                <TabsContent key={season.season_number} value={String(season.season_number)}>
+                  {seasonLoading && selectedSeason === season.season_number ? (
+                    <div className="space-y-4">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} className="bg-card rounded-lg p-4 animate-pulse">
+                          <div className="flex gap-4">
+                            <div className="w-32 h-20 bg-muted rounded" />
+                            <div className="flex-1 space-y-2">
+                              <div className="h-4 bg-muted rounded w-1/2" />
+                              <div className="h-3 bg-muted rounded w-full" />
+                              <div className="h-3 bg-muted rounded w-3/4" />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {seasonData?.episodes?.map((episode: Episode) => (
+                        <div
+                          key={episode.id}
+                          className="bg-card rounded-lg overflow-hidden border border-border hover:border-primary/50 transition-colors"
+                        >
+                          <div
+                            className="flex gap-4 p-4 cursor-pointer"
+                            onClick={() =>
+                              setExpandedEpisode(
+                                expandedEpisode === episode.id ? null : episode.id
+                              )
+                            }
+                          >
+                            {/* Episode Thumbnail */}
+                            <div className="relative flex-shrink-0">
+                              <img
+                                src={getStillUrl(episode.still_path)}
+                                alt={episode.name}
+                                className="w-32 sm:w-40 h-20 sm:h-24 object-cover rounded"
+                              />
+                              {episode.runtime && (
+                                <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-background/80 rounded text-xs flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {formatRuntime(episode.runtime)}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Episode Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <h3 className="font-medium text-sm sm:text-base">
+                                    E{episode.episode_number}. {episode.name}
+                                  </h3>
+                                  {episode.air_date && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {new Date(episode.air_date).toLocaleDateString("en-US", {
+                                        year: "numeric",
+                                        month: "short",
+                                        day: "numeric",
+                                      })}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {episode.vote_average > 0 && (
+                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                      <Star className="w-3 h-3 fill-accent text-accent" />
+                                      {episode.vote_average.toFixed(1)}
+                                    </div>
+                                  )}
+                                  {expandedEpisode === episode.id ? (
+                                    <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                                  ) : (
+                                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                                  )}
+                                </div>
+                              </div>
+                              <p className="text-xs sm:text-sm text-muted-foreground mt-2 line-clamp-2">
+                                {episode.overview || "No description available."}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Expanded Overview */}
+                          {expandedEpisode === episode.id && episode.overview && (
+                            <div className="px-4 pb-4 pt-0">
+                              <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded">
+                                {episode.overview}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+              ))}
+            </Tabs>
+          </div>
+        )}
+
         {/* Similar TV Shows */}
         {similarData && similarData.results.length > 0 && (
           <div className="mt-12">
@@ -332,6 +491,7 @@ export default function TVDetail() {
       )}
 
       <Footer />
+      <BottomNav />
     </div>
   );
 }

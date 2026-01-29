@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useUser } from "@/contexts/UserContext";
@@ -7,8 +7,8 @@ import {
   discoverTVShows,
   getMovieGenres,
   getTVGenres,
-  getBollywoodMovies,
-  getHollywoodMovies,
+  getNowPlayingMovies,
+  getUpcomingMovies,
   Movie,
   TVShow,
   Genre,
@@ -16,12 +16,13 @@ import {
 } from "@/lib/tmdb";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import BottomNav from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
-type ContentType = "all" | "bollywood" | "hollywood" | "tv";
+type ContentType = "all" | "bollywood" | "hollywood" | "tv" | "now_playing" | "upcoming";
 type SortOption = "popularity.desc" | "vote_average.desc" | "release_date.desc" | "revenue.desc";
 
 const sortOptions: { value: SortOption; label: string }[] = [
@@ -30,6 +31,10 @@ const sortOptions: { value: SortOption; label: string }[] = [
   { value: "release_date.desc", label: "Newest First" },
   { value: "revenue.desc", label: "Highest Grossing" },
 ];
+
+// Generate year options from current year to 1950
+const currentYear = new Date().getFullYear();
+const yearOptions = Array.from({ length: currentYear - 1949 }, (_, i) => currentYear - i);
 
 export default function Browse() {
   const { user, isLoading: userLoading } = useUser();
@@ -40,6 +45,7 @@ export default function Browse() {
     (searchParams.get("type") as ContentType) || "all"
   );
   const [selectedGenre, setSelectedGenre] = useState<string>(searchParams.get("genre") || "");
+  const [selectedYear, setSelectedYear] = useState<string>(searchParams.get("year") || "");
   const [sortBy, setSortBy] = useState<SortOption>(
     (searchParams.get("sort") as SortOption) || "popularity.desc"
   );
@@ -70,13 +76,27 @@ export default function Browse() {
 
   // Fetch content based on filters
   const { data: contentData, isLoading } = useQuery({
-    queryKey: ["browse", contentType, selectedGenre, sortBy, page],
+    queryKey: ["browse", contentType, selectedGenre, selectedYear, sortBy, page],
     queryFn: async () => {
-      const filters = {
+      // Special cases for now_playing and upcoming
+      if (contentType === "now_playing") {
+        return getNowPlayingMovies(page);
+      }
+      if (contentType === "upcoming") {
+        return getUpcomingMovies(page);
+      }
+
+      const filters: Record<string, any> = {
         page,
         sort_by: sortBy,
         with_genres: selectedGenre || undefined,
       };
+
+      // Add year filter
+      if (selectedYear) {
+        filters["primary_release_date.gte"] = `${selectedYear}-01-01`;
+        filters["primary_release_date.lte"] = `${selectedYear}-12-31`;
+      }
 
       switch (contentType) {
         case "bollywood":
@@ -97,9 +117,10 @@ export default function Browse() {
     const params = new URLSearchParams();
     if (contentType !== "all") params.set("type", contentType);
     if (selectedGenre) params.set("genre", selectedGenre);
+    if (selectedYear) params.set("year", selectedYear);
     if (sortBy !== "popularity.desc") params.set("sort", sortBy);
     setSearchParams(params, { replace: true });
-  }, [contentType, selectedGenre, sortBy, setSearchParams]);
+  }, [contentType, selectedGenre, selectedYear, sortBy, setSearchParams]);
 
   const handleItemClick = (item: Movie | TVShow) => {
     const isTV = "first_air_date" in item;
@@ -115,6 +136,9 @@ export default function Browse() {
     return date?.split("-")[0] || "";
   };
 
+  // Check if year/genre/sort filters should be disabled
+  const isSpecialCategory = contentType === "now_playing" || contentType === "upcoming";
+
   if (userLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -124,7 +148,7 @@ export default function Browse() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col pb-20 md:pb-0">
       <Header />
 
       <main className="flex-1 pt-20 pb-12">
@@ -133,25 +157,30 @@ export default function Browse() {
           <h1 className="text-3xl font-bold mb-6">Browse</h1>
 
           {/* Filters */}
-          <div className="flex flex-col md:flex-row gap-4 mb-8">
-            {/* Content Type Tabs */}
-            <Tabs
-              value={contentType}
-              onValueChange={(value) => {
-                setContentType(value as ContentType);
-                setSelectedGenre("");
-                setPage(1);
-              }}
-            >
-              <TabsList className="bg-muted">
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="bollywood">🇮🇳 Bollywood</TabsTrigger>
-                <TabsTrigger value="hollywood">🎬 Hollywood</TabsTrigger>
-                <TabsTrigger value="tv">📺 TV Series</TabsTrigger>
-              </TabsList>
-            </Tabs>
+          <div className="flex flex-col gap-4 mb-8">
+            {/* Content Type Tabs - Scrollable on mobile */}
+            <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
+              <Tabs
+                value={contentType}
+                onValueChange={(value) => {
+                  setContentType(value as ContentType);
+                  setSelectedGenre("");
+                  setSelectedYear("");
+                  setPage(1);
+                }}
+              >
+                <TabsList className="bg-muted inline-flex w-auto">
+                  <TabsTrigger value="all">All</TabsTrigger>
+                  <TabsTrigger value="now_playing">🎬 Now Playing</TabsTrigger>
+                  <TabsTrigger value="upcoming">🗓️ Upcoming</TabsTrigger>
+                  <TabsTrigger value="bollywood">🇮🇳 Bollywood</TabsTrigger>
+                  <TabsTrigger value="hollywood">🎬 Hollywood</TabsTrigger>
+                  <TabsTrigger value="tv">📺 TV Series</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
 
-            <div className="flex gap-4 flex-wrap">
+            <div className="flex gap-3 flex-wrap">
               {/* Genre Filter */}
               <Select
                 value={selectedGenre}
@@ -159,8 +188,9 @@ export default function Browse() {
                   setSelectedGenre(value === "all" ? "" : value);
                   setPage(1);
                 }}
+                disabled={isSpecialCategory}
               >
-                <SelectTrigger className="w-[180px] bg-card">
+                <SelectTrigger className="w-[140px] sm:w-[180px] bg-card">
                   <SelectValue placeholder="All Genres" />
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border z-50">
@@ -173,6 +203,28 @@ export default function Browse() {
                 </SelectContent>
               </Select>
 
+              {/* Year Filter */}
+              <Select
+                value={selectedYear}
+                onValueChange={(value) => {
+                  setSelectedYear(value === "all" ? "" : value);
+                  setPage(1);
+                }}
+                disabled={isSpecialCategory}
+              >
+                <SelectTrigger className="w-[120px] sm:w-[140px] bg-card">
+                  <SelectValue placeholder="All Years" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border-border z-50 max-h-[300px]">
+                  <SelectItem value="all">All Years</SelectItem>
+                  {yearOptions.map((year) => (
+                    <SelectItem key={year} value={String(year)}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
               {/* Sort By */}
               <Select
                 value={sortBy}
@@ -180,8 +232,9 @@ export default function Browse() {
                   setSortBy(value as SortOption);
                   setPage(1);
                 }}
+                disabled={isSpecialCategory}
               >
-                <SelectTrigger className="w-[180px] bg-card">
+                <SelectTrigger className="w-[140px] sm:w-[180px] bg-card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border z-50">
@@ -288,6 +341,7 @@ export default function Browse() {
       </main>
 
       <Footer />
+      <BottomNav />
     </div>
   );
 }
