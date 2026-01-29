@@ -163,6 +163,11 @@
   .badge-english {
     @apply bg-secondary text-secondary-foreground;
   }
+
+  /* Safe area for bottom nav on iOS */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }
 
 @layer utilities {

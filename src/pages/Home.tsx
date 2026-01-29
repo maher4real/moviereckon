@@ -8,10 +8,13 @@ import {
   getHollywoodMovies,
   getPopularTVShows,
   getTopRatedMovies,
+  getNowPlayingMovies,
+  getUpcomingMovies,
   Movie,
   TVShow,
 } from "@/lib/tmdb";
 import Header from "@/components/Header";
+import BottomNav from "@/components/BottomNav";
 import HeroBanner from "@/components/HeroBanner";
 import ContentCarousel from "@/components/ContentCarousel";
 import Footer from "@/components/Footer";
@@ -59,6 +62,18 @@ export default function Home() {
     staleTime: 1000 * 60 * 10,
   });
 
+  const { data: nowPlayingData, isLoading: nowPlayingLoading } = useQuery({
+    queryKey: ["now-playing-movies"],
+    queryFn: () => getNowPlayingMovies(),
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const { data: upcomingData, isLoading: upcomingLoading } = useQuery({
+    queryKey: ["upcoming-movies"],
+    queryFn: () => getUpcomingMovies(),
+    staleTime: 1000 * 60 * 10,
+  });
+
   // Auto-rotate hero banner
   useEffect(() => {
     if (!trendingMovies?.length) return;
@@ -86,7 +101,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
       <Header />
 
       {/* Hero Banner */}
@@ -101,6 +116,22 @@ export default function Home() {
       {/* Content Sections */}
       <main className="relative z-10 -mt-32 pb-20">
         <div className="space-y-8">
+          {/* Now Playing */}
+          <ContentCarousel
+            title="🎬 Now Playing in Theaters"
+            items={nowPlayingData?.results as (Movie | TVShow)[]}
+            isLoading={nowPlayingLoading}
+            type="movie"
+          />
+
+          {/* Upcoming */}
+          <ContentCarousel
+            title="🗓️ Coming Soon"
+            items={upcomingData?.results as (Movie | TVShow)[]}
+            isLoading={upcomingLoading}
+            type="movie"
+          />
+
           {/* Trending Now */}
           <ContentCarousel
             title="🔥 Trending Now"
@@ -173,6 +204,7 @@ export default function Home() {
       </main>
 
       <Footer />
+      <BottomNav />
     </div>
   );
 }

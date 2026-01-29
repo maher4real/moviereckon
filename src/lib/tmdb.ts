@@ -76,10 +76,43 @@ export interface TVShowDetails extends TVShow {
   genres: { id: number; name: string }[];
   number_of_episodes: number;
   number_of_seasons: number;
+  seasons: Season[];
   status: string;
   tagline: string;
   type: string;
   created_by: { id: number; name: string; profile_path: string | null }[];
+}
+
+export interface Season {
+  id: number;
+  name: string;
+  season_number: number;
+  episode_count: number;
+  air_date: string | null;
+  poster_path: string | null;
+  overview: string;
+}
+
+export interface Episode {
+  id: number;
+  name: string;
+  overview: string;
+  episode_number: number;
+  season_number: number;
+  air_date: string | null;
+  still_path: string | null;
+  runtime: number | null;
+  vote_average: number;
+}
+
+export interface SeasonDetails {
+  id: number;
+  name: string;
+  season_number: number;
+  episodes: Episode[];
+  air_date: string | null;
+  poster_path: string | null;
+  overview: string;
 }
 
 export interface Cast {
@@ -313,6 +346,23 @@ export async function getTVShowRecommendations(
   tvId: number,
 ): Promise<TMDBResponse<TVShow>> {
   return fetchTMDB<TMDBResponse<TVShow>>(`/tv/${tvId}/recommendations`);
+}
+
+// TV Season Details with Episodes
+export async function getTVSeasonDetails(
+  tvId: number,
+  seasonNumber: number,
+): Promise<SeasonDetails> {
+  return fetchTMDB<SeasonDetails>(`/tv/${tvId}/season/${seasonNumber}`);
+}
+
+// Get still image URL for episodes
+export function getStillUrl(
+  path: string | null,
+  size: "w185" | "w300" | "w500" | "original" = "w300",
+): string {
+  if (!path) return "/placeholder.svg";
+  return `${TMDB_IMAGE_BASE}/${size}${path}`;
 }
 
 // Search

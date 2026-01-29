@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useUser } from "@/contexts/UserContext";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import BottomNav from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPosterUrl } from "@/lib/tmdb";
@@ -56,7 +57,7 @@ export default function Profile() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col pb-20 md:pb-0">
       <Header />
 
       <main className="flex-1 pt-20 pb-12">
@@ -241,6 +242,7 @@ export default function Profile() {
       </main>
 
       <Footer />
+      <BottomNav />
     </div>
   );
 }

@@ -19,6 +19,7 @@ import {
 } from "@/lib/tmdb";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import BottomNav from "@/components/BottomNav";
 import ContentCarousel from "@/components/ContentCarousel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -146,7 +147,7 @@ export default function MovieDetail() {
   const year = movie.release_date?.split("-")[0] || "";
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
       <Header />
 
       {/* Backdrop */}
@@ -342,6 +343,7 @@ export default function MovieDetail() {
       )}
 
       <Footer />
+      <BottomNav />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { useUser } from "@/contexts/UserContext";
 import { searchMulti, Movie, TVShow, getPosterUrl } from "@/lib/tmdb";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import BottomNav from "@/components/BottomNav";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -126,7 +127,7 @@ export default function Search() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col pb-20 md:pb-0">
       <Header />
 
       <main className="flex-1 pt-20 pb-12">
@@ -300,6 +301,7 @@ export default function Search() {
       </main>
 
       <Footer />
+      <BottomNav />
     </div>
   );
 }
