@@ -14,13 +14,132 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      liked_items: {
+        Row: {
+          content_id: number
+          content_type: string
+          id: string
+          liked_at: string
+          poster_path: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          content_id: number
+          content_type: string
+          id?: string
+          liked_at?: string
+          poster_path?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          content_id?: number
+          content_type?: string
+          id?: string
+          liked_at?: string
+          poster_path?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+          username: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+          username: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      user_preferences: {
+        Row: {
+          created_at: string
+          id: string
+          preferred_genres: number[] | null
+          preferred_languages: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          preferred_genres?: number[] | null
+          preferred_languages?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          preferred_genres?: number[] | null
+          preferred_languages?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      watch_history: {
+        Row: {
+          content_id: number
+          content_type: string
+          genres: number[] | null
+          id: string
+          language: string
+          poster_path: string | null
+          title: string
+          user_id: string
+          watched_at: string
+        }
+        Insert: {
+          content_id: number
+          content_type: string
+          genres?: number[] | null
+          id?: string
+          language?: string
+          poster_path?: string | null
+          title: string
+          user_id: string
+          watched_at?: string
+        }
+        Update: {
+          content_id?: number
+          content_type?: string
+          genres?: number[] | null
+          id?: string
+          language?: string
+          poster_path?: string | null
+          title?: string
+          user_id?: string
+          watched_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_owner: { Args: { record_user_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
