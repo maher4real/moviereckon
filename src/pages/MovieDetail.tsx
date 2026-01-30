@@ -1,26 +1,27 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useUser } from "@/contexts/UserContext";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserData } from "@/hooks/useUserData";
 import {
   getMovieDetails,
   getMovieCredits,
   getMovieVideos,
   getSimilarMovies,
+  getMovieWatchProviders,
   getBackdropUrl,
   getPosterUrl,
-  getProfileUrl,
   getYouTubeTrailerUrl,
   getLanguageLabel,
-  MovieDetails,
-  Cast,
-  Video,
+  getLanguageBadgeClass,
   Movie,
 } from "@/lib/tmdb";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
 import ContentCarousel from "@/components/ContentCarousel";
+import WhereToWatch from "@/components/WhereToWatch";
+import CastList from "@/components/CastList";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -36,20 +37,23 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+const MemoizedCarousel = memo(ContentCarousel);
+
 export default function MovieDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, isLoading: userLoading, addToWatchHistory, isWatched, toggleLike, isLiked } = useUser();
+  const { user, isLoading: authLoading } = useAuth();
+  const { addToWatchHistory, isWatched, toggleLike, isLiked } = useUserData();
   const [showTrailer, setShowTrailer] = useState(false);
 
   const movieId = Number(id);
 
   // Redirect if no user
   useEffect(() => {
-    if (!userLoading && !user) {
+    if (!authLoading && !user) {
       navigate("/");
     }
-  }, [user, userLoading, navigate]);
+  }, [user, authLoading, navigate]);
 
   // Fetch movie details
   const { data: movie, isLoading: movieLoading } = useQuery({
@@ -79,28 +83,39 @@ export default function MovieDetail() {
     enabled: !!movieId,
   });
 
-  const cast = creditsData?.cast.slice(0, 10) || [];
-  const trailerUrl = videosData ? getYouTubeTrailerUrl(videosData.results) : null;
+  // Fetch watch providers (IN region for India)
+  const { data: watchProvidersData } = useQuery({
+    queryKey: ["movie-watch-providers", movieId],
+    queryFn: () => getMovieWatchProviders(movieId),
+    enabled: !!movieId,
+  });
 
-  const handleMarkWatched = () => {
+  const cast = creditsData?.cast.slice(0, 12) || [];
+  const trailerUrl = videosData ? getYouTubeTrailerUrl(videosData.results) : null;
+  
+  // Get providers for IN (India) or US as fallback
+  const providers = watchProvidersData?.results?.IN || watchProvidersData?.results?.US || null;
+  const watchLink = providers?.link;
+
+  const handleMarkWatched = async () => {
     if (!movie) return;
-    addToWatchHistory({
-      id: movie.id,
-      type: "movie",
+    await addToWatchHistory({
+      content_id: movie.id,
+      content_type: "movie",
       title: movie.title,
-      posterPath: movie.poster_path,
+      poster_path: movie.poster_path,
       genres: movie.genres.map((g) => g.id),
       language: movie.original_language,
     });
   };
 
-  const handleToggleLike = () => {
+  const handleToggleLike = async () => {
     if (!movie) return;
-    toggleLike({
-      id: movie.id,
-      type: "movie",
+    await toggleLike({
+      content_id: movie.id,
+      content_type: "movie",
       title: movie.title,
-      posterPath: movie.poster_path,
+      poster_path: movie.poster_path,
     });
   };
 
@@ -110,7 +125,7 @@ export default function MovieDetail() {
     return `${hours}h ${mins}m`;
   };
 
-  if (userLoading || movieLoading) {
+  if (authLoading || movieLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
@@ -136,7 +151,9 @@ export default function MovieDetail() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <p className="text-xl text-muted-foreground mb-4">Movie not found</p>
-          <Button onClick={() => navigate(-1)}>Go Back</Button>
+          <Button onClick={() => navigate(-1)} className="bg-primary hover:bg-primary/90">
+            Go Back
+          </Button>
         </div>
       </div>
     );
@@ -150,7 +167,7 @@ export default function MovieDetail() {
     <div className="min-h-screen bg-background pb-20 md:pb-0">
       <Header />
 
-      {/* Backdrop */}
+      {/* Backdrop with optional video */}
       <div className="relative h-[50vh] md:h-[70vh]">
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
@@ -209,11 +226,7 @@ export default function MovieDetail() {
 
             {/* Meta Info */}
             <div className="flex flex-wrap items-center gap-3 mb-6">
-              <Badge
-                className={cn(
-                  movie.original_language === "hi" ? "badge-hindi" : "badge-english"
-                )}
-              >
+              <Badge className={getLanguageBadgeClass(movie.original_language)}>
                 <Globe className="w-3 h-3 mr-1" />
                 {getLanguageLabel(movie.original_language)}
               </Badge>
@@ -246,12 +259,12 @@ export default function MovieDetail() {
               ))}
             </div>
 
-            {/* Action Buttons */}
+            {/* Action Buttons - Red Primary */}
             <div className="flex flex-wrap gap-3 mb-8">
               {trailerUrl && (
                 <Button
                   size="lg"
-                  className="bg-primary hover:bg-primary/90 glow-primary"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
                   onClick={() => setShowTrailer(true)}
                 >
                   <Play className="w-5 h-5 mr-2 fill-current" />
@@ -282,34 +295,18 @@ export default function MovieDetail() {
               <p className="text-muted-foreground leading-relaxed">{movie.overview}</p>
             </div>
 
+            {/* Where to Watch */}
+            <WhereToWatch providers={providers} link={watchLink} />
+
             {/* Cast */}
-            {cast.length > 0 && (
-              <div className="mb-8">
-                <h2 className="text-xl font-semibold mb-4">Top Cast</h2>
-                <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
-                  {cast.map((actor) => (
-                    <div key={actor.id} className="flex-shrink-0 text-center">
-                      <img
-                        src={getProfileUrl(actor.profile_path, "medium")}
-                        alt={actor.name}
-                        className="w-20 h-20 rounded-full object-cover mx-auto mb-2"
-                      />
-                      <p className="text-sm font-medium line-clamp-1 w-20">{actor.name}</p>
-                      <p className="text-xs text-muted-foreground line-clamp-1 w-20">
-                        {actor.character}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <CastList cast={cast} />
           </div>
         </div>
 
         {/* Similar Movies */}
         {similarData && similarData.results.length > 0 && (
           <div className="mt-12">
-            <ContentCarousel
+            <MemoizedCarousel
               title="Similar Movies"
               items={similarData.results as Movie[]}
               isLoading={similarLoading}

@@ -164,6 +164,18 @@
     @apply bg-secondary text-secondary-foreground;
   }
 
+  .badge-tamil {
+    @apply bg-rose-600 text-white;
+  }
+
+  .badge-telugu {
+    @apply bg-violet-600 text-white;
+  }
+
+  .badge-gujarati {
+    @apply bg-emerald-600 text-white;
+  }
+
   /* Safe area for bottom nav on iOS */
   .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);

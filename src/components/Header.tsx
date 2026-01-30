@@ -1,14 +1,14 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { useUser } from "@/contexts/UserContext";
-import { Film, Search, Menu, X, User, Home, Grid, Tv } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { Film, Search, Menu, X, User, Home, Grid, Tv, Clapperboard, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user } = useUser();
+  const { profile, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -23,11 +23,23 @@ export default function Header() {
 
   const navLinks = [
     { href: "/home", label: "Home", icon: Home },
+    { href: "/browse?type=all", label: "Movies", icon: Clapperboard },
     { href: "/browse", label: "Browse", icon: Grid },
-    { href: "/browse/tv", label: "TV Series", icon: Tv },
+    { href: "/browse?type=tv", label: "TV Series", icon: Tv },
   ];
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) => {
+    if (path.includes("?")) {
+      const [basePath, query] = path.split("?");
+      return location.pathname === basePath && location.search.includes(query.split("=")[1]);
+    }
+    return location.pathname === path;
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
 
   return (
     <header
@@ -117,12 +129,21 @@ export default function Header() {
                 {link.label}
               </Link>
             ))}
-            {user && (
-              <div className="px-4 py-3 mt-2 border-t border-border">
-                <p className="text-sm text-muted-foreground">
-                  Logged in as <span className="text-foreground font-medium">{user.username}</span>
-                </p>
-              </div>
+            {profile && (
+              <>
+                <div className="px-4 py-3 mt-2 border-t border-border">
+                  <p className="text-sm text-muted-foreground">
+                    Logged in as <span className="text-foreground font-medium">{profile.username}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={handleSignOut}
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
+                >
+                  <LogOut className="w-5 h-5" />
+                  Sign Out
+                </button>
+              </>
             )}
           </nav>
         </div>

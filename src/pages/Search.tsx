@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useUser } from "@/contexts/UserContext";
-import { searchMulti, Movie, TVShow, getPosterUrl } from "@/lib/tmdb";
+import { useAuth } from "@/hooks/useAuth";
+import { searchMulti, Movie, TVShow, getPosterUrl, getLanguageBadgeClass } from "@/lib/tmdb";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
@@ -17,8 +17,55 @@ const MAX_RECENT_SEARCHES = 10;
 
 type FilterType = "all" | "movie" | "tv";
 
+// Memoized result card
+const ResultCard = memo(({ item, onClick }: { item: Movie | TVShow; onClick: () => void }) => {
+  const isTV = "first_air_date" in item;
+  const title = isTV ? (item as TVShow).name : (item as Movie).title;
+  const date = isTV ? (item as TVShow).first_air_date : (item as Movie).release_date;
+  const year = date?.split("-")[0] || "";
+
+  return (
+    <div onClick={onClick} className="cursor-pointer group">
+      <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
+        <img
+          src={getPosterUrl(item.poster_path, "medium")}
+          alt={title}
+          className="w-full h-full object-cover"
+          loading="lazy"
+        />
+
+        {/* Hover Overlay */}
+        <div className="absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+          <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
+            <span className="text-xl text-primary-foreground">▶</span>
+          </div>
+        </div>
+
+        {/* Language Badge */}
+        <div className={cn("absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold", getLanguageBadgeClass(item.original_language))}>
+          {item.original_language.toUpperCase()}
+        </div>
+
+        {/* Rating Badge */}
+        {item.vote_average > 0 && (
+          <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
+            ⭐ {item.vote_average.toFixed(1)}
+          </div>
+        )}
+      </div>
+
+      <h3 className="mt-2 font-medium text-sm line-clamp-1 group-hover:text-primary transition-colors">
+        {title}
+      </h3>
+      <p className="text-xs text-muted-foreground">{year} • {isTV ? "TV" : "Movie"}</p>
+    </div>
+  );
+});
+
+ResultCard.displayName = "ResultCard";
+
 export default function Search() {
-  const { user, isLoading: userLoading } = useUser();
+  const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -27,10 +74,10 @@ export default function Search() {
 
   // Redirect if no user
   useEffect(() => {
-    if (!userLoading && !user) {
+    if (!authLoading && !user) {
       navigate("/");
     }
-  }, [user, userLoading, navigate]);
+  }, [user, authLoading, navigate]);
 
   // Load recent searches
   useEffect(() => {
@@ -78,47 +125,35 @@ export default function Search() {
   }, [searchResults, filterType]);
 
   // Save to recent searches
-  const saveRecentSearch = (searchTerm: string) => {
+  const saveRecentSearch = useCallback((searchTerm: string) => {
     const trimmed = searchTerm.trim();
     if (!trimmed) return;
 
-    const updated = [trimmed, ...recentSearches.filter((s) => s !== trimmed)].slice(
-      0,
-      MAX_RECENT_SEARCHES
-    );
-    setRecentSearches(updated);
-    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
-  };
+    setRecentSearches((prev) => {
+      const updated = [trimmed, ...prev.filter((s) => s !== trimmed)].slice(0, MAX_RECENT_SEARCHES);
+      localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
 
-  const clearRecentSearches = () => {
+  const clearRecentSearches = useCallback(() => {
     setRecentSearches([]);
     localStorage.removeItem(RECENT_SEARCHES_KEY);
-  };
+  }, []);
 
-  const handleItemClick = (item: Movie | TVShow) => {
-    // Save search to recent
+  const handleItemClick = useCallback((item: Movie | TVShow) => {
     if (debouncedQuery) {
       saveRecentSearch(debouncedQuery);
     }
-
     const isTV = "first_air_date" in item;
     navigate(`/${isTV ? "tv" : "movie"}/${item.id}`);
-  };
+  }, [navigate, debouncedQuery, saveRecentSearch]);
 
-  const handleRecentSearchClick = (searchTerm: string) => {
+  const handleRecentSearchClick = useCallback((searchTerm: string) => {
     setQuery(searchTerm);
-  };
+  }, []);
 
-  const getTitle = (item: Movie | TVShow): string => {
-    return "title" in item ? item.title : item.name;
-  };
-
-  const getYear = (item: Movie | TVShow): string => {
-    const date = "release_date" in item ? item.release_date : item.first_air_date;
-    return date?.split("-")[0] || "";
-  };
-
-  if (userLoading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -256,44 +291,11 @@ export default function Search() {
             // Results Grid
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {filteredResults.map((item) => (
-                <div
-                  key={item.id}
+                <ResultCard
+                  key={`${item.id}-${"first_air_date" in item ? "tv" : "movie"}`}
+                  item={item}
                   onClick={() => handleItemClick(item)}
-                  className="cursor-pointer group"
-                >
-                  <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
-                    <img
-                      src={getPosterUrl(item.poster_path, "medium")}
-                      alt={getTitle(item)}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
-
-                    {/* Hover Overlay */}
-                    <div className="absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center glow-primary">
-                        <span className="text-xl">▶</span>
-                      </div>
-                    </div>
-
-                    {/* Type Badge */}
-                    <div className="absolute top-2 left-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
-                      {"title" in item ? "Movie" : "TV"}
-                    </div>
-
-                    {/* Rating Badge */}
-                    {item.vote_average > 0 && (
-                      <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
-                        ⭐ {item.vote_average.toFixed(1)}
-                      </div>
-                    )}
-                  </div>
-
-                  <h3 className="mt-2 font-medium text-sm line-clamp-1 group-hover:text-primary transition-colors">
-                    {getTitle(item)}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">{getYear(item)}</p>
-                </div>
+                />
               ))}
             </div>
           )}
