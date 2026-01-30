@@ -1,7 +1,8 @@
 // TMDB API Configuration and Service Layer
+// All API calls go through secure edge function
 
-const TMDB_API_KEY = "3010e36929a0a234b31b30b9740278e7";
-const TMDB_BASE_URL = "https://api.themoviedb.org/3";
+import { supabase } from "@/integrations/supabase/client";
+
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
 // Image size configurations
@@ -137,6 +138,24 @@ export interface Genre {
   name: string;
 }
 
+export interface WatchProvider {
+  provider_id: number;
+  provider_name: string;
+  logo_path: string;
+  display_priority: number;
+}
+
+export interface WatchProviders {
+  results: {
+    [countryCode: string]: {
+      link?: string;
+      flatrate?: WatchProvider[];
+      rent?: WatchProvider[];
+      buy?: WatchProvider[];
+    };
+  };
+}
+
 interface TMDBResponse<T> {
   page: number;
   results: T[];
@@ -144,27 +163,25 @@ interface TMDBResponse<T> {
   total_results: number;
 }
 
-// Helper function for API calls
+// Helper function for API calls via edge function
 async function fetchTMDB<T>(
   endpoint: string,
-  params: Record<string, string> = {},
+  params: Record<string, string | number | undefined> = {},
 ): Promise<T> {
-  const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
-  url.searchParams.set("api_key", TMDB_API_KEY);
-
-  Object.entries(params).forEach(([key, value]) => {
-    url.searchParams.set(key, value);
+  const { data, error } = await supabase.functions.invoke("tmdb-proxy", {
+    body: { endpoint, params },
   });
 
-  const response = await fetch(url.toString());
-
-  if (!response.ok) {
-    throw new Error(
-      `TMDB API Error: ${response.status} ${response.statusText}`,
-    );
+  if (error) {
+    console.error("TMDB API Error:", error);
+    throw new Error(`TMDB API Error: ${error.message}`);
   }
 
-  return response.json();
+  if (data.error) {
+    throw new Error(data.error);
+  }
+
+  return data;
 }
 
 // Image URL helpers
@@ -203,55 +220,60 @@ export async function getTrendingMovies(
 }
 
 export async function getPopularMovies(page = 1): Promise<TMDBResponse<Movie>> {
-  return fetchTMDB<TMDBResponse<Movie>>("/movie/popular", {
-    page: String(page),
-  });
+  return fetchTMDB<TMDBResponse<Movie>>("/movie/popular", { page });
 }
 
-export async function getTopRatedMovies(
-  page = 1,
-): Promise<TMDBResponse<Movie>> {
-  return fetchTMDB<TMDBResponse<Movie>>("/movie/top_rated", {
-    page: String(page),
-  });
+export async function getTopRatedMovies(page = 1): Promise<TMDBResponse<Movie>> {
+  return fetchTMDB<TMDBResponse<Movie>>("/movie/top_rated", { page });
 }
 
-export async function getNowPlayingMovies(
-  page = 1,
-): Promise<TMDBResponse<Movie>> {
-  return fetchTMDB<TMDBResponse<Movie>>("/movie/now_playing", {
-    page: String(page),
-  });
+export async function getNowPlayingMovies(page = 1): Promise<TMDBResponse<Movie>> {
+  return fetchTMDB<TMDBResponse<Movie>>("/movie/now_playing", { page });
 }
 
-export async function getUpcomingMovies(
-  page = 1,
-): Promise<TMDBResponse<Movie>> {
-  return fetchTMDB<TMDBResponse<Movie>>("/movie/upcoming", {
-    page: String(page),
-  });
+export async function getUpcomingMovies(page = 1): Promise<TMDBResponse<Movie>> {
+  return fetchTMDB<TMDBResponse<Movie>>("/movie/upcoming", { page });
 }
 
-// Bollywood Movies (Hindi language, India region)
-export async function getBollywoodMovies(
-  page = 1,
-): Promise<TMDBResponse<Movie>> {
+// Regional Movies
+export async function getBollywoodMovies(page = 1): Promise<TMDBResponse<Movie>> {
   return fetchTMDB<TMDBResponse<Movie>>("/discover/movie", {
     with_original_language: "hi",
     region: "IN",
     sort_by: "popularity.desc",
-    page: String(page),
+    page,
   });
 }
 
-// Hollywood Movies (English language)
-export async function getHollywoodMovies(
-  page = 1,
-): Promise<TMDBResponse<Movie>> {
+export async function getHollywoodMovies(page = 1): Promise<TMDBResponse<Movie>> {
   return fetchTMDB<TMDBResponse<Movie>>("/discover/movie", {
     with_original_language: "en",
     sort_by: "popularity.desc",
-    page: String(page),
+    page,
+  });
+}
+
+export async function getGujaratiMovies(page = 1): Promise<TMDBResponse<Movie>> {
+  return fetchTMDB<TMDBResponse<Movie>>("/discover/movie", {
+    with_original_language: "gu",
+    sort_by: "popularity.desc",
+    page,
+  });
+}
+
+export async function getTamilMovies(page = 1): Promise<TMDBResponse<Movie>> {
+  return fetchTMDB<TMDBResponse<Movie>>("/discover/movie", {
+    with_original_language: "ta",
+    sort_by: "popularity.desc",
+    page,
+  });
+}
+
+export async function getTeluguMovies(page = 1): Promise<TMDBResponse<Movie>> {
+  return fetchTMDB<TMDBResponse<Movie>>("/discover/movie", {
+    with_original_language: "te",
+    sort_by: "popularity.desc",
+    page,
   });
 }
 
@@ -260,62 +282,46 @@ export async function getMovieDetails(movieId: number): Promise<MovieDetails> {
   return fetchTMDB<MovieDetails>(`/movie/${movieId}`);
 }
 
-export async function getMovieCredits(
-  movieId: number,
-): Promise<{ cast: Cast[] }> {
+export async function getMovieCredits(movieId: number): Promise<{ cast: Cast[] }> {
   return fetchTMDB<{ cast: Cast[] }>(`/movie/${movieId}/credits`);
 }
 
-export async function getMovieVideos(
-  movieId: number,
-): Promise<{ results: Video[] }> {
+export async function getMovieVideos(movieId: number): Promise<{ results: Video[] }> {
   return fetchTMDB<{ results: Video[] }>(`/movie/${movieId}/videos`);
 }
 
-export async function getSimilarMovies(
-  movieId: number,
-): Promise<TMDBResponse<Movie>> {
+export async function getSimilarMovies(movieId: number): Promise<TMDBResponse<Movie>> {
   return fetchTMDB<TMDBResponse<Movie>>(`/movie/${movieId}/similar`);
 }
 
-export async function getMovieRecommendations(
-  movieId: number,
-): Promise<TMDBResponse<Movie>> {
+export async function getMovieRecommendations(movieId: number): Promise<TMDBResponse<Movie>> {
   return fetchTMDB<TMDBResponse<Movie>>(`/movie/${movieId}/recommendations`);
 }
 
+export async function getMovieWatchProviders(movieId: number): Promise<WatchProviders> {
+  return fetchTMDB<WatchProviders>(`/movie/${movieId}/watch/providers`);
+}
+
 // TV Show endpoints
-export async function getTrendingTVShows(
-  timeWindow: "day" | "week" = "week",
-): Promise<TVShow[]> {
-  const data = await fetchTMDB<TMDBResponse<TVShow>>(
-    `/trending/tv/${timeWindow}`,
-  );
+export async function getTrendingTVShows(timeWindow: "day" | "week" = "week"): Promise<TVShow[]> {
+  const data = await fetchTMDB<TMDBResponse<TVShow>>(`/trending/tv/${timeWindow}`);
   return data.results;
 }
 
-export async function getPopularTVShows(
-  page = 1,
-): Promise<TMDBResponse<TVShow>> {
-  return fetchTMDB<TMDBResponse<TVShow>>("/tv/popular", { page: String(page) });
+export async function getPopularTVShows(page = 1): Promise<TMDBResponse<TVShow>> {
+  return fetchTMDB<TMDBResponse<TVShow>>("/tv/popular", { page });
 }
 
-export async function getTopRatedTVShows(
-  page = 1,
-): Promise<TMDBResponse<TVShow>> {
-  return fetchTMDB<TMDBResponse<TVShow>>("/tv/top_rated", {
-    page: String(page),
-  });
+export async function getTopRatedTVShows(page = 1): Promise<TMDBResponse<TVShow>> {
+  return fetchTMDB<TMDBResponse<TVShow>>("/tv/top_rated", { page });
 }
 
 // Indian TV Shows
-export async function getIndianTVShows(
-  page = 1,
-): Promise<TMDBResponse<TVShow>> {
+export async function getIndianTVShows(page = 1): Promise<TMDBResponse<TVShow>> {
   return fetchTMDB<TMDBResponse<TVShow>>("/discover/tv", {
     with_original_language: "hi",
     sort_by: "popularity.desc",
-    page: String(page),
+    page,
   });
 }
 
@@ -324,36 +330,28 @@ export async function getTVShowDetails(tvId: number): Promise<TVShowDetails> {
   return fetchTMDB<TVShowDetails>(`/tv/${tvId}`);
 }
 
-export async function getTVShowCredits(
-  tvId: number,
-): Promise<{ cast: Cast[] }> {
+export async function getTVShowCredits(tvId: number): Promise<{ cast: Cast[] }> {
   return fetchTMDB<{ cast: Cast[] }>(`/tv/${tvId}/credits`);
 }
 
-export async function getTVShowVideos(
-  tvId: number,
-): Promise<{ results: Video[] }> {
+export async function getTVShowVideos(tvId: number): Promise<{ results: Video[] }> {
   return fetchTMDB<{ results: Video[] }>(`/tv/${tvId}/videos`);
 }
 
-export async function getSimilarTVShows(
-  tvId: number,
-): Promise<TMDBResponse<TVShow>> {
+export async function getSimilarTVShows(tvId: number): Promise<TMDBResponse<TVShow>> {
   return fetchTMDB<TMDBResponse<TVShow>>(`/tv/${tvId}/similar`);
 }
 
-export async function getTVShowRecommendations(
-  tvId: number,
-): Promise<TMDBResponse<TVShow>> {
+export async function getTVShowRecommendations(tvId: number): Promise<TMDBResponse<TVShow>> {
   return fetchTMDB<TMDBResponse<TVShow>>(`/tv/${tvId}/recommendations`);
 }
 
-// TV Season Details with Episodes
-export async function getTVSeasonDetails(
-  tvId: number,
-  seasonNumber: number,
-): Promise<SeasonDetails> {
+export async function getTVSeasonDetails(tvId: number, seasonNumber: number): Promise<SeasonDetails> {
   return fetchTMDB<SeasonDetails>(`/tv/${tvId}/season/${seasonNumber}`);
+}
+
+export async function getTVWatchProviders(tvId: number): Promise<WatchProviders> {
+  return fetchTMDB<WatchProviders>(`/tv/${tvId}/watch/providers`);
 }
 
 // Get still image URL for episodes
@@ -366,35 +364,26 @@ export function getStillUrl(
 }
 
 // Search
-export async function searchMulti(
-  query: string,
-  page = 1,
-): Promise<TMDBResponse<Movie | TVShow>> {
+export async function searchMulti(query: string, page = 1): Promise<TMDBResponse<Movie | TVShow>> {
   return fetchTMDB<TMDBResponse<Movie | TVShow>>("/search/multi", {
     query,
-    page: String(page),
+    page,
     include_adult: "false",
   });
 }
 
-export async function searchMovies(
-  query: string,
-  page = 1,
-): Promise<TMDBResponse<Movie>> {
+export async function searchMovies(query: string, page = 1): Promise<TMDBResponse<Movie>> {
   return fetchTMDB<TMDBResponse<Movie>>("/search/movie", {
     query,
-    page: String(page),
+    page,
     include_adult: "false",
   });
 }
 
-export async function searchTVShows(
-  query: string,
-  page = 1,
-): Promise<TMDBResponse<TVShow>> {
+export async function searchTVShows(query: string, page = 1): Promise<TMDBResponse<TVShow>> {
   return fetchTMDB<TMDBResponse<TVShow>>("/search/tv", {
     query,
-    page: String(page),
+    page,
     include_adult: "false",
   });
 }
@@ -421,38 +410,29 @@ export interface DiscoverFilters {
   "vote_average.gte"?: string;
 }
 
-export async function discoverMovies(
-  filters: DiscoverFilters = {},
-): Promise<TMDBResponse<Movie>> {
-  const params: Record<string, string> = {
-    page: String(filters.page || 1),
+export async function discoverMovies(filters: DiscoverFilters = {}): Promise<TMDBResponse<Movie>> {
+  const params: Record<string, string | number | undefined> = {
+    page: filters.page || 1,
     sort_by: filters.sort_by || "popularity.desc",
   };
 
   if (filters.with_genres) params.with_genres = filters.with_genres;
-  if (filters.with_original_language)
-    params.with_original_language = filters.with_original_language;
-  if (filters["primary_release_date.gte"])
-    params["primary_release_date.gte"] = filters["primary_release_date.gte"];
-  if (filters["primary_release_date.lte"])
-    params["primary_release_date.lte"] = filters["primary_release_date.lte"];
-  if (filters["vote_average.gte"])
-    params["vote_average.gte"] = filters["vote_average.gte"];
+  if (filters.with_original_language) params.with_original_language = filters.with_original_language;
+  if (filters["primary_release_date.gte"]) params["primary_release_date.gte"] = filters["primary_release_date.gte"];
+  if (filters["primary_release_date.lte"]) params["primary_release_date.lte"] = filters["primary_release_date.lte"];
+  if (filters["vote_average.gte"]) params["vote_average.gte"] = filters["vote_average.gte"];
 
   return fetchTMDB<TMDBResponse<Movie>>("/discover/movie", params);
 }
 
-export async function discoverTVShows(
-  filters: DiscoverFilters = {},
-): Promise<TMDBResponse<TVShow>> {
-  const params: Record<string, string> = {
-    page: String(filters.page || 1),
+export async function discoverTVShows(filters: DiscoverFilters = {}): Promise<TMDBResponse<TVShow>> {
+  const params: Record<string, string | number | undefined> = {
+    page: filters.page || 1,
     sort_by: filters.sort_by || "popularity.desc",
   };
 
   if (filters.with_genres) params.with_genres = filters.with_genres;
-  if (filters.with_original_language)
-    params.with_original_language = filters.with_original_language;
+  if (filters.with_original_language) params.with_original_language = filters.with_original_language;
 
   return fetchTMDB<TMDBResponse<TVShow>>("/discover/tv", params);
 }
@@ -499,4 +479,28 @@ export function getLanguageLabel(langCode: string): string {
     gu: "Gujarati",
   };
   return languages[langCode] || langCode.toUpperCase();
+}
+
+// Get language badge class
+export function getLanguageBadgeClass(langCode: string): string {
+  switch (langCode) {
+    case "hi":
+      return "badge-hindi";
+    case "en":
+      return "badge-english";
+    case "ta":
+      return "badge-tamil";
+    case "te":
+      return "badge-telugu";
+    case "gu":
+      return "badge-gujarati";
+    default:
+      return "bg-muted";
+  }
+}
+
+// Get provider logo URL
+export function getProviderLogoUrl(path: string | null): string {
+  if (!path) return "/placeholder.svg";
+  return `${TMDB_IMAGE_BASE}/w92${path}`;
 }

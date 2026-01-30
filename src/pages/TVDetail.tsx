@@ -1,20 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useUser } from "@/contexts/UserContext";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserData } from "@/hooks/useUserData";
 import {
   getTVShowDetails,
   getTVShowCredits,
   getTVShowVideos,
   getSimilarTVShows,
   getTVSeasonDetails,
+  getTVWatchProviders,
   getBackdropUrl,
   getPosterUrl,
-  getProfileUrl,
   getStillUrl,
   getYouTubeTrailerUrl,
   getLanguageLabel,
-  TVShowDetails,
+  getLanguageBadgeClass,
   TVShow,
   Episode,
 } from "@/lib/tmdb";
@@ -22,6 +23,8 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
 import ContentCarousel from "@/components/ContentCarousel";
+import WhereToWatch from "@/components/WhereToWatch";
+import CastList from "@/components/CastList";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -41,10 +44,13 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+const MemoizedCarousel = memo(ContentCarousel);
+
 export default function TVDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, isLoading: userLoading, addToWatchHistory, isWatched, toggleLike, isLiked } = useUser();
+  const { user, isLoading: authLoading } = useAuth();
+  const { addToWatchHistory, isWatched, toggleLike, isLiked } = useUserData();
   const [showTrailer, setShowTrailer] = useState(false);
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
   const [expandedEpisode, setExpandedEpisode] = useState<number | null>(null);
@@ -53,10 +59,10 @@ export default function TVDetail() {
 
   // Redirect if no user
   useEffect(() => {
-    if (!userLoading && !user) {
+    if (!authLoading && !user) {
       navigate("/");
     }
-  }, [user, userLoading, navigate]);
+  }, [user, authLoading, navigate]);
 
   // Fetch TV show details
   const { data: tvShow, isLoading: tvLoading } = useQuery({
@@ -93,6 +99,13 @@ export default function TVDetail() {
     enabled: !!tvId && selectedSeason > 0,
   });
 
+  // Fetch watch providers
+  const { data: watchProvidersData } = useQuery({
+    queryKey: ["tv-watch-providers", tvId],
+    queryFn: () => getTVWatchProviders(tvId),
+    enabled: !!tvId,
+  });
+
   // Update selected season when TV show loads
   useEffect(() => {
     if (tvShow?.seasons) {
@@ -103,31 +116,35 @@ export default function TVDetail() {
     }
   }, [tvShow]);
 
-  const cast = creditsData?.cast.slice(0, 10) || [];
+  const cast = creditsData?.cast.slice(0, 12) || [];
   const trailerUrl = videosData ? getYouTubeTrailerUrl(videosData.results) : null;
   
   // Filter out "Specials" (season 0) from seasons list
   const seasons = tvShow?.seasons?.filter((s) => s.season_number > 0) || [];
 
-  const handleMarkWatched = () => {
+  // Get providers for IN (India) or US as fallback
+  const providers = watchProvidersData?.results?.IN || watchProvidersData?.results?.US || null;
+  const watchLink = providers?.link;
+
+  const handleMarkWatched = async () => {
     if (!tvShow) return;
-    addToWatchHistory({
-      id: tvShow.id,
-      type: "tv",
+    await addToWatchHistory({
+      content_id: tvShow.id,
+      content_type: "tv",
       title: tvShow.name,
-      posterPath: tvShow.poster_path,
+      poster_path: tvShow.poster_path,
       genres: tvShow.genres.map((g) => g.id),
       language: tvShow.original_language,
     });
   };
 
-  const handleToggleLike = () => {
+  const handleToggleLike = async () => {
     if (!tvShow) return;
-    toggleLike({
-      id: tvShow.id,
-      type: "tv",
+    await toggleLike({
+      content_id: tvShow.id,
+      content_type: "tv",
       title: tvShow.name,
-      posterPath: tvShow.poster_path,
+      poster_path: tvShow.poster_path,
     });
   };
 
@@ -138,7 +155,7 @@ export default function TVDetail() {
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
 
-  if (userLoading || tvLoading) {
+  if (authLoading || tvLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
@@ -164,7 +181,9 @@ export default function TVDetail() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <p className="text-xl text-muted-foreground mb-4">TV Show not found</p>
-          <Button onClick={() => navigate(-1)}>Go Back</Button>
+          <Button onClick={() => navigate(-1)} className="bg-primary hover:bg-primary/90">
+            Go Back
+          </Button>
         </div>
       </div>
     );
@@ -237,11 +256,7 @@ export default function TVDetail() {
 
             {/* Meta Info */}
             <div className="flex flex-wrap items-center gap-3 mb-6">
-              <Badge
-                className={cn(
-                  tvShow.original_language === "hi" ? "badge-hindi" : "badge-english"
-                )}
-              >
+              <Badge className={getLanguageBadgeClass(tvShow.original_language)}>
                 <Globe className="w-3 h-3 mr-1" />
                 {getLanguageLabel(tvShow.original_language)}
               </Badge>
@@ -272,12 +287,12 @@ export default function TVDetail() {
               ))}
             </div>
 
-            {/* Action Buttons */}
+            {/* Action Buttons - Red Primary */}
             <div className="flex flex-wrap gap-3 mb-8">
               {trailerUrl && (
                 <Button
                   size="lg"
-                  className="bg-primary hover:bg-primary/90 glow-primary"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
                   onClick={() => setShowTrailer(true)}
                 >
                   <Play className="w-5 h-5 mr-2 fill-current" />
@@ -308,27 +323,11 @@ export default function TVDetail() {
               <p className="text-muted-foreground leading-relaxed">{tvShow.overview}</p>
             </div>
 
+            {/* Where to Watch */}
+            <WhereToWatch providers={providers} link={watchLink} />
+
             {/* Cast */}
-            {cast.length > 0 && (
-              <div className="mb-8">
-                <h2 className="text-xl font-semibold mb-4">Top Cast</h2>
-                <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
-                  {cast.map((actor) => (
-                    <div key={actor.id} className="flex-shrink-0 text-center">
-                      <img
-                        src={getProfileUrl(actor.profile_path, "medium")}
-                        alt={actor.name}
-                        className="w-20 h-20 rounded-full object-cover mx-auto mb-2"
-                      />
-                      <p className="text-sm font-medium line-clamp-1 w-20">{actor.name}</p>
-                      <p className="text-xs text-muted-foreground line-clamp-1 w-20">
-                        {actor.character}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <CastList cast={cast} />
           </div>
         </div>
 
@@ -390,6 +389,7 @@ export default function TVDetail() {
                                 src={getStillUrl(episode.still_path)}
                                 alt={episode.name}
                                 className="w-32 sm:w-40 h-20 sm:h-24 object-cover rounded"
+                                loading="lazy"
                               />
                               {episode.runtime && (
                                 <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-background/80 rounded text-xs flex items-center gap-1">
@@ -457,7 +457,7 @@ export default function TVDetail() {
         {/* Similar TV Shows */}
         {similarData && similarData.results.length > 0 && (
           <div className="mt-12">
-            <ContentCarousel
+            <MemoizedCarousel
               title="Similar TV Shows"
               items={similarData.results as TVShow[]}
               isLoading={similarLoading}

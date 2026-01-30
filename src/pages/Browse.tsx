@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, memo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useUser } from "@/contexts/UserContext";
+import { useAuth } from "@/hooks/useAuth";
 import {
   discoverMovies,
   discoverTVShows,
@@ -13,6 +13,7 @@ import {
   TVShow,
   Genre,
   getPosterUrl,
+  getLanguageBadgeClass,
 } from "@/lib/tmdb";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -22,7 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
-type ContentType = "all" | "bollywood" | "hollywood" | "tv" | "now_playing" | "upcoming";
+type ContentType = "all" | "bollywood" | "hollywood" | "gujarati" | "tamil" | "telugu" | "tv" | "now_playing" | "upcoming";
 type SortOption = "popularity.desc" | "vote_average.desc" | "release_date.desc" | "revenue.desc";
 
 const sortOptions: { value: SortOption; label: string }[] = [
@@ -36,8 +37,67 @@ const sortOptions: { value: SortOption; label: string }[] = [
 const currentYear = new Date().getFullYear();
 const yearOptions = Array.from({ length: currentYear - 1949 }, (_, i) => currentYear - i);
 
+// Language code mapping
+const languageMap: Record<string, string> = {
+  bollywood: "hi",
+  hollywood: "en",
+  gujarati: "gu",
+  tamil: "ta",
+  telugu: "te",
+};
+
+const PosterCard = memo(({ item, onClick }: { item: Movie | TVShow; onClick: () => void }) => {
+  const getTitle = (item: Movie | TVShow): string => {
+    return "title" in item ? item.title : item.name;
+  };
+
+  const getYear = (item: Movie | TVShow): string => {
+    const date = "release_date" in item ? item.release_date : item.first_air_date;
+    return date?.split("-")[0] || "";
+  };
+
+  return (
+    <div onClick={onClick} className="cursor-pointer group">
+      <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
+        <img
+          src={getPosterUrl(item.poster_path, "medium")}
+          alt={getTitle(item)}
+          className="w-full h-full object-cover"
+          loading="lazy"
+        />
+
+        {/* Hover Overlay */}
+        <div className="absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+          <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
+            <span className="text-xl text-primary-foreground">▶</span>
+          </div>
+        </div>
+
+        {/* Rating Badge */}
+        {item.vote_average > 0 && (
+          <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
+            ⭐ {item.vote_average.toFixed(1)}
+          </div>
+        )}
+
+        {/* Language Badge */}
+        <div className={cn("absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold", getLanguageBadgeClass(item.original_language))}>
+          {item.original_language.toUpperCase()}
+        </div>
+      </div>
+
+      <h3 className="mt-2 font-medium text-sm line-clamp-1 group-hover:text-primary transition-colors">
+        {getTitle(item)}
+      </h3>
+      <p className="text-xs text-muted-foreground">{getYear(item)}</p>
+    </div>
+  );
+});
+
+PosterCard.displayName = "PosterCard";
+
 export default function Browse() {
-  const { user, isLoading: userLoading } = useUser();
+  const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -53,16 +113,16 @@ export default function Browse() {
 
   // Redirect if no user
   useEffect(() => {
-    if (!userLoading && !user) {
+    if (!authLoading && !user) {
       navigate("/");
     }
-  }, [user, userLoading, navigate]);
+  }, [user, authLoading, navigate]);
 
   // Fetch genres
   const { data: movieGenres } = useQuery({
     queryKey: ["movie-genres"],
     queryFn: getMovieGenres,
-    staleTime: 1000 * 60 * 60, // 1 hour
+    staleTime: 1000 * 60 * 60,
   });
 
   const { data: tvGenres } = useQuery({
@@ -98,11 +158,12 @@ export default function Browse() {
         filters["primary_release_date.lte"] = `${selectedYear}-12-31`;
       }
 
+      // Handle regional content
+      if (languageMap[contentType]) {
+        return discoverMovies({ ...filters, with_original_language: languageMap[contentType] });
+      }
+
       switch (contentType) {
-        case "bollywood":
-          return discoverMovies({ ...filters, with_original_language: "hi" });
-        case "hollywood":
-          return discoverMovies({ ...filters, with_original_language: "en" });
         case "tv":
           return discoverTVShows(filters);
         default:
@@ -111,6 +172,25 @@ export default function Browse() {
     },
     staleTime: 1000 * 60 * 5,
   });
+
+  // Filter content based on date for special categories
+  const filteredContent = useMemo(() => {
+    if (!contentData?.results) return [];
+    
+    const today = new Date().toISOString().split("T")[0];
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split("T")[0];
+
+    if (contentType === "now_playing") {
+      return contentData.results.filter((movie: Movie) => movie.release_date <= today);
+    }
+    if (contentType === "upcoming") {
+      return contentData.results.filter((movie: Movie) => movie.release_date >= tomorrowStr);
+    }
+    
+    return contentData.results;
+  }, [contentData, contentType]);
 
   // Update URL params
   useEffect(() => {
@@ -127,19 +207,10 @@ export default function Browse() {
     navigate(`/${isTV ? "tv" : "movie"}/${item.id}`);
   };
 
-  const getTitle = (item: Movie | TVShow): string => {
-    return "title" in item ? item.title : item.name;
-  };
-
-  const getYear = (item: Movie | TVShow): string => {
-    const date = "release_date" in item ? item.release_date : item.first_air_date;
-    return date?.split("-")[0] || "";
-  };
-
   // Check if year/genre/sort filters should be disabled
   const isSpecialCategory = contentType === "now_playing" || contentType === "upcoming";
 
-  if (userLoading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -175,6 +246,9 @@ export default function Browse() {
                   <TabsTrigger value="upcoming">🗓️ Upcoming</TabsTrigger>
                   <TabsTrigger value="bollywood">🇮🇳 Bollywood</TabsTrigger>
                   <TabsTrigger value="hollywood">🎬 Hollywood</TabsTrigger>
+                  <TabsTrigger value="tamil">🎭 Tamil</TabsTrigger>
+                  <TabsTrigger value="telugu">🌟 Telugu</TabsTrigger>
+                  <TabsTrigger value="gujarati">🎪 Gujarati</TabsTrigger>
                   <TabsTrigger value="tv">📺 TV Series</TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -262,56 +336,21 @@ export default function Browse() {
           ) : (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {contentData?.results.map((item) => (
-                  <div
+                {filteredContent.map((item) => (
+                  <PosterCard
                     key={item.id}
+                    item={item}
                     onClick={() => handleItemClick(item)}
-                    className="cursor-pointer group"
-                  >
-                    <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
-                      <img
-                        src={getPosterUrl(item.poster_path, "medium")}
-                        alt={getTitle(item)}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-
-                      {/* Hover Overlay */}
-                      <div className="absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center glow-primary">
-                          <span className="text-xl">▶</span>
-                        </div>
-                      </div>
-
-                      {/* Rating Badge */}
-                      {item.vote_average > 0 && (
-                        <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
-                          ⭐ {item.vote_average.toFixed(1)}
-                        </div>
-                      )}
-
-                      {/* Language Badge */}
-                      <div
-                        className={cn(
-                          "absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold",
-                          item.original_language === "hi"
-                            ? "badge-hindi"
-                            : item.original_language === "en"
-                            ? "badge-english"
-                            : "bg-muted"
-                        )}
-                      >
-                        {item.original_language === "hi" ? "HI" : item.original_language.toUpperCase()}
-                      </div>
-                    </div>
-
-                    <h3 className="mt-2 font-medium text-sm line-clamp-1 group-hover:text-primary transition-colors">
-                      {getTitle(item)}
-                    </h3>
-                    <p className="text-xs text-muted-foreground">{getYear(item)}</p>
-                  </div>
+                  />
                 ))}
               </div>
+
+              {/* Empty State */}
+              {filteredContent.length === 0 && (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">No content found for the selected filters.</p>
+                </div>
+              )}
 
               {/* Pagination */}
               {contentData && contentData.total_pages > 1 && (
