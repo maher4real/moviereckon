@@ -53,7 +53,7 @@ export default function ContentCarousel({
   return (
     <section className="px-4 md:px-8">
       {/* Title */}
-      <h2 className="text-xl md:text-2xl font-bold mb-4">{title}</h2>
+      {title && <h2 className="text-xl md:text-2xl font-bold mb-4">{title}</h2>}
 
       {/* Carousel Container */}
       <div className="relative group">
