@@ -83,7 +83,7 @@ export default function HeroBanner({
             <div className="flex flex-wrap gap-3">
               <Button
                 size="lg"
-                className="bg-primary hover:bg-primary/90 glow-primary font-semibold"
+                className="bg-primary hover:bg-primary/90 glow-primary font-semibold text-primary-foreground"
                 onClick={() => navigate(`/movie/${movie.id}`)}
               >
                 <Play className="w-5 h-5 mr-2 fill-current" />
@@ -91,8 +91,8 @@ export default function HeroBanner({
               </Button>
               <Button
                 size="lg"
-                variant="outline"
-                className="border-foreground/30 hover:bg-foreground/10"
+                variant="secondary"
+                className="font-semibold"
                 onClick={() => navigate(`/movie/${movie.id}`)}
               >
                 <Info className="w-5 h-5 mr-2" />

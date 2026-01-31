@@ -135,6 +135,23 @@
     box-shadow: 0 0 20px hsl(var(--secondary) / 0.3);
   }
 
+  /* Button hierarchy - Primary is red, Secondary is blue, Tertiary is outline */
+  .btn-primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90;
+  }
+
+  .btn-secondary {
+    @apply bg-secondary text-secondary-foreground hover:bg-secondary/90;
+  }
+
+  .btn-tertiary {
+    @apply bg-muted text-muted-foreground hover:bg-muted/80;
+  }
+
+  .btn-success {
+    @apply bg-emerald-600 text-white hover:bg-emerald-700;
+  }
+
   /* Hide scrollbar for carousels */
   .scrollbar-hide {
     -ms-overflow-style: none;

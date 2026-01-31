@@ -83,7 +83,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
           .from("user_preferences")
           .select("*")
           .eq("user_id", user.id)
-          .single(),
+          .maybeSingle(),
       ]);
 
       if (historyRes.data) setWatchHistory(historyRes.data as WatchedItem[]);

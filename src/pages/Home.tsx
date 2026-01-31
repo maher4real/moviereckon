@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, memo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserData } from "@/hooks/useUserData";
+import { useRecommendations } from "@/hooks/useRecommendations";
 import { useNavigate } from "react-router-dom";
 import {
   getTrendingMovies,
@@ -22,6 +23,7 @@ import BottomNav from "@/components/BottomNav";
 import HeroBanner from "@/components/HeroBanner";
 import ContentCarousel from "@/components/ContentCarousel";
 import Footer from "@/components/Footer";
+import { Sparkles } from "lucide-react";
 
 // Memoized carousel for performance
 const MemoizedCarousel = memo(ContentCarousel);
@@ -29,6 +31,7 @@ const MemoizedCarousel = memo(ContentCarousel);
 export default function Home() {
   const { user, isLoading: authLoading, profile } = useAuth();
   const { watchHistory, isLoading: dataLoading } = useUserData();
+  const { items: reckonItems, isLoading: reckonLoading, isPersonalized } = useRecommendations();
   const navigate = useNavigate();
   const [heroIndex, setHeroIndex] = useState(0);
 
@@ -188,8 +191,31 @@ export default function Home() {
       {/* Content Sections */}
       <main className="relative z-10 -mt-32 pb-20">
         <div className="space-y-8">
+          {/* Reckon - Personalized Recommendations */}
+          {reckonItems.length > 0 && (
+            <section className="px-4 md:px-8">
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles className="w-6 h-6 text-primary" />
+                <h2 className="text-xl md:text-2xl font-bold">
+                  {isPersonalized ? "Reckon For You" : "Reckon - Top Picks"}
+                </h2>
+                {isPersonalized && (
+                  <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-xs font-medium">
+                    Personalized
+                  </span>
+                )}
+              </div>
+              <MemoizedCarousel
+                title=""
+                items={reckonItems as (Movie | TVShow)[]}
+                isLoading={reckonLoading}
+                type="mixed"
+              />
+            </section>
+          )}
+
           {/* Now Playing - Only movies released today or earlier */}
-          {filteredNowPlaying.length > 0 && (
+          {(filteredNowPlaying.length > 0 || nowPlayingLoading) && (
             <MemoizedCarousel
               title="🎬 Now Playing in Theaters"
               items={filteredNowPlaying as (Movie | TVShow)[]}
@@ -199,7 +225,7 @@ export default function Home() {
           )}
 
           {/* Upcoming - Only movies releasing tomorrow or later */}
-          {filteredUpcoming.length > 0 && (
+          {(filteredUpcoming.length > 0 || upcomingLoading) && (
             <MemoizedCarousel
               title="🗓️ Coming Soon"
               items={filteredUpcoming as (Movie | TVShow)[]}
