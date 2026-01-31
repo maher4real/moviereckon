@@ -1,4 +1,5 @@
-// MovieReckon App - Netflix-inspired movie recommendation platform
+// MovieReckon - Netflix-inspired movie recommendation platform
+// Version: 2.0.0 - Rebuilt with Lovable Cloud backend
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
