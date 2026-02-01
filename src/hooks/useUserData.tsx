@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { useAuth } from "./useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/backendClient";
 import { useToast } from "@/hooks/use-toast";
 
 export interface WatchedItem {
