@@ -287,12 +287,12 @@ export default function TVDetail() {
               ))}
             </div>
 
-            {/* Action Buttons - Red Primary */}
+            {/* Action Buttons - All using primary red color */}
             <div className="flex flex-wrap gap-3 mb-8">
               {trailerUrl && (
                 <Button
                   size="lg"
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground action-btn"
                   onClick={() => setShowTrailer(true)}
                 >
                   <Play className="w-5 h-5 mr-2 fill-current" />
@@ -301,18 +301,28 @@ export default function TVDetail() {
               )}
               <Button
                 size="lg"
-                variant={watched ? "secondary" : "outline"}
+                className={cn(
+                  "action-btn",
+                  watched
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "bg-muted text-foreground hover:bg-primary/20 hover:text-primary"
+                )}
                 onClick={handleMarkWatched}
               >
-                <Check className={cn("w-5 h-5 mr-2", watched && "text-green-500")} />
+                <Check className="w-5 h-5 mr-2" />
                 {watched ? "Watched" : "Mark as Watched"}
               </Button>
               <Button
                 size="lg"
-                variant={liked ? "secondary" : "outline"}
+                className={cn(
+                  "action-btn",
+                  liked
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "bg-muted text-foreground hover:bg-primary/20 hover:text-primary"
+                )}
                 onClick={handleToggleLike}
               >
-                <Heart className={cn("w-5 h-5 mr-2", liked && "fill-primary text-primary")} />
+                <Heart className={cn("w-5 h-5 mr-2", liked && "fill-current")} />
                 {liked ? "Liked" : "Like"}
               </Button>
             </div>

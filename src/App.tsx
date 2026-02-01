@@ -1,5 +1,5 @@
 // MovieReckon - Netflix-inspired movie recommendation platform
-// Version: 2.0.0 - Rebuilt with Lovable Cloud backend
+// Version: 2.1.0 - Enhanced recommendations and UI polish
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,6 +15,7 @@ import Search from "./pages/Search";
 import MovieDetail from "./pages/MovieDetail";
 import TVDetail from "./pages/TVDetail";
 import Profile from "./pages/Profile";
+import Reckon from "./pages/Reckon";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -49,6 +50,7 @@ const App = () => (
                 <Route path="/movie/:id" element={<MovieDetail />} />
                 <Route path="/tv/:id" element={<TVDetail />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/reckon" element={<Reckon />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

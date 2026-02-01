@@ -194,16 +194,24 @@ export default function Home() {
           {/* Reckon - Personalized Recommendations */}
           {reckonItems.length > 0 && (
             <section className="px-4 md:px-8">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="w-6 h-6 text-primary" />
-                <h2 className="text-xl md:text-2xl font-bold">
-                  {isPersonalized ? "Reckon For You" : "Reckon - Top Picks"}
-                </h2>
-                {isPersonalized && (
-                  <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-xs font-medium">
-                    Personalized
-                  </span>
-                )}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-6 h-6 text-primary" />
+                  <h2 className="text-xl md:text-2xl font-bold">
+                    {isPersonalized ? "Reckon For You" : "Reckon - Top Picks"}
+                  </h2>
+                  {isPersonalized && (
+                    <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-xs font-medium">
+                      Personalized
+                    </span>
+                  )}
+                </div>
+                <a
+                  href="/reckon"
+                  className="text-sm text-primary hover:underline transition-colors"
+                >
+                  View All →
+                </a>
               </div>
               <MemoizedCarousel
                 title=""

@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { Film, Search, Menu, X, User, Home, Grid, Tv, Clapperboard, LogOut } from "lucide-react";
+import { Film, Search, Menu, X, User, Home, Grid, Tv, Clapperboard, LogOut, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +23,7 @@ export default function Header() {
 
   const navLinks = [
     { href: "/home", label: "Home", icon: Home },
+    { href: "/reckon", label: "Reckon", icon: Sparkles },
     { href: "/browse?type=all", label: "Movies", icon: Clapperboard },
     { href: "/browse", label: "Browse", icon: Grid },
     { href: "/browse?type=tv", label: "TV Series", icon: Tv },

@@ -91,16 +91,16 @@ function ContentCardComponent({ item, type, showActions = true }: ContentCardPro
           </div>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons - Red themed for consistency */}
         {showActions && (
-          <div className="absolute bottom-2 left-2 right-2 flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
+          <div className="absolute bottom-2 left-2 right-2 flex gap-1 opacity-0 group-hover/card:opacity-100 transition-all duration-200">
             <button
               onClick={handleWatched}
               className={cn(
-                "flex-1 py-1.5 rounded text-xs font-medium flex items-center justify-center gap-1 transition-colors",
+                "flex-1 py-1.5 rounded text-xs font-medium flex items-center justify-center gap-1 action-btn",
                 watched
                   ? "bg-primary text-primary-foreground"
-                  : "bg-background/80 text-foreground hover:bg-background"
+                  : "bg-background/80 text-foreground hover:bg-primary/20 hover:text-primary"
               )}
               title={watched ? "Watched" : "Mark as watched"}
             >
@@ -110,10 +110,10 @@ function ContentCardComponent({ item, type, showActions = true }: ContentCardPro
             <button
               onClick={handleLike}
               className={cn(
-                "p-1.5 rounded transition-colors",
+                "p-1.5 rounded action-btn",
                 liked
-                  ? "bg-destructive text-destructive-foreground"
-                  : "bg-background/80 text-foreground hover:bg-background"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-background/80 text-foreground hover:bg-primary/20 hover:text-primary"
               )}
               title={liked ? "Unlike" : "Like"}
             >
