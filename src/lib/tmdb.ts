@@ -1,7 +1,7 @@
 // TMDB API Configuration and Service Layer
 // All API calls go through secure edge function
 
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/backendClient";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 

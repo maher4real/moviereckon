@@ -52,23 +52,6 @@ function renderFatal(message: string, details?: Record<string, unknown>) {
     return;
   }
 
-  const env = {
-    VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
-    VITE_SUPABASE_PUBLISHABLE_KEY: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-    MODE: import.meta.env.MODE,
-  };
-
-  // If env vars are missing, importing App will crash immediately because the backend client
-  // is initialized at module import time.
-  if (!env.VITE_SUPABASE_URL || !env.VITE_SUPABASE_PUBLISHABLE_KEY) {
-    renderFatal("Backend configuration is missing in this build.", {
-      hasUrl: !!env.VITE_SUPABASE_URL,
-      hasKey: !!env.VITE_SUPABASE_PUBLISHABLE_KEY,
-      mode: env.MODE,
-    });
-    return;
-  }
-
   try {
     const mod = await import("./App.tsx");
     const App = mod.default;
