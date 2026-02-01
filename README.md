@@ -1,9 +1,10 @@
-<img width="1728" height="909" alt="Screenshot 2026-02-01 at 5 44 16 pm" src="https://github.com/user-attachments/assets/66ac84f0-389f-4754-9c8d-1ab7040daedd" /># 🎬 MovieReckon
+# 🎬 MovieReckon
 
 **Live Demo:** https://moviereckon.vercel.app/
 
 MovieReckon is a **personalized movie & TV series discovery web app** that offers Netflix-style recommendations, dynamic content filtering, and user-driven recommendations based on watch history and interactions.
 <img width="1724" height="911" alt="Screenshot 2026-02-01 at 5 43 09 pm" src="https://github.com/user-attachments/assets/b8aa225c-b976-4e23-827d-ff873c3f27be" />
+<img width="1728" height="909" alt="Screenshot 2026-02-01 at 5 44 16 pm" src="https://github.com/user-attachments/assets/66ac84f0-389f-4754-9c8d-1ab7040daedd" />
 <img width="1728" height="913" alt="Screenshot 2026-02-01 at 5 43 51 pm" src="https://github.com/user-attachments/assets/ed6774e4-a748-4ff8-aa79-b36d1a2ecf88" />
 <img width="1728" height="897" alt="Screenshot 2026-02-01 at 5 46 48 pm" src="https://github.com/user-attachments/assets/e477b6cf-e998-44a9-abac-8c788b8919bc" />
 <img width="1728" height="909" alt="Screenshot 2026-02-01 at 5 44 16 pm" src="https://github.com/user-attachments/assets/8729ccaa-a51c-4753-8a4d-aa8f4969cb70" />
