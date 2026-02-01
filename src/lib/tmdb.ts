@@ -407,7 +407,8 @@ export interface DiscoverFilters {
   sort_by?: string;
   "primary_release_date.gte"?: string;
   "primary_release_date.lte"?: string;
-  "vote_average.gte"?: string;
+  "vote_average.gte"?: string | number;
+  "vote_count.gte"?: string | number;
 }
 
 export async function discoverMovies(filters: DiscoverFilters = {}): Promise<TMDBResponse<Movie>> {
@@ -421,6 +422,7 @@ export async function discoverMovies(filters: DiscoverFilters = {}): Promise<TMD
   if (filters["primary_release_date.gte"]) params["primary_release_date.gte"] = filters["primary_release_date.gte"];
   if (filters["primary_release_date.lte"]) params["primary_release_date.lte"] = filters["primary_release_date.lte"];
   if (filters["vote_average.gte"]) params["vote_average.gte"] = filters["vote_average.gte"];
+  if (filters["vote_count.gte"]) params["vote_count.gte"] = filters["vote_count.gte"];
 
   return fetchTMDB<TMDBResponse<Movie>>("/discover/movie", params);
 }

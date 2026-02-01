@@ -24,14 +24,19 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 type ContentType = "all" | "bollywood" | "hollywood" | "gujarati" | "tamil" | "telugu" | "tv" | "now_playing" | "upcoming";
-type SortOption = "popularity.desc" | "vote_average.desc" | "release_date.desc" | "revenue.desc";
+type SortOption = "popularity.desc" | "popularity.asc" | "vote_average.desc" | "vote_average.asc" | "release_date.desc" | "release_date.asc" | "revenue.desc";
 
 const sortOptions: { value: SortOption; label: string }[] = [
   { value: "popularity.desc", label: "Most Popular" },
+  { value: "popularity.asc", label: "Least Popular" },
   { value: "vote_average.desc", label: "Top Rated" },
+  { value: "vote_average.asc", label: "Lowest Rated" },
   { value: "release_date.desc", label: "Newest First" },
+  { value: "release_date.asc", label: "Oldest First" },
   { value: "revenue.desc", label: "Highest Grossing" },
 ];
+
+const ITEMS_PER_PAGE_OPTIONS = [12, 24, 36, 48];
 
 // Generate year options from current year to 1950
 const currentYear = new Date().getFullYear();
@@ -109,7 +114,10 @@ export default function Browse() {
   const [sortBy, setSortBy] = useState<SortOption>(
     (searchParams.get("sort") as SortOption) || "popularity.desc"
   );
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
+  const [itemsPerPage, setItemsPerPage] = useState(
+    Number(searchParams.get("perPage")) || 24
+  );
 
   // Redirect if no user
   useEffect(() => {
@@ -192,15 +200,17 @@ export default function Browse() {
     return contentData.results;
   }, [contentData, contentType]);
 
-  // Update URL params
+  // Update URL params - include page and perPage
   useEffect(() => {
     const params = new URLSearchParams();
     if (contentType !== "all") params.set("type", contentType);
     if (selectedGenre) params.set("genre", selectedGenre);
     if (selectedYear) params.set("year", selectedYear);
     if (sortBy !== "popularity.desc") params.set("sort", sortBy);
+    if (page > 1) params.set("page", String(page));
+    if (itemsPerPage !== 24) params.set("perPage", String(itemsPerPage));
     setSearchParams(params, { replace: true });
-  }, [contentType, selectedGenre, selectedYear, sortBy, setSearchParams]);
+  }, [contentType, selectedGenre, selectedYear, sortBy, page, itemsPerPage, setSearchParams]);
 
   const handleItemClick = (item: Movie | TVShow) => {
     const isTV = "first_air_date" in item;
@@ -312,9 +322,29 @@ export default function Browse() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border z-50">
-                  {sortOptions.map((option) => (
+                {sortOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Items per page */}
+              <Select
+                value={String(itemsPerPage)}
+                onValueChange={(value) => {
+                  setItemsPerPage(Number(value));
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className="w-[120px] sm:w-[140px] bg-card">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border-border z-50">
+                  {ITEMS_PER_PAGE_OPTIONS.map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n} per page
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -354,24 +384,40 @@ export default function Browse() {
 
               {/* Pagination */}
               {contentData && contentData.total_pages > 1 && (
-                <div className="flex justify-center gap-2 mt-8">
-                  <Button
-                    variant="outline"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                  >
-                    Previous
-                  </Button>
-                  <span className="flex items-center px-4 text-sm text-muted-foreground">
-                    Page {page} of {Math.min(contentData.total_pages, 500)}
-                  </span>
-                  <Button
-                    variant="outline"
-                    onClick={() => setPage((p) => p + 1)}
-                    disabled={page >= Math.min(contentData.total_pages, 500)}
-                  >
-                    Next
-                  </Button>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8">
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setPage(1)}
+                      disabled={page === 1}
+                    >
+                      First
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                    >
+                      Previous
+                    </Button>
+                    <span className="flex items-center px-4 text-sm text-muted-foreground">
+                      Page {page} of {Math.min(contentData.total_pages, 500)}
+                    </span>
+                    <Button
+                      variant="outline"
+                      onClick={() => setPage((p) => p + 1)}
+                      disabled={page >= Math.min(contentData.total_pages, 500)}
+                    >
+                      Next
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setPage(Math.min(contentData.total_pages, 500))}
+                      disabled={page >= Math.min(contentData.total_pages, 500)}
+                    >
+                      Last
+                    </Button>
+                  </div>
                 </div>
               )}
             </>

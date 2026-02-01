@@ -135,21 +135,34 @@
     box-shadow: 0 0 20px hsl(var(--secondary) / 0.3);
   }
 
-  /* Button hierarchy - Primary is red, Secondary is blue, Tertiary is outline */
+  /* Button hierarchy - Primary is red, consistent styling */
   .btn-primary {
-    @apply bg-primary text-primary-foreground hover:bg-primary/90;
+    @apply bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 active:scale-95;
   }
 
   .btn-secondary {
-    @apply bg-secondary text-secondary-foreground hover:bg-secondary/90;
+    @apply bg-primary/20 text-primary hover:bg-primary/30 transition-all duration-200 active:scale-95;
   }
 
   .btn-tertiary {
-    @apply bg-muted text-muted-foreground hover:bg-muted/80;
+    @apply bg-muted text-muted-foreground hover:bg-muted/80 transition-all duration-200 active:scale-95;
   }
 
   .btn-success {
-    @apply bg-emerald-600 text-white hover:bg-emerald-700;
+    @apply bg-emerald-600 text-white hover:bg-emerald-700 transition-all duration-200 active:scale-95;
+  }
+
+  /* Interactive elements - unified transitions */
+  .interactive {
+    @apply transition-all duration-200 ease-out;
+  }
+
+  .interactive:hover {
+    @apply scale-[1.02];
+  }
+
+  .interactive:active {
+    @apply scale-[0.98];
   }
 
   /* Hide scrollbar for carousels */
@@ -162,7 +175,7 @@
     display: none;
   }
 
-  /* Poster card hover effect */
+  /* Poster card hover effect with animation */
   .poster-card {
     @apply transition-all duration-300 ease-out;
   }
@@ -172,30 +185,43 @@
     box-shadow: 0 10px 40px hsl(0 0% 0% / 0.5);
   }
 
-  /* Language badges */
+  /* Language badges - all using primary color family */
   .badge-hindi {
-    @apply bg-accent text-accent-foreground;
+    @apply bg-primary text-primary-foreground;
   }
 
   .badge-english {
-    @apply bg-secondary text-secondary-foreground;
+    @apply bg-primary/80 text-primary-foreground;
   }
 
   .badge-tamil {
-    @apply bg-rose-600 text-white;
+    @apply bg-primary/70 text-primary-foreground;
   }
 
   .badge-telugu {
-    @apply bg-violet-600 text-white;
+    @apply bg-primary/60 text-primary-foreground;
   }
 
   .badge-gujarati {
-    @apply bg-emerald-600 text-white;
+    @apply bg-primary/50 text-primary-foreground;
   }
 
   /* Safe area for bottom nav on iOS */
   .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Action button consistent styling */
+  .action-btn {
+    @apply transition-all duration-200 ease-out active:scale-95;
+  }
+
+  .action-btn-active {
+    @apply bg-primary text-primary-foreground;
+  }
+
+  .action-btn-inactive {
+    @apply bg-background/80 text-foreground hover:bg-background;
   }
 }
 

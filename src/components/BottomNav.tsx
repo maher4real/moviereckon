@@ -1,10 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, Grid, Search, User, Clapperboard } from "lucide-react";
+import { Home, Grid, Search, User, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/home", label: "Home", icon: Home },
-  { href: "/browse?type=all", label: "Movies", icon: Clapperboard },
+  { href: "/reckon", label: "Reckon", icon: Sparkles },
   { href: "/browse", label: "Browse", icon: Grid },
   { href: "/search", label: "Search", icon: Search },
   { href: "/profile", label: "Profile", icon: User },
