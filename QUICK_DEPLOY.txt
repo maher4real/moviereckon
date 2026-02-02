@@ -1,0 +1,128 @@
+# 🚀 MovieReckon - Vercel Deployment Quick Reference
+
+## 30-Second Overview
+
+Your app is **production-ready**. All local dev files removed. API handlers configured for Vercel serverless.
+
+## Deploy in 5 Minutes
+
+### 1. MongoDB Setup (2 min)
+- Go to https://cloud.mongodb.com
+- Create free cluster → Get connection string
+
+### 2. GitHub Commit (1 min)
+```bash
+git add .
+git commit -m "Ready for Vercel"
+git push origin main
+```
+
+### 3. Vercel Deploy (1 min)
+- Visit https://vercel.com/new
+- Import GitHub repo
+- Add 3 env variables:
+  ```
+  MONGODB_URI = your_mongodb_connection_string
+  MONGODB_DB_NAME = moviereckon
+  JWT_SECRET = [generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"]
+  ```
+- Click Deploy
+
+### 4. Final Step (1 min)
+- Copy deployed URL from Vercel
+- Add env var: `VITE_MONGODB_API_URL = your_deployed_url`
+- Redeploy
+- Test: curl https://your-url/api/health
+
+## Environment Variables Checklist
+
+```
+□ MONGODB_URI          mongodb+srv://...
+□ MONGODB_DB_NAME      moviereckon
+□ JWT_SECRET           [random 32+ chars]
+□ VITE_MONGODB_API_URL https://your-app.vercel.app
+```
+
+## Files Structure
+
+```
+✓ api/*.ts          → Vercel serverless functions
+✓ src/              → React frontend (Vite build)
+✓ vercel.json       → Serverless routing config
+✓ package.json      → Production dependencies
+✓ .env.example      → Environment template
+```
+
+## Documentation Files
+
+| File | Read This |
+|------|-----------|
+| `DEPLOY_NOW.md` | Start here (overview) |
+| `DEPLOYMENT.md` | Complete step-by-step guide |
+| `VERCEL_CHECKLIST.md` | Verification checklist |
+
+## Common Commands
+
+```bash
+# Build frontend
+npm run build
+
+# Test locally (dev mode only)
+npm run dev
+
+# Lint code
+npm run lint
+
+# Generate JWT secret
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+## Testing Checklist
+
+- [ ] `/api/health` returns 200
+- [ ] Can register user
+- [ ] Can login user
+- [ ] Can like content
+- [ ] Can mark watched
+- [ ] Data appears in MongoDB
+
+## Troubleshooting
+
+| Issue | Fix |
+|-------|-----|
+| API 404 | Check `vercel.json` exists |
+| MongoDB error | Verify connection string in env vars |
+| CORS error | Check `VITE_MONGODB_API_URL` matches URL |
+| Auth fails | Check `JWT_SECRET` is set |
+
+## Deployment URL Pattern
+
+Once deployed, your app will be at:
+```
+https://moviereckon-[random].vercel.app
+```
+
+Copy this and use as `VITE_MONGODB_API_URL` value.
+
+## Resources
+
+- **Vercel Docs**: https://vercel.com/docs
+- **MongoDB Docs**: https://docs.mongodb.com
+- **This Repo**: See DEPLOYMENT.md for detailed guide
+
+## Status
+
+✅ All files cleaned up  
+✅ Production config ready  
+✅ API handlers verified  
+✅ MongoDB integration configured  
+✅ Environment template created  
+✅ Documentation complete  
+
+**Ready to deploy!**
+
+---
+
+**Quick Deploy**: Follow these 4 steps above, should take ~5 minutes total.
+
+**Need details?** Read `DEPLOYMENT.md` for step-by-step instructions.

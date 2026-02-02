@@ -1,33 +1,60 @@
 /**
  * MongoDB Connection Utility
- * Used by Vercel serverless functions
+ * Used by Vercel serverless functions and local development
+ *
+ * Implements connection pooling with globalThis caching to avoid
+ * multiple connections in serverless environments.
  */
 import { MongoClient, Db, ObjectId } from "mongodb";
 
-// Connection string should be set as MONGODB_URI env var on Vercel
+// Connection string should be set as MONGODB_URI env var
 const uri = process.env.MONGODB_URI || "";
 const dbName = process.env.MONGODB_DB_NAME || "moviereckon";
 
-let cachedClient: MongoClient | null = null;
-let cachedDb: Db | null = null;
+// Use globalThis for serverless caching compatibility
+declare global {
+  var mongoClient: MongoClient | undefined;
+  var mongoDb: Db | undefined;
+}
 
-export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db }> {
-  if (cachedClient && cachedDb) {
-    return { client: cachedClient, db: cachedDb };
+export async function connectToDatabase(): Promise<{
+  client: MongoClient;
+  db: Db;
+}> {
+  // Return cached connection if available
+  if (globalThis.mongoClient && globalThis.mongoDb) {
+    return { client: globalThis.mongoClient, db: globalThis.mongoDb };
   }
 
   if (!uri) {
-    throw new Error("MONGODB_URI environment variable is not set");
+    throw new Error(
+      "MONGODB_URI environment variable is not set. " +
+        "Ensure .env.local or Vercel environment variables contain MONGODB_URI.",
+    );
   }
 
-  const client = new MongoClient(uri);
-  await client.connect();
-  const db = client.db(dbName);
+  try {
+    const client = new MongoClient(uri, {
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+    });
 
-  cachedClient = client;
-  cachedDb = db;
+    await client.connect();
+    const db = client.db(dbName);
 
-  return { client, db };
+    // Cache in globalThis for reuse
+    globalThis.mongoClient = client;
+    globalThis.mongoDb = db;
+
+    console.log(`[MongoDB] Connected to ${dbName}`);
+
+    return { client, db };
+  } catch (error) {
+    console.error("[MongoDB] Connection failed:", error);
+    throw new Error(
+      `Failed to connect to MongoDB: ${error instanceof Error ? error.message : "Unknown error"}`,
+    );
+  }
 }
 
 export { ObjectId };
