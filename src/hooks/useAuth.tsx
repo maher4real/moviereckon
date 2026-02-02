@@ -1,7 +1,18 @@
+/**
+ * Unified Auth Hook with MongoDB + Lovable Cloud Fallback
+ * 
+ * This hook provides authentication that works with:
+ * 1. MongoDB backend (when VITE_MONGODB_API_URL is set and backend is deployed)
+ * 2. Lovable Cloud (Supabase) as fallback
+ */
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/backendClient";
+import * as mongoClient from "@/lib/mongodbClient";
 import { useToast } from "@/hooks/use-toast";
+
+// Determine which backend to use
+const USE_MONGODB = mongoClient.isMongoDBConfigured();
 
 interface Profile {
   id: string;
@@ -13,10 +24,11 @@ interface Profile {
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: User | mongoClient.MongoUser | null;
   session: Session | null;
   profile: Profile | null;
   isLoading: boolean;
+  backendType: "mongodb" | "supabase";
   signUp: (email: string, password: string, username: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -26,13 +38,14 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | mongoClient.MongoUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
-  const fetchProfile = useCallback(async (userId: string) => {
+  // =========== Supabase Auth (Fallback) ===========
+  const fetchSupabaseProfile = useCallback(async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from("profiles")
@@ -52,7 +65,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  useEffect(() => {
+  // =========== MongoDB Auth ===========
+  const initMongoDBAuth = useCallback(async () => {
+    try {
+      // Check for existing token
+      const token = mongoClient.getAccessToken();
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+
+      // Try to get current user
+      const user = await mongoClient.getCurrentUser();
+      if (user) {
+        setUser(user);
+        setProfile({
+          id: user.id,
+          user_id: user.id,
+          username: user.username,
+          avatar_url: user.avatar_url,
+          created_at: user.created_at,
+          updated_at: user.updated_at,
+        });
+      } else {
+        // Token invalid, try refresh
+        const refreshed = await mongoClient.refreshAccessToken();
+        if (refreshed) {
+          const refreshedUser = await mongoClient.getCurrentUser();
+          if (refreshedUser) {
+            setUser(refreshedUser);
+            setProfile({
+              id: refreshedUser.id,
+              user_id: refreshedUser.id,
+              username: refreshedUser.username,
+              avatar_url: refreshedUser.avatar_url,
+              created_at: refreshedUser.created_at,
+              updated_at: refreshedUser.updated_at,
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error("MongoDB auth init error:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const initSupabaseAuth = useCallback(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -62,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Defer profile fetch with setTimeout to avoid deadlock
         if (session?.user) {
           setTimeout(() => {
-            fetchProfile(session.user.id).then(setProfile);
+            fetchSupabaseProfile(session.user.id).then(setProfile);
           }, 0);
         } else {
           setProfile(null);
@@ -76,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        fetchProfile(session.user.id).then((p) => {
+        fetchSupabaseProfile(session.user.id).then((p) => {
           setProfile(p);
           setIsLoading(false);
         });
@@ -86,9 +146,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, [fetchProfile]);
+  }, [fetchSupabaseProfile]);
 
+  // Initialize auth based on backend type
+  useEffect(() => {
+    if (USE_MONGODB) {
+      initMongoDBAuth();
+    } else {
+      const unsubscribe = initSupabaseAuth();
+      return unsubscribe;
+    }
+  }, [initMongoDBAuth, initSupabaseAuth]);
+
+  // =========== Sign Up ===========
   const signUp = async (email: string, password: string, username: string) => {
+    if (USE_MONGODB) {
+      const { user, error } = await mongoClient.register(email, password, username);
+      
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Sign up failed",
+          description: error,
+        });
+        return { error: new Error(error) };
+      }
+
+      if (user) {
+        setUser(user);
+        setProfile({
+          id: user.id,
+          user_id: user.id,
+          username: user.username,
+          avatar_url: user.avatar_url,
+          created_at: user.created_at,
+          updated_at: user.updated_at,
+        });
+      }
+
+      toast({
+        title: "Welcome!",
+        description: "Your account has been created successfully.",
+      });
+
+      return { error: null };
+    }
+
+    // Supabase fallback
     try {
       const redirectUrl = `${window.location.origin}/`;
       
@@ -97,9 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
         options: {
           emailRedirectTo: redirectUrl,
-          data: {
-            username,
-          },
+          data: { username },
         },
       });
 
@@ -131,7 +233,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // =========== Sign In ===========
   const signIn = async (email: string, password: string) => {
+    if (USE_MONGODB) {
+      const { user, error } = await mongoClient.login(email, password);
+      
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Sign in failed",
+          description: error,
+        });
+        return { error: new Error(error) };
+      }
+
+      if (user) {
+        setUser(user);
+        setProfile({
+          id: user.id,
+          user_id: user.id,
+          username: user.username,
+          avatar_url: user.avatar_url,
+          created_at: user.created_at,
+          updated_at: user.updated_at,
+        });
+      }
+
+      toast({
+        title: "Welcome back!",
+        description: "You've been signed in successfully.",
+      });
+
+      return { error: null };
+    }
+
+    // Supabase fallback
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -158,22 +294,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // =========== Sign Out ===========
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setProfile(null);
+    if (USE_MONGODB) {
+      await mongoClient.logout();
+      setUser(null);
+      setProfile(null);
+    } else {
+      await supabase.auth.signOut();
+      setProfile(null);
+    }
+
     toast({
       title: "Signed out",
       description: "You've been signed out successfully.",
     });
   };
 
+  // =========== Update Profile ===========
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!user) return;
 
+    if (USE_MONGODB) {
+      const updated = await mongoClient.updateProfile({
+        username: updates.username,
+        avatar_url: updates.avatar_url || undefined,
+      });
+
+      if (!updated) {
+        toast({
+          variant: "destructive",
+          title: "Update failed",
+          description: "Failed to update profile",
+        });
+        return;
+      }
+
+      setProfile((prev) => (prev ? { ...prev, ...updates } : null));
+      toast({
+        title: "Profile updated",
+        description: "Your profile has been updated successfully.",
+      });
+      return;
+    }
+
+    // Supabase fallback
+    const userId = "id" in user ? user.id : "";
     const { error } = await supabase
       .from("profiles")
       .update(updates)
-      .eq("user_id", user.id);
+      .eq("user_id", userId);
 
     if (error) {
       toast({
@@ -198,6 +368,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         profile,
         isLoading,
+        backendType: USE_MONGODB ? "mongodb" : "supabase",
         signUp,
         signIn,
         signOut,
