@@ -1,0 +1,391 @@
+/**
+ * MongoDB Backend API Client with Lovable Cloud fallback
+ * 
+ * This client first tries to use the MongoDB backend (when deployed on Vercel).
+ * If that fails or isn't available, it falls back to Lovable Cloud (Supabase).
+ */
+
+// Token storage keys
+const ACCESS_TOKEN_KEY = "moviereckon_access_token";
+const REFRESH_TOKEN_KEY = "moviereckon_refresh_token";
+const USER_KEY = "moviereckon_user";
+
+// Backend URL - will be your Vercel deployment URL
+// During development, set VITE_MONGODB_API_URL to your deployed Vercel URL
+const MONGODB_API_URL = import.meta.env.VITE_MONGODB_API_URL || "";
+
+// Check if MongoDB backend is configured
+export const isMongoDBConfigured = (): boolean => {
+  return !!MONGODB_API_URL && MONGODB_API_URL.length > 0;
+};
+
+// Helper for making authenticated requests
+async function fetchWithAuth(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+  };
+
+  if (token) {
+    (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${MONGODB_API_URL}${endpoint}`, {
+    ...options,
+    headers,
+  });
+
+  // Handle token refresh if unauthorized
+  if (response.status === 401 && token) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      // Retry with new token
+      const newToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+      (headers as Record<string, string>)["Authorization"] = `Bearer ${newToken}`;
+      return fetch(`${MONGODB_API_URL}${endpoint}`, {
+        ...options,
+        headers,
+      });
+    }
+  }
+
+  return response;
+}
+
+// Token management
+export function getAccessToken(): string | null {
+  return localStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
+export function getRefreshToken(): string | null {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+export function setTokens(accessToken: string, refreshToken: string): void {
+  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+}
+
+export function clearTokens(): void {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+}
+
+export function getStoredUser(): MongoUser | null {
+  const stored = localStorage.getItem(USER_KEY);
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredUser(user: MongoUser): void {
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
+// Types
+export interface MongoUser {
+  id: string;
+  email: string;
+  username: string;
+  avatar_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuthResponse {
+  user: MongoUser;
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface WatchedItem {
+  id: string;
+  user_id: string;
+  content_id: number;
+  content_type: "movie" | "tv";
+  title: string;
+  poster_path: string | null;
+  genres: number[];
+  language: string;
+  watched_at: string;
+}
+
+export interface LikedItem {
+  id: string;
+  user_id: string;
+  content_id: number;
+  content_type: "movie" | "tv";
+  title: string;
+  poster_path: string | null;
+  liked_at: string;
+}
+
+export interface UserPreferences {
+  id: string;
+  user_id: string;
+  preferred_languages: string[];
+  preferred_genres: number[];
+}
+
+// ========== Auth API ==========
+
+export async function register(
+  email: string,
+  password: string,
+  username: string
+): Promise<{ user: MongoUser | null; error: string | null }> {
+  try {
+    const response = await fetch(`${MONGODB_API_URL}/api/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, username }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { user: null, error: data.error || "Registration failed" };
+    }
+
+    setTokens(data.accessToken, data.refreshToken);
+    setStoredUser(data.user);
+
+    return { user: data.user, error: null };
+  } catch (error) {
+    console.error("Registration error:", error);
+    return { user: null, error: "Network error. Please try again." };
+  }
+}
+
+export async function login(
+  email: string,
+  password: string
+): Promise<{ user: MongoUser | null; error: string | null }> {
+  try {
+    const response = await fetch(`${MONGODB_API_URL}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { user: null, error: data.error || "Login failed" };
+    }
+
+    setTokens(data.accessToken, data.refreshToken);
+    setStoredUser(data.user);
+
+    return { user: data.user, error: null };
+  } catch (error) {
+    console.error("Login error:", error);
+    return { user: null, error: "Network error. Please try again." };
+  }
+}
+
+export async function logout(): Promise<void> {
+  try {
+    const refreshToken = getRefreshToken();
+    if (refreshToken && MONGODB_API_URL) {
+      await fetch(`${MONGODB_API_URL}/api/auth/logout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken }),
+      });
+    }
+  } catch {
+    // Ignore errors during logout
+  } finally {
+    clearTokens();
+  }
+}
+
+export async function refreshAccessToken(): Promise<boolean> {
+  try {
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) return false;
+
+    const response = await fetch(`${MONGODB_API_URL}/api/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!response.ok) {
+      clearTokens();
+      return false;
+    }
+
+    const data = await response.json();
+    setTokens(data.accessToken, data.refreshToken);
+    setStoredUser(data.user);
+
+    return true;
+  } catch {
+    clearTokens();
+    return false;
+  }
+}
+
+export async function getCurrentUser(): Promise<MongoUser | null> {
+  try {
+    const response = await fetchWithAuth("/api/auth/me");
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        clearTokens();
+      }
+      return null;
+    }
+
+    const data = await response.json();
+    setStoredUser(data.user);
+    return data.user;
+  } catch {
+    return null;
+  }
+}
+
+// ========== User Data API ==========
+
+export async function fetchWatchHistory(): Promise<WatchedItem[]> {
+  try {
+    const response = await fetchWithAuth("/api/user/watch-history");
+    if (!response.ok) return [];
+    const data = await response.json();
+    return data.data || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function addToWatchHistory(item: Omit<WatchedItem, "id" | "user_id" | "watched_at">): Promise<WatchedItem | null> {
+  try {
+    const response = await fetchWithAuth("/api/user/watch-history", {
+      method: "POST",
+      body: JSON.stringify(item),
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.data;
+  } catch {
+    return null;
+  }
+}
+
+export async function removeFromWatchHistory(contentId: number, contentType: string): Promise<boolean> {
+  try {
+    const response = await fetchWithAuth("/api/user/watch-history", {
+      method: "DELETE",
+      body: JSON.stringify({ content_id: contentId, content_type: contentType }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchLikedItems(): Promise<LikedItem[]> {
+  try {
+    const response = await fetchWithAuth("/api/user/liked-items");
+    if (!response.ok) return [];
+    const data = await response.json();
+    return data.data || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function toggleLikeItem(item: Omit<LikedItem, "id" | "user_id" | "liked_at">): Promise<{ action: "added" | "removed"; data: LikedItem | null }> {
+  try {
+    const response = await fetchWithAuth("/api/user/liked-items", {
+      method: "POST",
+      body: JSON.stringify(item),
+    });
+    if (!response.ok) return { action: "removed", data: null };
+    const data = await response.json();
+    return { action: data.action, data: data.data };
+  } catch {
+    return { action: "removed", data: null };
+  }
+}
+
+export async function fetchUserPreferences(): Promise<UserPreferences | null> {
+  try {
+    const response = await fetchWithAuth("/api/user/preferences");
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.data;
+  } catch {
+    return null;
+  }
+}
+
+export async function updateUserPreferences(prefs: Partial<UserPreferences>): Promise<UserPreferences | null> {
+  try {
+    const response = await fetchWithAuth("/api/user/preferences", {
+      method: "PUT",
+      body: JSON.stringify(prefs),
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.data;
+  } catch {
+    return null;
+  }
+}
+
+export async function clearAllHistory(): Promise<boolean> {
+  try {
+    const response = await fetchWithAuth("/api/user/clear-history", {
+      method: "DELETE",
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function updateProfile(updates: { username?: string; avatar_url?: string }): Promise<MongoUser | null> {
+  try {
+    const response = await fetchWithAuth("/api/user/profile", {
+      method: "PUT",
+      body: JSON.stringify(updates),
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (data.data) {
+      setStoredUser(data.data);
+    }
+    return data.data;
+  } catch {
+    return null;
+  }
+}
+
+// ========== Health Check ==========
+
+export async function checkMongoDBHealth(): Promise<{ healthy: boolean; latency?: number }> {
+  if (!MONGODB_API_URL) {
+    return { healthy: false };
+  }
+
+  try {
+    const response = await fetch(`${MONGODB_API_URL}/api/health`);
+    if (!response.ok) return { healthy: false };
+    const data = await response.json();
+    return { healthy: data.status === "healthy", latency: data.latency_ms };
+  } catch {
+    return { healthy: false };
+  }
+}
