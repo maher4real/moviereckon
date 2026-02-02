@@ -3,6 +3,7 @@
 ## Pre-Deployment Setup
 
 ### Local Environment
+
 - [x] Code cleaned up (removed local dev files)
 - [x] Dependencies updated for production
 - [x] vercel.json configured correctly
@@ -11,11 +12,13 @@
 - [x] .env.example updated with production variables
 
 ### Version Control
+
 - [ ] All changes committed to git
 - [ ] Code pushed to GitHub main branch
 - [ ] GitHub repository linked to Vercel account
 
 ### MongoDB Atlas Setup
+
 - [ ] MongoDB Atlas account created (https://www.mongodb.com/cloud/atlas)
 - [ ] Free M0 cluster created
 - [ ] Database user created with strong password
@@ -26,28 +29,33 @@
 ## Vercel Deployment
 
 ### Account & Project
+
 - [ ] Vercel account created (https://vercel.com)
 - [ ] Repository imported into Vercel
 - [ ] Project name set to "moviereckon" (or preferred name)
 
 ### Environment Variables in Vercel Dashboard
+
 - [ ] `MONGODB_URI` = Full connection string from MongoDB Atlas
 - [ ] `MONGODB_DB_NAME` = "moviereckon"
 - [ ] `JWT_SECRET` = Generated random string (see below)
 - [ ] `VITE_MONGODB_API_URL` = Will set after first deploy
 
 **To generate JWT_SECRET:**
+
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 ### Initial Deployment
+
 - [ ] All environment variables set (except VITE_MONGODB_API_URL)
 - [ ] Click "Deploy" in Vercel
 - [ ] Deployment completes successfully
 - [ ] Vercel provides deployment URL (e.g., https://moviereckon-xyz.vercel.app)
 
 ### Post-Deployment Configuration
+
 - [ ] Update `VITE_MONGODB_API_URL` to your Vercel deployment URL
 - [ ] Trigger redeploy:
   ```bash
@@ -59,6 +67,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ## Verification
 
 ### API Endpoint Testing
+
 - [ ] Health endpoint responds: `curl https://YOUR_URL/api/health`
   - Expected: `{"status":"healthy","database":"connected",...}`
 - [ ] Register endpoint works (test with curl or Postman)
@@ -66,6 +75,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 - [ ] Me endpoint works with token
 
 ### Frontend Testing
+
 - [ ] Visit `https://YOUR_URL` in browser
 - [ ] Register a new account
 - [ ] Receive confirmation
@@ -76,6 +86,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 - [ ] Recommendations display
 
 ### MongoDB Verification
+
 - [ ] Login to MongoDB Atlas
 - [ ] Check "moviereckon" database exists
 - [ ] Collections created:
@@ -89,6 +100,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 - [ ] Watch document created after watching content
 
 ### Monitoring
+
 - [ ] Check Vercel Function logs for errors
 - [ ] Check MongoDB Atlas metrics
 - [ ] Monitor API response times
@@ -97,30 +109,35 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ## Troubleshooting Guide
 
 ### API Returns 404
+
 - [ ] Check vercel.json is in root directory
 - [ ] Verify api/ folder exists
 - [ ] Check file extensions are .ts
 - [ ] Review Vercel Function logs
 
 ### MongoDB Connection Error
+
 - [ ] Verify MONGODB_URI is correct
 - [ ] Check IP is whitelisted in MongoDB Atlas
 - [ ] Test connection string locally first
 - [ ] Ensure database name is included in URI
 
 ### Authentication Failed
+
 - [ ] Verify JWT_SECRET is set in Vercel
 - [ ] Check Authorization header in requests
 - [ ] Review Vercel Function logs for errors
 - [ ] Test /api/auth/login endpoint directly
 
 ### Frontend Can't Reach API
+
 - [ ] Verify VITE_MONGODB_API_URL matches deployment URL
 - [ ] Check browser console for CORS errors
 - [ ] Verify API is responding to health check
 - [ ] Check Network tab in browser DevTools
 
 ### Data Not Persisting
+
 - [ ] Verify MONGODB_URI is correct
 - [ ] Check MongoDB Atlas connection status
 - [ ] Review MongoDB Atlas logs
@@ -129,18 +146,21 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ## Performance & Optimization
 
 ### Vercel Settings
+
 - [ ] Configure regions for optimal latency
 - [ ] Enable automatic rebuilds on git push
 - [ ] Monitor function duration
 - [ ] Check bandwidth usage
 
 ### MongoDB Optimization
+
 - [ ] Consider database indexing for frequently queried fields
 - [ ] Monitor database size and performance
 - [ ] Set up alerts for unusual activity
 - [ ] Enable automatic backups
 
 ### Optional Improvements
+
 - [ ] Add rate limiting to auth endpoints
 - [ ] Implement request logging/monitoring
 - [ ] Add error tracking (Sentry, etc.)
@@ -159,18 +179,21 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ## Post-Deployment
 
 ### Monitoring Checklist
+
 - [ ] Check Vercel Analytics dashboard weekly
 - [ ] Monitor MongoDB Atlas metrics
 - [ ] Review error logs regularly
 - [ ] Test critical user flows periodically
 
 ### Maintenance
+
 - [ ] Update dependencies monthly
 - [ ] Review MongoDB backups
 - [ ] Monitor costs (Vercel + MongoDB)
 - [ ] Keep JWT_SECRET secure
 
 ### Scaling (When Needed)
+
 - [ ] Upgrade MongoDB tier from M0
 - [ ] Enable database sharding for large datasets
 - [ ] Add CDN for static assets
@@ -179,6 +202,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ## Rollback Plan
 
 If deployment has critical issues:
+
 ```bash
 # Revert to previous commit
 git revert HEAD
