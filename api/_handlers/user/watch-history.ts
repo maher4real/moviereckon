@@ -3,18 +3,10 @@
  * Manage user watch history
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { connectToDatabase, ObjectId } from "../lib/mongodb";
-import { extractTokenFromHeader, verifyAccessToken } from "../lib/auth";
+import { connectToDatabase } from "../../lib/mongodb";
+import { extractTokenFromHeader, verifyAccessToken } from "../../lib/auth";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
-  }
-
   // Authenticate user
   const token = extractTokenFromHeader(req.headers.authorization as string | null);
   if (!token) {

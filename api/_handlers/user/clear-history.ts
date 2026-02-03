@@ -1,20 +1,12 @@
 /**
  * DELETE /api/user/clear-history
- * Clear all user watch history and likes
+ * Clear all user history data
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { connectToDatabase } from "../lib/mongodb";
-import { extractTokenFromHeader, verifyAccessToken } from "../lib/auth";
+import { connectToDatabase } from "../../lib/mongodb";
+import { extractTokenFromHeader, verifyAccessToken } from "../../lib/auth";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
-  }
-
   if (req.method !== "DELETE") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -39,13 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       db.collection("liked_items").deleteMany({ user_id: user.id }),
       db.collection("user_preferences").updateOne(
         { user_id: user.id },
-        {
-          $set: {
-            preferred_languages: [],
-            preferred_genres: [],
-            updated_at: new Date().toISOString(),
-          },
-        }
+        { $set: { preferred_languages: [], preferred_genres: [], updated_at: new Date().toISOString() } }
       ),
     ]);
 

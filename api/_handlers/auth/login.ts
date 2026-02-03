@@ -1,20 +1,12 @@
 /**
  * POST /api/auth/login
- * Authenticate user and return tokens
+ * Authenticate user and return JWT tokens
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { connectToDatabase } from "../lib/mongodb";
-import { comparePassword, generateTokens, UserPayload } from "../lib/auth";
+import { connectToDatabase } from "../../lib/mongodb";
+import { comparePassword, generateTokens, UserPayload } from "../../lib/auth";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
-  }
-
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -34,7 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
-    // Verify password
+    // Check password
     const isValid = await comparePassword(password, user.password_hash);
     if (!isValid) {
       return res.status(401).json({ error: "Invalid email or password" });

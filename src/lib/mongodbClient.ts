@@ -1,8 +1,6 @@
 /**
- * MongoDB Backend API Client with Lovable Cloud fallback
- * 
- * This client first tries to use the MongoDB backend (when deployed on Vercel).
- * If that fails or isn't available, it falls back to Lovable Cloud (Supabase).
+ * MongoDB Backend API Client
+ * Uses MongoDB backend exclusively - no fallback to other services
  */
 
 // Token storage keys
@@ -10,14 +8,22 @@ const ACCESS_TOKEN_KEY = "moviereckon_access_token";
 const REFRESH_TOKEN_KEY = "moviereckon_refresh_token";
 const USER_KEY = "moviereckon_user";
 
-// Backend URL - will be your Vercel deployment URL
-// During development, set VITE_MONGODB_API_URL to your deployed Vercel URL
-const MONGODB_API_URL = import.meta.env.VITE_MONGODB_API_URL || "";
-
-// Check if MongoDB backend is configured
-export const isMongoDBConfigured = (): boolean => {
-  return !!MONGODB_API_URL && MONGODB_API_URL.length > 0;
+// Backend URL - relative path for same-origin requests on Vercel
+// In production, API routes are at /api/* on the same domain
+const getApiUrl = () => {
+  // If VITE_MONGODB_API_URL is set, use it (for cross-origin development)
+  const configuredUrl = import.meta.env.VITE_MONGODB_API_URL;
+  if (configuredUrl && configuredUrl.length > 0) {
+    return configuredUrl;
+  }
+  // In production on Vercel, use relative paths
+  return "";
 };
+
+const MONGODB_API_URL = getApiUrl();
+
+// Always return true since MongoDB is the only backend
+export const isMongoDBConfigured = (): boolean => true;
 
 // Helper for making authenticated requests
 async function fetchWithAuth(
@@ -162,7 +168,7 @@ export async function register(
     return { user: data.user, error: null };
   } catch (error) {
     console.error("Registration error:", error);
-    return { user: null, error: "Network error. Please try again." };
+    return { user: null, error: "Network error. Backend may be unavailable." };
   }
 }
 
@@ -189,14 +195,14 @@ export async function login(
     return { user: data.user, error: null };
   } catch (error) {
     console.error("Login error:", error);
-    return { user: null, error: "Network error. Please try again." };
+    return { user: null, error: "Network error. Backend may be unavailable." };
   }
 }
 
 export async function logout(): Promise<void> {
   try {
     const refreshToken = getRefreshToken();
-    if (refreshToken && MONGODB_API_URL) {
+    if (refreshToken) {
       await fetch(`${MONGODB_API_URL}/api/auth/logout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -375,17 +381,16 @@ export async function updateProfile(updates: { username?: string; avatar_url?: s
 
 // ========== Health Check ==========
 
-export async function checkMongoDBHealth(): Promise<{ healthy: boolean; latency?: number }> {
-  if (!MONGODB_API_URL) {
-    return { healthy: false };
-  }
-
+export async function checkMongoDBHealth(): Promise<{ healthy: boolean; latency?: number; error?: string }> {
   try {
     const response = await fetch(`${MONGODB_API_URL}/api/health`);
-    if (!response.ok) return { healthy: false };
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      return { healthy: false, error: data.error || "Backend unavailable" };
+    }
     const data = await response.json();
     return { healthy: data.status === "healthy", latency: data.latency_ms };
-  } catch {
-    return { healthy: false };
+  } catch (error) {
+    return { healthy: false, error: "Cannot connect to backend" };
   }
 }
