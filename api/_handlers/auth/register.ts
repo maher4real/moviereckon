@@ -3,19 +3,10 @@
  * Register a new user
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { connectToDatabase } from "../lib/mongodb";
-import { hashPassword, generateTokens, UserPayload } from "../lib/auth";
+import { connectToDatabase } from "../../lib/mongodb";
+import { hashPassword, generateTokens, UserPayload } from "../../lib/auth";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS headers
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
-  }
-
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }

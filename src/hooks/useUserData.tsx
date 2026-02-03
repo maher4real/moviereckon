@@ -1,14 +1,11 @@
 /**
- * Unified User Data Hook with MongoDB + Lovable Cloud Fallback
+ * User Data Hook - MongoDB Backend Only
+ * No fallback to other services
  */
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { useAuth } from "./useAuth";
-import { supabase } from "@/lib/backendClient";
 import * as mongoClient from "@/lib/mongodbClient";
 import { useToast } from "@/hooks/use-toast";
-
-// Check which backend to use
-const USE_MONGODB = mongoClient.isMongoDBConfigured();
 
 export interface WatchedItem {
   id: string;
@@ -65,13 +62,13 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Get user ID regardless of backend type
+  // Get user ID
   const getUserId = useCallback(() => {
     if (!user) return null;
-    return "id" in user ? user.id : null;
+    return user.id;
   }, [user]);
 
-  // =========== Fetch User Data ===========
+  // Fetch User Data from MongoDB
   const fetchUserData = useCallback(async () => {
     const userId = getUserId();
     
@@ -84,41 +81,15 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      if (USE_MONGODB) {
-        // Fetch from MongoDB
-        const [history, liked, prefs] = await Promise.all([
-          mongoClient.fetchWatchHistory(),
-          mongoClient.fetchLikedItems(),
-          mongoClient.fetchUserPreferences(),
-        ]);
+      const [history, liked, prefs] = await Promise.all([
+        mongoClient.fetchWatchHistory(),
+        mongoClient.fetchLikedItems(),
+        mongoClient.fetchUserPreferences(),
+      ]);
 
-        setWatchHistory(history as WatchedItem[]);
-        setLikedItems(liked as LikedItem[]);
-        setPreferences(prefs as UserPreferences | null);
-      } else {
-        // Fetch from Supabase
-        const [historyRes, likedRes, prefsRes] = await Promise.all([
-          supabase
-            .from("watch_history")
-            .select("*")
-            .eq("user_id", userId)
-            .order("watched_at", { ascending: false }),
-          supabase
-            .from("liked_items")
-            .select("*")
-            .eq("user_id", userId)
-            .order("liked_at", { ascending: false }),
-          supabase
-            .from("user_preferences")
-            .select("*")
-            .eq("user_id", userId)
-            .maybeSingle(),
-        ]);
-
-        if (historyRes.data) setWatchHistory(historyRes.data as WatchedItem[]);
-        if (likedRes.data) setLikedItems(likedRes.data as LikedItem[]);
-        if (prefsRes.data) setPreferences(prefsRes.data as UserPreferences);
-      }
+      setWatchHistory(history as WatchedItem[]);
+      setLikedItems(liked as LikedItem[]);
+      setPreferences(prefs as UserPreferences | null);
     } catch (error) {
       console.error("Error fetching user data:", error);
     } finally {
@@ -130,54 +101,21 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     fetchUserData();
   }, [fetchUserData]);
 
-  // =========== Add to Watch History ===========
+  // Add to Watch History
   const addToWatchHistory = useCallback(
     async (item: Omit<WatchedItem, "id" | "user_id" | "watched_at">) => {
       const userId = getUserId();
       if (!userId) return;
 
       try {
-        if (USE_MONGODB) {
-          const result = await mongoClient.addToWatchHistory(item);
-          if (result) {
-            setWatchHistory((prev) => {
-              const filtered = prev.filter(
-                (w) => !(w.content_id === item.content_id && w.content_type === item.content_type)
-              );
-              return [result as WatchedItem, ...filtered];
-            });
-          }
-        } else {
-          // Supabase
-          const { data, error } = await supabase
-            .from("watch_history")
-            .upsert(
-              {
-                user_id: userId,
-                content_id: item.content_id,
-                content_type: item.content_type,
-                title: item.title,
-                poster_path: item.poster_path,
-                genres: item.genres,
-                language: item.language,
-                watched_at: new Date().toISOString(),
-              },
-              { onConflict: "user_id,content_id,content_type" }
-            )
-            .select()
-            .single();
-
-          if (error) throw error;
-
+        const result = await mongoClient.addToWatchHistory(item);
+        if (result) {
           setWatchHistory((prev) => {
             const filtered = prev.filter(
               (w) => !(w.content_id === item.content_id && w.content_type === item.content_type)
             );
-            return [data as WatchedItem, ...filtered];
+            return [result as WatchedItem, ...filtered];
           });
-
-          // Update preferences
-          await updateSupabasePreferences(userId, item.language, item.genres);
         }
       } catch (error) {
         console.error("Error adding to watch history:", error);
@@ -191,50 +129,14 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     [getUserId, toast]
   );
 
-  const updateSupabasePreferences = async (userId: string, language: string, genres: number[]) => {
-    if (!preferences) return;
-
-    const newLanguages = preferences.preferred_languages.includes(language)
-      ? preferences.preferred_languages
-      : [language, ...preferences.preferred_languages].slice(0, 5);
-
-    const newGenres = [...new Set([...genres, ...preferences.preferred_genres])].slice(0, 10);
-
-    const { error } = await supabase
-      .from("user_preferences")
-      .update({
-        preferred_languages: newLanguages,
-        preferred_genres: newGenres,
-      })
-      .eq("user_id", userId);
-
-    if (!error) {
-      setPreferences((prev) =>
-        prev ? { ...prev, preferred_languages: newLanguages, preferred_genres: newGenres } : null
-      );
-    }
-  };
-
-  // =========== Remove from Watch History ===========
+  // Remove from Watch History
   const removeFromWatchHistory = useCallback(
     async (contentId: number, contentType: "movie" | "tv") => {
       const userId = getUserId();
       if (!userId) return;
 
       try {
-        if (USE_MONGODB) {
-          await mongoClient.removeFromWatchHistory(contentId, contentType);
-        } else {
-          const { error } = await supabase
-            .from("watch_history")
-            .delete()
-            .eq("user_id", userId)
-            .eq("content_id", contentId)
-            .eq("content_type", contentType);
-
-          if (error) throw error;
-        }
-
+        await mongoClient.removeFromWatchHistory(contentId, contentType);
         setWatchHistory((prev) =>
           prev.filter((w) => !(w.content_id === contentId && w.content_type === contentType))
         );
@@ -245,7 +147,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     [getUserId]
   );
 
-  // =========== Is Watched ===========
+  // Is Watched
   const isWatched = useCallback(
     (contentId: number, contentType: "movie" | "tv") => {
       return watchHistory.some(
@@ -255,56 +157,21 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     [watchHistory]
   );
 
-  // =========== Toggle Like ===========
+  // Toggle Like
   const toggleLike = useCallback(
     async (item: Omit<LikedItem, "id" | "user_id" | "liked_at">) => {
       const userId = getUserId();
       if (!userId) return;
 
-      const existingLike = likedItems.find(
-        (l) => l.content_id === item.content_id && l.content_type === item.content_type
-      );
-
       try {
-        if (USE_MONGODB) {
-          const result = await mongoClient.toggleLikeItem(item);
-          
-          if (result.action === "added" && result.data) {
-            setLikedItems((prev) => [result.data as LikedItem, ...prev]);
-          } else {
-            setLikedItems((prev) =>
-              prev.filter((l) => !(l.content_id === item.content_id && l.content_type === item.content_type))
-            );
-          }
+        const result = await mongoClient.toggleLikeItem(item);
+        
+        if (result.action === "added" && result.data) {
+          setLikedItems((prev) => [result.data as LikedItem, ...prev]);
         } else {
-          if (existingLike) {
-            // Unlike
-            const { error } = await supabase
-              .from("liked_items")
-              .delete()
-              .eq("id", existingLike.id);
-
-            if (error) throw error;
-
-            setLikedItems((prev) => prev.filter((l) => l.id !== existingLike.id));
-          } else {
-            // Like
-            const { data, error } = await supabase
-              .from("liked_items")
-              .insert({
-                user_id: userId,
-                content_id: item.content_id,
-                content_type: item.content_type,
-                title: item.title,
-                poster_path: item.poster_path,
-              })
-              .select()
-              .single();
-
-            if (error) throw error;
-
-            setLikedItems((prev) => [data as LikedItem, ...prev]);
-          }
+          setLikedItems((prev) =>
+            prev.filter((l) => !(l.content_id === item.content_id && l.content_type === item.content_type))
+          );
         }
       } catch (error) {
         console.error("Error toggling like:", error);
@@ -315,10 +182,10 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
         });
       }
     },
-    [getUserId, likedItems, toast]
+    [getUserId, toast]
   );
 
-  // =========== Is Liked ===========
+  // Is Liked
   const isLiked = useCallback(
     (contentId: number, contentType: "movie" | "tv") => {
       return likedItems.some(
@@ -328,7 +195,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     [likedItems]
   );
 
-  // =========== Get Recently Watched ===========
+  // Get Recently Watched
   const getRecentlyWatched = useCallback(
     (limit = 10) => {
       return watchHistory.slice(0, limit);
@@ -336,7 +203,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     [watchHistory]
   );
 
-  // =========== Get Top Genres ===========
+  // Get Top Genres
   const getTopGenres = useCallback(
     (limit = 5) => {
       if (!watchHistory.length) return [];
@@ -356,24 +223,13 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     [watchHistory]
   );
 
-  // =========== Clear History ===========
+  // Clear History
   const clearHistory = useCallback(async () => {
     const userId = getUserId();
     if (!userId) return;
 
     try {
-      if (USE_MONGODB) {
-        await mongoClient.clearAllHistory();
-      } else {
-        await Promise.all([
-          supabase.from("watch_history").delete().eq("user_id", userId),
-          supabase.from("liked_items").delete().eq("user_id", userId),
-          supabase
-            .from("user_preferences")
-            .update({ preferred_languages: [], preferred_genres: [] })
-            .eq("user_id", userId),
-        ]);
-      }
+      await mongoClient.clearAllHistory();
 
       setWatchHistory([]);
       setLikedItems([]);
@@ -395,7 +251,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     }
   }, [getUserId, toast]);
 
-  // =========== Refresh Data ===========
+  // Refresh Data
   const refreshData = useCallback(async () => {
     setIsLoading(true);
     await fetchUserData();

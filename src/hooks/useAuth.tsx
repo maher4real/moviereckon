@@ -1,18 +1,10 @@
 /**
- * Unified Auth Hook with MongoDB + Lovable Cloud Fallback
- * 
- * This hook provides authentication that works with:
- * 1. MongoDB backend (when VITE_MONGODB_API_URL is set and backend is deployed)
- * 2. Lovable Cloud (Supabase) as fallback
+ * Auth Hook - MongoDB Backend Only
+ * No fallback to other services
  */
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
-import { User, Session } from "@supabase/supabase-js";
-import { supabase } from "@/lib/backendClient";
 import * as mongoClient from "@/lib/mongodbClient";
 import { useToast } from "@/hooks/use-toast";
-
-// Determine which backend to use
-const USE_MONGODB = mongoClient.isMongoDBConfigured();
 
 interface Profile {
   id: string;
@@ -24,11 +16,9 @@ interface Profile {
 }
 
 interface AuthContextType {
-  user: User | mongoClient.MongoUser | null;
-  session: Session | null;
+  user: mongoClient.MongoUser | null;
   profile: Profile | null;
   isLoading: boolean;
-  backendType: "mongodb" | "supabase";
   signUp: (email: string, password: string, username: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -38,35 +28,13 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | mongoClient.MongoUser | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<mongoClient.MongoUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
-  // =========== Supabase Auth (Fallback) ===========
-  const fetchSupabaseProfile = useCallback(async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("user_id", userId)
-        .single();
-
-      if (error) {
-        console.error("Error fetching profile:", error);
-        return null;
-      }
-
-      return data as Profile;
-    } catch (error) {
-      console.error("Error fetching profile:", error);
-      return null;
-    }
-  }, []);
-
-  // =========== MongoDB Auth ===========
-  const initMongoDBAuth = useCallback(async () => {
+  // Initialize auth from stored tokens
+  const initAuth = useCallback(async () => {
     try {
       // Check for existing token
       const token = mongoClient.getAccessToken();
@@ -76,16 +44,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // Try to get current user
-      const user = await mongoClient.getCurrentUser();
-      if (user) {
-        setUser(user);
+      const currentUser = await mongoClient.getCurrentUser();
+      if (currentUser) {
+        setUser(currentUser);
         setProfile({
-          id: user.id,
-          user_id: user.id,
-          username: user.username,
-          avatar_url: user.avatar_url,
-          created_at: user.created_at,
-          updated_at: user.updated_at,
+          id: currentUser.id,
+          user_id: currentUser.id,
+          username: currentUser.username,
+          avatar_url: currentUser.avatar_url,
+          created_at: currentUser.created_at,
+          updated_at: currentUser.updated_at,
         });
       } else {
         // Token invalid, try refresh
@@ -106,204 +74,87 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch (error) {
-      console.error("MongoDB auth init error:", error);
+      console.error("Auth init error:", error);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  const initSupabaseAuth = useCallback(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+  useEffect(() => {
+    initAuth();
+  }, [initAuth]);
 
-        // Defer profile fetch with setTimeout to avoid deadlock
-        if (session?.user) {
-          setTimeout(() => {
-            fetchSupabaseProfile(session.user.id).then(setProfile);
-          }, 0);
-        } else {
-          setProfile(null);
-        }
-      }
-    );
+  // Sign Up
+  const signUp = async (email: string, password: string, username: string) => {
+    const { user: newUser, error } = await mongoClient.register(email, password, username);
+    
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Sign up failed",
+        description: error,
+      });
+      return { error: new Error(error) };
+    }
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchSupabaseProfile(session.user.id).then((p) => {
-          setProfile(p);
-          setIsLoading(false);
-        });
-      } else {
-        setIsLoading(false);
-      }
+    if (newUser) {
+      setUser(newUser);
+      setProfile({
+        id: newUser.id,
+        user_id: newUser.id,
+        username: newUser.username,
+        avatar_url: newUser.avatar_url,
+        created_at: newUser.created_at,
+        updated_at: newUser.updated_at,
+      });
+    }
+
+    toast({
+      title: "Welcome!",
+      description: "Your account has been created successfully.",
     });
 
-    return () => subscription.unsubscribe();
-  }, [fetchSupabaseProfile]);
-
-  // Initialize auth based on backend type
-  useEffect(() => {
-    if (USE_MONGODB) {
-      initMongoDBAuth();
-    } else {
-      const unsubscribe = initSupabaseAuth();
-      return unsubscribe;
-    }
-  }, [initMongoDBAuth, initSupabaseAuth]);
-
-  // =========== Sign Up ===========
-  const signUp = async (email: string, password: string, username: string) => {
-    if (USE_MONGODB) {
-      const { user, error } = await mongoClient.register(email, password, username);
-      
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Sign up failed",
-          description: error,
-        });
-        return { error: new Error(error) };
-      }
-
-      if (user) {
-        setUser(user);
-        setProfile({
-          id: user.id,
-          user_id: user.id,
-          username: user.username,
-          avatar_url: user.avatar_url,
-          created_at: user.created_at,
-          updated_at: user.updated_at,
-        });
-      }
-
-      toast({
-        title: "Welcome!",
-        description: "Your account has been created successfully.",
-      });
-
-      return { error: null };
-    }
-
-    // Supabase fallback
-    try {
-      const redirectUrl = `${window.location.origin}/`;
-      
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: { username },
-        },
-      });
-
-      if (error) {
-        if (error.message.includes("already registered")) {
-          toast({
-            variant: "destructive",
-            title: "Account exists",
-            description: "This email is already registered. Please sign in instead.",
-          });
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Sign up failed",
-            description: error.message,
-          });
-        }
-        return { error };
-      }
-
-      toast({
-        title: "Welcome!",
-        description: "Your account has been created successfully.",
-      });
-
-      return { error: null };
-    } catch (error) {
-      return { error: error as Error };
-    }
+    return { error: null };
   };
 
-  // =========== Sign In ===========
+  // Sign In
   const signIn = async (email: string, password: string) => {
-    if (USE_MONGODB) {
-      const { user, error } = await mongoClient.login(email, password);
-      
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Sign in failed",
-          description: error,
-        });
-        return { error: new Error(error) };
-      }
-
-      if (user) {
-        setUser(user);
-        setProfile({
-          id: user.id,
-          user_id: user.id,
-          username: user.username,
-          avatar_url: user.avatar_url,
-          created_at: user.created_at,
-          updated_at: user.updated_at,
-        });
-      }
-
+    const { user: loggedInUser, error } = await mongoClient.login(email, password);
+    
+    if (error) {
       toast({
-        title: "Welcome back!",
-        description: "You've been signed in successfully.",
+        variant: "destructive",
+        title: "Sign in failed",
+        description: error,
       });
-
-      return { error: null };
+      return { error: new Error(error) };
     }
 
-    // Supabase fallback
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+    if (loggedInUser) {
+      setUser(loggedInUser);
+      setProfile({
+        id: loggedInUser.id,
+        user_id: loggedInUser.id,
+        username: loggedInUser.username,
+        avatar_url: loggedInUser.avatar_url,
+        created_at: loggedInUser.created_at,
+        updated_at: loggedInUser.updated_at,
       });
-
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Sign in failed",
-          description: error.message,
-        });
-        return { error };
-      }
-
-      toast({
-        title: "Welcome back!",
-        description: "You've been signed in successfully.",
-      });
-
-      return { error: null };
-    } catch (error) {
-      return { error: error as Error };
     }
+
+    toast({
+      title: "Welcome back!",
+      description: "You've been signed in successfully.",
+    });
+
+    return { error: null };
   };
 
-  // =========== Sign Out ===========
+  // Sign Out
   const signOut = async () => {
-    if (USE_MONGODB) {
-      await mongoClient.logout();
-      setUser(null);
-      setProfile(null);
-    } else {
-      await supabase.auth.signOut();
-      setProfile(null);
-    }
+    await mongoClient.logout();
+    setUser(null);
+    setProfile(null);
 
     toast({
       title: "Signed out",
@@ -311,45 +162,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  // =========== Update Profile ===========
+  // Update Profile
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!user) return;
 
-    if (USE_MONGODB) {
-      const updated = await mongoClient.updateProfile({
-        username: updates.username,
-        avatar_url: updates.avatar_url || undefined,
-      });
+    const updated = await mongoClient.updateProfile({
+      username: updates.username,
+      avatar_url: updates.avatar_url || undefined,
+    });
 
-      if (!updated) {
-        toast({
-          variant: "destructive",
-          title: "Update failed",
-          description: "Failed to update profile",
-        });
-        return;
-      }
-
-      setProfile((prev) => (prev ? { ...prev, ...updates } : null));
-      toast({
-        title: "Profile updated",
-        description: "Your profile has been updated successfully.",
-      });
-      return;
-    }
-
-    // Supabase fallback
-    const userId = "id" in user ? user.id : "";
-    const { error } = await supabase
-      .from("profiles")
-      .update(updates)
-      .eq("user_id", userId);
-
-    if (error) {
+    if (!updated) {
       toast({
         variant: "destructive",
         title: "Update failed",
-        description: error.message,
+        description: "Failed to update profile",
       });
       return;
     }
@@ -365,10 +191,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        session,
         profile,
         isLoading,
-        backendType: USE_MONGODB ? "mongodb" : "supabase",
         signUp,
         signIn,
         signOut,
