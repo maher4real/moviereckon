@@ -1,19 +1,11 @@
 {
   "functions": {
-    "api/auth.ts": {
-      "runtime": "nodejs20.x"
-    },
-    "api/user.ts": {
-      "runtime": "nodejs20.x"
-    },
-    "api/health.ts": {
+    "api/**/*.ts": {
       "runtime": "nodejs20.x"
     }
   },
   "rewrites": [
-    { "source": "/api/auth/:path*", "destination": "/api/auth" },
-    { "source": "/api/user/:path*", "destination": "/api/user" },
-    { "source": "/api/health", "destination": "/api/health" },
+    { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
