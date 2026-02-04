@@ -3,7 +3,7 @@
  */
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { connectToDatabase, ObjectId } from "./mongodb";
+import { connectToDatabase, ObjectId } from "./mongodb.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-super-secret-jwt-key-change-in-production";
 const JWT_EXPIRES_IN = "7d";
@@ -60,8 +60,21 @@ export function extractTokenFromHeader(authHeader: string | null): string | null
   return authHeader.substring(7);
 }
 
-export async function getUserFromRequest(request: Request): Promise<UserPayload | null> {
-  const authHeader = request.headers.get("Authorization");
+type RequestLike = {
+  headers:
+    | { get(name: string): string | null }
+    | Record<string, string | string[] | undefined>
+    | { authorization?: string };
+};
+
+export async function getUserFromRequest(request: RequestLike): Promise<UserPayload | null> {
+  const authHeader =
+    // Fetch API Request
+    typeof (request.headers as any)?.get === "function"
+      ? (request.headers as any).get("Authorization")
+      : // Node/Vercel request
+        ((request.headers as any)?.authorization as string | undefined) ?? null;
+
   const token = extractTokenFromHeader(authHeader);
   if (!token) return null;
   return verifyAccessToken(token);

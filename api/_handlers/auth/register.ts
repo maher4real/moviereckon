@@ -3,8 +3,8 @@
  * Register a new user
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { connectToDatabase } from "../../lib/mongodb";
-import { hashPassword, generateTokens, UserPayload } from "../../lib/auth";
+import { connectToDatabase } from "../../lib/mongodb.js";
+import { hashPassword, generateTokens, UserPayload } from "../../lib/auth.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {

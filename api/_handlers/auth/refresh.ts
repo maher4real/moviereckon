@@ -3,8 +3,8 @@
  * Refresh access token using refresh token
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { connectToDatabase, ObjectId } from "../../lib/mongodb";
-import { verifyRefreshToken, generateTokens, UserPayload } from "../../lib/auth";
+import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
+import { verifyRefreshToken, generateTokens, UserPayload } from "../../lib/auth.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {

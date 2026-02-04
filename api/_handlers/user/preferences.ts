@@ -3,8 +3,8 @@
  * Manage user preferences
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { connectToDatabase } from "../../lib/mongodb";
-import { extractTokenFromHeader, verifyAccessToken } from "../../lib/auth";
+import { connectToDatabase } from "../../lib/mongodb.js";
+import { extractTokenFromHeader, verifyAccessToken } from "../../lib/auth.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Authenticate user
