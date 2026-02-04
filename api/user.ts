@@ -3,11 +3,11 @@
  * Routes: /api/user/watch-history, /api/user/liked-items, /api/user/preferences, /api/user/profile, /api/user/clear-history
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import watchHistoryHandler from "./_handlers/user/watch-history";
-import likedItemsHandler from "./_handlers/user/liked-items";
-import preferencesHandler from "./_handlers/user/preferences";
-import profileHandler from "./_handlers/user/profile";
-import clearHistoryHandler from "./_handlers/user/clear-history";
+import watchHistoryHandler from "./_handlers/user/watch-history.js";
+import likedItemsHandler from "./_handlers/user/liked-items.js";
+import preferencesHandler from "./_handlers/user/preferences.js";
+import profileHandler from "./_handlers/user/profile.js";
+import clearHistoryHandler from "./_handlers/user/clear-history.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS headers
