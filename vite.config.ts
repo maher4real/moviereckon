@@ -7,7 +7,7 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => ({
   build: {
     target: "ES2020",
-    minify: "terser",
+    minify: "esbuild",
     sourcemap: false,
     outDir: "dist",
   },
