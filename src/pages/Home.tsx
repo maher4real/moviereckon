@@ -146,6 +146,10 @@ export default function Home() {
     [tvShowsData]
   );
 
+  // Hero movies (top 5 trending)
+  const heroMovies = useMemo(() => filteredTrendingMovies.slice(0, 5), [filteredTrendingMovies]);
+  const currentHeroMovie = heroMovies[heroIndex];
+
   // Auto-rotate hero banner
   useEffect(() => {
     if (heroMovies.length === 0) {
@@ -189,10 +193,6 @@ export default function Home() {
     };
     });
   }, [watchHistory]);
-
-  // Hero movies (top 5 trending)
-  const heroMovies = useMemo(() => filteredTrendingMovies.slice(0, 5), [filteredTrendingMovies]);
-  const currentHeroMovie = heroMovies[heroIndex];
 
   const handleDotClick = useCallback((index: number) => {
     setHeroIndex(index);
