@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, memo } from "react";
+import { useState, useMemo, useEffect, memo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useRecommendations } from "@/hooks/useRecommendations";
@@ -10,9 +10,10 @@ import { ContentCard } from "@/components/ContentCard";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, ArrowUpDown, Filter, RefreshCw } from "lucide-react";
+import { Sparkles, ArrowUpDown, RefreshCw, Film, Tv } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+type ContentTypeFilter = "all" | "movie" | "tv";
 type SortField = "relevance" | "popularity" | "rating" | "release_date";
 type SortOrder = "asc" | "desc";
 
@@ -65,6 +66,7 @@ export default function Reckon() {
   const { items: recommendations, isLoading: reckonLoading, isPersonalized } = useRecommendations();
 
   // Filters and sorting
+  const [contentTypeFilter, setContentTypeFilter] = useState<ContentTypeFilter>("all");
   const [sortField, setSortField] = useState<SortField>("relevance");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [selectedGenre, setSelectedGenre] = useState<string>("");
@@ -107,6 +109,13 @@ export default function Reckon() {
   const processedItems = useMemo(() => {
     let filtered = [...recommendations];
 
+    // Filter by content type
+    if (contentTypeFilter === "movie") {
+      filtered = filtered.filter((item) => "title" in item);
+    } else if (contentTypeFilter === "tv") {
+      filtered = filtered.filter((item) => "first_air_date" in item && !("title" in item));
+    }
+
     // Filter by genre
     if (selectedGenre) {
       const genreId = Number(selectedGenre);
@@ -144,7 +153,7 @@ export default function Reckon() {
     });
 
     return filtered;
-  }, [recommendations, selectedGenre, selectedLanguage, sortField, sortOrder]);
+  }, [recommendations, contentTypeFilter, selectedGenre, selectedLanguage, sortField, sortOrder]);
 
   // Paginate
   const paginatedItems = useMemo(() => {
@@ -157,13 +166,14 @@ export default function Reckon() {
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [selectedGenre, selectedLanguage, sortField, sortOrder, itemsPerPage]);
+  }, [contentTypeFilter, selectedGenre, selectedLanguage, sortField, sortOrder, itemsPerPage]);
 
   const toggleSortOrder = () => {
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
   };
 
   const clearFilters = () => {
+    setContentTypeFilter("all");
     setSelectedGenre("");
     setSelectedLanguage("");
     setSortField("relevance");
@@ -209,12 +219,42 @@ export default function Reckon() {
             </div>
           </div>
 
+          {/* Content Type Toggle */}
+          <div className="flex gap-2 mb-6 bg-card/50 p-3 rounded-lg border border-border">
+            <Button
+              variant={contentTypeFilter === "all" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setContentTypeFilter("all")}
+              className="gap-2"
+            >
+              <Sparkles className="w-4 h-4" />
+              All
+            </Button>
+            <Button
+              variant={contentTypeFilter === "movie" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setContentTypeFilter("movie")}
+              className="gap-2"
+            >
+              <Film className="w-4 h-4" />
+              Movies
+            </Button>
+            <Button
+              variant={contentTypeFilter === "tv" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setContentTypeFilter("tv")}
+              className="gap-2"
+            >
+              <Tv className="w-4 h-4" />
+              TV Series
+            </Button>
+          </div>
+
           {/* Filters */}
           <div className="flex flex-col sm:flex-row gap-3 mb-6 flex-wrap">
             {/* Genre Filter */}
             <Select value={selectedGenre} onValueChange={setSelectedGenre}>
               <SelectTrigger className="w-full sm:w-[160px] bg-card">
-                <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
                 <SelectValue placeholder="All Genres" />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border z-50">

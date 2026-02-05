@@ -206,6 +206,31 @@
     @apply bg-primary/50 text-primary-foreground;
   }
 
+  /* Better placeholder for missing images */
+  .poster-placeholder {
+    @apply bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center;
+  }
+
+  /* Carousel fade edges */
+  .carousel-fade-left {
+    background: linear-gradient(to right, hsl(var(--background)) 0%, transparent 100%);
+  }
+  
+  .carousel-fade-right {
+    background: linear-gradient(to left, hsl(var(--background)) 0%, transparent 100%);
+  }
+
+  /* Like/Watch animation */
+  @keyframes heart-pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+  }
+  
+  .animate-heart-pop {
+    animation: heart-pop 0.3s ease-out;
+  }
+
   /* Safe area for bottom nav on iOS */
   .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);

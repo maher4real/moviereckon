@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { href: "/home", label: "Home", icon: Home },
   { href: "/reckon", label: "Reckon", icon: Sparkles },
-  { href: "/browse", label: "Browse", icon: Grid },
+  { href: "/movies", label: "Movies", icon: Grid },
   { href: "/search", label: "Search", icon: Search },
   { href: "/profile", label: "Profile", icon: User },
 ];
@@ -14,14 +14,7 @@ export default function BottomNav() {
   const location = useLocation();
 
   const isActive = (path: string) => {
-    if (path.includes("?")) {
-      const [basePath, query] = path.split("?");
-      return location.pathname === basePath && location.search.includes(query.split("=")[1]);
-    }
-    if (path === "/browse") {
-      return location.pathname.startsWith("/browse") && !location.search.includes("type=all");
-    }
-    return location.pathname === path;
+    return location.pathname === path || location.pathname.startsWith(path + "/");
   };
 
   return (

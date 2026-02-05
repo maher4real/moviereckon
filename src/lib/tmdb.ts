@@ -189,7 +189,7 @@ export function getPosterUrl(
   path: string | null,
   size: keyof typeof IMAGE_SIZES.poster = "medium",
 ): string {
-  if (!path) return "/placeholder.svg";
+  if (!path) return "https://via.placeholder.com/342x513/1a1a1a/666666?text=No+Image";
   return `${TMDB_IMAGE_BASE}/${IMAGE_SIZES.poster[size]}${path}`;
 }
 
@@ -197,7 +197,7 @@ export function getBackdropUrl(
   path: string | null,
   size: keyof typeof IMAGE_SIZES.backdrop = "large",
 ): string {
-  if (!path) return "/placeholder.svg";
+  if (!path) return "https://via.placeholder.com/1280x720/1a1a1a/666666?text=No+Image";
   return `${TMDB_IMAGE_BASE}/${IMAGE_SIZES.backdrop[size]}${path}`;
 }
 
@@ -205,7 +205,7 @@ export function getProfileUrl(
   path: string | null,
   size: keyof typeof IMAGE_SIZES.profile = "medium",
 ): string {
-  if (!path) return "/placeholder.svg";
+  if (!path) return "https://via.placeholder.com/185x278/1a1a1a/666666?text=No+Photo";
   return `${TMDB_IMAGE_BASE}/${IMAGE_SIZES.profile[size]}${path}`;
 }
 

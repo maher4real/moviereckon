@@ -5,9 +5,14 @@ import { Movie, TVShow, getPosterUrl } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+// Extended type for items with preserved content_type (from watch history)
+interface ContentItem extends Movie, TVShow {
+  _content_type?: "movie" | "tv";
+}
+
 interface ContentCarouselProps {
   title: string;
-  items: (Movie | TVShow)[] | undefined;
+  items: (Movie | TVShow | ContentItem)[] | undefined;
   isLoading: boolean;
   type: "movie" | "tv" | "mixed";
 }
@@ -30,8 +35,14 @@ export default function ContentCarousel({
     });
   };
 
-  const handleItemClick = (item: Movie | TVShow) => {
-    const isTV = "first_air_date" in item;
+  const handleItemClick = (item: Movie | TVShow | ContentItem) => {
+    // Check for preserved content_type first (from watch history)
+    if ("_content_type" in item && item._content_type) {
+      navigate(`/${item._content_type}/${item.id}`);
+      return;
+    }
+    // Fall back to checking for TV show properties
+    const isTV = "first_air_date" in item && item.first_air_date;
     const itemType = type === "mixed" ? (isTV ? "tv" : "movie") : type;
     navigate(`/${itemType}/${item.id}`);
   };
@@ -57,6 +68,11 @@ export default function ContentCarousel({
 
       {/* Carousel Container */}
       <div className="relative group">
+        {/* Left fade effect */}
+        <div className="absolute left-0 top-0 bottom-4 w-8 bg-gradient-to-r from-background to-transparent z-[5] pointer-events-none" />
+        {/* Right fade effect */}
+        <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-background to-transparent z-[5] pointer-events-none" />
+
         {/* Scroll Buttons */}
         <Button
           variant="ghost"
