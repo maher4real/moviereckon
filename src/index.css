@@ -231,6 +231,17 @@
     animation: heart-pop 0.3s ease-out;
   }
 
+  @keyframes watched-pop {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.08); }
+    70% { transform: scale(0.97); }
+    100% { transform: scale(1); }
+  }
+
+  .animate-watched-pop {
+    animation: watched-pop 0.4s ease-out;
+  }
+
   /* Safe area for bottom nav on iOS */
   .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);

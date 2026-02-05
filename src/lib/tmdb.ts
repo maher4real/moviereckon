@@ -4,6 +4,10 @@
 import { supabase } from "@/lib/backendClient";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
+const FALLBACK_POSTER = "/fallbacks/poster.svg";
+const FALLBACK_BACKDROP = "/fallbacks/backdrop.svg";
+const FALLBACK_PROFILE = "/fallbacks/profile.svg";
+const FALLBACK_STILL = "/fallbacks/still.svg";
 
 // Image size configurations
 export const IMAGE_SIZES = {
@@ -189,7 +193,7 @@ export function getPosterUrl(
   path: string | null,
   size: keyof typeof IMAGE_SIZES.poster = "medium",
 ): string {
-  if (!path) return "https://via.placeholder.com/342x513/1a1a1a/666666?text=No+Image";
+  if (!path) return FALLBACK_POSTER;
   return `${TMDB_IMAGE_BASE}/${IMAGE_SIZES.poster[size]}${path}`;
 }
 
@@ -197,7 +201,7 @@ export function getBackdropUrl(
   path: string | null,
   size: keyof typeof IMAGE_SIZES.backdrop = "large",
 ): string {
-  if (!path) return "https://via.placeholder.com/1280x720/1a1a1a/666666?text=No+Image";
+  if (!path) return FALLBACK_BACKDROP;
   return `${TMDB_IMAGE_BASE}/${IMAGE_SIZES.backdrop[size]}${path}`;
 }
 
@@ -205,7 +209,7 @@ export function getProfileUrl(
   path: string | null,
   size: keyof typeof IMAGE_SIZES.profile = "medium",
 ): string {
-  if (!path) return "https://via.placeholder.com/185x278/1a1a1a/666666?text=No+Photo";
+  if (!path) return FALLBACK_PROFILE;
   return `${TMDB_IMAGE_BASE}/${IMAGE_SIZES.profile[size]}${path}`;
 }
 
@@ -359,7 +363,7 @@ export function getStillUrl(
   path: string | null,
   size: "w185" | "w300" | "w500" | "original" = "w300",
 ): string {
-  if (!path) return "/placeholder.svg";
+  if (!path) return FALLBACK_STILL;
   return `${TMDB_IMAGE_BASE}/${size}${path}`;
 }
 
@@ -405,6 +409,9 @@ export interface DiscoverFilters {
   with_genres?: string;
   with_original_language?: string;
   sort_by?: string;
+  with_watch_providers?: string;
+  watch_region?: string;
+  with_networks?: string;
   "primary_release_date.gte"?: string;
   "primary_release_date.lte"?: string;
   "vote_average.gte"?: string | number;
@@ -419,6 +426,9 @@ export async function discoverMovies(filters: DiscoverFilters = {}): Promise<TMD
 
   if (filters.with_genres) params.with_genres = filters.with_genres;
   if (filters.with_original_language) params.with_original_language = filters.with_original_language;
+  if (filters.with_watch_providers) params.with_watch_providers = filters.with_watch_providers;
+  if (filters.watch_region) params.watch_region = filters.watch_region;
+  if (filters.with_networks) params.with_networks = filters.with_networks;
   if (filters["primary_release_date.gte"]) params["primary_release_date.gte"] = filters["primary_release_date.gte"];
   if (filters["primary_release_date.lte"]) params["primary_release_date.lte"] = filters["primary_release_date.lte"];
   if (filters["vote_average.gte"]) params["vote_average.gte"] = filters["vote_average.gte"];
@@ -435,6 +445,11 @@ export async function discoverTVShows(filters: DiscoverFilters = {}): Promise<TM
 
   if (filters.with_genres) params.with_genres = filters.with_genres;
   if (filters.with_original_language) params.with_original_language = filters.with_original_language;
+  if (filters.with_watch_providers) params.with_watch_providers = filters.with_watch_providers;
+  if (filters.watch_region) params.watch_region = filters.watch_region;
+  if (filters.with_networks) params.with_networks = filters.with_networks;
+  if (filters["vote_average.gte"]) params["vote_average.gte"] = filters["vote_average.gte"];
+  if (filters["vote_count.gte"]) params["vote_count.gte"] = filters["vote_count.gte"];
 
   return fetchTMDB<TMDBResponse<TVShow>>("/discover/tv", params);
 }
@@ -503,6 +518,6 @@ export function getLanguageBadgeClass(langCode: string): string {
 
 // Get provider logo URL
 export function getProviderLogoUrl(path: string | null): string {
-  if (!path) return "/placeholder.svg";
+  if (!path) return FALLBACK_STILL;
   return `${TMDB_IMAGE_BASE}/w92${path}`;
 }

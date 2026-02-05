@@ -1,9 +1,10 @@
 import { memo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Heart, HeartOff } from "lucide-react";
+import { Eye, Heart } from "lucide-react";
 import { Movie, TVShow, getPosterUrl, getLanguageLabel } from "@/lib/tmdb";
 import { useUserData } from "@/hooks/useUserData";
 import { cn } from "@/lib/utils";
+import MediaImage from "@/components/MediaImage";
 
 interface ContentCardProps {
   item: Movie | TVShow;
@@ -83,11 +84,12 @@ function ContentCardComponent({ item, type, showActions = true }: ContentCardPro
     >
       {/* Poster */}
       <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
-        <img
+        <MediaImage
           src={getPosterUrl(item.poster_path, "medium")}
           alt={title}
           className="w-full h-full object-cover"
           loading="lazy"
+          fallbackSrc="/fallbacks/poster.svg"
         />
 
         {/* Hover Overlay */}
@@ -107,7 +109,7 @@ function ContentCardComponent({ item, type, showActions = true }: ContentCardPro
                 watched
                   ? "bg-primary text-primary-foreground"
                   : "bg-background/80 text-foreground hover:bg-primary/20 hover:text-primary",
-                watchAnimating && "scale-110"
+                watchAnimating && "animate-watched-pop"
               )}
               title={watched ? "Watched" : "Mark as watched"}
             >
@@ -121,7 +123,7 @@ function ContentCardComponent({ item, type, showActions = true }: ContentCardPro
                 liked
                   ? "bg-primary text-primary-foreground"
                   : "bg-background/80 text-foreground hover:bg-primary/20 hover:text-primary",
-                likeAnimating && "scale-125"
+                likeAnimating && "animate-heart-pop"
               )}
               title={liked ? "Unlike" : "Like"}
             >

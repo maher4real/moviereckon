@@ -36,9 +36,26 @@ export interface UserPreferences {
   preferred_genres: number[];
 }
 
+export type FeedbackType = mongoClient.FeedbackType;
+
+export interface FeedbackItem {
+  id: string;
+  user_id: string;
+  content_id: number;
+  content_type: "movie" | "tv";
+  feedback_type: FeedbackType;
+  title: string;
+  poster_path: string | null;
+  genres: number[];
+  language: string;
+  created_at: string;
+  updated_at: string;
+}
+
 interface UserDataContextType {
   watchHistory: WatchedItem[];
   likedItems: LikedItem[];
+  feedbackItems: FeedbackItem[];
   preferences: UserPreferences | null;
   isLoading: boolean;
   addToWatchHistory: (item: Omit<WatchedItem, "id" | "user_id" | "watched_at">) => Promise<void>;
@@ -46,6 +63,16 @@ interface UserDataContextType {
   isWatched: (contentId: number, contentType: "movie" | "tv") => boolean;
   toggleLike: (item: Omit<LikedItem, "id" | "user_id" | "liked_at">) => Promise<void>;
   isLiked: (contentId: number, contentType: "movie" | "tv") => boolean;
+  setFeedback: (item: {
+    content_id: number;
+    content_type: "movie" | "tv";
+    feedback_type: FeedbackType;
+    title?: string;
+    poster_path?: string | null;
+    genres?: number[];
+    language?: string;
+  }) => Promise<void>;
+  getFeedback: (contentId: number, contentType: "movie" | "tv") => FeedbackType | null;
   getRecentlyWatched: (limit?: number) => WatchedItem[];
   getTopGenres: (limit?: number) => number[];
   clearHistory: () => Promise<void>;
@@ -59,6 +86,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const [watchHistory, setWatchHistory] = useState<WatchedItem[]>([]);
   const [likedItems, setLikedItems] = useState<LikedItem[]>([]);
+  const [feedbackItems, setFeedbackItems] = useState<FeedbackItem[]>([]);
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -75,20 +103,23 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     if (!userId) {
       setWatchHistory([]);
       setLikedItems([]);
+      setFeedbackItems([]);
       setPreferences(null);
       setIsLoading(false);
       return;
     }
 
     try {
-      const [history, liked, prefs] = await Promise.all([
+      const [history, liked, feedback, prefs] = await Promise.all([
         mongoClient.fetchWatchHistory(),
         mongoClient.fetchLikedItems(),
+        mongoClient.fetchUserFeedback(),
         mongoClient.fetchUserPreferences(),
       ]);
 
       setWatchHistory(history as WatchedItem[]);
       setLikedItems(liked as LikedItem[]);
+      setFeedbackItems(feedback as FeedbackItem[]);
       setPreferences(prefs as UserPreferences | null);
     } catch (error) {
       console.error("Error fetching user data:", error);
@@ -195,6 +226,64 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     [likedItems]
   );
 
+  const setFeedback = useCallback(
+    async (item: {
+      content_id: number;
+      content_type: "movie" | "tv";
+      feedback_type: FeedbackType;
+      title?: string;
+      poster_path?: string | null;
+      genres?: number[];
+      language?: string;
+    }) => {
+      const userId = getUserId();
+      if (!userId) return;
+
+      try {
+        const result = await mongoClient.setContentFeedback(item);
+
+        if (result.action === "removed") {
+          setFeedbackItems((prev) =>
+            prev.filter(
+              (feedback) =>
+                !(feedback.content_id === item.content_id && feedback.content_type === item.content_type)
+            )
+          );
+          return;
+        }
+
+        if (result.data) {
+          setFeedbackItems((prev) => {
+            const filtered = prev.filter(
+              (feedback) =>
+                !(feedback.content_id === result.data!.content_id && feedback.content_type === result.data!.content_type)
+            );
+            return [result.data as FeedbackItem, ...filtered];
+          });
+        }
+      } catch (error) {
+        console.error("Error setting feedback:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to update feedback",
+        });
+      }
+    },
+    [getUserId, toast]
+  );
+
+  const getFeedback = useCallback(
+    (contentId: number, contentType: "movie" | "tv") => {
+      return (
+        feedbackItems.find(
+          (item) => item.content_id === contentId && item.content_type === contentType
+        )?.feedback_type || null
+      );
+    },
+    [feedbackItems]
+  );
+
   // Get Recently Watched
   const getRecentlyWatched = useCallback(
     (limit = 10) => {
@@ -262,6 +351,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       value={{
         watchHistory,
         likedItems,
+        feedbackItems,
         preferences,
         isLoading,
         addToWatchHistory,
@@ -269,6 +359,8 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
         isWatched,
         toggleLike,
         isLiked,
+        setFeedback,
+        getFeedback,
         getRecentlyWatched,
         getTopGenres,
         clearHistory,

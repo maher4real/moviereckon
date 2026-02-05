@@ -25,6 +25,9 @@ import BottomNav from "@/components/BottomNav";
 import ContentCarousel from "@/components/ContentCarousel";
 import WhereToWatch from "@/components/WhereToWatch";
 import CastList from "@/components/CastList";
+import MediaImage from "@/components/MediaImage";
+import FeedbackButtons from "@/components/FeedbackButtons";
+import CommentsSection from "@/components/CommentsSection";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -54,6 +57,8 @@ export default function TVDetail() {
   const [showTrailer, setShowTrailer] = useState(false);
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
   const [expandedEpisode, setExpandedEpisode] = useState<number | null>(null);
+  const [watchAnimating, setWatchAnimating] = useState(false);
+  const [likeAnimating, setLikeAnimating] = useState(false);
 
   const tvId = Number(id);
 
@@ -128,6 +133,8 @@ export default function TVDetail() {
 
   const handleMarkWatched = async () => {
     if (!tvShow) return;
+    setWatchAnimating(true);
+    setTimeout(() => setWatchAnimating(false), 420);
     await addToWatchHistory({
       content_id: tvShow.id,
       content_type: "tv",
@@ -140,6 +147,8 @@ export default function TVDetail() {
 
   const handleToggleLike = async () => {
     if (!tvShow) return;
+    setLikeAnimating(true);
+    setTimeout(() => setLikeAnimating(false), 420);
     await toggleLike({
       content_id: tvShow.id,
       content_type: "tv",
@@ -199,9 +208,11 @@ export default function TVDetail() {
 
       {/* Backdrop */}
       <div className="relative h-[50vh] md:h-[70vh]">
-        <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: `url(${getBackdropUrl(tvShow.backdrop_path, "original")})` }}
+        <MediaImage
+          src={getBackdropUrl(tvShow.backdrop_path, "original")}
+          alt={`${tvShow.name} backdrop`}
+          className="absolute inset-0 w-full h-full object-cover"
+          fallbackSrc="/fallbacks/backdrop.svg"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent" />
         <div className="absolute inset-0 hero-gradient" />
@@ -222,10 +233,11 @@ export default function TVDetail() {
         <div className="flex flex-col md:flex-row gap-8">
           {/* Poster */}
           <div className="hidden md:block flex-shrink-0">
-            <img
+            <MediaImage
               src={getPosterUrl(tvShow.poster_path, "large")}
               alt={tvShow.name}
               className="w-[280px] lg:w-[320px] rounded-lg shadow-2xl"
+              fallbackSrc="/fallbacks/poster.svg"
             />
           </div>
 
@@ -233,10 +245,11 @@ export default function TVDetail() {
           <div className="flex-1">
             {/* Mobile Poster */}
             <div className="md:hidden flex gap-4 mb-6">
-              <img
+              <MediaImage
                 src={getPosterUrl(tvShow.poster_path, "medium")}
                 alt={tvShow.name}
                 className="w-32 rounded-lg shadow-lg"
+                fallbackSrc="/fallbacks/poster.svg"
               />
               <div className="flex-1">
                 <h1 className="text-2xl font-bold mb-2">{tvShow.name}</h1>
@@ -305,7 +318,8 @@ export default function TVDetail() {
                   "action-btn",
                   watched
                     ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                    : "bg-muted text-foreground hover:bg-primary/20 hover:text-primary"
+                    : "bg-muted text-foreground hover:bg-primary/20 hover:text-primary",
+                  watchAnimating && "animate-watched-pop"
                 )}
                 onClick={handleMarkWatched}
               >
@@ -318,7 +332,8 @@ export default function TVDetail() {
                   "action-btn",
                   liked
                     ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                    : "bg-muted text-foreground hover:bg-primary/20 hover:text-primary"
+                    : "bg-muted text-foreground hover:bg-primary/20 hover:text-primary",
+                  likeAnimating && "animate-heart-pop"
                 )}
                 onClick={handleToggleLike}
               >
@@ -326,6 +341,15 @@ export default function TVDetail() {
                 {liked ? "Liked" : "Like"}
               </Button>
             </div>
+
+            <FeedbackButtons
+              contentId={tvShow.id}
+              contentType="tv"
+              title={tvShow.name}
+              posterPath={tvShow.poster_path}
+              genres={tvShow.genres.map((genre) => genre.id)}
+              language={tvShow.original_language}
+            />
 
             {/* Overview */}
             <div className="mb-8">
@@ -338,6 +362,7 @@ export default function TVDetail() {
 
             {/* Cast */}
             <CastList cast={cast} />
+            <CommentsSection contentId={tvShow.id} contentType="tv" />
           </div>
         </div>
 
@@ -395,11 +420,12 @@ export default function TVDetail() {
                           >
                             {/* Episode Thumbnail */}
                             <div className="relative flex-shrink-0">
-                              <img
+                              <MediaImage
                                 src={getStillUrl(episode.still_path)}
                                 alt={episode.name}
                                 className="w-32 sm:w-40 h-20 sm:h-24 object-cover rounded"
                                 loading="lazy"
+                                fallbackSrc="/fallbacks/still.svg"
                               />
                               {episode.runtime && (
                                 <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-background/80 rounded text-xs flex items-center gap-1">

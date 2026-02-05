@@ -1,12 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { getTrendingMovies, getTrendingTVShows, getPosterUrl } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import MediaImage from "@/components/MediaImage";
 import { Film, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
+import { cn } from "@/lib/utils";
 
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z
@@ -25,11 +29,49 @@ export default function Auth() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [posterOffset, setPosterOffset] = useState(0);
 
   // Form state
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
+
+  const { data: trendingMovies } = useQuery({
+    queryKey: ["auth-bg-trending-movies"],
+    queryFn: () => getTrendingMovies("week"),
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const { data: trendingTV } = useQuery({
+    queryKey: ["auth-bg-trending-tv"],
+    queryFn: () => getTrendingTVShows("week"),
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const backgroundPosters = useMemo(() => {
+    const combined = [...(trendingMovies || []), ...(trendingTV || [])]
+      .filter((item) => item.poster_path)
+      .slice(0, 28);
+
+    if (combined.length > 0) {
+      return combined.map((item, index) => ({
+        id: `${item.id}-${index}`,
+        src: getPosterUrl(item.poster_path, "small"),
+      }));
+    }
+
+    return Array.from({ length: 28 }, (_, index) => ({
+      id: `fallback-${index}`,
+      src: "/fallbacks/poster.svg",
+    }));
+  }, [trendingMovies, trendingTV]);
+
+  const visiblePosterTiles = useMemo(() => {
+    return Array.from({ length: 35 }, (_, index) => {
+      const pointer = (posterOffset + index) % backgroundPosters.length;
+      return backgroundPosters[pointer];
+    });
+  }, [backgroundPosters, posterOffset]);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -37,6 +79,16 @@ export default function Auth() {
       navigate("/home");
     }
   }, [user, isLoading, navigate]);
+
+  useEffect(() => {
+    if (!backgroundPosters.length) return;
+
+    const interval = setInterval(() => {
+      setPosterOffset((prev) => (prev + 1) % backgroundPosters.length);
+    }, 3200);
+
+    return () => clearInterval(interval);
+  }, [backgroundPosters.length]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -96,8 +148,29 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      {/* Background gradient effects */}
+      {/* Background poster carousel + gradient effects */}
       <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute inset-0 grid grid-cols-5 sm:grid-cols-6 lg:grid-cols-7 gap-2 p-2 opacity-30">
+          {visiblePosterTiles.map((poster, index) => (
+            <div
+              key={`${poster.id}-${index}`}
+              className={cn(
+                "relative aspect-[2/3] rounded-md overflow-hidden transition-transform duration-700",
+                index % 2 === 0 ? "translate-y-2" : "-translate-y-2"
+              )}
+            >
+              <MediaImage
+                src={poster.src}
+                alt=""
+                aria-hidden="true"
+                className="w-full h-full object-cover"
+                fallbackSrc="/fallbacks/poster.svg"
+                loading="lazy"
+              />
+            </div>
+          ))}
+        </div>
+        <div className="absolute inset-0 bg-gradient-to-br from-background/95 via-background/85 to-background/95" />
         <div className="absolute top-1/4 -left-1/4 w-1/2 h-1/2 bg-primary/10 rounded-full blur-[100px]" />
         <div className="absolute bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-secondary/10 rounded-full blur-[100px]" />
       </div>

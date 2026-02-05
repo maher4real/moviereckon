@@ -6,6 +6,7 @@ import { searchMulti, Movie, TVShow, getPosterUrl, getLanguageBadgeClass } from 
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
+import MediaImage from "@/components/MediaImage";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -27,11 +28,12 @@ const ResultCard = memo(({ item, onClick }: { item: Movie | TVShow; onClick: () 
   return (
     <div onClick={onClick} className="cursor-pointer group">
       <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
-        <img
+        <MediaImage
           src={getPosterUrl(item.poster_path, "medium")}
           alt={title}
           className="w-full h-full object-cover"
           loading="lazy"
+          fallbackSrc="/fallbacks/poster.svg"
         />
 
         {/* Hover Overlay */}

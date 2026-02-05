@@ -28,6 +28,8 @@ import { Sparkles } from "lucide-react";
 
 // Memoized carousel for performance
 const MemoizedCarousel = memo(ContentCarousel);
+const isAnimeLike = (item: Movie | TVShow) =>
+  item.original_language === "ja" && item.genre_ids?.includes(16);
 
 export default function Home() {
   const { user, isLoading: authLoading, profile } = useAuth();
@@ -113,7 +115,9 @@ export default function Home() {
   const filteredNowPlaying = useMemo(() => {
     if (!nowPlayingData?.results) return [];
     const today = new Date().toISOString().split("T")[0];
-    return nowPlayingData.results.filter((movie) => movie.release_date <= today);
+    return nowPlayingData.results.filter(
+      (movie) => movie.release_date <= today && !isAnimeLike(movie)
+    );
   }, [nowPlayingData]);
 
   // Filter Upcoming to only show movies releasing tomorrow or later
@@ -122,19 +126,41 @@ export default function Home() {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toISOString().split("T")[0];
-    return upcomingData.results.filter((movie) => movie.release_date >= tomorrowStr);
+    return upcomingData.results.filter(
+      (movie) => movie.release_date >= tomorrowStr && !isAnimeLike(movie)
+    );
   }, [upcomingData]);
+
+  const filteredTrendingMovies = useMemo(
+    () => (trendingMovies || []).filter((movie) => !isAnimeLike(movie)),
+    [trendingMovies]
+  );
+
+  const filteredTopRatedMovies = useMemo(
+    () => (topRatedData?.results || []).filter((movie) => !isAnimeLike(movie)),
+    [topRatedData]
+  );
+
+  const filteredTvShows = useMemo(
+    () => (tvShowsData?.results || []).filter((show) => !isAnimeLike(show)),
+    [tvShowsData]
+  );
 
   // Auto-rotate hero banner
   useEffect(() => {
-    if (!trendingMovies?.length) return;
+    if (heroMovies.length === 0) {
+      setHeroIndex(0);
+      return;
+    }
+
+    setHeroIndex((prev) => (prev >= heroMovies.length ? 0 : prev));
 
     const interval = setInterval(() => {
-      setHeroIndex((prev) => (prev + 1) % Math.min(5, trendingMovies.length));
+      setHeroIndex((prev) => (prev + 1) % heroMovies.length);
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [trendingMovies]);
+  }, [heroMovies.length]);
 
   // Get recently watched for recommendations - memoized
   const recentlyWatched = useMemo(() => {
@@ -165,7 +191,7 @@ export default function Home() {
   }, [watchHistory]);
 
   // Hero movies (top 5 trending)
-  const heroMovies = useMemo(() => trendingMovies?.slice(0, 5) || [], [trendingMovies]);
+  const heroMovies = useMemo(() => filteredTrendingMovies.slice(0, 5), [filteredTrendingMovies]);
   const currentHeroMovie = heroMovies[heroIndex];
 
   const handleDotClick = useCallback((index: number) => {
@@ -250,7 +276,7 @@ export default function Home() {
           {/* Trending Now */}
           <MemoizedCarousel
             title="🔥 Trending Now"
-            items={trendingMovies as (Movie | TVShow)[]}
+            items={filteredTrendingMovies as (Movie | TVShow)[]}
             isLoading={trendingLoading}
             type="movie"
           />
@@ -314,7 +340,7 @@ export default function Home() {
           {/* Trending TV Series */}
           <MemoizedCarousel
             title="📺 Trending TV Series"
-            items={tvShowsData?.results as (Movie | TVShow)[]}
+            items={filteredTvShows as (Movie | TVShow)[]}
             isLoading={tvLoading}
             type="tv"
           />
@@ -322,7 +348,7 @@ export default function Home() {
           {/* Top Rated */}
           <MemoizedCarousel
             title="⭐ Top Rated"
-            items={topRatedData?.results as (Movie | TVShow)[]}
+            items={filteredTopRatedMovies as (Movie | TVShow)[]}
             isLoading={topRatedLoading}
             type="movie"
           />

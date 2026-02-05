@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Movie, TVShow, getPosterUrl } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import MediaImage from "@/components/MediaImage";
 
 // Extended type for items with preserved content_type (from watch history)
 interface ContentItem extends Movie, TVShow {
@@ -118,11 +119,12 @@ export default function ContentCarousel({
                 >
                   {/* Poster */}
                   <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
-                    <img
+                    <MediaImage
                       src={getPosterUrl(item.poster_path, "medium")}
                       alt={getTitle(item)}
                       className="w-full h-full object-cover"
                       loading="lazy"
+                      fallbackSrc="/fallbacks/poster.svg"
                     />
 
                     {/* Hover Overlay */}

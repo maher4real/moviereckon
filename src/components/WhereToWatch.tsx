@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { ExternalLink } from "lucide-react";
 import { WatchProvider, getProviderLogoUrl } from "@/lib/tmdb";
+import MediaImage from "@/components/MediaImage";
 
 interface WhereToWatchProps {
   providers: {
@@ -70,10 +71,11 @@ function WhereToWatch({ providers, link }: WhereToWatchProps) {
               rel="noopener noreferrer"
               className="flex items-center gap-2 px-3 py-2 bg-card hover:bg-card/80 rounded-lg border border-border transition-colors group"
             >
-              <img
+              <MediaImage
                 src={getProviderLogoUrl(provider.logo_path)}
                 alt={provider.provider_name}
                 className="w-8 h-8 rounded"
+                fallbackSrc="/fallbacks/still.svg"
               />
               <div className="flex flex-col">
                 <span className="text-sm font-medium group-hover:text-primary transition-colors">

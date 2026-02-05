@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, memo } from "react";
+import { useState, useEffect, useMemo, memo, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import {
   discoverMovies,
@@ -14,10 +14,12 @@ import {
   Genre,
   getPosterUrl,
   getLanguageBadgeClass,
+  DiscoverFilters,
 } from "@/lib/tmdb";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
+import MediaImage from "@/components/MediaImage";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,6 +27,13 @@ import { cn } from "@/lib/utils";
 
 type ContentType = "all" | "bollywood" | "hollywood" | "gujarati" | "tamil" | "telugu" | "tv" | "now_playing" | "upcoming";
 type SortOption = "popularity.desc" | "popularity.asc" | "vote_average.desc" | "vote_average.asc" | "release_date.desc" | "release_date.asc" | "revenue.desc";
+
+interface ContentPage {
+  results: (Movie | TVShow)[];
+  total_pages: number;
+  page: number;
+  total_results: number;
+}
 
 const sortOptions: { value: SortOption; label: string }[] = [
   { value: "popularity.desc", label: "Most Popular" },
@@ -36,13 +45,9 @@ const sortOptions: { value: SortOption; label: string }[] = [
   { value: "revenue.desc", label: "Highest Grossing" },
 ];
 
-const ITEMS_PER_PAGE_OPTIONS = [12, 24, 36, 48];
-
-// Generate year options from current year to 1950
 const currentYear = new Date().getFullYear();
 const yearOptions = Array.from({ length: currentYear - 1949 }, (_, i) => currentYear - i);
 
-// Language code mapping
 const languageMap: Record<string, string> = {
   bollywood: "hi",
   hollywood: "en",
@@ -51,41 +56,42 @@ const languageMap: Record<string, string> = {
   telugu: "te",
 };
 
+const isAnimeLike = (item: Movie | TVShow) =>
+  item.original_language === "ja" && item.genre_ids?.includes(16);
+
 const PosterCard = memo(({ item, onClick }: { item: Movie | TVShow; onClick: () => void }) => {
-  const getTitle = (item: Movie | TVShow): string => {
-    return "title" in item ? item.title : item.name;
+  const getTitle = (entry: Movie | TVShow): string => {
+    return "title" in entry ? entry.title : entry.name;
   };
 
-  const getYear = (item: Movie | TVShow): string => {
-    const date = "release_date" in item ? item.release_date : item.first_air_date;
+  const getYear = (entry: Movie | TVShow): string => {
+    const date = "release_date" in entry ? entry.release_date : entry.first_air_date;
     return date?.split("-")[0] || "";
   };
 
   return (
     <div onClick={onClick} className="cursor-pointer group">
       <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
-        <img
+        <MediaImage
           src={getPosterUrl(item.poster_path, "medium")}
           alt={getTitle(item)}
           className="w-full h-full object-cover"
           loading="lazy"
+          fallbackSrc="/fallbacks/poster.svg"
         />
 
-        {/* Hover Overlay */}
         <div className="absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
           <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
             <span className="text-xl text-primary-foreground">▶</span>
           </div>
         </div>
 
-        {/* Rating Badge */}
         {item.vote_average > 0 && (
           <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
             ⭐ {item.vote_average.toFixed(1)}
           </div>
         )}
 
-        {/* Language Badge */}
         <div className={cn("absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold", getLanguageBadgeClass(item.original_language))}>
           {item.original_language.toUpperCase()}
         </div>
@@ -105,6 +111,7 @@ export default function Browse() {
   const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const [contentType, setContentType] = useState<ContentType>(
     (searchParams.get("type") as ContentType) || "all"
@@ -114,19 +121,13 @@ export default function Browse() {
   const [sortBy, setSortBy] = useState<SortOption>(
     (searchParams.get("sort") as SortOption) || "popularity.desc"
   );
-  const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
-  const [itemsPerPage, setItemsPerPage] = useState(
-    Number(searchParams.get("perPage")) || 24
-  );
 
-  // Redirect if no user
   useEffect(() => {
     if (!authLoading && !user) {
       navigate("/");
     }
   }, [user, authLoading, navigate]);
 
-  // Fetch genres
   const { data: movieGenres } = useQuery({
     queryKey: ["movie-genres"],
     queryFn: getMovieGenres,
@@ -139,85 +140,120 @@ export default function Browse() {
     staleTime: 1000 * 60 * 60,
   });
 
-  // Get appropriate genres based on content type
   const genres: Genre[] = contentType === "tv" ? tvGenres || [] : movieGenres || [];
 
-  // Fetch content based on filters
-  const { data: contentData, isLoading } = useQuery({
-    queryKey: ["browse", contentType, selectedGenre, selectedYear, sortBy, page],
-    queryFn: async () => {
-      // Special cases for now_playing and upcoming
+  const {
+    data: contentData,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery<ContentPage>({
+    queryKey: ["browse-infinite", contentType, selectedGenre, selectedYear, sortBy],
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) => {
+      const page = Number(pageParam) || 1;
+
       if (contentType === "now_playing") {
         return getNowPlayingMovies(page);
       }
+
       if (contentType === "upcoming") {
         return getUpcomingMovies(page);
       }
 
-      const filters: Record<string, any> = {
+      const filters: DiscoverFilters = {
         page,
         sort_by: sortBy,
         with_genres: selectedGenre || undefined,
       };
 
-      // Add year filter
-      if (selectedYear) {
+      if (selectedYear && contentType !== "tv") {
         filters["primary_release_date.gte"] = `${selectedYear}-01-01`;
         filters["primary_release_date.lte"] = `${selectedYear}-12-31`;
       }
 
-      // Handle regional content
       if (languageMap[contentType]) {
-        return discoverMovies({ ...filters, with_original_language: languageMap[contentType] });
+        return discoverMovies({
+          ...filters,
+          with_original_language: languageMap[contentType],
+        });
       }
 
-      switch (contentType) {
-        case "tv":
-          return discoverTVShows(filters);
-        default:
-          return discoverMovies(filters);
+      if (contentType === "tv") {
+        return discoverTVShows(filters);
       }
+
+      return discoverMovies(filters);
+    },
+    getNextPageParam: (lastPage) => {
+      if (!lastPage?.page || !lastPage?.total_pages) return undefined;
+      return lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined;
     },
     staleTime: 1000 * 60 * 5,
+    enabled: !authLoading && !!user,
   });
 
-  // Filter content based on date for special categories
   const filteredContent = useMemo(() => {
-    if (!contentData?.results) return [];
-    
+    if (!contentData?.pages) return [];
+
     const today = new Date().toISOString().split("T")[0];
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toISOString().split("T")[0];
 
-    if (contentType === "now_playing") {
-      return contentData.results.filter((movie: Movie) => movie.release_date <= today);
-    }
-    if (contentType === "upcoming") {
-      return contentData.results.filter((movie: Movie) => movie.release_date >= tomorrowStr);
-    }
-    
-    return contentData.results;
+    const dedupe = new Set<string>();
+    const merged: (Movie | TVShow)[] = [];
+
+    contentData.pages.forEach((page) => {
+      (page.results || []).forEach((item) => {
+        const isTV = "first_air_date" in item;
+        const key = `${isTV ? "tv" : "movie"}:${item.id}`;
+        if (dedupe.has(key)) return;
+
+        if (contentType === "now_playing" && "release_date" in item && item.release_date > today) return;
+        if (contentType === "upcoming" && "release_date" in item && item.release_date < tomorrowStr) return;
+        if (isAnimeLike(item)) return;
+
+        dedupe.add(key);
+        merged.push(item);
+      });
+    });
+
+    return merged;
   }, [contentData, contentType]);
 
-  // Update URL params - include page and perPage
   useEffect(() => {
     const params = new URLSearchParams();
     if (contentType !== "all") params.set("type", contentType);
     if (selectedGenre) params.set("genre", selectedGenre);
     if (selectedYear) params.set("year", selectedYear);
     if (sortBy !== "popularity.desc") params.set("sort", sortBy);
-    if (page > 1) params.set("page", String(page));
-    if (itemsPerPage !== 24) params.set("perPage", String(itemsPerPage));
     setSearchParams(params, { replace: true });
-  }, [contentType, selectedGenre, selectedYear, sortBy, page, itemsPerPage, setSearchParams]);
+  }, [contentType, selectedGenre, selectedYear, sortBy, setSearchParams]);
+
+  useEffect(() => {
+    const node = loadMoreRef.current;
+    if (!node || !hasNextPage) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { rootMargin: "600px 0px" }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage, filteredContent.length]);
 
   const handleItemClick = (item: Movie | TVShow) => {
     const isTV = "first_air_date" in item;
     navigate(`/${isTV ? "tv" : "movie"}/${item.id}`);
   };
 
-  // Check if year/genre/sort filters should be disabled
   const isSpecialCategory = contentType === "now_playing" || contentType === "upcoming";
 
   if (authLoading) {
@@ -234,12 +270,9 @@ export default function Browse() {
 
       <main className="flex-1 pt-20 pb-12">
         <div className="container mx-auto px-4">
-          {/* Page Title */}
           <h1 className="text-3xl font-bold mb-6">Browse</h1>
 
-          {/* Filters */}
           <div className="flex flex-col gap-4 mb-8">
-            {/* Content Type Tabs - Scrollable on mobile */}
             <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
               <Tabs
                 value={contentType}
@@ -247,7 +280,6 @@ export default function Browse() {
                   setContentType(value as ContentType);
                   setSelectedGenre("");
                   setSelectedYear("");
-                  setPage(1);
                 }}
               >
                 <TabsList className="bg-muted inline-flex w-auto">
@@ -265,13 +297,9 @@ export default function Browse() {
             </div>
 
             <div className="flex gap-3 flex-wrap">
-              {/* Genre Filter */}
               <Select
                 value={selectedGenre}
-                onValueChange={(value) => {
-                  setSelectedGenre(value === "all" ? "" : value);
-                  setPage(1);
-                }}
+                onValueChange={(value) => setSelectedGenre(value === "all" ? "" : value)}
                 disabled={isSpecialCategory}
               >
                 <SelectTrigger className="w-[140px] sm:w-[180px] bg-card">
@@ -287,14 +315,10 @@ export default function Browse() {
                 </SelectContent>
               </Select>
 
-              {/* Year Filter */}
               <Select
                 value={selectedYear}
-                onValueChange={(value) => {
-                  setSelectedYear(value === "all" ? "" : value);
-                  setPage(1);
-                }}
-                disabled={isSpecialCategory}
+                onValueChange={(value) => setSelectedYear(value === "all" ? "" : value)}
+                disabled={isSpecialCategory || contentType === "tv"}
               >
                 <SelectTrigger className="w-[120px] sm:w-[140px] bg-card">
                   <SelectValue placeholder="All Years" />
@@ -309,42 +333,18 @@ export default function Browse() {
                 </SelectContent>
               </Select>
 
-              {/* Sort By */}
               <Select
                 value={sortBy}
-                onValueChange={(value) => {
-                  setSortBy(value as SortOption);
-                  setPage(1);
-                }}
+                onValueChange={(value) => setSortBy(value as SortOption)}
                 disabled={isSpecialCategory}
               >
                 <SelectTrigger className="w-[140px] sm:w-[180px] bg-card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border z-50">
-                {sortOptions.map((option) => (
+                  {sortOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* Items per page */}
-              <Select
-                value={String(itemsPerPage)}
-                onValueChange={(value) => {
-                  setItemsPerPage(Number(value));
-                  setPage(1);
-                }}
-              >
-                <SelectTrigger className="w-[120px] sm:w-[140px] bg-card">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-popover border-border z-50">
-                  {ITEMS_PER_PAGE_OPTIONS.map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n} per page
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -352,7 +352,6 @@ export default function Browse() {
             </div>
           </div>
 
-          {/* Content Grid */}
           {isLoading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {Array.from({ length: 18 }).map((_, i) => (
@@ -368,57 +367,29 @@ export default function Browse() {
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                 {filteredContent.map((item) => (
                   <PosterCard
-                    key={item.id}
+                    key={`${item.id}-${"first_air_date" in item ? "tv" : "movie"}`}
                     item={item}
                     onClick={() => handleItemClick(item)}
                   />
                 ))}
               </div>
 
-              {/* Empty State */}
               {filteredContent.length === 0 && (
                 <div className="text-center py-12">
                   <p className="text-muted-foreground">No content found for the selected filters.</p>
                 </div>
               )}
 
-              {/* Pagination */}
-              {contentData && contentData.total_pages > 1 && (
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8">
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => setPage(1)}
-                      disabled={page === 1}
-                    >
-                      First
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                    >
-                      Previous
-                    </Button>
-                    <span className="flex items-center px-4 text-sm text-muted-foreground">
-                      Page {page} of {Math.min(contentData.total_pages, 500)}
-                    </span>
-                    <Button
-                      variant="outline"
-                      onClick={() => setPage((p) => p + 1)}
-                      disabled={page >= Math.min(contentData.total_pages, 500)}
-                    >
-                      Next
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => setPage(Math.min(contentData.total_pages, 500))}
-                      disabled={page >= Math.min(contentData.total_pages, 500)}
-                    >
-                      Last
-                    </Button>
-                  </div>
+              <div ref={loadMoreRef} className="h-12 w-full" />
+
+              {isFetchingNextPage && (
+                <div className="flex items-center justify-center py-4">
+                  <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                 </div>
+              )}
+
+              {!hasNextPage && filteredContent.length > 0 && (
+                <p className="text-center text-sm text-muted-foreground py-2">You are all caught up.</p>
               )}
             </>
           )}

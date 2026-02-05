@@ -1,8 +1,8 @@
-import { useState, useMemo, useEffect, memo, useCallback } from "react";
+import { useState, useMemo, useEffect, memo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useRecommendations } from "@/hooks/useRecommendations";
-import { Movie, TVShow, getPosterUrl, getLanguageBadgeClass } from "@/lib/tmdb";
+import { Movie, TVShow } from "@/lib/tmdb";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
@@ -17,9 +17,9 @@ type ContentTypeFilter = "all" | "movie" | "tv";
 type SortField = "relevance" | "popularity" | "rating" | "release_date";
 type SortOrder = "asc" | "desc";
 
-const ITEMS_PER_PAGE_OPTIONS = [12, 24, 36, 48];
+const INITIAL_VISIBLE_ITEMS = 36;
+const LOAD_MORE_BATCH = 24;
 
-// Genre ID to name mapping (TMDB)
 const GENRE_MAP: Record<number, string> = {
   28: "Action",
   12: "Adventure",
@@ -52,6 +52,8 @@ const LANGUAGE_MAP: Record<string, string> = {
   ja: "Japanese",
   es: "Spanish",
   fr: "French",
+  tr: "Turkish",
+  pt: "Portuguese",
 };
 
 const ReckonCard = memo(({ item, type }: { item: Movie | TVShow; type: "movie" | "tv" | "mixed" }) => {
@@ -64,35 +66,32 @@ export default function Reckon() {
   const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { items: recommendations, isLoading: reckonLoading, isPersonalized } = useRecommendations();
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
-  // Filters and sorting
   const [contentTypeFilter, setContentTypeFilter] = useState<ContentTypeFilter>("all");
   const [sortField, setSortField] = useState<SortField>("relevance");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
-  const [selectedGenre, setSelectedGenre] = useState<string>("");
-  const [selectedLanguage, setSelectedLanguage] = useState<string>("");
-  const [page, setPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(24);
+  const [selectedGenre, setSelectedGenre] = useState<string>("all");
+  const [selectedLanguage, setSelectedLanguage] = useState<string>("all");
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_ITEMS);
 
-  // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
       navigate("/");
     }
   }, [user, authLoading, navigate]);
 
-  // Get unique genres from recommendations
   const availableGenres = useMemo(() => {
     const genres = new Set<number>();
     recommendations.forEach((item) => {
       item.genre_ids?.forEach((g) => genres.add(g));
     });
+
     return Array.from(genres)
       .filter((g) => GENRE_MAP[g])
       .sort((a, b) => GENRE_MAP[a].localeCompare(GENRE_MAP[b]));
   }, [recommendations]);
 
-  // Get unique languages from recommendations
   const availableLanguages = useMemo(() => {
     const langs = new Set<string>();
     recommendations.forEach((item) => {
@@ -100,34 +99,30 @@ export default function Reckon() {
         langs.add(item.original_language);
       }
     });
+
     return Array.from(langs)
       .filter((l) => LANGUAGE_MAP[l])
       .sort((a, b) => LANGUAGE_MAP[a].localeCompare(LANGUAGE_MAP[b]));
   }, [recommendations]);
 
-  // Filter and sort recommendations
   const processedItems = useMemo(() => {
     let filtered = [...recommendations];
 
-    // Filter by content type
     if (contentTypeFilter === "movie") {
       filtered = filtered.filter((item) => "title" in item);
     } else if (contentTypeFilter === "tv") {
       filtered = filtered.filter((item) => "first_air_date" in item && !("title" in item));
     }
 
-    // Filter by genre
-    if (selectedGenre) {
+    if (selectedGenre !== "all") {
       const genreId = Number(selectedGenre);
       filtered = filtered.filter((item) => item.genre_ids?.includes(genreId));
     }
 
-    // Filter by language
-    if (selectedLanguage) {
+    if (selectedLanguage !== "all") {
       filtered = filtered.filter((item) => item.original_language === selectedLanguage);
     }
 
-    // Sort
     filtered.sort((a, b) => {
       let comparison = 0;
 
@@ -138,14 +133,14 @@ export default function Reckon() {
         case "rating":
           comparison = (a.vote_average || 0) - (b.vote_average || 0);
           break;
-        case "release_date":
+        case "release_date": {
           const dateA = "release_date" in a ? a.release_date : a.first_air_date || "";
           const dateB = "release_date" in b ? b.release_date : b.first_air_date || "";
           comparison = dateA.localeCompare(dateB);
           break;
+        }
         case "relevance":
         default:
-          // Keep original order (already sorted by relevance)
           return 0;
       }
 
@@ -155,18 +150,32 @@ export default function Reckon() {
     return filtered;
   }, [recommendations, contentTypeFilter, selectedGenre, selectedLanguage, sortField, sortOrder]);
 
-  // Paginate
-  const paginatedItems = useMemo(() => {
-    const start = (page - 1) * itemsPerPage;
-    return processedItems.slice(start, start + itemsPerPage);
-  }, [processedItems, page, itemsPerPage]);
+  const visibleItems = useMemo(
+    () => processedItems.slice(0, visibleCount),
+    [processedItems, visibleCount]
+  );
 
-  const totalPages = Math.ceil(processedItems.length / itemsPerPage);
+  const hasMore = visibleCount < processedItems.length;
 
-  // Reset page when filters change
   useEffect(() => {
-    setPage(1);
-  }, [contentTypeFilter, selectedGenre, selectedLanguage, sortField, sortOrder, itemsPerPage]);
+    setVisibleCount(INITIAL_VISIBLE_ITEMS);
+  }, [contentTypeFilter, selectedGenre, selectedLanguage, sortField, sortOrder]);
+
+  useEffect(() => {
+    const node = loadMoreRef.current;
+    if (!node || !hasMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        setVisibleCount((prev) => Math.min(prev + LOAD_MORE_BATCH, processedItems.length));
+      },
+      { rootMargin: "500px 0px" }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, processedItems.length, visibleItems.length]);
 
   const toggleSortOrder = () => {
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -174,8 +183,8 @@ export default function Reckon() {
 
   const clearFilters = () => {
     setContentTypeFilter("all");
-    setSelectedGenre("");
-    setSelectedLanguage("");
+    setSelectedGenre("all");
+    setSelectedLanguage("all");
     setSortField("relevance");
     setSortOrder("desc");
   };
@@ -194,7 +203,6 @@ export default function Reckon() {
 
       <main className="flex-1 pt-20 pb-12">
         <div className="container mx-auto px-4">
-          {/* Header */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-3">
               <Sparkles className="w-8 h-8 text-primary" />
@@ -202,8 +210,8 @@ export default function Reckon() {
                 <h1 className="text-3xl font-bold">Reckon</h1>
                 <p className="text-muted-foreground">
                   {isPersonalized
-                    ? "Personalized recommendations just for you"
-                    : "Top picks and trending content"}
+                    ? "Personalized recommendations that evolve with your activity"
+                    : "Trending and globally diverse picks"}
                 </p>
               </div>
               {isPersonalized && (
@@ -213,13 +221,11 @@ export default function Reckon() {
               )}
             </div>
 
-            {/* Stats */}
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span>{processedItems.length} recommendations</span>
             </div>
           </div>
 
-          {/* Content Type Toggle */}
           <div className="flex gap-2 mb-6 bg-card/50 p-3 rounded-lg border border-border">
             <Button
               variant={contentTypeFilter === "all" ? "default" : "ghost"}
@@ -250,11 +256,9 @@ export default function Reckon() {
             </Button>
           </div>
 
-          {/* Filters */}
           <div className="flex flex-col sm:flex-row gap-3 mb-6 flex-wrap">
-            {/* Genre Filter */}
             <Select value={selectedGenre} onValueChange={setSelectedGenre}>
-              <SelectTrigger className="w-full sm:w-[160px] bg-card">
+              <SelectTrigger className="w-full sm:w-[170px] bg-card">
                 <SelectValue placeholder="All Genres" />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border z-50">
@@ -267,9 +271,8 @@ export default function Reckon() {
               </SelectContent>
             </Select>
 
-            {/* Language Filter */}
             <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-              <SelectTrigger className="w-full sm:w-[160px] bg-card">
+              <SelectTrigger className="w-full sm:w-[170px] bg-card">
                 <SelectValue placeholder="All Languages" />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border z-50">
@@ -282,9 +285,8 @@ export default function Reckon() {
               </SelectContent>
             </Select>
 
-            {/* Sort Field */}
             <Select value={sortField} onValueChange={(v) => setSortField(v as SortField)}>
-              <SelectTrigger className="w-full sm:w-[160px] bg-card">
+              <SelectTrigger className="w-full sm:w-[170px] bg-card">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border z-50">
@@ -295,7 +297,6 @@ export default function Reckon() {
               </SelectContent>
             </Select>
 
-            {/* Sort Order Toggle */}
             <Button
               variant="outline"
               size="icon"
@@ -306,22 +307,7 @@ export default function Reckon() {
               <ArrowUpDown className={cn("w-4 h-4", sortOrder === "asc" && "rotate-180")} />
             </Button>
 
-            {/* Rows per page */}
-            <Select value={String(itemsPerPage)} onValueChange={(v) => setItemsPerPage(Number(v))}>
-              <SelectTrigger className="w-full sm:w-[120px] bg-card">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-popover border-border z-50">
-                {ITEMS_PER_PAGE_OPTIONS.map((n) => (
-                  <SelectItem key={n} value={String(n)}>
-                    {n} per page
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Clear Filters */}
-            {(selectedGenre || selectedLanguage || sortField !== "relevance") && (
+            {(selectedGenre !== "all" || selectedLanguage !== "all" || sortField !== "relevance") && (
               <Button variant="ghost" onClick={clearFilters} className="text-muted-foreground">
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Clear
@@ -329,10 +315,9 @@ export default function Reckon() {
             )}
           </div>
 
-          {/* Content Grid */}
           {reckonLoading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {Array.from({ length: itemsPerPage }).map((_, i) => (
+              {Array.from({ length: INITIAL_VISIBLE_ITEMS }).map((_, i) => (
                 <div key={i}>
                   <div className="aspect-[2/3] rounded-lg bg-muted animate-pulse" />
                   <div className="mt-2 h-4 bg-muted rounded animate-pulse w-3/4" />
@@ -340,10 +325,10 @@ export default function Reckon() {
                 </div>
               ))}
             </div>
-          ) : paginatedItems.length > 0 ? (
+          ) : visibleItems.length > 0 ? (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {paginatedItems.map((item) => {
+                {visibleItems.map((item) => {
                   const isTV = "first_air_date" in item;
                   return (
                     <ReckonCard
@@ -355,42 +340,16 @@ export default function Reckon() {
                 })}
               </div>
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8">
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => setPage(1)}
-                      disabled={page === 1}
-                    >
-                      First
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                    >
-                      Previous
-                    </Button>
-                    <span className="flex items-center px-4 text-sm text-muted-foreground">
-                      Page {page} of {totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={page >= totalPages}
-                    >
-                      Next
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => setPage(totalPages)}
-                      disabled={page >= totalPages}
-                    >
-                      Last
-                    </Button>
-                  </div>
+              <div ref={loadMoreRef} className="h-12 w-full" />
+
+              {hasMore && (
+                <div className="flex justify-center py-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setVisibleCount((prev) => Math.min(prev + LOAD_MORE_BATCH, processedItems.length))}
+                  >
+                    Load More
+                  </Button>
                 </div>
               )}
             </>
@@ -399,11 +358,11 @@ export default function Reckon() {
               <Sparkles className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-xl font-semibold mb-2">No recommendations found</h3>
               <p className="text-muted-foreground mb-4">
-                {selectedGenre || selectedLanguage
+                {selectedGenre !== "all" || selectedLanguage !== "all"
                   ? "Try adjusting your filters"
-                  : "Start watching and liking content to get personalized recommendations!"}
+                  : "Start watching and liking content to unlock stronger recommendations."}
               </p>
-              {(selectedGenre || selectedLanguage) && (
+              {(selectedGenre !== "all" || selectedLanguage !== "all") && (
                 <Button onClick={clearFilters}>Clear Filters</Button>
               )}
             </div>

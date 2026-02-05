@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, memo } from "react";
+import { useState, useEffect, useMemo, memo, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import {
   discoverMovies,
@@ -12,18 +12,26 @@ import {
   Genre,
   getPosterUrl,
   getLanguageBadgeClass,
+  DiscoverFilters,
 } from "@/lib/tmdb";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
+import MediaImage from "@/components/MediaImage";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { Film, ChevronLeft, ChevronRight } from "lucide-react";
+import { Film } from "lucide-react";
 
 type MovieCategory = "all" | "now_playing" | "upcoming" | "trending" | "bollywood" | "hollywood" | "tamil" | "telugu";
 type SortOption = "popularity.desc" | "vote_average.desc" | "release_date.desc" | "revenue.desc";
+
+interface MoviePage {
+  results: Movie[];
+  total_pages: number;
+  page: number;
+  total_results: number;
+}
 
 const sortOptions: { value: SortOption; label: string }[] = [
   { value: "popularity.desc", label: "Most Popular" },
@@ -39,14 +47,18 @@ const languageMap: Record<string, string> = {
   telugu: "te",
 };
 
+const isAnimeLikeMovie = (movie: Movie) =>
+  movie.original_language === "ja" && movie.genre_ids?.includes(16);
+
 const PosterCard = memo(({ item, onClick }: { item: Movie; onClick: () => void }) => (
   <div onClick={onClick} className="cursor-pointer group">
     <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
-      <img
+      <MediaImage
         src={getPosterUrl(item.poster_path, "medium")}
         alt={item.title}
         className="w-full h-full object-cover"
         loading="lazy"
+        fallbackSrc="/fallbacks/poster.svg"
       />
       <div className="absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
         <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
@@ -75,6 +87,7 @@ export default function Movies() {
   const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const [category, setCategory] = useState<MovieCategory>(
     (searchParams.get("category") as MovieCategory) || "all"
@@ -83,7 +96,6 @@ export default function Movies() {
   const [sortBy, setSortBy] = useState<SortOption>(
     (searchParams.get("sort") as SortOption) || "popularity.desc"
   );
-  const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -97,9 +109,18 @@ export default function Movies() {
     staleTime: 1000 * 60 * 60,
   });
 
-  const { data: contentData, isLoading } = useQuery({
-    queryKey: ["movies", category, selectedGenre, sortBy, page],
-    queryFn: async () => {
+  const {
+    data: contentData,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery<MoviePage>({
+    queryKey: ["movies-infinite", category, selectedGenre, sortBy],
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) => {
+      const page = Number(pageParam) || 1;
+
       if (category === "now_playing") return getNowPlayingMovies(page);
       if (category === "upcoming") return getUpcomingMovies(page);
       if (category === "trending") {
@@ -107,7 +128,7 @@ export default function Movies() {
         return { results, total_pages: 1, page: 1, total_results: results.length };
       }
 
-      const filters: Record<string, any> = {
+      const filters: DiscoverFilters = {
         page,
         sort_by: sortBy,
         with_genres: selectedGenre || undefined,
@@ -119,24 +140,39 @@ export default function Movies() {
 
       return discoverMovies(filters);
     },
+    getNextPageParam: (lastPage) => {
+      if (!lastPage?.page || !lastPage?.total_pages) return undefined;
+      return lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined;
+    },
     staleTime: 1000 * 60 * 5,
+    enabled: !authLoading && !!user,
   });
 
-  const filteredContent = useMemo(() => {
-    if (!contentData) return [];
-    const results = "results" in contentData ? contentData.results : contentData;
-    if (!results) return [];
+  const allMovies = useMemo(() => {
+    if (!contentData?.pages) return [];
+
     const today = new Date().toISOString().split("T")[0];
-    
-    if (category === "now_playing") {
-      return results.filter((m: Movie) => m.release_date <= today);
-    }
-    if (category === "upcoming") {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      return results.filter((m: Movie) => m.release_date >= tomorrow.toISOString().split("T")[0]);
-    }
-    return results;
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split("T")[0];
+
+    const dedupe = new Set<number>();
+    const merged: Movie[] = [];
+
+    contentData.pages.forEach((page) => {
+      (page.results || []).forEach((movie) => {
+        if (dedupe.has(movie.id)) return;
+
+        if (category === "now_playing" && movie.release_date > today) return;
+        if (category === "upcoming" && movie.release_date < tomorrowStr) return;
+        if (isAnimeLikeMovie(movie)) return;
+
+        dedupe.add(movie.id);
+        merged.push(movie);
+      });
+    });
+
+    return merged;
   }, [contentData, category]);
 
   useEffect(() => {
@@ -144,14 +180,26 @@ export default function Movies() {
     if (category !== "all") params.set("category", category);
     if (selectedGenre) params.set("genre", selectedGenre);
     if (sortBy !== "popularity.desc") params.set("sort", sortBy);
-    if (page > 1) params.set("page", String(page));
     setSearchParams(params, { replace: true });
-  }, [category, selectedGenre, sortBy, page, setSearchParams]);
+  }, [category, selectedGenre, sortBy, setSearchParams]);
 
-  const totalPages = Math.min(
-    (contentData && "total_pages" in contentData ? contentData.total_pages : 1) || 1,
-    50
-  );
+  useEffect(() => {
+    const node = loadMoreRef.current;
+    if (!node || !hasNextPage) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { rootMargin: "600px 0px" }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage, allMovies.length]);
+
   const isSpecialCategory = ["now_playing", "upcoming", "trending"].includes(category);
 
   if (authLoading) {
@@ -173,7 +221,6 @@ export default function Movies() {
             <h1 className="text-3xl font-bold">Movies</h1>
           </div>
 
-          {/* Category Chips */}
           <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 mb-6">
             <div className="flex gap-2">
               {[
@@ -190,7 +237,7 @@ export default function Movies() {
                   key={cat.value}
                   variant={category === cat.value ? "default" : "outline"}
                   size="sm"
-                  onClick={() => { setCategory(cat.value as MovieCategory); setPage(1); }}
+                  onClick={() => setCategory(cat.value as MovieCategory)}
                   className="whitespace-nowrap"
                 >
                   {cat.label}
@@ -199,11 +246,10 @@ export default function Movies() {
             </div>
           </div>
 
-          {/* Filters Row */}
           <div className="flex gap-3 flex-wrap mb-6">
             <Select
               value={selectedGenre}
-              onValueChange={(v) => { setSelectedGenre(v === "all" ? "" : v); setPage(1); }}
+              onValueChange={(v) => setSelectedGenre(v === "all" ? "" : v)}
               disabled={isSpecialCategory}
             >
               <SelectTrigger className="w-[150px] bg-card">
@@ -219,7 +265,7 @@ export default function Movies() {
 
             <Select
               value={sortBy}
-              onValueChange={(v) => { setSortBy(v as SortOption); setPage(1); }}
+              onValueChange={(v) => setSortBy(v as SortOption)}
               disabled={isSpecialCategory}
             >
               <SelectTrigger className="w-[150px] bg-card">
@@ -233,7 +279,6 @@ export default function Movies() {
             </Select>
           </div>
 
-          {/* Grid */}
           {isLoading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {Array.from({ length: 18 }).map((_, i) => (
@@ -246,40 +291,29 @@ export default function Movies() {
           ) : (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {filteredContent.map((item: Movie) => (
+                {allMovies.map((item) => (
                   <PosterCard key={item.id} item={item} onClick={() => navigate(`/movie/${item.id}`)} />
                 ))}
               </div>
 
-              {filteredContent.length === 0 && (
+              {allMovies.length === 0 && (
                 <div className="text-center py-12">
                   <p className="text-muted-foreground">No movies found for the selected filters.</p>
                 </div>
               )}
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-2 mt-8">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setPage(Math.max(1, page - 1))}
-                    disabled={page === 1}
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
-                  <span className="px-4 text-sm text-muted-foreground">
-                    Page {page} of {totalPages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setPage(Math.min(totalPages, page + 1))}
-                    disabled={page >= totalPages}
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
+              <div ref={loadMoreRef} className="h-12 w-full" />
+
+              {isFetchingNextPage && (
+                <div className="flex items-center justify-center py-4">
+                  <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                 </div>
+              )}
+
+              {!hasNextPage && allMovies.length > 0 && (
+                <p className="text-center text-sm text-muted-foreground py-2">
+                  You are all caught up.
+                </p>
               )}
             </>
           )}

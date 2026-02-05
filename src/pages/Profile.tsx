@@ -5,6 +5,7 @@ import { useUserData } from "@/hooks/useUserData";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
+import MediaImage from "@/components/MediaImage";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPosterUrl } from "@/lib/tmdb";
@@ -27,11 +28,12 @@ const HistoryCard = memo(({ item, onRemove, onClick }: {
 }) => (
   <div className="relative group cursor-pointer" onClick={onClick}>
     <div className="aspect-[2/3] rounded-lg overflow-hidden poster-card">
-      <img
+      <MediaImage
         src={getPosterUrl(item.poster_path, "small")}
         alt={item.title}
         className="w-full h-full object-cover"
         loading="lazy"
+        fallbackSrc="/fallbacks/poster.svg"
       />
       <div className="absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
         {onRemove && (

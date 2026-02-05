@@ -22,6 +22,9 @@ import BottomNav from "@/components/BottomNav";
 import ContentCarousel from "@/components/ContentCarousel";
 import WhereToWatch from "@/components/WhereToWatch";
 import CastList from "@/components/CastList";
+import MediaImage from "@/components/MediaImage";
+import FeedbackButtons from "@/components/FeedbackButtons";
+import CommentsSection from "@/components/CommentsSection";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -45,6 +48,8 @@ export default function MovieDetail() {
   const { user, isLoading: authLoading } = useAuth();
   const { addToWatchHistory, isWatched, toggleLike, isLiked } = useUserData();
   const [showTrailer, setShowTrailer] = useState(false);
+  const [watchAnimating, setWatchAnimating] = useState(false);
+  const [likeAnimating, setLikeAnimating] = useState(false);
 
   const movieId = Number(id);
 
@@ -99,6 +104,8 @@ export default function MovieDetail() {
 
   const handleMarkWatched = async () => {
     if (!movie) return;
+    setWatchAnimating(true);
+    setTimeout(() => setWatchAnimating(false), 420);
     await addToWatchHistory({
       content_id: movie.id,
       content_type: "movie",
@@ -111,6 +118,8 @@ export default function MovieDetail() {
 
   const handleToggleLike = async () => {
     if (!movie) return;
+    setLikeAnimating(true);
+    setTimeout(() => setLikeAnimating(false), 420);
     await toggleLike({
       content_id: movie.id,
       content_type: "movie",
@@ -169,9 +178,11 @@ export default function MovieDetail() {
 
       {/* Backdrop with optional video */}
       <div className="relative h-[50vh] md:h-[70vh]">
-        <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: `url(${getBackdropUrl(movie.backdrop_path, "original")})` }}
+        <MediaImage
+          src={getBackdropUrl(movie.backdrop_path, "original")}
+          alt={`${movie.title} backdrop`}
+          className="absolute inset-0 w-full h-full object-cover"
+          fallbackSrc="/fallbacks/backdrop.svg"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent" />
         <div className="absolute inset-0 hero-gradient" />
@@ -192,10 +203,11 @@ export default function MovieDetail() {
         <div className="flex flex-col md:flex-row gap-8">
           {/* Poster */}
           <div className="hidden md:block flex-shrink-0">
-            <img
+            <MediaImage
               src={getPosterUrl(movie.poster_path, "large")}
               alt={movie.title}
               className="w-[280px] lg:w-[320px] rounded-lg shadow-2xl"
+              fallbackSrc="/fallbacks/poster.svg"
             />
           </div>
 
@@ -203,10 +215,11 @@ export default function MovieDetail() {
           <div className="flex-1">
             {/* Mobile Poster */}
             <div className="md:hidden flex gap-4 mb-6">
-              <img
+              <MediaImage
                 src={getPosterUrl(movie.poster_path, "medium")}
                 alt={movie.title}
                 className="w-32 rounded-lg shadow-lg"
+                fallbackSrc="/fallbacks/poster.svg"
               />
               <div className="flex-1">
                 <h1 className="text-2xl font-bold mb-2">{movie.title}</h1>
@@ -277,7 +290,8 @@ export default function MovieDetail() {
                   "action-btn",
                   watched
                     ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                    : "bg-muted text-foreground hover:bg-primary/20 hover:text-primary"
+                    : "bg-muted text-foreground hover:bg-primary/20 hover:text-primary",
+                  watchAnimating && "animate-watched-pop"
                 )}
                 onClick={handleMarkWatched}
               >
@@ -290,7 +304,8 @@ export default function MovieDetail() {
                   "action-btn",
                   liked
                     ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                    : "bg-muted text-foreground hover:bg-primary/20 hover:text-primary"
+                    : "bg-muted text-foreground hover:bg-primary/20 hover:text-primary",
+                  likeAnimating && "animate-heart-pop"
                 )}
                 onClick={handleToggleLike}
               >
@@ -298,6 +313,15 @@ export default function MovieDetail() {
                 {liked ? "Liked" : "Like"}
               </Button>
             </div>
+
+            <FeedbackButtons
+              contentId={movie.id}
+              contentType="movie"
+              title={movie.title}
+              posterPath={movie.poster_path}
+              genres={movie.genres.map((genre) => genre.id)}
+              language={movie.original_language}
+            />
 
             {/* Overview */}
             <div className="mb-8">
@@ -312,6 +336,7 @@ export default function MovieDetail() {
 
             {/* Cast */}
             <CastList cast={cast} />
+            <CommentsSection contentId={movie.id} contentType="movie" />
           </div>
         </div>
 

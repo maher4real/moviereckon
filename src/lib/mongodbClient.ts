@@ -142,6 +142,39 @@ export interface UserPreferences {
   preferred_genres: number[];
 }
 
+export type FeedbackType = "give_it_a_go" | "one_time_watch" | "must_watch" | "skip";
+
+export interface FeedbackItem {
+  id: string;
+  user_id: string;
+  content_id: number;
+  content_type: "movie" | "tv";
+  feedback_type: FeedbackType;
+  title: string;
+  poster_path: string | null;
+  genres: number[];
+  language: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FeedbackSummary {
+  counts: Record<FeedbackType, number>;
+  user_feedback: FeedbackType | null;
+}
+
+export interface CommentItem {
+  id: string;
+  user_id: string;
+  username: string;
+  avatar_url: string | null;
+  content_id: number;
+  content_type: "movie" | "tv";
+  text: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // ========== Auth API ==========
 
 export async function register(
@@ -323,6 +356,97 @@ export async function toggleLikeItem(item: Omit<LikedItem, "id" | "user_id" | "l
     return { action: data.action, data: data.data };
   } catch {
     return { action: "removed", data: null };
+  }
+}
+
+export async function fetchUserFeedback(): Promise<FeedbackItem[]> {
+  try {
+    const response = await fetchWithAuth("/api/user/feedback");
+    if (!response.ok) return [];
+    const data = await response.json();
+    return data.data || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function setContentFeedback(item: {
+  content_id: number;
+  content_type: "movie" | "tv";
+  feedback_type: FeedbackType;
+  title?: string;
+  poster_path?: string | null;
+  genres?: number[];
+  language?: string;
+}): Promise<{ action: "added" | "updated" | "removed"; data: FeedbackItem | null }> {
+  try {
+    const response = await fetchWithAuth("/api/user/feedback", {
+      method: "POST",
+      body: JSON.stringify(item),
+    });
+
+    if (!response.ok) {
+      return { action: "removed", data: null };
+    }
+
+    const data = await response.json();
+    return { action: data.action, data: data.data || null };
+  } catch {
+    return { action: "removed", data: null };
+  }
+}
+
+export async function fetchContentFeedbackSummary(
+  contentId: number,
+  contentType: "movie" | "tv"
+): Promise<FeedbackSummary | null> {
+  try {
+    const query = new URLSearchParams({
+      content_id: String(contentId),
+      content_type: contentType,
+    });
+    const response = await fetchWithAuth(`/api/user/feedback?${query.toString()}`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.data || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchComments(
+  contentId: number,
+  contentType: "movie" | "tv"
+): Promise<CommentItem[]> {
+  try {
+    const query = new URLSearchParams({
+      content_id: String(contentId),
+      content_type: contentType,
+    });
+    const response = await fetchWithAuth(`/api/user/comments?${query.toString()}`);
+    if (!response.ok) return [];
+    const data = await response.json();
+    return data.data || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function postComment(item: {
+  content_id: number;
+  content_type: "movie" | "tv";
+  text: string;
+}): Promise<CommentItem | null> {
+  try {
+    const response = await fetchWithAuth("/api/user/comments", {
+      method: "POST",
+      body: JSON.stringify(item),
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.data || null;
+  } catch {
+    return null;
   }
 }
 

@@ -3,6 +3,7 @@ import { Movie, getBackdropUrl } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
 import { Play, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
+import MediaImage from "@/components/MediaImage";
 
 interface HeroBannerProps {
   movie: Movie | undefined;
@@ -34,9 +35,11 @@ export default function HeroBanner({
   return (
     <div className="relative h-[70vh] md:h-[85vh] overflow-hidden">
       {/* Background Image */}
-      <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-700"
-        style={{ backgroundImage: `url(${getBackdropUrl(movie.backdrop_path, "original")})` }}
+      <MediaImage
+        src={getBackdropUrl(movie.backdrop_path, "original")}
+        alt={`${movie.title} backdrop`}
+        className="absolute inset-0 w-full h-full object-cover transition-all duration-700"
+        fallbackSrc="/fallbacks/backdrop.svg"
       />
 
       {/* Gradient Overlays */}
