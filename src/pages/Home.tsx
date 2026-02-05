@@ -194,7 +194,7 @@ export default function Home() {
       />
 
       {/* Content Sections */}
-      <main className="relative z-10 -mt-32 pb-20">
+      <main className="relative z-10 -mt-20 md:-mt-24 pt-6 md:pt-8 pb-20">
         <div className="space-y-8">
           {/* Reckon - Personalized Recommendations */}
           {reckonItems.length > 0 && (
