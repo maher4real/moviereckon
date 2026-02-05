@@ -1,17 +1,18 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Film } from "lucide-react";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
+  const navigate = useNavigate();
 
   const footerLinks = [
     {
       title: "Browse",
       links: [
-        { label: "Bollywood", href: "/browse/bollywood" },
-        { label: "Hollywood", href: "/browse/hollywood" },
-        { label: "TV Series", href: "/browse/tv" },
-        { label: "Top Rated", href: "/browse?sort=vote_average.desc" },
+        { label: "Movies", href: "/movies" },
+        { label: "TV Series", href: "/series" },
+        { label: "Bollywood", href: "/browse?type=bollywood" },
+        { label: "Hollywood", href: "/browse?type=hollywood" },
       ],
     },
     {
@@ -27,11 +28,16 @@ export default function Footer() {
       title: "Account",
       links: [
         { label: "Profile", href: "/profile" },
-        { label: "Watch History", href: "/profile" },
-        { label: "Liked Movies", href: "/profile" },
+        { label: "Reckon", href: "/reckon" },
+        { label: "Search", href: "/search" },
       ],
     },
   ];
+
+  const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    e.preventDefault();
+    navigate(href);
+  };
 
   return (
     <footer className="bg-card/50 border-t border-border mt-auto">
@@ -57,12 +63,13 @@ export default function Footer() {
               <ul className="space-y-2">
                 {section.links.map((link) => (
                   <li key={link.label}>
-                    <Link
-                      to={link.href}
+                      <a
+                        href={link.href}
+                        onClick={(e) => handleLinkClick(e, link.href)}
                       className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                     >
                       {link.label}
-                    </Link>
+                      </a>
                   </li>
                 ))}
               </ul>

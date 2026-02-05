@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Heart, HeartOff } from "lucide-react";
 import { Movie, TVShow, getPosterUrl, getLanguageLabel } from "@/lib/tmdb";
@@ -14,6 +14,8 @@ interface ContentCardProps {
 function ContentCardComponent({ item, type, showActions = true }: ContentCardProps) {
   const navigate = useNavigate();
   const { isWatched, isLiked, addToWatchHistory, toggleLike } = useUserData();
+  const [likeAnimating, setLikeAnimating] = useState(false);
+  const [watchAnimating, setWatchAnimating] = useState(false);
 
   const isTV = "first_air_date" in item;
   const itemType = type === "mixed" ? (isTV ? "tv" : "movie") : type;
@@ -32,6 +34,8 @@ function ContentCardComponent({ item, type, showActions = true }: ContentCardPro
   const handleWatched = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!watched) {
+      setWatchAnimating(true);
+      setTimeout(() => setWatchAnimating(false), 300);
       await addToWatchHistory({
         content_id: item.id,
         content_type: contentType,
@@ -45,6 +49,8 @@ function ContentCardComponent({ item, type, showActions = true }: ContentCardPro
 
   const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    setLikeAnimating(true);
+    setTimeout(() => setLikeAnimating(false), 300);
     await toggleLike({
       content_id: item.id,
       content_type: contentType,
@@ -93,31 +99,33 @@ function ContentCardComponent({ item, type, showActions = true }: ContentCardPro
 
         {/* Action Buttons - Red themed for consistency */}
         {showActions && (
-          <div className="absolute bottom-2 left-2 right-2 flex gap-1 opacity-0 group-hover/card:opacity-100 transition-all duration-200">
+          <div className="absolute bottom-2 left-2 right-2 flex gap-1 opacity-0 group-hover/card:opacity-100 transition-all duration-200 transform translate-y-2 group-hover/card:translate-y-0">
             <button
               onClick={handleWatched}
               className={cn(
-                "flex-1 py-1.5 rounded text-xs font-medium flex items-center justify-center gap-1 action-btn",
+                "flex-1 py-1.5 rounded text-xs font-medium flex items-center justify-center gap-1 action-btn transition-all",
                 watched
                   ? "bg-primary text-primary-foreground"
-                  : "bg-background/80 text-foreground hover:bg-primary/20 hover:text-primary"
+                  : "bg-background/80 text-foreground hover:bg-primary/20 hover:text-primary",
+                watchAnimating && "scale-110"
               )}
               title={watched ? "Watched" : "Mark as watched"}
             >
-              {watched ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+              <Eye className={cn("w-3 h-3", watchAnimating && "animate-pulse")} />
               {watched ? "Watched" : "Watch"}
             </button>
             <button
               onClick={handleLike}
               className={cn(
-                "p-1.5 rounded action-btn",
+                "p-1.5 rounded action-btn transition-all",
                 liked
                   ? "bg-primary text-primary-foreground"
-                  : "bg-background/80 text-foreground hover:bg-primary/20 hover:text-primary"
+                  : "bg-background/80 text-foreground hover:bg-primary/20 hover:text-primary",
+                likeAnimating && "scale-125"
               )}
               title={liked ? "Unlike" : "Like"}
             >
-              {liked ? <Heart className="w-3 h-3 fill-current" /> : <Heart className="w-3 h-3" />}
+              <Heart className={cn("w-3 h-3", liked && "fill-current", likeAnimating && "animate-pulse")} />
             </button>
           </div>
         )}

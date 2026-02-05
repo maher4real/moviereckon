@@ -17,6 +17,8 @@ import TVDetail from "./pages/TVDetail";
 import Profile from "./pages/Profile";
 import Reckon from "./pages/Reckon";
 import NotFound from "./pages/NotFound";
+import Movies from "./pages/Movies";
+import Series from "./pages/Series";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,6 +53,8 @@ const App = () => (
                 <Route path="/tv/:id" element={<TVDetail />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/reckon" element={<Reckon />} />
+              <Route path="/movies" element={<Movies />} />
+              <Route path="/series" element={<Series />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

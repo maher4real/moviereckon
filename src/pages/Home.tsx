@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, memo, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserData } from "@/hooks/useUserData";
@@ -137,7 +138,9 @@ export default function Home() {
 
   // Get recently watched for recommendations - memoized
   const recentlyWatched = useMemo(() => {
-    return watchHistory.slice(0, 10).map((item) => ({
+    return watchHistory.slice(0, 10).map((item) => {
+      const isTV = item.content_type === "tv";
+      return {
       id: item.content_id,
       title: item.title,
       name: item.title,
@@ -150,13 +153,15 @@ export default function Home() {
       genre_ids: item.genres,
       original_language: item.language,
       release_date: "",
-      first_air_date: "",
+      first_air_date: isTV ? "2024-01-01" : "", // Mark TV shows properly for type detection
       adult: false,
       video: false,
       original_title: item.title,
       original_name: item.title,
       origin_country: [],
-    }));
+      _content_type: item.content_type, // Preserve content type for routing
+    };
+    });
   }, [watchHistory]);
 
   // Hero movies (top 5 trending)
@@ -193,7 +198,7 @@ export default function Home() {
         <div className="space-y-8">
           {/* Reckon - Personalized Recommendations */}
           {reckonItems.length > 0 && (
-            <section className="px-4 md:px-8">
+            <section className="px-4 md:px-8 py-6 bg-gradient-to-b from-card/50 to-transparent rounded-xl mx-2 md:mx-4 border border-border/30">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-6 h-6 text-primary" />
@@ -206,12 +211,12 @@ export default function Home() {
                     </span>
                   )}
                 </div>
-                <a
-                  href="/reckon"
+                <Link
+                  to="/reckon"
                   className="text-sm text-primary hover:underline transition-colors"
                 >
                   View All →
-                </a>
+                </Link>
               </div>
               <MemoizedCarousel
                 title=""

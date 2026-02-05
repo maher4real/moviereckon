@@ -302,7 +302,9 @@ export default function MovieDetail() {
             {/* Overview */}
             <div className="mb-8">
               <h2 className="text-xl font-semibold mb-3">Overview</h2>
-              <p className="text-muted-foreground leading-relaxed">{movie.overview}</p>
+              <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">
+                {movie.overview || "No overview available."}
+              </p>
             </div>
 
             {/* Where to Watch */}
