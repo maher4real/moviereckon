@@ -36,7 +36,6 @@ import {
   Star,
   Calendar,
   Globe,
-  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -48,7 +47,6 @@ export default function MovieDetail() {
   const location = useLocation();
   const { user, isLoading: authLoading } = useAuth();
   const { addToWatchHistory, isWatched, toggleLike, isLiked } = useUserData();
-  const [showTrailer, setShowTrailer] = useState(false);
   const [watchAnimating, setWatchAnimating] = useState(false);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [bgVideoIndex, setBgVideoIndex] = useState(0);
@@ -119,6 +117,12 @@ export default function MovieDetail() {
 
   const cast = creditsData?.cast.slice(0, 12) || [];
   const trailerUrl = videosData ? getYouTubeTrailerUrl(videosData.results) : null;
+  const preferredTrailerKey = trailerUrl?.split("/embed/")[1]?.split("?")[0] || null;
+  const trailerWatchUrl = useMemo(() => {
+    if (!trailerUrl) return null;
+    const embedKey = trailerUrl.split("/embed/")[1]?.split("?")[0];
+    return embedKey ? `https://www.youtube.com/watch?v=${embedKey}` : trailerUrl;
+  }, [trailerUrl]);
   const backgroundTrailerKeys = useMemo(() => {
     const results = videosData?.results || [];
     const ranked = results
@@ -138,8 +142,12 @@ export default function MovieDetail() {
       });
 
     const unique = Array.from(new Map(ranked.map((video) => [video.key, video])).values());
-    return unique.slice(0, 3).map((video) => video.key);
-  }, [videosData]);
+    const candidateKeys = [
+      preferredTrailerKey,
+      ...unique.map((video) => video.key),
+    ].filter((key): key is string => Boolean(key));
+    return Array.from(new Set(candidateKeys)).slice(0, 3);
+  }, [videosData, preferredTrailerKey]);
   const activeBgVideoKey = backgroundTrailerKeys[bgVideoIndex];
 
   useEffect(() => {
@@ -264,6 +272,10 @@ export default function MovieDetail() {
   const backgroundTrailerEmbedUrl = activeBgVideoKey
     ? `https://www.youtube.com/embed/${activeBgVideoKey}?autoplay=1&mute=1&controls=0&loop=1&playlist=${activeBgVideoKey}&modestbranding=1&rel=0&playsinline=1&iv_load_policy=3&disablekb=1&fs=0`
     : null;
+  const openTrailerOnYouTube = () => {
+    if (!trailerWatchUrl) return;
+    window.open(trailerWatchUrl, "_blank", "noopener,noreferrer");
+  };
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0 overflow-x-hidden">
@@ -280,9 +292,10 @@ export default function MovieDetail() {
           className="absolute inset-0 w-full h-full object-cover"
           fallbackSrc="/fallbacks/poster.svg"
         />
-        {backgroundTrailerEmbedUrl && !showTrailer && (
+        {backgroundTrailerEmbedUrl && (
           <div className="absolute inset-0">
             <iframe
+              key={activeBgVideoKey}
               src={backgroundTrailerEmbedUrl}
               title={`${movie.title} background trailer`}
               className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
@@ -291,14 +304,14 @@ export default function MovieDetail() {
                 height: `${bgFrameSize.height}px`,
                 willChange: "transform",
               }}
-              allow="autoplay; encrypted-media; picture-in-picture"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               loading="eager"
               referrerPolicy="strict-origin-when-cross-origin"
               tabIndex={-1}
             />
           </div>
         )}
-        {activeBgVideoKey && !showTrailer && (
+        {activeBgVideoKey && (
           <div className="absolute inset-x-0 bottom-0 h-3 bg-background/85 pointer-events-none z-[3]" />
         )}
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-background/25" />
@@ -309,9 +322,9 @@ export default function MovieDetail() {
             <Button
               type="button"
               size="icon"
-              onClick={() => setShowTrailer(true)}
+              onClick={openTrailerOnYouTube}
               className="pointer-events-auto h-16 w-16 rounded-full bg-background/70 border border-white/20 text-foreground backdrop-blur-md opacity-0 group-hover/hero:opacity-100 transition-all duration-300 hover:bg-primary hover:text-primary-foreground"
-              aria-label="Play trailer"
+              aria-label="Play trailer on YouTube"
             >
               <Play className="w-7 h-7 fill-current" />
             </Button>
@@ -409,7 +422,7 @@ export default function MovieDetail() {
                 <Button
                   size="lg"
                   className="bg-primary hover:bg-primary/90 text-primary-foreground action-btn"
-                  onClick={() => setShowTrailer(true)}
+                  onClick={openTrailerOnYouTube}
                 >
                   <Play className="w-5 h-5 mr-2 fill-current" />
                   Watch Trailer
@@ -484,29 +497,6 @@ export default function MovieDetail() {
           </div>
         )}
       </div>
-
-      {/* Trailer Modal */}
-      {showTrailer && trailerUrl && (
-        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="relative w-full max-w-5xl aspect-video">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowTrailer(false)}
-              className="absolute -top-12 right-0 text-foreground"
-            >
-              <X className="w-6 h-6" />
-            </Button>
-            <iframe
-              src={`${trailerUrl}?autoplay=1`}
-              title={`${movie.title} Trailer`}
-              className="w-full h-full rounded-lg"
-              allowFullScreen
-              allow="autoplay; encrypted-media"
-            />
-          </div>
-        </div>
-      )}
 
       <Footer />
       <BottomNav />
