@@ -1,7 +1,5 @@
 // TMDB API Configuration and Service Layer
-// All API calls go through secure edge function
-
-import { supabase } from "@/lib/backendClient";
+// All API calls go through the backend proxy (/api/tmdb) so TMDB keys stay server-side.
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 const FALLBACK_POSTER = "/fallbacks/poster.svg";
@@ -186,20 +184,24 @@ async function fetchTMDB<T>(
   endpoint: string,
   params: Record<string, string | number | undefined> = {},
 ): Promise<T> {
-  const { data, error } = await supabase.functions.invoke("tmdb-proxy", {
-    body: { endpoint, params },
+  const response = await fetch("/api/tmdb", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ endpoint, params }),
   });
 
-  if (error) {
-    console.error("TMDB API Error:", error);
-    throw new Error(`TMDB API Error: ${error.message}`);
+  if (!response.ok) {
+    let message = `TMDB API Error: ${response.status}`;
+    try {
+      const payload = await response.json();
+      if (payload?.error) message = String(payload.error);
+    } catch {
+      // keep default message
+    }
+    throw new Error(message);
   }
 
-  if (data.error) {
-    throw new Error(data.error);
-  }
-
-  return data;
+  return (await response.json()) as T;
 }
 
 // Image URL helpers
