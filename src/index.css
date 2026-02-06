@@ -89,10 +89,13 @@
 
   html {
     @apply scroll-smooth;
+    scrollbar-gutter: stable;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* Custom scrollbar */
@@ -259,6 +262,23 @@
   .action-btn-inactive {
     @apply bg-background/80 text-foreground hover:bg-background;
   }
+
+  .auth-poster-row {
+    @apply flex gap-3;
+    width: max-content;
+    animation: auth-marquee 40s linear infinite;
+    will-change: transform;
+  }
+
+  .auth-poster-row-reverse {
+    animation-name: auth-marquee-reverse;
+  }
+
+  .auth-poster-tile {
+    width: clamp(88px, 9vw, 146px);
+    aspect-ratio: 2 / 3;
+    @apply rounded-md overflow-hidden border border-white/10 shadow-lg shadow-black/30;
+  }
 }
 
 @layer utilities {
@@ -319,6 +339,24 @@
     to {
       opacity: 1;
       transform: translateY(0);
+    }
+  }
+
+  @keyframes auth-marquee {
+    from {
+      transform: translate3d(0, 0, 0);
+    }
+    to {
+      transform: translate3d(-50%, 0, 0);
+    }
+  }
+
+  @keyframes auth-marquee-reverse {
+    from {
+      transform: translate3d(-50%, 0, 0);
+    }
+    to {
+      transform: translate3d(0, 0, 0);
     }
   }
 }

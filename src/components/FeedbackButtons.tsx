@@ -79,7 +79,7 @@ export default function FeedbackButtons({
         Your reaction helps improve recommendations for everyone.
       </p>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-4xl">
         {FEEDBACK_OPTIONS.map((option) => {
           const isSelected = selectedFeedback === option.value;
           const count = counts[option.value] || 0;
@@ -91,7 +91,7 @@ export default function FeedbackButtons({
               onClick={() => feedbackMutation.mutate(option.value)}
               disabled={feedbackMutation.isPending}
               className={cn(
-                "h-auto py-3 px-3 flex-col items-start gap-1 transition-all duration-200 active:scale-95",
+                "h-auto py-3 px-3 whitespace-normal text-left flex-col items-start gap-1 transition-all duration-200 active:scale-95",
                 isSelected && "shadow-md shadow-primary/20"
               )}
             >

@@ -29,7 +29,6 @@ export default function Auth() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [posterOffset, setPosterOffset] = useState(0);
 
   // Form state
   const [email, setEmail] = useState("");
@@ -66,12 +65,19 @@ export default function Auth() {
     }));
   }, [trendingMovies, trendingTV]);
 
-  const visiblePosterTiles = useMemo(() => {
-    return Array.from({ length: 35 }, (_, index) => {
-      const pointer = (posterOffset + index) % backgroundPosters.length;
-      return backgroundPosters[pointer];
+  const posterRows = useMemo(() => {
+    if (!backgroundPosters.length) return [];
+
+    const rowCount = 4;
+    const postersPerRow = 12;
+
+    return Array.from({ length: rowCount }, (_, rowIndex) => {
+      const start = (rowIndex * 6) % backgroundPosters.length;
+      return Array.from({ length: postersPerRow }, (_, offset) => {
+        return backgroundPosters[(start + offset) % backgroundPosters.length];
+      });
     });
-  }, [backgroundPosters, posterOffset]);
+  }, [backgroundPosters]);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -79,16 +85,6 @@ export default function Auth() {
       navigate("/home");
     }
   }, [user, isLoading, navigate]);
-
-  useEffect(() => {
-    if (!backgroundPosters.length) return;
-
-    const interval = setInterval(() => {
-      setPosterOffset((prev) => (prev + 1) % backgroundPosters.length);
-    }, 3200);
-
-    return () => clearInterval(interval);
-  }, [backgroundPosters.length]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -150,29 +146,39 @@ export default function Auth() {
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 relative overflow-hidden">
       {/* Background poster carousel + gradient effects */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute inset-0 grid grid-cols-5 sm:grid-cols-6 lg:grid-cols-7 gap-2 p-2 opacity-30">
-          {visiblePosterTiles.map((poster, index) => (
-            <div
-              key={`${poster.id}-${index}`}
-              className={cn(
-                "relative aspect-[2/3] rounded-md overflow-hidden transition-transform duration-700",
-                index % 2 === 0 ? "translate-y-2" : "-translate-y-2"
-              )}
-            >
-              <MediaImage
-                src={poster.src}
-                alt=""
-                aria-hidden="true"
-                className="w-full h-full object-cover"
-                fallbackSrc="/fallbacks/poster.svg"
-                loading="lazy"
-              />
-            </div>
-          ))}
+        <div className="absolute inset-0 scale-110 -rotate-2">
+          <div className="flex h-full flex-col justify-center gap-3 opacity-55">
+            {posterRows.map((row, rowIndex) => (
+              <div
+                key={`row-${rowIndex}`}
+                className={cn(
+                  "auth-poster-row",
+                  rowIndex % 2 === 1 && "auth-poster-row-reverse"
+                )}
+                style={{ animationDuration: `${34 + rowIndex * 4}s` }}
+              >
+                {[...row, ...row].map((poster, index) => (
+                  <div
+                    key={`${poster.id}-${rowIndex}-${index}`}
+                    className="auth-poster-tile"
+                  >
+                    <MediaImage
+                      src={poster.src}
+                      alt=""
+                      aria-hidden="true"
+                      className="h-full w-full object-cover"
+                      fallbackSrc="/fallbacks/poster.svg"
+                      loading="lazy"
+                    />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="absolute inset-0 bg-gradient-to-br from-background/95 via-background/85 to-background/95" />
+        <div className="absolute inset-0 bg-gradient-to-br from-background/90 via-background/70 to-background/88" />
         <div className="absolute top-1/4 -left-1/4 w-1/2 h-1/2 bg-primary/10 rounded-full blur-[100px]" />
-        <div className="absolute bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-secondary/10 rounded-full blur-[100px]" />
+        <div className="absolute bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-secondary/15 rounded-full blur-[100px]" />
       </div>
 
       <div className="relative z-10 w-full max-w-md animate-fade-in">

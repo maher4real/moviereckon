@@ -203,18 +203,18 @@ export default function TVDetail() {
   const year = tvShow.first_air_date?.split("-")[0] || "";
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0">
+    <div className="min-h-screen bg-background pb-20 md:pb-0 overflow-x-hidden">
       <Header />
 
       {/* Backdrop */}
-      <div className="relative h-[50vh] md:h-[70vh]">
+      <div className="relative h-[50vh] md:h-[70vh] overflow-hidden">
         <MediaImage
           src={getBackdropUrl(tvShow.backdrop_path, "original")}
           alt={`${tvShow.name} backdrop`}
           className="absolute inset-0 w-full h-full object-cover"
           fallbackSrc="/fallbacks/backdrop.svg"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-background/25" />
         <div className="absolute inset-0 hero-gradient" />
 
         {/* Back Button */}
@@ -242,7 +242,7 @@ export default function TVDetail() {
           </div>
 
           {/* Details */}
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             {/* Mobile Poster */}
             <div className="md:hidden flex gap-4 mb-6">
               <MediaImage

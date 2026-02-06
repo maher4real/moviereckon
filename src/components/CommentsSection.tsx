@@ -66,16 +66,19 @@ export default function CommentsSection({ contentId, contentType }: CommentsSect
   };
 
   return (
-    <section className="mt-10">
+    <section className="mt-10 max-w-4xl">
       <h2 className="text-xl font-semibold mb-4">Comments</h2>
 
-      <form onSubmit={handleSubmit} className="space-y-3 mb-6">
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-3 mb-6 rounded-xl border border-border bg-card/50 p-4"
+      >
         <Textarea
           value={commentText}
           onChange={(event) => setCommentText(event.target.value)}
           placeholder="Share your thoughts..."
           maxLength={1000}
-          className="min-h-[96px] bg-card"
+          className="min-h-[96px] w-full max-w-full bg-card"
         />
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground">{commentText.length}/1000</p>
