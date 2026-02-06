@@ -452,6 +452,36 @@ export async function postComment(item: {
   }
 }
 
+export async function updateComment(item: {
+  comment_id: string;
+  text: string;
+  rating: number;
+}): Promise<CommentItem | null> {
+  try {
+    const response = await fetchWithAuth("/api/user/comments", {
+      method: "PUT",
+      body: JSON.stringify(item),
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.data || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteComment(commentId: string): Promise<boolean> {
+  try {
+    const response = await fetchWithAuth("/api/user/comments", {
+      method: "DELETE",
+      body: JSON.stringify({ comment_id: commentId }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function fetchUserPreferences(): Promise<UserPreferences | null> {
   try {
     const response = await fetchWithAuth("/api/user/preferences");

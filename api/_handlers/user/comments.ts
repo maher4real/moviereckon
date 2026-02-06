@@ -1,5 +1,5 @@
 /**
- * GET/POST /api/user/comments
+ * GET/POST/PUT/DELETE /api/user/comments
  * Manage content comments
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
@@ -119,6 +119,86 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           updated_at: now,
         },
       });
+    }
+
+    if (req.method === "PUT") {
+      const { comment_id, text, rating } = req.body || {};
+      const normalizedText = typeof text === "string" ? text.trim() : "";
+      const normalizedRating = Number(rating);
+
+      if (!comment_id || !ObjectId.isValid(String(comment_id))) {
+        return res.status(400).json({ error: "valid comment_id is required" });
+      }
+
+      if (!normalizedText) {
+        return res.status(400).json({ error: "text is required" });
+      }
+
+      if (!Number.isInteger(normalizedRating) || normalizedRating < 1 || normalizedRating > 10) {
+        return res.status(400).json({ error: "rating must be an integer between 1 and 10" });
+      }
+
+      if (normalizedText.length > 1000) {
+        return res.status(400).json({ error: "Comment must be 1000 characters or less" });
+      }
+
+      const commentObjectId = new ObjectId(String(comment_id));
+      const now = new Date().toISOString();
+
+      const updateResult = await db.collection("content_comments").findOneAndUpdate(
+        { _id: commentObjectId, user_id: user.id },
+        {
+          $set: {
+            text: normalizedText,
+            rating: normalizedRating,
+            updated_at: now,
+          },
+        },
+        { returnDocument: "after" }
+      );
+
+      const updatedComment = (updateResult as any)?.value ?? updateResult;
+      if (!updatedComment) {
+        return res.status(404).json({ error: "Comment not found or not owned by user" });
+      }
+
+      return res.status(200).json({
+        data: {
+          id: updatedComment._id.toString(),
+          user_id: updatedComment.user_id,
+          username: updatedComment.username,
+          avatar_url: updatedComment.avatar_url || null,
+          content_id: updatedComment.content_id,
+          content_type: updatedComment.content_type,
+          text: updatedComment.text,
+          rating:
+            Number.isInteger(updatedComment.rating) &&
+            updatedComment.rating >= 1 &&
+            updatedComment.rating <= 10
+              ? updatedComment.rating
+              : null,
+          created_at: updatedComment.created_at,
+          updated_at: updatedComment.updated_at,
+        },
+      });
+    }
+
+    if (req.method === "DELETE") {
+      const { comment_id } = req.body || {};
+      if (!comment_id || !ObjectId.isValid(String(comment_id))) {
+        return res.status(400).json({ error: "valid comment_id is required" });
+      }
+
+      const deleteResult = await db.collection("content_comments").deleteOne({
+        _id: new ObjectId(String(comment_id)),
+        user_id: user.id,
+      });
+
+      if (deleteResult.deletedCount === 0) {
+        return res.status(404).json({ error: "Comment not found or not owned by user" });
+      }
+
+      return res.status(200).json({ success: true });
     }
 
     return res.status(405).json({ error: "Method not allowed" });

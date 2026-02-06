@@ -1,17 +1,12 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Globe, MessageSquare, Star } from "lucide-react";
+import { Globe, MessageSquare, Pencil, Star, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import MediaImage from "@/components/MediaImage";
+import { cn } from "@/lib/utils";
 import * as mongoClient from "@/lib/mongodbClient";
+import { useAuth } from "@/hooks/useAuth";
 import {
   getMovieReviewsExpanded,
   getTMDBAvatarUrl,
@@ -23,8 +18,17 @@ interface CommentsSectionProps {
   contentType: "movie" | "tv";
 }
 
+interface StarRatingProps {
+  value: number;
+  onChange?: (value: number) => void;
+  max?: number;
+  interactive?: boolean;
+  sizeClass?: string;
+}
+
 const INITIAL_PUBLIC_REVIEWS_VISIBLE = 6;
 const PUBLIC_REVIEWS_LOAD_STEP = 6;
+const PUBLIC_REVIEW_PREVIEW_LENGTH = 420;
 
 function formatTimestamp(value: string) {
   const date = new Date(value);
@@ -38,19 +42,74 @@ function formatTimestamp(value: string) {
   });
 }
 
+function StarRating({
+  value,
+  onChange,
+  max = 10,
+  interactive = false,
+  sizeClass = "w-4 h-4",
+}: StarRatingProps) {
+  return (
+    <div className="flex items-center flex-wrap gap-1">
+      {Array.from({ length: max }, (_, index) => {
+        const ratingValue = index + 1;
+        const filled = ratingValue <= value;
+
+        if (interactive) {
+          return (
+            <button
+              key={ratingValue}
+              type="button"
+              onClick={() => onChange?.(ratingValue)}
+              className="rounded-sm p-0.5 transition-transform duration-150 hover:scale-110"
+              aria-label={`Rate ${ratingValue} out of ${max}`}
+            >
+              <Star
+                className={cn(
+                  sizeClass,
+                  filled
+                    ? "fill-amber-400 text-amber-400"
+                    : "text-muted-foreground/40 hover:text-amber-300",
+                )}
+              />
+            </button>
+          );
+        }
+
+        return (
+          <Star
+            key={ratingValue}
+            className={cn(
+              sizeClass,
+              filled ? "fill-amber-400 text-amber-400" : "text-muted-foreground/35",
+            )}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 export default function CommentsSection({ contentId, contentType }: CommentsSectionProps) {
   const [commentText, setCommentText] = useState("");
-  const [commentRating, setCommentRating] = useState<string>("8");
+  const [commentRating, setCommentRating] = useState(8);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const [editRating, setEditRating] = useState(8);
   const [visiblePublicReviews, setVisiblePublicReviews] = useState(INITIAL_PUBLIC_REVIEWS_VISIBLE);
+  const [expandedPublicReviews, setExpandedPublicReviews] = useState<Record<string, boolean>>({});
+
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   useEffect(() => {
     setVisiblePublicReviews(INITIAL_PUBLIC_REVIEWS_VISIBLE);
+    setExpandedPublicReviews({});
+    setEditingCommentId(null);
   }, [contentId, contentType]);
 
-  const selectedRating = Number(commentRating);
-  const hasValidRating =
-    Number.isInteger(selectedRating) && selectedRating >= 1 && selectedRating <= 10;
+  const hasValidCommentRating =
+    Number.isInteger(commentRating) && commentRating >= 1 && commentRating <= 10;
 
   const queryKey = useMemo(
     () => ["content-comments", contentType, contentId],
@@ -81,11 +140,11 @@ export default function CommentsSection({ contentId, contentType }: CommentsSect
         content_id: contentId,
         content_type: contentType,
         text: commentText.trim(),
-        rating: selectedRating,
+        rating: commentRating,
       }),
     onSuccess: async (newComment) => {
       setCommentText("");
-      setCommentRating("8");
+      setCommentRating(8);
 
       if (newComment) {
         queryClient.setQueryData<mongoClient.CommentItem[]>(queryKey, (prev = []) => [
@@ -98,10 +157,79 @@ export default function CommentsSection({ contentId, contentType }: CommentsSect
     },
   });
 
+  const updateCommentMutation = useMutation({
+    mutationFn: ({ commentId, text, rating }: { commentId: string; text: string; rating: number }) =>
+      mongoClient.updateComment({
+        comment_id: commentId,
+        text,
+        rating,
+      }),
+    onSuccess: async (updatedComment) => {
+      if (updatedComment) {
+        queryClient.setQueryData<mongoClient.CommentItem[]>(queryKey, (prev = []) =>
+          prev.map((comment) => (comment.id === updatedComment.id ? updatedComment : comment)),
+        );
+      }
+
+      setEditingCommentId(null);
+      setEditText("");
+      setEditRating(8);
+      await queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: (commentId: string) => mongoClient.deleteComment(commentId),
+    onSuccess: async (success, commentId) => {
+      if (success) {
+        queryClient.setQueryData<mongoClient.CommentItem[]>(queryKey, (prev = []) =>
+          prev.filter((comment) => comment.id !== commentId),
+        );
+      }
+      await queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    if (!commentText.trim() || !hasValidRating || postCommentMutation.isPending) return;
+    if (!commentText.trim() || !hasValidCommentRating || postCommentMutation.isPending) return;
     postCommentMutation.mutate();
+  };
+
+  const handleStartEdit = (comment: mongoClient.CommentItem) => {
+    setEditingCommentId(comment.id);
+    setEditText(comment.text);
+    setEditRating(comment.rating && comment.rating >= 1 && comment.rating <= 10 ? comment.rating : 8);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCommentId(null);
+    setEditText("");
+    setEditRating(8);
+  };
+
+  const handleSaveEdit = (commentId: string) => {
+    const normalizedText = editText.trim();
+    if (!normalizedText) return;
+    if (!Number.isInteger(editRating) || editRating < 1 || editRating > 10) return;
+
+    updateCommentMutation.mutate({
+      commentId,
+      text: normalizedText,
+      rating: editRating,
+    });
+  };
+
+  const handleDelete = (commentId: string) => {
+    if (!window.confirm("Delete this comment?")) return;
+    deleteCommentMutation.mutate(commentId);
+  };
+
+  const togglePublicReviewExpanded = (reviewId: string) => {
+    setExpandedPublicReviews((prev) => ({
+      ...prev,
+      [reviewId]: !prev[reviewId],
+    }));
   };
 
   const ratedComments = comments.filter(
@@ -134,30 +262,19 @@ export default function CommentsSection({ contentId, contentType }: CommentsSect
         />
 
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <div className="space-y-1 min-w-[160px]">
+          <div className="space-y-1 min-w-[220px]">
             <p className="text-xs text-muted-foreground">Your Rating (1-10)</p>
-            <Select value={commentRating} onValueChange={setCommentRating}>
-              <SelectTrigger className="h-9 bg-background">
-                <SelectValue placeholder="Select rating" />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: 10 }, (_, index) => {
-                  const value = String(10 - index);
-                  return (
-                    <SelectItem key={value} value={value}>
-                      {value} / 10
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <StarRating value={commentRating} onChange={setCommentRating} interactive />
+              <span className="text-sm font-medium text-foreground/90">{commentRating}/10</span>
+            </div>
           </div>
 
           <div className="flex items-center gap-3 ml-auto">
             <p className="text-xs text-muted-foreground">{commentText.length}/1000</p>
             <Button
               type="submit"
-              disabled={!commentText.trim() || !hasValidRating || postCommentMutation.isPending}
+              disabled={!commentText.trim() || !hasValidCommentRating || postCommentMutation.isPending}
               className="bg-primary hover:bg-primary/90"
             >
               {postCommentMutation.isPending ? "Posting..." : "Post Comment"}
@@ -197,28 +314,100 @@ export default function CommentsSection({ contentId, contentType }: CommentsSect
             </div>
           ) : (
             <div className="space-y-3">
-              {comments.map((comment) => (
-                <article key={comment.id} className="rounded-lg bg-card border border-border p-4">
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-semibold text-primary">
-                        {comment.username?.charAt(0)?.toUpperCase() || "U"}
+              {comments.map((comment) => {
+                const isOwner = !!user && comment.user_id === user.id;
+                const isEditing = editingCommentId === comment.id;
+                const hasRating =
+                  typeof comment.rating === "number" && comment.rating >= 1 && comment.rating <= 10;
+
+                return (
+                  <article key={comment.id} className="rounded-lg bg-card border border-border p-4">
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-semibold text-primary">
+                          {comment.username?.charAt(0)?.toUpperCase() || "U"}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{comment.username || "User"}</p>
+                          <p className="text-[11px] text-muted-foreground">{formatTimestamp(comment.created_at)}</p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{comment.username || "User"}</p>
-                        <p className="text-[11px] text-muted-foreground">{formatTimestamp(comment.created_at)}</p>
+
+                      <div className="flex items-center gap-2">
+                        {hasRating && (
+                          <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-primary/15 text-primary whitespace-nowrap">
+                            <Star className="w-3 h-3 fill-current" />
+                            {comment.rating!.toFixed(1)}
+                          </span>
+                        )}
+
+                        {isOwner && !isEditing && (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleStartEdit(comment)}
+                              title="Edit comment"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => handleDelete(comment.id)}
+                              disabled={deleteCommentMutation.isPending}
+                              title="Delete comment"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
-                    {typeof comment.rating === "number" && comment.rating >= 1 && comment.rating <= 10 && (
-                      <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-primary/15 text-primary whitespace-nowrap">
-                        <Star className="w-3 h-3 fill-current" />
-                        {comment.rating.toFixed(1)}
-                      </span>
+
+                    {isEditing ? (
+                      <div className="space-y-3">
+                        <Textarea
+                          value={editText}
+                          onChange={(event) => setEditText(event.target.value)}
+                          maxLength={1000}
+                          className="min-h-[90px] bg-background"
+                        />
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <StarRating value={editRating} onChange={setEditRating} interactive />
+                            <span className="text-sm font-medium text-foreground/90">{editRating}/10</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button type="button" variant="outline" onClick={handleCancelEdit}>
+                              Cancel
+                            </Button>
+                            <Button
+                              type="button"
+                              onClick={() => handleSaveEdit(comment.id)}
+                              disabled={
+                                !editText.trim() ||
+                                updateCommentMutation.isPending ||
+                                !Number.isInteger(editRating) ||
+                                editRating < 1 ||
+                                editRating > 10
+                              }
+                            >
+                              {updateCommentMutation.isPending ? "Saving..." : "Save"}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words">{comment.text}</p>
                     )}
-                  </div>
-                  <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words">{comment.text}</p>
-                </article>
-              ))}
+                  </article>
+                );
+              })}
             </div>
           )}
         </div>
@@ -250,6 +439,13 @@ export default function CommentsSection({ contentId, contentType }: CommentsSect
                   const avatarSrc = getTMDBAvatarUrl(review.author_details?.avatar_path);
                   const author = review.author || review.author_details?.username || "TMDB User";
                   const rating = review.author_details?.rating;
+                  const fullText = review.content || "";
+                  const isExpanded = !!expandedPublicReviews[review.id];
+                  const shouldTruncate = fullText.length > PUBLIC_REVIEW_PREVIEW_LENGTH;
+                  const displayText =
+                    !shouldTruncate || isExpanded
+                      ? fullText
+                      : `${fullText.slice(0, PUBLIC_REVIEW_PREVIEW_LENGTH).trimEnd()}...`;
 
                   return (
                     <article key={review.id} className="rounded-lg bg-card border border-border p-4">
@@ -275,18 +471,17 @@ export default function CommentsSection({ contentId, contentType }: CommentsSect
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-foreground/85 whitespace-pre-wrap break-words line-clamp-6">
-                        {review.content}
-                      </p>
-                      {review.url && (
-                        <a
-                          href={review.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-3 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+
+                      <p className="text-sm text-foreground/85 whitespace-pre-wrap break-words">{displayText}</p>
+
+                      {shouldTruncate && (
+                        <button
+                          type="button"
+                          onClick={() => togglePublicReviewExpanded(review.id)}
+                          className="mt-3 text-xs text-primary hover:underline"
                         >
-                          Read full review <ExternalLink className="w-3 h-3" />
-                        </a>
+                          {isExpanded ? "Show less" : "Read more"}
+                        </button>
                       )}
                     </article>
                   );
