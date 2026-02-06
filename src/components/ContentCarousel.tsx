@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Movie, TVShow, getPosterUrl } from "@/lib/tmdb";
@@ -26,6 +26,38 @@ export default function ContentCarousel({
 }: ContentCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const [showLeftFade, setShowLeftFade] = useState(false);
+  const [showRightFade, setShowRightFade] = useState(false);
+
+  const updateFadeVisibility = useCallback(() => {
+    if (!scrollRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+    const maxScrollLeft = Math.max(0, scrollWidth - clientWidth);
+    const threshold = 4;
+
+    // Keep fades hidden on initial position; reveal only after user starts scrolling.
+    const hasStartedScrolling = scrollLeft > threshold;
+    setShowLeftFade(hasStartedScrolling);
+    setShowRightFade(hasStartedScrolling && scrollLeft < maxScrollLeft - threshold);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    updateFadeVisibility();
+
+    const handleScroll = () => updateFadeVisibility();
+    const handleResize = () => updateFadeVisibility();
+
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      el.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [items?.length, updateFadeVisibility]);
 
   const scroll = (direction: "left" | "right") => {
     if (!scrollRef.current) return;
@@ -74,8 +106,18 @@ export default function ContentCarousel({
       {/* Carousel Container */}
       <div className="relative group -mx-4 md:-mx-8">
         {/* Side fade bars */}
-        <div className="pointer-events-none absolute left-0 top-0 bottom-3 md:bottom-4 w-8 md:w-12 bg-gradient-to-r from-background via-background/85 to-transparent z-[5]" />
-        <div className="pointer-events-none absolute right-0 top-0 bottom-3 md:bottom-4 w-8 md:w-12 bg-gradient-to-l from-background via-background/85 to-transparent z-[5]" />
+        <div
+          className={cn(
+            "pointer-events-none absolute left-0 top-0 bottom-3 md:bottom-4 w-8 md:w-12 bg-gradient-to-r from-background via-background/85 to-transparent z-[5] transition-opacity duration-200",
+            showLeftFade ? "opacity-100" : "opacity-0",
+          )}
+        />
+        <div
+          className={cn(
+            "pointer-events-none absolute right-0 top-0 bottom-3 md:bottom-4 w-8 md:w-12 bg-gradient-to-l from-background via-background/85 to-transparent z-[5] transition-opacity duration-200",
+            showRightFade ? "opacity-100" : "opacity-0",
+          )}
+        />
 
         {/* Scroll Buttons */}
         <Button
@@ -99,7 +141,7 @@ export default function ContentCarousel({
         {/* Scrollable Content */}
         <div
           ref={scrollRef}
-          className="flex gap-3 md:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory px-10 md:px-14 pb-3 md:pb-4"
+          className="flex gap-3 md:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory px-4 md:px-8 pb-3 md:pb-4"
         >
           {isLoading
             ? // Loading Skeletons
