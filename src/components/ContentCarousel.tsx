@@ -98,7 +98,7 @@ export default function ContentCarousel({
   }
 
   return (
-    <section className="px-2 md:px-6">
+    <section className="px-2 md:px-4">
       {title && (
         <h2 className="text-xl md:text-2xl font-bold tracking-tight mb-3 md:mb-4">
           {title}
