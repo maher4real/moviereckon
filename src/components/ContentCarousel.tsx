@@ -63,10 +63,10 @@ export default function ContentCarousel({
   }
 
   return (
-    <section className="px-4 md:px-8">
+    <section className="px-0">
       {/* Title */}
       {title && (
-        <h2 className="text-xl md:text-2xl font-bold tracking-tight mb-4">
+        <h2 className="px-4 md:px-8 text-xl md:text-2xl font-bold tracking-tight mb-4">
           {title}
         </h2>
       )}
@@ -78,7 +78,7 @@ export default function ContentCarousel({
           variant="ghost"
           size="icon"
           onClick={() => scroll("left")}
-          className="absolute -left-2 top-1/2 -translate-y-1/2 z-10 bg-background/70 hover:bg-primary/20 hover:text-primary text-foreground/90 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
+          className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-background/70 hover:bg-primary/20 hover:text-primary text-foreground/90 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
         >
           <ChevronLeft className="w-6 h-6" />
         </Button>
@@ -87,7 +87,7 @@ export default function ContentCarousel({
           variant="ghost"
           size="icon"
           onClick={() => scroll("right")}
-          className="absolute -right-2 top-1/2 -translate-y-1/2 z-10 bg-background/70 hover:bg-primary/20 hover:text-primary text-foreground/90 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
+          className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-background/70 hover:bg-primary/20 hover:text-primary text-foreground/90 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
         >
           <ChevronRight className="w-6 h-6" />
         </Button>
