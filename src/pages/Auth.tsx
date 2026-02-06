@@ -176,7 +176,7 @@ export default function Auth() {
             ))}
           </div>
         </div>
-        <div className="absolute inset-0 bg-gradient-to-br from-background/94 via-background/66 to-background/92" />
+        <div className="absolute inset-0 bg-gradient-to-br from-background/87 via-background/66 to-background/92" />
         <div className="absolute top-1/4 -left-1/4 w-1/2 h-1/2 bg-primary/10 rounded-full blur-[100px]" />
         <div className="absolute bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-secondary/15 rounded-full blur-[100px]" />
       </div>
