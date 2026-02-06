@@ -27,6 +27,9 @@ import { Sparkles } from "lucide-react";
 
 // Memoized carousel for performance
 const MemoizedCarousel = memo(ContentCarousel);
+const STARTUP_SOUND_SRC = "/startup.mp3";
+const STARTUP_SOUND_PENDING_KEY = "startupSoundPending";
+const STARTUP_SOUND_PLAYED_KEY = "startupSoundPlayed";
 const isAnimeLike = (item: Movie | TVShow) =>
   item.original_language === "ja" && item.genre_ids?.includes(16);
 
@@ -43,6 +46,74 @@ export default function Home() {
       navigate("/");
     }
   }, [user, authLoading, navigate]);
+
+  // Play startup sound after auth success, or on first authenticated app startup.
+  useEffect(() => {
+    if (authLoading || !user) return;
+
+    const pendingStartupSound = (() => {
+      try {
+        return sessionStorage.getItem(STARTUP_SOUND_PENDING_KEY) === "1";
+      } catch {
+        return false;
+      }
+    })();
+
+    const startupSoundAlreadyPlayed = (() => {
+      try {
+        return sessionStorage.getItem(STARTUP_SOUND_PLAYED_KEY) === "1";
+      } catch {
+        return false;
+      }
+    })();
+
+    if (!pendingStartupSound && startupSoundAlreadyPlayed) return;
+
+    const audio = new Audio(STARTUP_SOUND_SRC);
+    audio.preload = "auto";
+    let fallbackAttached = false;
+
+    const markStartupSoundPlayed = () => {
+      try {
+        sessionStorage.setItem(STARTUP_SOUND_PLAYED_KEY, "1");
+        sessionStorage.removeItem(STARTUP_SOUND_PENDING_KEY);
+      } catch {
+        // Ignore storage errors (private mode, strict browser settings).
+      }
+    };
+
+    const cleanupFallbackListeners = () => {
+      if (!fallbackAttached) return;
+      window.removeEventListener("pointerdown", playOnInteraction);
+      window.removeEventListener("keydown", playOnInteraction);
+      fallbackAttached = false;
+    };
+
+    const playOnInteraction = () => {
+      cleanupFallbackListeners();
+      void audio.play().then(markStartupSoundPlayed).catch(() => undefined);
+    };
+
+    const attachFallbackListeners = () => {
+      if (fallbackAttached) return;
+      window.addEventListener("pointerdown", playOnInteraction, { once: true });
+      window.addEventListener("keydown", playOnInteraction, { once: true });
+      fallbackAttached = true;
+    };
+
+    void audio
+      .play()
+      .then(markStartupSoundPlayed)
+      .catch(() => {
+        attachFallbackListeners();
+      });
+
+    return () => {
+      cleanupFallbackListeners();
+      audio.pause();
+      audio.src = "";
+    };
+  }, [authLoading, user]);
 
   // Fetch all data with optimized query config
   const queryConfig = useMemo(() => ({

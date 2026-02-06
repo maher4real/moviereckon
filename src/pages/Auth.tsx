@@ -26,6 +26,7 @@ const usernameSchema = z
   .string()
   .min(2, "Username must be at least 2 characters")
   .max(50, "Username is too long");
+const STARTUP_SOUND_PENDING_KEY = "startupSoundPending";
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -39,6 +40,14 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
+
+  const queueStartupSound = () => {
+    try {
+      sessionStorage.setItem(STARTUP_SOUND_PENDING_KEY, "1");
+    } catch {
+      // Ignore storage errors (private mode, strict browser settings).
+    }
+  };
 
   const { data: trendingMovies } = useQuery({
     queryKey: ["auth-bg-trending-movies"],
@@ -185,11 +194,13 @@ export default function Auth() {
       if (activeTab === "signup") {
         const { error } = await signUp(email, password, username);
         if (!error) {
+          queueStartupSound();
           navigate("/home");
         }
       } else {
         const { error } = await signIn(email, password);
         if (!error) {
+          queueStartupSound();
           navigate("/home");
         }
       }
