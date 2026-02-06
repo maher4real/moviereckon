@@ -254,9 +254,9 @@ export default function Auth() {
         </div>
 
         {/* Auth Card */}
-        <div className="bg-black/68 backdrop-blur-2xl rounded-2xl p-8 border border-white/15 shadow-[0_16px_46px_rgba(0,0,0,0.55)]">
+        <div className="bg-card rounded-2xl p-8 border border-border shadow-2xl">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "signin" | "signup")}>
-            <TabsList className="grid w-full grid-cols-2 mb-6 bg-background/60">
+            <TabsList className="grid w-full grid-cols-2 mb-6 bg-muted">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
             </TabsList>
@@ -273,7 +273,7 @@ export default function Auth() {
                       placeholder="you@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10 h-12 bg-background/55"
+                      className="pl-10 h-12 bg-background"
                       autoComplete="email"
                     />
                   </div>
@@ -290,7 +290,7 @@ export default function Auth() {
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10 pr-10 h-12 bg-background/55"
+                      className="pl-10 pr-10 h-12 bg-background"
                       autoComplete="current-password"
                     />
                     <button
@@ -333,7 +333,7 @@ export default function Auth() {
                         placeholder="Your name"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
-                        className="pl-10 h-12 bg-background/55"
+                        className="pl-10 h-12 bg-background"
                         autoComplete="name"
                       />
                     </div>
@@ -350,7 +350,7 @@ export default function Auth() {
                         placeholder="you@example.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="pl-10 h-12 bg-background/55"
+                        className="pl-10 h-12 bg-background"
                         autoComplete="email"
                       />
                     </div>
@@ -367,7 +367,7 @@ export default function Auth() {
                         placeholder="At least 6 characters"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="pl-10 pr-10 h-12 bg-background/55"
+                        className="pl-10 pr-10 h-12 bg-background"
                         autoComplete="new-password"
                       />
                       <button
