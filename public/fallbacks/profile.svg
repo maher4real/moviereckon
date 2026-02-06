@@ -6,7 +6,6 @@
     </linearGradient>
   </defs>
   <rect width="370" height="556" rx="24" fill="url(#profileBg)"/>
-  <rect x="28" y="28" width="314" height="500" rx="20" stroke="#303949" stroke-width="2"/>
   <circle cx="185" cy="214" r="78" fill="#2A3140"/>
   <circle cx="185" cy="190" r="38" fill="#3A4354"/>
   <path d="M123 281C123 252.281 146.281 229 175 229H195C223.719 229 247 252.281 247 281V300C247 303.314 244.314 306 241 306H129C125.686 306 123 303.314 123 300V281Z" fill="#3A4354"/>

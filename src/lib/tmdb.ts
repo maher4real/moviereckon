@@ -160,6 +160,20 @@ export interface WatchProviders {
   };
 }
 
+export interface TMDBReview {
+  id: string;
+  author: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  url: string;
+  author_details?: {
+    avatar_path?: string | null;
+    rating?: number | null;
+    username?: string;
+  };
+}
+
 interface TMDBResponse<T> {
   page: number;
   results: T[];
@@ -306,6 +320,11 @@ export async function getMovieWatchProviders(movieId: number): Promise<WatchProv
   return fetchTMDB<WatchProviders>(`/movie/${movieId}/watch/providers`);
 }
 
+export async function getMovieReviews(movieId: number, page = 1): Promise<TMDBReview[]> {
+  const data = await fetchTMDB<TMDBResponse<TMDBReview>>(`/movie/${movieId}/reviews`, { page });
+  return data.results || [];
+}
+
 // TV Show endpoints
 export async function getTrendingTVShows(timeWindow: "day" | "week" = "week"): Promise<TVShow[]> {
   const data = await fetchTMDB<TMDBResponse<TVShow>>(`/trending/tv/${timeWindow}`);
@@ -356,6 +375,11 @@ export async function getTVSeasonDetails(tvId: number, seasonNumber: number): Pr
 
 export async function getTVWatchProviders(tvId: number): Promise<WatchProviders> {
   return fetchTMDB<WatchProviders>(`/tv/${tvId}/watch/providers`);
+}
+
+export async function getTVShowReviews(tvId: number, page = 1): Promise<TMDBReview[]> {
+  const data = await fetchTMDB<TMDBResponse<TMDBReview>>(`/tv/${tvId}/reviews`, { page });
+  return data.results || [];
 }
 
 // Get still image URL for episodes
@@ -520,4 +544,11 @@ export function getLanguageBadgeClass(langCode: string): string {
 export function getProviderLogoUrl(path: string | null): string {
   if (!path) return FALLBACK_STILL;
   return `${TMDB_IMAGE_BASE}/w92${path}`;
+}
+
+export function getTMDBAvatarUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  if (path.startsWith("/http")) return path.slice(1);
+  if (path.startsWith("http")) return path;
+  return `${TMDB_IMAGE_BASE}/w185${path}`;
 }

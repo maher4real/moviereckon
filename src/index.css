@@ -49,6 +49,7 @@
     --gradient-hero: linear-gradient(to top, hsl(0 0% 4%) 0%, transparent 100%);
     --gradient-card: linear-gradient(180deg, transparent 0%, hsl(0 0% 4% / 0.9) 100%);
     --shadow-glow: 0 0 20px hsl(0 79% 52% / 0.3);
+    --ease-fluid: cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .dark {
@@ -96,6 +97,7 @@
     @apply bg-background text-foreground antialiased;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
+    text-rendering: optimizeLegibility;
   }
 
   /* Custom scrollbar */
@@ -140,24 +142,29 @@
 
   /* Button hierarchy - Primary is red, consistent styling */
   .btn-primary {
-    @apply bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 active:scale-95;
+    @apply bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-300 active:scale-95;
+    transition-timing-function: var(--ease-fluid);
   }
 
   .btn-secondary {
-    @apply bg-primary/20 text-primary hover:bg-primary/30 transition-all duration-200 active:scale-95;
+    @apply bg-primary/20 text-primary hover:bg-primary/30 transition-all duration-300 active:scale-95;
+    transition-timing-function: var(--ease-fluid);
   }
 
   .btn-tertiary {
-    @apply bg-muted text-muted-foreground hover:bg-muted/80 transition-all duration-200 active:scale-95;
+    @apply bg-muted text-muted-foreground hover:bg-muted/80 transition-all duration-300 active:scale-95;
+    transition-timing-function: var(--ease-fluid);
   }
 
   .btn-success {
-    @apply bg-emerald-600 text-white hover:bg-emerald-700 transition-all duration-200 active:scale-95;
+    @apply bg-emerald-600 text-white hover:bg-emerald-700 transition-all duration-300 active:scale-95;
+    transition-timing-function: var(--ease-fluid);
   }
 
   /* Interactive elements - unified transitions */
   .interactive {
-    @apply transition-all duration-200 ease-out;
+    @apply transition-all duration-300;
+    transition-timing-function: var(--ease-fluid);
   }
 
   .interactive:hover {
@@ -180,7 +187,8 @@
 
   /* Poster card hover effect with animation */
   .poster-card {
-    @apply transition-all duration-300 ease-out;
+    @apply transition-all duration-300;
+    transition-timing-function: var(--ease-fluid);
   }
 
   .poster-card:hover {
@@ -252,7 +260,8 @@
 
   /* Action button consistent styling */
   .action-btn {
-    @apply transition-all duration-200 ease-out active:scale-95;
+    @apply transition-all duration-300 active:scale-95;
+    transition-timing-function: var(--ease-fluid);
   }
 
   .action-btn-active {
@@ -278,6 +287,13 @@
     width: clamp(88px, 9vw, 146px);
     aspect-ratio: 2 / 3;
     @apply rounded-md overflow-hidden border border-white/10 shadow-lg shadow-black/30;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .auth-poster-row {
+      animation-duration: 0.01ms;
+      animation-iteration-count: 1;
+    }
   }
 }
 

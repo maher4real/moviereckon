@@ -11,7 +11,6 @@
   </defs>
 
   <rect width="684" height="1026" rx="32" fill="url(#posterBg)"/>
-  <rect x="42" y="42" width="600" height="942" rx="26" stroke="#2C3442" stroke-width="2"/>
   <rect x="84" y="128" width="516" height="770" rx="24" fill="#151B24"/>
   <rect x="84" y="128" width="516" height="770" rx="24" fill="url(#posterGlow)"/>
 

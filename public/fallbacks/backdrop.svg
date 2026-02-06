@@ -13,7 +13,6 @@
   <rect width="1920" height="1080" fill="url(#bg)"/>
   <rect x="80" y="80" width="1760" height="920" rx="36" fill="#121824"/>
   <rect x="80" y="80" width="1760" height="920" rx="36" fill="url(#light)"/>
-  <rect x="80" y="80" width="1760" height="920" rx="36" stroke="#2A3342" stroke-width="2"/>
 
   <circle cx="960" cy="520" r="122" fill="#EE3C3C" fill-opacity="0.22"/>
   <path d="M924 460.5C924 451.993 933.26 446.488 940.92 450.712L1040.2 505.462C1048.1 509.819 1048.1 521.181 1040.2 525.538L940.92 580.288C933.26 584.512 924 579.007 924 570.5V460.5Z" fill="#EE3C3C"/>
