@@ -171,6 +171,7 @@ export interface CommentItem {
   content_id: number;
   content_type: "movie" | "tv";
   text: string;
+  rating: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -436,6 +437,7 @@ export async function postComment(item: {
   content_id: number;
   content_type: "movie" | "tv";
   text: string;
+  rating: number;
 }): Promise<CommentItem | null> {
   try {
     const response = await fetchWithAuth("/api/user/comments", {

@@ -50,6 +50,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           content_id: comment.content_id,
           content_type: comment.content_type,
           text: comment.text,
+          rating:
+            Number.isInteger(comment.rating) && comment.rating >= 1 && comment.rating <= 10
+              ? comment.rating
+              : null,
           created_at: comment.created_at,
           updated_at: comment.updated_at,
         })),
@@ -57,14 +61,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === "POST") {
-      const { content_id, content_type, text } = req.body || {};
+      const { content_id, content_type, text, rating } = req.body || {};
       const contentId = Number(content_id);
       const normalizedText = typeof text === "string" ? text.trim() : "";
+      const normalizedRating = Number(rating);
 
       if (!contentId || !content_type || !["movie", "tv"].includes(content_type) || !normalizedText) {
         return res.status(400).json({
           error: "content_id, valid content_type, and text are required",
         });
+      }
+
+      if (!Number.isInteger(normalizedRating) || normalizedRating < 1 || normalizedRating > 10) {
+        return res.status(400).json({ error: "rating must be an integer between 1 and 10" });
       }
 
       if (normalizedText.length > 1000) {
@@ -91,6 +100,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         content_id: contentId,
         content_type,
         text: normalizedText,
+        rating: normalizedRating,
         created_at: now,
         updated_at: now,
       });
@@ -104,6 +114,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           content_id: contentId,
           content_type,
           text: normalizedText,
+          rating: normalizedRating,
           created_at: now,
           updated_at: now,
         },

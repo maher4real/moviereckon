@@ -325,6 +325,25 @@ export async function getMovieReviews(movieId: number, page = 1): Promise<TMDBRe
   return data.results || [];
 }
 
+export async function getMovieReviewsExpanded(
+  movieId: number,
+  pages = 3,
+): Promise<TMDBReview[]> {
+  const pageCount = Math.max(1, Math.min(pages, 5));
+  const responses = await Promise.all(
+    Array.from({ length: pageCount }, (_, index) => getMovieReviews(movieId, index + 1)),
+  );
+
+  const deduped = new Map<string, TMDBReview>();
+  responses.flat().forEach((review) => deduped.set(review.id, review));
+
+  return Array.from(deduped.values()).sort((a, b) => {
+    const aTime = new Date(a.created_at).getTime();
+    const bTime = new Date(b.created_at).getTime();
+    return (Number.isNaN(bTime) ? 0 : bTime) - (Number.isNaN(aTime) ? 0 : aTime);
+  });
+}
+
 // TV Show endpoints
 export async function getTrendingTVShows(timeWindow: "day" | "week" = "week"): Promise<TVShow[]> {
   const data = await fetchTMDB<TMDBResponse<TVShow>>(`/trending/tv/${timeWindow}`);
@@ -380,6 +399,25 @@ export async function getTVWatchProviders(tvId: number): Promise<WatchProviders>
 export async function getTVShowReviews(tvId: number, page = 1): Promise<TMDBReview[]> {
   const data = await fetchTMDB<TMDBResponse<TMDBReview>>(`/tv/${tvId}/reviews`, { page });
   return data.results || [];
+}
+
+export async function getTVShowReviewsExpanded(
+  tvId: number,
+  pages = 3,
+): Promise<TMDBReview[]> {
+  const pageCount = Math.max(1, Math.min(pages, 5));
+  const responses = await Promise.all(
+    Array.from({ length: pageCount }, (_, index) => getTVShowReviews(tvId, index + 1)),
+  );
+
+  const deduped = new Map<string, TMDBReview>();
+  responses.flat().forEach((review) => deduped.set(review.id, review));
+
+  return Array.from(deduped.values()).sort((a, b) => {
+    const aTime = new Date(a.created_at).getTime();
+    const bTime = new Date(b.created_at).getTime();
+    return (Number.isNaN(bTime) ? 0 : bTime) - (Number.isNaN(aTime) ? 0 : aTime);
+  });
 }
 
 // Get still image URL for episodes
