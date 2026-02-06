@@ -73,6 +73,10 @@ export default function ContentCarousel({
 
       {/* Carousel Container */}
       <div className="relative group -mx-4 md:-mx-8">
+        {/* Side fade bars */}
+        <div className="pointer-events-none absolute left-0 top-0 bottom-3 md:bottom-4 w-10 md:w-16 bg-gradient-to-r from-background via-background/95 to-transparent z-[5]" />
+        <div className="pointer-events-none absolute right-0 top-0 bottom-3 md:bottom-4 w-10 md:w-16 bg-gradient-to-l from-background via-background/95 to-transparent z-[5]" />
+
         {/* Scroll Buttons */}
         <Button
           variant="ghost"
