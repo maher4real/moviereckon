@@ -5,30 +5,55 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
-const TMDB_API_KEY =
-  process.env.TMDB_API_KEY ||
-  process.env.TMDB_KEY ||
-  process.env.TMDB_V3_API_KEY ||
-  process.env.TMDB_API_V3_KEY ||
-  process.env.VITE_TMDB_API_KEY ||
-  null;
-const TMDB_BEARER_TOKEN =
-  process.env.TMDB_BEARER_TOKEN ||
-  process.env.TMDB_READ_ACCESS_TOKEN ||
-  process.env.TMDB_ACCESS_TOKEN ||
-  process.env.TMDB_V4_TOKEN ||
-  process.env.TMDB_API_READ_ACCESS_TOKEN ||
-  process.env.VITE_TMDB_BEARER_TOKEN ||
-  null;
-const LEGACY_SUPABASE_URL =
-  process.env.SUPABASE_URL ||
-  process.env.VITE_SUPABASE_URL ||
-  null;
-const LEGACY_SUPABASE_ANON_KEY =
-  process.env.SUPABASE_PUBLISHABLE_KEY ||
-  process.env.SUPABASE_ANON_KEY ||
-  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  null;
+const normalizeEnvName = (key: string) => key.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+
+function getEnvByAliases(aliases: string[]): string | null {
+  const aliasSet = new Set(aliases.map(normalizeEnvName));
+
+  for (const [envKey, envValue] of Object.entries(process.env)) {
+    if (!envValue) continue;
+    if (aliasSet.has(normalizeEnvName(envKey))) {
+      return envValue;
+    }
+  }
+
+  return null;
+}
+
+const TMDB_API_KEY = getEnvByAliases([
+  "TMDB_API_KEY",
+  "TMDB_KEY",
+  "TMDB_V3_API_KEY",
+  "TMDB_API_V3_KEY",
+  "TMDB_KEY_V3",
+  "TMDB_API",
+  "NEXT_PUBLIC_TMDB_API_KEY",
+  "VITE_TMDB_API_KEY",
+]);
+
+const TMDB_BEARER_TOKEN = getEnvByAliases([
+  "TMDB_BEARER_TOKEN",
+  "TMDB_READ_ACCESS_TOKEN",
+  "TMDB_ACCESS_TOKEN",
+  "TMDB_V4_TOKEN",
+  "TMDB_V4_READ_ACCESS_TOKEN",
+  "TMDB_API_READ_ACCESS_TOKEN",
+  "TMDB_TOKEN",
+  "NEXT_PUBLIC_TMDB_BEARER_TOKEN",
+  "VITE_TMDB_BEARER_TOKEN",
+  "VITE_TMDB_ACCESS_TOKEN",
+]);
+
+const LEGACY_SUPABASE_URL = getEnvByAliases([
+  "SUPABASE_URL",
+  "VITE_SUPABASE_URL",
+]);
+
+const LEGACY_SUPABASE_ANON_KEY = getEnvByAliases([
+  "SUPABASE_PUBLISHABLE_KEY",
+  "SUPABASE_ANON_KEY",
+  "VITE_SUPABASE_PUBLISHABLE_KEY",
+]);
 const LEGACY_SUPABASE_TMDB_FN = process.env.SUPABASE_TMDB_FUNCTION || "tmdb-proxy";
 
 const ALLOWED_PREFIXES = [
