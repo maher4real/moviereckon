@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogTitle,
@@ -42,6 +43,7 @@ import {
   Star,
   Calendar,
   Globe,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -639,23 +641,35 @@ export default function MovieDetail() {
       </div>
 
       <Dialog open={isTrailerModalOpen} onOpenChange={setIsTrailerModalOpen}>
-        <DialogContent className="w-[96vw] max-w-5xl border border-white/15 bg-black p-0 text-white [&>button]:-top-12 [&>button]:right-0 [&>button]:h-10 [&>button]:w-10 [&>button]:rounded-full [&>button]:border [&>button]:border-white/25 [&>button]:bg-primary [&>button]:text-primary-foreground [&>button]:opacity-100 [&>button]:shadow-lg [&>button]:ring-offset-black [&>button]:transition-colors [&>button:hover]:bg-primary/90">
+        <DialogContent className="w-[96vw] max-w-5xl gap-0 border-0 bg-transparent p-0 text-white shadow-none sm:rounded-none [&>button]:hidden">
           <DialogTitle className="sr-only">{movie.title} trailer</DialogTitle>
           <DialogDescription className="sr-only">
             Trailer player with sound and playback controls.
           </DialogDescription>
-          <div className="relative w-full aspect-video bg-black">
-            {modalTrailerEmbedUrl && (
-              <iframe
-                key={`movie-trailer-${trailerSessionId}`}
-                src={modalTrailerEmbedUrl}
-                title={`${movie.title} trailer`}
-                className="absolute inset-0 h-full w-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-                referrerPolicy="strict-origin-when-cross-origin"
-              />
-            )}
+          <div className="relative">
+            <DialogClose asChild>
+              <button
+                type="button"
+                className="absolute -top-3 -right-3 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-primary/45 bg-primary text-primary-foreground shadow-[0_8px_24px_rgba(0,0,0,0.45)] transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                aria-label="Close trailer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </DialogClose>
+
+            <div className="relative w-full aspect-video overflow-hidden rounded-xl border border-primary/30 bg-black shadow-[0_12px_48px_rgba(0,0,0,0.55)]">
+              {modalTrailerEmbedUrl && (
+                <iframe
+                  key={`movie-trailer-${trailerSessionId}`}
+                  src={modalTrailerEmbedUrl}
+                  title={`${movie.title} trailer`}
+                  className="absolute inset-0 h-full w-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  referrerPolicy="strict-origin-when-cross-origin"
+                />
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
