@@ -203,7 +203,7 @@ export default function TVDetail() {
   const year = tvShow.first_air_date?.split("-")[0] || "";
 
   return (
-    <div className="min-h-screen bg-background pb-16 md:pb-0 overflow-x-hidden">
+    <div className="min-h-screen bg-background pb-20 md:pb-0 overflow-x-hidden">
       <Header />
 
       {/* Backdrop */}

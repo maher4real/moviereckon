@@ -66,7 +66,11 @@ export default function ContentCarousel({
     <section className="px-3 sm:px-4 md:px-8">
       <div className="rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.04] via-white/[0.02] to-transparent shadow-[0_8px_30px_rgba(0,0,0,0.28)] p-3 md:p-4">
         {/* Title */}
-        {title && <h2 className="mb-3 md:mb-4 text-lg sm:text-xl md:text-2xl font-bold tracking-tight">{title}</h2>}
+        {title && (
+          <h2 className="mb-3 md:mb-4 text-lg sm:text-xl md:text-2xl font-bold tracking-tight">
+            {title}
+          </h2>
+        )}
 
         {/* Carousel Container */}
         <div className="relative group">
