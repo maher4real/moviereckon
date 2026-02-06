@@ -1,17 +1,13 @@
 // TMDB API Configuration and Service Layer
-// All API calls go through the backend proxy (/api/tmdb) so TMDB keys stay server-side.
+// All API calls go through secure edge function
+
+import { supabase } from "@/lib/backendClient";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 const FALLBACK_POSTER = "/fallbacks/poster.svg";
 const FALLBACK_BACKDROP = "/fallbacks/backdrop.svg";
 const FALLBACK_PROFILE = "/fallbacks/profile.svg";
 const FALLBACK_STILL = "/fallbacks/still.svg";
-const normalizeApiBaseUrl = (url: string): string => {
-  const trimmed = url.trim().replace(/\/+$/, "");
-  if (trimmed.endsWith("/api")) return trimmed.slice(0, -4);
-  return trimmed;
-};
-const API_BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_MONGODB_API_URL || "");
 
 // Image size configurations
 export const IMAGE_SIZES = {
@@ -190,24 +186,20 @@ async function fetchTMDB<T>(
   endpoint: string,
   params: Record<string, string | number | undefined> = {},
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}/api/tmdb`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ endpoint, params }),
+  const { data, error } = await supabase.functions.invoke("tmdb-proxy", {
+    body: { endpoint, params },
   });
 
-  if (!response.ok) {
-    let message = `TMDB API Error: ${response.status}`;
-    try {
-      const payload = await response.json();
-      if (payload?.error) message = String(payload.error);
-    } catch {
-      // keep default message
-    }
-    throw new Error(message);
+  if (error) {
+    console.error("TMDB API Error:", error);
+    throw new Error(`TMDB API Error: ${error.message}`);
   }
 
-  return (await response.json()) as T;
+  if (data.error) {
+    throw new Error(data.error);
+  }
+
+  return data;
 }
 
 // Image URL helpers
