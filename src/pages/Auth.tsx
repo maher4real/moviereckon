@@ -254,7 +254,7 @@ export default function Auth() {
         </div>
 
         {/* Auth Card */}
-        <div className="bg-card/82 backdrop-blur-xl rounded-2xl p-8 border border-border/70 shadow-[0_10px_38px_rgba(0,0,0,0.45)]">
+        <div className="bg-black/68 backdrop-blur-2xl rounded-2xl p-8 border border-white/15 shadow-[0_16px_46px_rgba(0,0,0,0.55)]">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "signin" | "signup")}>
             <TabsList className="grid w-full grid-cols-2 mb-6 bg-background/60">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
