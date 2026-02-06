@@ -63,16 +63,16 @@ export default function ContentCarousel({
   }
 
   return (
-    <section className="px-0">
+    <section className="px-4 md:px-8">
       {/* Title */}
       {title && (
-        <h2 className="px-4 md:px-8 text-xl md:text-2xl font-bold tracking-tight mb-4">
+        <h2 className="text-xl md:text-2xl font-bold tracking-tight mb-4">
           {title}
         </h2>
       )}
 
       {/* Carousel Container */}
-      <div className="relative group">
+      <div className="relative group -mx-4 md:-mx-8">
         {/* Scroll Buttons */}
         <Button
           variant="ghost"
@@ -95,7 +95,7 @@ export default function ContentCarousel({
         {/* Scrollable Content */}
         <div
           ref={scrollRef}
-          className="flex gap-3 md:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory pb-3 md:pb-4"
+          className="flex gap-3 md:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory px-4 md:px-8 pb-3 md:pb-4"
         >
           {isLoading
             ? // Loading Skeletons
