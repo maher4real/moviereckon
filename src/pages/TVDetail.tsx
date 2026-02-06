@@ -628,15 +628,6 @@ export default function TVDetail() {
               </Button>
             </div>
 
-            <FeedbackButtons
-              contentId={tvShow.id}
-              contentType="tv"
-              title={tvShow.name}
-              posterPath={tvShow.poster_path}
-              genres={tvShow.genres.map((genre) => genre.id)}
-              language={tvShow.original_language}
-            />
-
             {/* Overview */}
             <div className="mb-8">
               <h2 className="text-xl font-semibold mb-3">Overview</h2>
@@ -648,6 +639,14 @@ export default function TVDetail() {
 
             {/* Cast */}
             <CastList cast={cast} />
+            <FeedbackButtons
+              contentId={tvShow.id}
+              contentType="tv"
+              title={tvShow.name}
+              posterPath={tvShow.poster_path}
+              genres={tvShow.genres.map((genre) => genre.id)}
+              language={tvShow.original_language}
+            />
             <CommentsSection contentId={tvShow.id} contentType="tv" />
           </div>
         </div>

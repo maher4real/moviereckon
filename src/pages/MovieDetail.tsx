@@ -600,15 +600,6 @@ export default function MovieDetail() {
               </Button>
             </div>
 
-            <FeedbackButtons
-              contentId={movie.id}
-              contentType="movie"
-              title={movie.title}
-              posterPath={movie.poster_path}
-              genres={movie.genres.map((genre) => genre.id)}
-              language={movie.original_language}
-            />
-
             {/* Overview */}
             <div className="mb-8">
               <h2 className="text-xl font-semibold mb-3">Overview</h2>
@@ -622,6 +613,14 @@ export default function MovieDetail() {
 
             {/* Cast */}
             <CastList cast={cast} />
+            <FeedbackButtons
+              contentId={movie.id}
+              contentType="movie"
+              title={movie.title}
+              posterPath={movie.poster_path}
+              genres={movie.genres.map((genre) => genre.id)}
+              language={movie.original_language}
+            />
             <CommentsSection contentId={movie.id} contentType="movie" />
           </div>
         </div>
