@@ -102,24 +102,11 @@ export default function ContentCarousel({
       )}
 
       <div className="relative group">
-        {/* <div
-          className={cn(
-            "pointer-events-none absolute left-0 top-0 bottom-3 md:bottom-4 w-8 md:w-12 bg-gradient-to-r from-background via-background/85 to-transparent z-[5] transition-opacity duration-200",
-            showLeftFade ? "opacity-10" : "opacity-0",
-          )}
-        />
-        <div
-          className={cn(
-            "pointer-events-none absolute right-0 top-0 bottom-3 md:bottom-4 w-8 md:w-12 bg-gradient-to-l from-background via-background/85 to-transparent z-[5] transition-opacity duration-200",
-            showRightFade ? "opacity-10" : "opacity-0",
-          )}
-        /> */}
-
         <Button
           variant="ghost"
           size="icon"
           onClick={() => scroll("left")}
-          className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-background/70 hover:bg-primary/20 hover:text-primary text-foreground/90 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
+          className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-background/70 hover:bg-primary/20 hover:text-primary text-foreground/90 backdrop-blur-md opacity-0 group-hover:opacity-10 transition-opacity hidden md:flex"
         >
           <ChevronLeft className="w-6 h-6" />
         </Button>
@@ -128,7 +115,7 @@ export default function ContentCarousel({
           variant="ghost"
           size="icon"
           onClick={() => scroll("right")}
-          className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-background/70 hover:bg-primary/20 hover:text-primary text-foreground/90 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
+          className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-background/70 hover:bg-primary/20 hover:text-primary text-foreground/90 backdrop-blur-md opacity-0 group-hover:opacity-10 transition-opacity hidden md:flex"
         >
           <ChevronRight className="w-6 h-6" />
         </Button>
