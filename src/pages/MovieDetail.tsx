@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, memo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
@@ -52,6 +52,7 @@ export default function MovieDetail() {
   const [bgVideoIndex, setBgVideoIndex] = useState(0);
   const [bgFrameSize, setBgFrameSize] = useState({ width: 0, height: 0 });
   const heroMediaRef = useRef<HTMLDivElement>(null);
+  const bgPlayerRef = useRef<HTMLIFrameElement>(null);
 
   const movieId = Number(id);
 
@@ -149,6 +150,11 @@ export default function MovieDetail() {
     return Array.from(new Set(candidateKeys)).slice(0, 3);
   }, [videosData, preferredTrailerKey]);
   const activeBgVideoKey = backgroundTrailerKeys[bgVideoIndex];
+  const youtubeOrigin = useMemo(
+    () =>
+      typeof window !== "undefined" ? encodeURIComponent(window.location.origin) : "",
+    [],
+  );
 
   useEffect(() => {
     setBgVideoIndex(0);
@@ -270,12 +276,32 @@ export default function MovieDetail() {
       ? getBackdropUrl(movie.backdrop_path, "original")
       : getPosterUrl(movie.poster_path, "large");
   const backgroundTrailerEmbedUrl = activeBgVideoKey
-    ? `https://www.youtube.com/embed/${activeBgVideoKey}?autoplay=1&mute=1&controls=0&loop=1&playlist=${activeBgVideoKey}&modestbranding=1&rel=0&playsinline=1&iv_load_policy=3&disablekb=1&fs=0`
+    ? `https://www.youtube.com/embed/${activeBgVideoKey}?autoplay=1&mute=1&controls=0&loop=1&playlist=${activeBgVideoKey}&modestbranding=1&rel=0&playsinline=1&iv_load_policy=3&disablekb=1&fs=0&enablejsapi=1${youtubeOrigin ? `&origin=${youtubeOrigin}` : ""}`
     : null;
   const openTrailerOnYouTube = () => {
     if (!trailerWatchUrl) return;
     window.open(trailerWatchUrl, "_blank", "noopener,noreferrer");
   };
+  const controlBackgroundPreview = useCallback(
+    (func: "mute" | "playVideo") => {
+      const frame = bgPlayerRef.current;
+      if (!frame?.contentWindow) return;
+      frame.contentWindow.postMessage(
+        JSON.stringify({ event: "command", func, args: [] }),
+        "*",
+      );
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!backgroundTrailerEmbedUrl) return;
+    const timer = window.setTimeout(() => {
+      controlBackgroundPreview("mute");
+      controlBackgroundPreview("playVideo");
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [backgroundTrailerEmbedUrl, activeBgVideoKey, controlBackgroundPreview]);
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0 overflow-x-hidden">
@@ -296,6 +322,7 @@ export default function MovieDetail() {
           <div className="absolute inset-0">
             <iframe
               key={activeBgVideoKey}
+              ref={bgPlayerRef}
               src={backgroundTrailerEmbedUrl}
               title={`${movie.title} background trailer`}
               className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
@@ -307,6 +334,10 @@ export default function MovieDetail() {
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               loading="eager"
               referrerPolicy="strict-origin-when-cross-origin"
+              onLoad={() => {
+                controlBackgroundPreview("mute");
+                controlBackgroundPreview("playVideo");
+              }}
               tabIndex={-1}
             />
           </div>
