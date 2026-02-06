@@ -93,7 +93,6 @@ export default function ContentCarousel({
   const shouldRenderViewAllCard =
     !isLoading &&
     showViewAllCard &&
-    !!title &&
     !!items?.length &&
     !!resolvedViewAllHref;
 
@@ -216,7 +215,9 @@ export default function ContentCarousel({
                   <h3 className="mt-2 font-medium text-sm line-clamp-1 text-primary group-hover/viewall:text-primary/80 transition-colors">
                     Explore More
                   </h3>
-                  <p className="text-xs text-muted-foreground">{title}</p>
+                  {title && (
+                    <p className="text-xs text-muted-foreground">{title}</p>
+                  )}
                 </div>
               )}
             </>

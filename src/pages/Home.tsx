@@ -1,5 +1,4 @@
 import { useEffect, useState, useMemo, memo, useCallback } from "react";
-import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserData } from "@/hooks/useUserData";
@@ -237,19 +236,13 @@ export default function Home() {
                     </span>
                   )}
                 </div>
-                <Link
-                  to="/reckon"
-                  className="text-sm text-primary hover:underline transition-colors"
-                >
-                  View All →
-                </Link>
               </div>
               <MemoizedCarousel
                 title=""
                 items={reckonItems as (Movie | TVShow)[]}
                 isLoading={reckonLoading}
                 type="mixed"
-                showViewAllCard={false}
+                viewAllHref="/reckon"
               />
             </section>
           )}
