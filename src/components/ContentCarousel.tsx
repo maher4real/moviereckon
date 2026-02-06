@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import MediaImage from "@/components/MediaImage";
 
-// Extended type for items with preserved content_type (from watch history)
 interface ContentItem extends Movie, TVShow {
   _content_type?: "movie" | "tv";
 }
@@ -35,7 +34,6 @@ export default function ContentCarousel({
     const maxScrollLeft = Math.max(0, scrollWidth - clientWidth);
     const threshold = 4;
 
-    // Keep fades hidden on initial position; reveal only after user starts scrolling.
     const hasStartedScrolling = scrollLeft > threshold;
     setShowLeftFade(hasStartedScrolling);
     setShowRightFade(hasStartedScrolling && scrollLeft < maxScrollLeft - threshold);
@@ -69,12 +67,11 @@ export default function ContentCarousel({
   };
 
   const handleItemClick = (item: Movie | TVShow | ContentItem) => {
-    // Check for preserved content_type first (from watch history)
     if ("_content_type" in item && item._content_type) {
       navigate(`/${item._content_type}/${item.id}`);
       return;
     }
-    // Fall back to checking for TV show properties
+
     const isTV = "first_air_date" in item && item.first_air_date;
     const itemType = type === "mixed" ? (isTV ? "tv" : "movie") : type;
     navigate(`/${itemType}/${item.id}`);
@@ -85,8 +82,7 @@ export default function ContentCarousel({
   };
 
   const getYear = (item: Movie | TVShow): string => {
-    const date =
-      "release_date" in item ? item.release_date : item.first_air_date;
+    const date = "release_date" in item ? item.release_date : item.first_air_date;
     return date?.split("-")[0] || "";
   };
 
@@ -96,16 +92,13 @@ export default function ContentCarousel({
 
   return (
     <section className="px-4 md:px-8">
-      {/* Title */}
       {title && (
         <h2 className="text-xl md:text-2xl font-bold tracking-tight mb-4">
           {title}
         </h2>
       )}
 
-      {/* Carousel Container */}
       <div className="relative group -mx-4 md:-mx-8">
-        {/* Side fade bars */}
         <div
           className={cn(
             "pointer-events-none absolute left-0 top-0 bottom-3 md:bottom-4 w-8 md:w-12 bg-gradient-to-r from-background via-background/85 to-transparent z-[5] transition-opacity duration-200",
@@ -119,7 +112,6 @@ export default function ContentCarousel({
           )}
         />
 
-        {/* Scroll Buttons */}
         <Button
           variant="ghost"
           size="icon"
@@ -138,14 +130,12 @@ export default function ContentCarousel({
           <ChevronRight className="w-6 h-6" />
         </Button>
 
-        {/* Scrollable Content */}
         <div
           ref={scrollRef}
           className="flex gap-3 md:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory px-4 md:px-8 pb-3 md:pb-4"
         >
           {isLoading
-            ? // Loading Skeletons
-              Array.from({ length: 8 }).map((_, i) => (
+            ? Array.from({ length: 8 }).map((_, i) => (
                 <div
                   key={i}
                   className="flex-shrink-0 snap-start w-[140px] md:w-[180px] lg:w-[200px]"
@@ -155,14 +145,12 @@ export default function ContentCarousel({
                   <div className="mt-1 h-3 bg-muted rounded animate-pulse w-1/2" />
                 </div>
               ))
-            : // Actual Items
-              items?.map((item) => (
+            : items?.map((item) => (
                 <div
                   key={item.id}
                   onClick={() => handleItemClick(item)}
                   className="flex-shrink-0 snap-start w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/card"
                 >
-                  {/* Poster */}
                   <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
                     <MediaImage
                       src={getPosterUrl(item.poster_path, "medium")}
@@ -172,21 +160,18 @@ export default function ContentCarousel({
                       fallbackSrc="/fallbacks/poster.svg"
                     />
 
-                    {/* Hover Overlay */}
                     <div className="absolute inset-0 bg-background/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
                       <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center glow-primary">
                         <span className="text-xl">▶</span>
                       </div>
                     </div>
 
-                    {/* Rating Badge */}
                     {item.vote_average > 0 && (
                       <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
                         ⭐ {item.vote_average.toFixed(1)}
                       </div>
                     )}
 
-                    {/* Language Badge */}
                     <div
                       className={cn(
                         "absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold",
@@ -203,13 +188,10 @@ export default function ContentCarousel({
                     </div>
                   </div>
 
-                  {/* Info */}
                   <h3 className="mt-2 font-medium text-sm line-clamp-1 group-hover/card:text-primary transition-colors">
                     {getTitle(item)}
                   </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {getYear(item)}
-                  </p>
+                  <p className="text-xs text-muted-foreground">{getYear(item)}</p>
                 </div>
               ))}
         </div>
