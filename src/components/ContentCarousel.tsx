@@ -64,109 +64,110 @@ export default function ContentCarousel({
 
   return (
     <section className="px-3 sm:px-4 md:px-8">
-      {/* Title */}
-      {title && <h2 className="mb-3 md:mb-4 text-lg sm:text-xl md:text-2xl font-bold tracking-tight">{title}</h2>}
+      <div className="rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.04] via-white/[0.02] to-transparent shadow-[0_8px_30px_rgba(0,0,0,0.28)] p-3 md:p-4">
+        {/* Title */}
+        {title && <h2 className="mb-3 md:mb-4 text-lg sm:text-xl md:text-2xl font-bold tracking-tight">{title}</h2>}
 
-      {/* Carousel Container */}
-      <div className="relative group">
-        {/* Left fade effect */}
-        <div className="hidden md:block absolute left-0 top-0 bottom-2 md:bottom-4 w-6 lg:w-8 bg-gradient-to-r from-background/95 via-background/35 to-transparent z-[5] pointer-events-none" />
-        {/* Right fade effect */}
-        <div className="hidden md:block absolute right-0 top-0 bottom-2 md:bottom-4 w-6 lg:w-8 bg-gradient-to-l from-background/95 via-background/35 to-transparent z-[5] pointer-events-none" />
+        {/* Carousel Container */}
+        <div className="relative group">
+          {/* Subtle edge fades on larger screens only */}
+          <div className="hidden md:block absolute left-0 top-0 bottom-2 md:bottom-4 w-8 lg:w-10 bg-gradient-to-r from-background/45 via-background/12 to-transparent z-[5] pointer-events-none" />
+          <div className="hidden md:block absolute right-0 top-0 bottom-2 md:bottom-4 w-8 lg:w-10 bg-gradient-to-l from-background/45 via-background/12 to-transparent z-[5] pointer-events-none" />
 
-        {/* Scroll Buttons */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => scroll("left")}
-          className="absolute left-1 top-1/2 -translate-y-1/2 z-10 bg-background/70 border border-white/10 text-foreground/90 shadow-md backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
-        >
-          <ChevronLeft className="w-6 h-6" />
-        </Button>
+          {/* Scroll Buttons */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => scroll("left")}
+            className="absolute left-1 top-1/2 -translate-y-1/2 z-10 bg-background/55 border border-white/15 text-foreground/90 shadow-md backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </Button>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => scroll("right")}
-          className="absolute right-1 top-1/2 -translate-y-1/2 z-10 bg-background/70 border border-white/10 text-foreground/90 shadow-md backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
-        >
-          <ChevronRight className="w-6 h-6" />
-        </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => scroll("right")}
+            className="absolute right-1 top-1/2 -translate-y-1/2 z-10 bg-background/55 border border-white/15 text-foreground/90 shadow-md backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </Button>
 
-        {/* Scrollable Content */}
-        <div
-          ref={scrollRef}
-          className="flex gap-3 md:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory pb-2 md:pb-4"
-        >
-          {isLoading
-            ? // Loading Skeletons
-              Array.from({ length: 8 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="flex-shrink-0 snap-start w-[132px] md:w-[180px] lg:w-[200px]"
-                >
-                  <div className="aspect-[2/3] rounded-lg bg-muted animate-pulse" />
-                  <div className="mt-2 h-4 bg-muted rounded animate-pulse w-3/4" />
-                  <div className="mt-1 h-3 bg-muted rounded animate-pulse w-1/2" />
-                </div>
-              ))
-            : // Actual Items
-              items?.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => handleItemClick(item)}
-                  className="flex-shrink-0 snap-start w-[132px] md:w-[180px] lg:w-[200px] cursor-pointer group/card"
-                >
-                  {/* Poster */}
-                  <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
-                    <MediaImage
-                      src={getPosterUrl(item.poster_path, "medium")}
-                      alt={getTitle(item)}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                      fallbackSrc="/fallbacks/poster.svg"
-                    />
-
-                    {/* Hover Overlay */}
-                    <div className="absolute inset-0 bg-background/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
-                      <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center glow-primary">
-                        <span className="text-xl">▶</span>
-                      </div>
-                    </div>
-
-                    {/* Rating Badge */}
-                    {item.vote_average > 0 && (
-                      <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
-                        ⭐ {item.vote_average.toFixed(1)}
-                      </div>
-                    )}
-
-                    {/* Language Badge */}
-                    <div
-                      className={cn(
-                        "absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold",
-                        item.original_language === "hi"
-                          ? "badge-hindi"
-                          : item.original_language === "en"
-                            ? "badge-english"
-                            : "bg-muted",
-                      )}
-                    >
-                      {item.original_language === "hi"
-                        ? "HI"
-                        : item.original_language.toUpperCase()}
-                    </div>
+          {/* Scrollable Content */}
+          <div
+            ref={scrollRef}
+            className="flex gap-3 md:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory pb-2 md:pb-4"
+          >
+            {isLoading
+              ? // Loading Skeletons
+                Array.from({ length: 8 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex-shrink-0 snap-start w-[132px] md:w-[180px] lg:w-[200px]"
+                  >
+                    <div className="aspect-[2/3] rounded-lg bg-muted animate-pulse" />
+                    <div className="mt-2 h-4 bg-muted rounded animate-pulse w-3/4" />
+                    <div className="mt-1 h-3 bg-muted rounded animate-pulse w-1/2" />
                   </div>
+                ))
+              : // Actual Items
+                items?.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => handleItemClick(item)}
+                    className="flex-shrink-0 snap-start w-[132px] md:w-[180px] lg:w-[200px] cursor-pointer group/card"
+                  >
+                    {/* Poster */}
+                    <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
+                      <MediaImage
+                        src={getPosterUrl(item.poster_path, "medium")}
+                        alt={getTitle(item)}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        fallbackSrc="/fallbacks/poster.svg"
+                      />
 
-                  {/* Info */}
-                  <h3 className="mt-2 font-medium text-sm line-clamp-1 group-hover/card:text-primary transition-colors">
-                    {getTitle(item)}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {getYear(item)}
-                  </p>
-                </div>
-              ))}
+                      {/* Hover Overlay */}
+                      <div className="absolute inset-0 bg-background/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center glow-primary">
+                          <span className="text-xl">▶</span>
+                        </div>
+                      </div>
+
+                      {/* Rating Badge */}
+                      {item.vote_average > 0 && (
+                        <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/75 backdrop-blur-sm text-xs font-semibold">
+                          ⭐ {item.vote_average.toFixed(1)}
+                        </div>
+                      )}
+
+                      {/* Language Badge */}
+                      <div
+                        className={cn(
+                          "absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold",
+                          item.original_language === "hi"
+                            ? "badge-hindi"
+                            : item.original_language === "en"
+                              ? "badge-english"
+                              : "bg-muted",
+                        )}
+                      >
+                        {item.original_language === "hi"
+                          ? "HI"
+                          : item.original_language.toUpperCase()}
+                      </div>
+                    </div>
+
+                    {/* Info */}
+                    <h3 className="mt-2 font-medium text-sm line-clamp-1 group-hover/card:text-primary transition-colors">
+                      {getTitle(item)}
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      {getYear(item)}
+                    </p>
+                  </div>
+                ))}
+          </div>
         </div>
       </div>
     </section>
