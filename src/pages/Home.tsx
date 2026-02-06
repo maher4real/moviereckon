@@ -249,6 +249,7 @@ export default function Home() {
                 items={reckonItems as (Movie | TVShow)[]}
                 isLoading={reckonLoading}
                 type="mixed"
+                showViewAllCard={false}
               />
             </section>
           )}
@@ -260,6 +261,7 @@ export default function Home() {
               items={filteredNowPlaying as (Movie | TVShow)[]}
               isLoading={nowPlayingLoading}
               type="movie"
+              viewAllHref="/movies?category=now_playing"
             />
           )}
 
@@ -270,6 +272,7 @@ export default function Home() {
               items={filteredUpcoming as (Movie | TVShow)[]}
               isLoading={upcomingLoading}
               type="movie"
+              viewAllHref="/movies?category=upcoming"
             />
           )}
 
@@ -279,6 +282,7 @@ export default function Home() {
             items={filteredTrendingMovies as (Movie | TVShow)[]}
             isLoading={trendingLoading}
             type="movie"
+            viewAllHref="/movies?category=trending"
           />
 
           {/* Recently Watched (if any) */}
@@ -288,6 +292,7 @@ export default function Home() {
               items={recentlyWatched as (Movie | TVShow)[]}
               isLoading={false}
               type="mixed"
+              viewAllHref="/profile"
             />
           )}
 
@@ -297,6 +302,7 @@ export default function Home() {
             items={bollywoodData?.results as (Movie | TVShow)[]}
             isLoading={bollywoodLoading}
             type="movie"
+            viewAllHref="/movies?category=bollywood"
           />
 
           {/* Hollywood Blockbusters */}
@@ -305,6 +311,7 @@ export default function Home() {
             items={hollywoodData?.results as (Movie | TVShow)[]}
             isLoading={hollywoodLoading}
             type="movie"
+            viewAllHref="/movies?category=hollywood"
           />
 
           {/* Tamil Cinema */}
@@ -314,6 +321,7 @@ export default function Home() {
               items={tamilData.results as (Movie | TVShow)[]}
               isLoading={tamilLoading}
               type="movie"
+              viewAllHref="/movies?category=tamil"
             />
           )}
 
@@ -324,6 +332,7 @@ export default function Home() {
               items={teluguData.results as (Movie | TVShow)[]}
               isLoading={teluguLoading}
               type="movie"
+              viewAllHref="/movies?category=telugu"
             />
           )}
 
@@ -334,6 +343,7 @@ export default function Home() {
               items={gujaratiData.results as (Movie | TVShow)[]}
               isLoading={gujaratiLoading}
               type="movie"
+              viewAllHref="/browse?type=gujarati"
             />
           )}
 
@@ -343,6 +353,7 @@ export default function Home() {
             items={filteredTvShows as (Movie | TVShow)[]}
             isLoading={tvLoading}
             type="tv"
+            viewAllHref="/series?category=popular"
           />
 
           {/* Top Rated */}
@@ -351,6 +362,7 @@ export default function Home() {
             items={filteredTopRatedMovies as (Movie | TVShow)[]}
             isLoading={topRatedLoading}
             type="movie"
+            viewAllHref="/movies?sort=vote_average.desc"
           />
         </div>
       </main>

@@ -498,6 +498,7 @@ export default function TVDetail() {
               items={similarData.results as TVShow[]}
               isLoading={similarLoading}
               type="tv"
+              viewAllHref="/series"
             />
           </div>
         )}

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
 import { Movie, TVShow, getPosterUrl } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,8 @@ interface ContentCarouselProps {
   items: (Movie | TVShow | ContentItem)[] | undefined;
   isLoading: boolean;
   type: "movie" | "tv" | "mixed";
+  viewAllHref?: string;
+  showViewAllCard?: boolean;
 }
 
 export default function ContentCarousel({
@@ -22,42 +24,11 @@ export default function ContentCarousel({
   items,
   isLoading,
   type,
+  viewAllHref,
+  showViewAllCard = true,
 }: ContentCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  const [showLeftFade, setShowLeftFade] = useState(false);
-  const [showRightFade, setShowRightFade] = useState(false);
-
-  const updateFadeVisibility = useCallback(() => {
-    if (!scrollRef.current) return;
-    const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-    const maxScrollLeft = Math.max(0, scrollWidth - clientWidth);
-    const threshold = 4;
-
-    const hasStartedScrolling = scrollLeft > threshold;
-    setShowLeftFade(hasStartedScrolling);
-    setShowRightFade(
-      hasStartedScrolling && scrollLeft < maxScrollLeft - threshold,
-    );
-  }, []);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-
-    updateFadeVisibility();
-
-    const handleScroll = () => updateFadeVisibility();
-    const handleResize = () => updateFadeVisibility();
-
-    el.addEventListener("scroll", handleScroll, { passive: true });
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      el.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("resize", handleResize);
-    };
-  }, [items?.length, updateFadeVisibility]);
 
   const scroll = (direction: "left" | "right") => {
     if (!scrollRef.current) return;
@@ -89,6 +60,36 @@ export default function ContentCarousel({
     return date?.split("-")[0] || "";
   };
 
+  const getDefaultViewAllHref = (): string => {
+    const normalized = title.toLowerCase();
+
+    if (normalized.includes("now playing")) return "/movies?category=now_playing";
+    if (normalized.includes("coming soon") || normalized.includes("upcoming")) {
+      return "/movies?category=upcoming";
+    }
+    if (normalized.includes("continue watching")) return "/profile";
+    if (normalized.includes("bollywood")) return "/movies?category=bollywood";
+    if (normalized.includes("hollywood")) return "/movies?category=hollywood";
+    if (normalized.includes("tamil")) return "/movies?category=tamil";
+    if (normalized.includes("telugu")) return "/movies?category=telugu";
+    if (normalized.includes("gujarati")) return "/browse?type=gujarati";
+    if (normalized.includes("trending tv")) return "/series?category=popular";
+    if (normalized.includes("top rated")) return "/movies?sort=vote_average.desc";
+    if (normalized.includes("trending")) return "/movies?category=trending";
+    if (normalized.includes("similar")) return type === "tv" ? "/series" : "/movies";
+    if (type === "movie") return "/movies";
+    if (type === "tv") return "/series";
+    return "/reckon";
+  };
+
+  const resolvedViewAllHref = viewAllHref || getDefaultViewAllHref();
+  const shouldRenderViewAllCard =
+    !isLoading &&
+    showViewAllCard &&
+    !!title &&
+    !!items?.length &&
+    !!resolvedViewAllHref;
+
   if (!isLoading && (!items || items.length === 0)) {
     return null;
   }
@@ -106,7 +107,7 @@ export default function ContentCarousel({
           variant="ghost"
           size="icon"
           onClick={() => scroll("left")}
-          className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-background/70 hover:bg-primary/20 hover:text-primary text-foreground/90 backdrop-blur-md opacity-0 group-hover:opacity-10 transition-opacity hidden md:flex"
+          className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-background/70 hover:bg-primary/20 hover:text-primary text-foreground/90 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
         >
           <ChevronLeft className="w-6 h-6" />
         </Button>
@@ -115,7 +116,7 @@ export default function ContentCarousel({
           variant="ghost"
           size="icon"
           onClick={() => scroll("right")}
-          className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-background/70 hover:bg-primary/20 hover:text-primary text-foreground/90 backdrop-blur-md opacity-0 group-hover:opacity-10 transition-opacity hidden md:flex"
+          className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-background/70 hover:bg-primary/20 hover:text-primary text-foreground/90 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
         >
           <ChevronRight className="w-6 h-6" />
         </Button>
@@ -135,57 +136,89 @@ export default function ContentCarousel({
                   <div className="mt-1 h-3 bg-muted rounded animate-pulse w-1/2" />
                 </div>
               ))
-            : items?.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => handleItemClick(item)}
-                  className="flex-shrink-0 snap-start w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/card"
-                >
-                  <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
-                    <MediaImage
-                      src={getPosterUrl(item.poster_path, "medium")}
-                      alt={getTitle(item)}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                      fallbackSrc="/fallbacks/poster.svg"
-                    />
-
-                    <div className="absolute inset-0 bg-background/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
-                      <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center glow-primary">
-                        <span className="text-xl">▶</span>
-                      </div>
-                    </div>
-
-                    {item.vote_average > 0 && (
-                      <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
-                        ⭐ {item.vote_average.toFixed(1)}
-                      </div>
-                    )}
-
+            : (
+                <>
+                  {items?.map((item) => (
                     <div
-                      className={cn(
-                        "absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold",
-                        item.original_language === "hi"
-                          ? "badge-hindi"
-                          : item.original_language === "en"
-                            ? "badge-english"
-                            : "bg-muted",
-                      )}
+                      key={item.id}
+                      onClick={() => handleItemClick(item)}
+                      className="flex-shrink-0 snap-start w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/card"
                     >
-                      {item.original_language === "hi"
-                        ? "HI"
-                        : item.original_language.toUpperCase()}
-                    </div>
-                  </div>
+                      <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
+                        <MediaImage
+                          src={getPosterUrl(item.poster_path, "medium")}
+                          alt={getTitle(item)}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                          fallbackSrc="/fallbacks/poster.svg"
+                        />
 
-                  <h3 className="mt-2 font-medium text-sm line-clamp-1 group-hover/card:text-primary transition-colors">
-                    {getTitle(item)}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {getYear(item)}
-                  </p>
-                </div>
-              ))}
+                        <div className="absolute inset-0 bg-background/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
+                          <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center glow-primary">
+                            <span className="text-xl">▶</span>
+                          </div>
+                        </div>
+
+                        {item.vote_average > 0 && (
+                          <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
+                            ⭐ {item.vote_average.toFixed(1)}
+                          </div>
+                        )}
+
+                        <div
+                          className={cn(
+                            "absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold",
+                            item.original_language === "hi"
+                              ? "badge-hindi"
+                              : item.original_language === "en"
+                                ? "badge-english"
+                                : "bg-muted",
+                          )}
+                        >
+                          {item.original_language === "hi"
+                            ? "HI"
+                            : item.original_language.toUpperCase()}
+                        </div>
+                      </div>
+
+                      <h3 className="mt-2 font-medium text-sm line-clamp-1 group-hover/card:text-primary transition-colors">
+                        {getTitle(item)}
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        {getYear(item)}
+                      </p>
+                    </div>
+                  ))}
+
+                  {shouldRenderViewAllCard && (
+                    <div
+                      onClick={() => navigate(resolvedViewAllHref)}
+                      className="flex-shrink-0 snap-start w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/viewall"
+                    >
+                      <div className="relative aspect-[2/3] rounded-lg overflow-hidden border border-border bg-gradient-to-br from-card to-muted/40 transition-all duration-300 group-hover/viewall:border-primary/40 group-hover/viewall:shadow-[0_10px_30px_rgba(0,0,0,0.35)] flex items-center justify-center">
+                        <div className="flex flex-col items-center justify-center gap-3 px-4 text-center">
+                          <div className="w-12 h-12 rounded-full bg-primary/20 text-primary flex items-center justify-center group-hover/viewall:bg-primary group-hover/viewall:text-primary-foreground transition-colors">
+                            <ArrowRight className="w-6 h-6" />
+                          </div>
+                          <p className="text-base md:text-lg font-semibold text-foreground">
+                            View All
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Open full section
+                          </p>
+                        </div>
+                      </div>
+
+                      <h3 className="mt-2 font-medium text-sm line-clamp-1 text-primary group-hover/viewall:text-primary/80 transition-colors">
+                        Explore More
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        {title}
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
         </div>
       </div>
     </section>

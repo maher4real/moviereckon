@@ -348,6 +348,7 @@ export default function MovieDetail() {
               items={similarData.results as Movie[]}
               isLoading={similarLoading}
               type="movie"
+              viewAllHref="/movies"
             />
           </div>
         )}
