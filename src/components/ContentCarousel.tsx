@@ -102,9 +102,9 @@ export default function ContentCarousel({
   }
 
   return (
-    <section className="px-4 md:px-8">
+    <section className="px-2 md:px-8">
       {title && (
-        <h2 className="text-xl md:text-2xl font-bold tracking-tight mb-4">
+        <h2 className="text-xl md:text-2xl font-bold tracking-tight mb-3 md:mb-4">
           {title}
         </h2>
       )}
@@ -130,13 +130,13 @@ export default function ContentCarousel({
 
         <div
           ref={scrollRef}
-          className="flex gap-3 md:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory px-4 md:px-8 pb-3 md:pb-4"
+          className="flex gap-2 md:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory px-2 md:px-8 pb-2 md:pb-4"
         >
           {isLoading ? (
             Array.from({ length: 8 }).map((_, i) => (
               <div
                 key={i}
-                className="flex-shrink-0 snap-start w-[140px] md:w-[180px] lg:w-[200px]"
+                className="flex-shrink-0 snap-start w-[128px] sm:w-[140px] md:w-[180px] lg:w-[200px]"
               >
                 <div className="aspect-[2/3] rounded-lg bg-muted animate-pulse" />
                 <div className="mt-2 h-4 bg-muted rounded animate-pulse w-3/4" />
@@ -149,7 +149,7 @@ export default function ContentCarousel({
                 <div
                   key={item.id}
                   onClick={() => handleItemClick(item)}
-                  className="flex-shrink-0 snap-start w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/card"
+                  className="flex-shrink-0 snap-start w-[128px] sm:w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/card"
                 >
                   <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
                     <MediaImage
@@ -200,7 +200,7 @@ export default function ContentCarousel({
               {shouldRenderViewAllCard && (
                 <div
                   onClick={() => navigate(resolvedViewAllHref)}
-                  className="flex-shrink-0 snap-start w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/viewall"
+                  className="flex-shrink-0 snap-start w-[128px] sm:w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/viewall"
                 >
                   <div className="relative aspect-[2/3] rounded-lg overflow-hidden border border-border bg-gradient-to-br from-card to-muted/40 transition-all duration-300 group-hover/viewall:border-primary/40 group-hover/viewall:shadow-[0_10px_30px_rgba(0,0,0,0.35)] flex items-center justify-center">
                     <div className="flex flex-col items-center justify-center gap-3 px-4 text-center">
