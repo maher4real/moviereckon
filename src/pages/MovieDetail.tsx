@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, memo } from "react";
+import { useEffect, useMemo, useRef, useState, memo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
@@ -36,6 +36,7 @@ import {
   Star,
   Calendar,
   Globe,
+  ExternalLink,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -51,6 +52,9 @@ export default function MovieDetail() {
   const [watchAnimating, setWatchAnimating] = useState(false);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [bgVideoIndex, setBgVideoIndex] = useState(0);
+  const [isBgVideoPaused, setIsBgVideoPaused] = useState(false);
+  const [bgFrameSize, setBgFrameSize] = useState({ width: 0, height: 0 });
+  const heroMediaRef = useRef<HTMLDivElement>(null);
 
   const movieId = Number(id);
 
@@ -128,15 +132,56 @@ export default function MovieDetail() {
 
   useEffect(() => {
     setBgVideoIndex(0);
+    setIsBgVideoPaused(false);
   }, [movieId, backgroundTrailerKeys.length]);
 
   useEffect(() => {
-    if (backgroundTrailerKeys.length <= 1) return;
+    if (backgroundTrailerKeys.length <= 1 || isBgVideoPaused) return;
     const intervalId = window.setInterval(() => {
       setBgVideoIndex((prev) => (prev + 1) % backgroundTrailerKeys.length);
     }, 12000);
     return () => window.clearInterval(intervalId);
-  }, [backgroundTrailerKeys]);
+  }, [backgroundTrailerKeys, isBgVideoPaused]);
+
+  useEffect(() => {
+    const updateFrameSize = () => {
+      const container = heroMediaRef.current;
+      if (!container) return;
+      const { width: containerWidth, height: containerHeight } =
+        container.getBoundingClientRect();
+      const aspectRatio = 16 / 9;
+
+      let width = containerWidth;
+      let height = width / aspectRatio;
+      if (height < containerHeight) {
+        height = containerHeight;
+        width = height * aspectRatio;
+      }
+
+      // Slight overscan prevents micro letterboxing across devices.
+      setBgFrameSize({ width: Math.ceil(width * 1.08), height: Math.ceil(height * 1.08) });
+    };
+
+    updateFrameSize();
+    const observer = new ResizeObserver(updateFrameSize);
+    if (heroMediaRef.current) observer.observe(heroMediaRef.current);
+    window.addEventListener("resize", updateFrameSize);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateFrameSize);
+    };
+  }, []);
+
+  const handlePlayOnYouTube = () => {
+    if (!activeBgVideoKey) return;
+    setIsBgVideoPaused(true);
+    window.open(
+      `https://www.youtube.com/watch?v=${activeBgVideoKey}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+  };
   
   // Get providers for IN (India) or US as fallback
   const providers = watchProvidersData?.results?.IN || watchProvidersData?.results?.US || null;
@@ -211,32 +256,54 @@ export default function MovieDetail() {
   const watched = isWatched(movie.id, "movie");
   const liked = isLiked(movie.id, "movie");
   const year = movie.release_date?.split("-")[0] || "";
+  const heroVisualSrc =
+    backgroundTrailerKeys.length > 0
+      ? getBackdropUrl(movie.backdrop_path, "original")
+      : getPosterUrl(movie.poster_path, "large");
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0 overflow-x-hidden">
       <Header />
 
       {/* Backdrop with optional video */}
-      <div className="relative h-[50vh] md:h-[70vh] overflow-hidden">
+      <div ref={heroMediaRef} className="relative h-[50vh] md:h-[70vh] overflow-hidden group/hero">
         <MediaImage
-          src={getBackdropUrl(movie.backdrop_path, "original")}
-          alt={`${movie.title} backdrop`}
+          src={heroVisualSrc}
+          alt={`${movie.title} visual`}
           className="absolute inset-0 w-full h-full object-cover"
-          fallbackSrc="/fallbacks/backdrop.svg"
+          fallbackSrc="/fallbacks/poster.svg"
         />
-        {activeBgVideoKey && (
+        {activeBgVideoKey && !isBgVideoPaused && (
           <div className="absolute inset-0">
             <iframe
               src={`https://www.youtube.com/embed/${activeBgVideoKey}?autoplay=1&mute=1&controls=0&loop=1&playlist=${activeBgVideoKey}&modestbranding=1&rel=0&playsinline=1&iv_load_policy=3`}
               title={`${movie.title} background trailer`}
-              className="absolute top-1/2 left-1/2 h-[130%] w-[240%] md:w-[165%] -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+              style={{ width: `${bgFrameSize.width}px`, height: `${bgFrameSize.height}px` }}
               allow="autoplay; encrypted-media; picture-in-picture"
               tabIndex={-1}
             />
           </div>
         )}
+        {activeBgVideoKey && !isBgVideoPaused && (
+          <div className="absolute inset-x-0 bottom-0 h-3 bg-background/85 pointer-events-none z-[3]" />
+        )}
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-background/25" />
         <div className="absolute inset-0 hero-gradient" />
+
+        {activeBgVideoKey && (
+          <div className="absolute inset-x-0 bottom-4 z-10 flex justify-end px-4 md:px-6">
+            <Button
+              type="button"
+              size="sm"
+              onClick={handlePlayOnYouTube}
+              className="bg-background/70 border border-white/15 text-foreground hover:bg-primary hover:text-primary-foreground backdrop-blur-md transition-all opacity-100 md:opacity-0 md:group-hover/hero:opacity-100"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Play on YouTube
+            </Button>
+          </div>
+        )}
 
         {/* Back Button */}
         <Button

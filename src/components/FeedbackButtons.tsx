@@ -142,17 +142,9 @@ export default function FeedbackButtons({
 
               <p className="text-xs text-muted-foreground leading-snug">{option.hint}</p>
 
-              <div className="w-full mt-1">
-                <div className="h-1.5 w-full rounded-full bg-muted/70 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-primary/80 transition-all duration-500"
-                    style={{ width: `${Math.max(voteShare, isSelected ? 6 : 0)}%` }}
-                  />
-                </div>
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  {count} votes{totalVotes > 0 ? ` (${voteShare}%)` : ""}
-                </p>
-              </div>
+              <p className="w-full mt-1 text-[11px] text-muted-foreground">
+                {count} votes{totalVotes > 0 ? ` (${voteShare}%)` : ""}
+              </p>
             </Button>
           );
         })}
