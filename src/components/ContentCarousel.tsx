@@ -36,7 +36,9 @@ export default function ContentCarousel({
 
     const hasStartedScrolling = scrollLeft > threshold;
     setShowLeftFade(hasStartedScrolling);
-    setShowRightFade(hasStartedScrolling && scrollLeft < maxScrollLeft - threshold);
+    setShowRightFade(
+      hasStartedScrolling && scrollLeft < maxScrollLeft - threshold,
+    );
   }, []);
 
   useEffect(() => {
@@ -82,7 +84,8 @@ export default function ContentCarousel({
   };
 
   const getYear = (item: Movie | TVShow): string => {
-    const date = "release_date" in item ? item.release_date : item.first_air_date;
+    const date =
+      "release_date" in item ? item.release_date : item.first_air_date;
     return date?.split("-")[0] || "";
   };
 
@@ -98,7 +101,7 @@ export default function ContentCarousel({
         </h2>
       )}
 
-      <div className="relative group -mx-4 md:-mx-8">
+      <div className="relative group">
         <div
           className={cn(
             "pointer-events-none absolute left-0 top-0 bottom-3 md:bottom-4 w-8 md:w-12 bg-gradient-to-r from-background via-background/85 to-transparent z-[5] transition-opacity duration-200",
@@ -132,7 +135,7 @@ export default function ContentCarousel({
 
         <div
           ref={scrollRef}
-          className="flex gap-3 md:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory px-4 md:px-8 pb-3 md:pb-4"
+          className="className=flex gap-3 md:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory px-0 pb-3 md:pb-4"
         >
           {isLoading
             ? Array.from({ length: 8 }).map((_, i) => (
@@ -191,7 +194,9 @@ export default function ContentCarousel({
                   <h3 className="mt-2 font-medium text-sm line-clamp-1 group-hover/card:text-primary transition-colors">
                     {getTitle(item)}
                   </h3>
-                  <p className="text-xs text-muted-foreground">{getYear(item)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {getYear(item)}
+                  </p>
                 </div>
               ))}
         </div>
