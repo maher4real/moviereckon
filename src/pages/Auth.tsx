@@ -258,7 +258,7 @@ export default function Auth() {
         </div>
 
         {/* Auth Card */}
-        <div className="bg-card/80 backdrop-blur-sm rounded-2xl p-8 border border-border shadow-2xl">
+        <div className="bg-card/80 backdrop-blur-md rounded-2xl p-8 border border-border shadow-2xl">
           <Tabs
             value={activeTab}
             onValueChange={(v) => setActiveTab(v as "signin" | "signup")}
