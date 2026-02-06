@@ -89,7 +89,11 @@ export default function Auth() {
       bollywood: bollywoodPosters.slice(0, 8),
     };
 
-    const orderedKeys: (keyof typeof curatedPools)[] = ["movie", "tv", "bollywood"];
+    const orderedKeys: (keyof typeof curatedPools)[] = [
+      "movie",
+      "tv",
+      "bollywood",
+    ];
     const mixed: { id: string; src: string }[] = [];
     let cursor = 0;
 
@@ -172,9 +176,9 @@ export default function Auth() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
-    
+
     setIsSubmitting(true);
 
     try {
@@ -213,7 +217,7 @@ export default function Auth() {
                 key={`row-${rowIndex}`}
                 className={cn(
                   "auth-poster-row",
-                  rowIndex % 2 === 1 && "auth-poster-row-reverse"
+                  rowIndex % 2 === 1 && "auth-poster-row-reverse",
                 )}
                 style={{ animationDuration: `${34 + rowIndex * 4}s` }}
               >
@@ -254,8 +258,11 @@ export default function Auth() {
         </div>
 
         {/* Auth Card */}
-        <div className="bg-card/95 backdrop-blur-sm rounded-2xl p-8 border border-border shadow-2xl">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "signin" | "signup")}>
+        <div className="bg-card/90 backdrop-blur-sm rounded-2xl p-8 border border-border shadow-2xl">
+          <Tabs
+            value={activeTab}
+            onValueChange={(v) => setActiveTab(v as "signin" | "signup")}
+          >
             <TabsList className="grid w-full grid-cols-2 mb-6 bg-muted">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
@@ -277,7 +284,9 @@ export default function Auth() {
                       autoComplete="email"
                     />
                   </div>
-                  {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
+                  {errors.email && (
+                    <p className="text-xs text-destructive">{errors.email}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -298,10 +307,18 @@ export default function Auth() {
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
                     </button>
                   </div>
-                  {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
+                  {errors.password && (
+                    <p className="text-xs text-destructive">
+                      {errors.password}
+                    </p>
+                  )}
                 </div>
 
                 <Button
@@ -323,78 +340,92 @@ export default function Auth() {
 
             <TabsContent value="signup">
               <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-username">Username</Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="signup-username"
-                        type="text"
-                        placeholder="Your name"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        className="pl-10 h-12 bg-background"
-                        autoComplete="name"
-                      />
-                    </div>
-                    {errors.username && <p className="text-xs text-destructive">{errors.username}</p>}
+                <div className="space-y-2">
+                  <Label htmlFor="signup-username">Username</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="signup-username"
+                      type="text"
+                      placeholder="Your name"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className="pl-10 h-12 bg-background"
+                      autoComplete="name"
+                    />
                   </div>
+                  {errors.username && (
+                    <p className="text-xs text-destructive">
+                      {errors.username}
+                    </p>
+                  )}
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="signup-email"
-                        type="email"
-                        placeholder="you@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="pl-10 h-12 bg-background"
-                        autoComplete="email"
-                      />
-                    </div>
-                    {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
+                <div className="space-y-2">
+                  <Label htmlFor="signup-email">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="signup-email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="pl-10 h-12 bg-background"
+                      autoComplete="email"
+                    />
                   </div>
+                  {errors.email && (
+                    <p className="text-xs text-destructive">{errors.email}</p>
+                  )}
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="signup-password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="At least 6 characters"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="pl-10 pr-10 h-12 bg-background"
-                        autoComplete="new-password"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
+                <div className="space-y-2">
+                  <Label htmlFor="signup-password">Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="signup-password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="At least 6 characters"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pl-10 pr-10 h-12 bg-background"
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </button>
                   </div>
+                  {errors.password && (
+                    <p className="text-xs text-destructive">
+                      {errors.password}
+                    </p>
+                  )}
+                </div>
 
-                  <Button
-                    type="submit"
-                    className="w-full h-12 text-lg font-semibold bg-primary hover:bg-primary/90"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <span className="flex items-center gap-2">
-                        <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Creating account...
-                      </span>
-                    ) : (
-                      "Create Account"
-                    )}
-                  </Button>
+                <Button
+                  type="submit"
+                  className="w-full h-12 text-lg font-semibold bg-primary hover:bg-primary/90"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <span className="flex items-center gap-2">
+                      <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Creating account...
+                    </span>
+                  ) : (
+                    "Create Account"
+                  )}
+                </Button>
               </form>
             </TabsContent>
           </Tabs>
