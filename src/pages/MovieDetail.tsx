@@ -1,4 +1,4 @@
-import { useEffect, useState, memo } from "react";
+import { useEffect, useMemo, useState, memo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
@@ -50,6 +50,7 @@ export default function MovieDetail() {
   const [showTrailer, setShowTrailer] = useState(false);
   const [watchAnimating, setWatchAnimating] = useState(false);
   const [likeAnimating, setLikeAnimating] = useState(false);
+  const [bgVideoIndex, setBgVideoIndex] = useState(0);
 
   const movieId = Number(id);
 
@@ -59,6 +60,11 @@ export default function MovieDetail() {
       navigate("/");
     }
   }, [user, authLoading, navigate]);
+
+  // Always open detail page from top
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [movieId]);
 
   // Fetch movie details
   const { data: movie, isLoading: movieLoading } = useQuery({
@@ -97,6 +103,40 @@ export default function MovieDetail() {
 
   const cast = creditsData?.cast.slice(0, 12) || [];
   const trailerUrl = videosData ? getYouTubeTrailerUrl(videosData.results) : null;
+  const backgroundTrailerKeys = useMemo(() => {
+    const results = videosData?.results || [];
+    const ranked = results
+      .filter(
+        (video) =>
+          video.site === "YouTube" &&
+          !!video.key &&
+          (video.type === "Trailer" || video.type === "Teaser" || video.type === "Clip"),
+      )
+      .sort((a, b) => {
+        const score = (video: (typeof results)[number]) => {
+          const typeScore =
+            video.type === "Trailer" ? 3 : video.type === "Teaser" ? 2 : 1;
+          return (video.official ? 10 : 0) + typeScore;
+        };
+        return score(b) - score(a);
+      });
+
+    const unique = Array.from(new Map(ranked.map((video) => [video.key, video])).values());
+    return unique.slice(0, 3).map((video) => video.key);
+  }, [videosData]);
+  const activeBgVideoKey = backgroundTrailerKeys[bgVideoIndex];
+
+  useEffect(() => {
+    setBgVideoIndex(0);
+  }, [movieId, backgroundTrailerKeys.length]);
+
+  useEffect(() => {
+    if (backgroundTrailerKeys.length <= 1) return;
+    const intervalId = window.setInterval(() => {
+      setBgVideoIndex((prev) => (prev + 1) % backgroundTrailerKeys.length);
+    }, 12000);
+    return () => window.clearInterval(intervalId);
+  }, [backgroundTrailerKeys]);
   
   // Get providers for IN (India) or US as fallback
   const providers = watchProvidersData?.results?.IN || watchProvidersData?.results?.US || null;
@@ -184,6 +224,17 @@ export default function MovieDetail() {
           className="absolute inset-0 w-full h-full object-cover"
           fallbackSrc="/fallbacks/backdrop.svg"
         />
+        {activeBgVideoKey && (
+          <div className="absolute inset-0">
+            <iframe
+              src={`https://www.youtube.com/embed/${activeBgVideoKey}?autoplay=1&mute=1&controls=0&loop=1&playlist=${activeBgVideoKey}&modestbranding=1&rel=0&playsinline=1&iv_load_policy=3`}
+              title={`${movie.title} background trailer`}
+              className="absolute top-1/2 left-1/2 h-[130%] w-[240%] md:w-[165%] -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+              allow="autoplay; encrypted-media; picture-in-picture"
+              tabIndex={-1}
+            />
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-background/25" />
         <div className="absolute inset-0 hero-gradient" />
 

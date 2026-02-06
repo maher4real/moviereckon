@@ -63,7 +63,8 @@ export default function ContentCarousel({
   const getDefaultViewAllHref = (): string => {
     const normalized = title.toLowerCase();
 
-    if (normalized.includes("now playing")) return "/movies?category=now_playing";
+    if (normalized.includes("now playing"))
+      return "/movies?category=now_playing";
     if (normalized.includes("coming soon") || normalized.includes("upcoming")) {
       return "/movies?category=upcoming";
     }
@@ -74,9 +75,11 @@ export default function ContentCarousel({
     if (normalized.includes("telugu")) return "/movies?category=telugu";
     if (normalized.includes("gujarati")) return "/browse?type=gujarati";
     if (normalized.includes("trending tv")) return "/series?category=popular";
-    if (normalized.includes("top rated")) return "/movies?sort=vote_average.desc";
+    if (normalized.includes("top rated"))
+      return "/movies?sort=vote_average.desc";
     if (normalized.includes("trending")) return "/movies?category=trending";
-    if (normalized.includes("similar")) return type === "tv" ? "/series" : "/movies";
+    if (normalized.includes("similar"))
+      return type === "tv" ? "/series" : "/movies";
     if (type === "movie") return "/movies";
     if (type === "tv") return "/series";
     return "/reckon";
@@ -125,100 +128,95 @@ export default function ContentCarousel({
           ref={scrollRef}
           className="flex gap-3 md:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory px-4 md:px-8 pb-3 md:pb-4"
         >
-          {isLoading
-            ? Array.from({ length: 8 }).map((_, i) => (
+          {isLoading ? (
+            Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex-shrink-0 snap-start w-[140px] md:w-[180px] lg:w-[200px]"
+              >
+                <div className="aspect-[2/3] rounded-lg bg-muted animate-pulse" />
+                <div className="mt-2 h-4 bg-muted rounded animate-pulse w-3/4" />
+                <div className="mt-1 h-3 bg-muted rounded animate-pulse w-1/2" />
+              </div>
+            ))
+          ) : (
+            <>
+              {items?.map((item) => (
                 <div
-                  key={i}
-                  className="flex-shrink-0 snap-start w-[140px] md:w-[180px] lg:w-[200px]"
+                  key={item.id}
+                  onClick={() => handleItemClick(item)}
+                  className="flex-shrink-0 snap-start w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/card"
                 >
-                  <div className="aspect-[2/3] rounded-lg bg-muted animate-pulse" />
-                  <div className="mt-2 h-4 bg-muted rounded animate-pulse w-3/4" />
-                  <div className="mt-1 h-3 bg-muted rounded animate-pulse w-1/2" />
+                  <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
+                    <MediaImage
+                      src={getPosterUrl(item.poster_path, "medium")}
+                      alt={getTitle(item)}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                      fallbackSrc="/fallbacks/poster.svg"
+                    />
+
+                    <div className="absolute inset-0 bg-background/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
+                      <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center glow-primary">
+                        <span className="text-xl">▶</span>
+                      </div>
+                    </div>
+
+                    {item.vote_average > 0 && (
+                      <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
+                        ⭐ {item.vote_average.toFixed(1)}
+                      </div>
+                    )}
+
+                    <div
+                      className={cn(
+                        "absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold",
+                        item.original_language === "hi"
+                          ? "badge-hindi"
+                          : item.original_language === "en"
+                            ? "badge-english"
+                            : "bg-muted",
+                      )}
+                    >
+                      {item.original_language === "hi"
+                        ? "HI"
+                        : item.original_language.toUpperCase()}
+                    </div>
+                  </div>
+
+                  <h3 className="mt-2 font-medium text-sm line-clamp-1 group-hover/card:text-primary transition-colors">
+                    {getTitle(item)}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    {getYear(item)}
+                  </p>
                 </div>
-              ))
-            : (
-                <>
-                  {items?.map((item) => (
-                    <div
-                      key={item.id}
-                      onClick={() => handleItemClick(item)}
-                      className="flex-shrink-0 snap-start w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/card"
-                    >
-                      <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
-                        <MediaImage
-                          src={getPosterUrl(item.poster_path, "medium")}
-                          alt={getTitle(item)}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                          fallbackSrc="/fallbacks/poster.svg"
-                        />
+              ))}
 
-                        <div className="absolute inset-0 bg-background/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
-                          <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center glow-primary">
-                            <span className="text-xl">▶</span>
-                          </div>
-                        </div>
-
-                        {item.vote_average > 0 && (
-                          <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
-                            ⭐ {item.vote_average.toFixed(1)}
-                          </div>
-                        )}
-
-                        <div
-                          className={cn(
-                            "absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold",
-                            item.original_language === "hi"
-                              ? "badge-hindi"
-                              : item.original_language === "en"
-                                ? "badge-english"
-                                : "bg-muted",
-                          )}
-                        >
-                          {item.original_language === "hi"
-                            ? "HI"
-                            : item.original_language.toUpperCase()}
-                        </div>
+              {shouldRenderViewAllCard && (
+                <div
+                  onClick={() => navigate(resolvedViewAllHref)}
+                  className="flex-shrink-0 snap-start w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/viewall"
+                >
+                  <div className="relative aspect-[2/3] rounded-lg overflow-hidden border border-border bg-gradient-to-br from-card to-muted/40 transition-all duration-300 group-hover/viewall:border-primary/40 group-hover/viewall:shadow-[0_10px_30px_rgba(0,0,0,0.35)] flex items-center justify-center">
+                    <div className="flex flex-col items-center justify-center gap-3 px-4 text-center">
+                      <div className="w-12 h-12 rounded-full bg-primary/20 text-primary flex items-center justify-center group-hover/viewall:bg-primary group-hover/viewall:text-primary-foreground transition-colors">
+                        <ArrowRight className="w-6 h-6" />
                       </div>
-
-                      <h3 className="mt-2 font-medium text-sm line-clamp-1 group-hover/card:text-primary transition-colors">
-                        {getTitle(item)}
-                      </h3>
-                      <p className="text-xs text-muted-foreground">
-                        {getYear(item)}
+                      <p className="text-base md:text-lg font-semibold text-foreground">
+                        View All
                       </p>
                     </div>
-                  ))}
+                  </div>
 
-                  {shouldRenderViewAllCard && (
-                    <div
-                      onClick={() => navigate(resolvedViewAllHref)}
-                      className="flex-shrink-0 snap-start w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/viewall"
-                    >
-                      <div className="relative aspect-[2/3] rounded-lg overflow-hidden border border-border bg-gradient-to-br from-card to-muted/40 transition-all duration-300 group-hover/viewall:border-primary/40 group-hover/viewall:shadow-[0_10px_30px_rgba(0,0,0,0.35)] flex items-center justify-center">
-                        <div className="flex flex-col items-center justify-center gap-3 px-4 text-center">
-                          <div className="w-12 h-12 rounded-full bg-primary/20 text-primary flex items-center justify-center group-hover/viewall:bg-primary group-hover/viewall:text-primary-foreground transition-colors">
-                            <ArrowRight className="w-6 h-6" />
-                          </div>
-                          <p className="text-base md:text-lg font-semibold text-foreground">
-                            View All
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Open full section
-                          </p>
-                        </div>
-                      </div>
-
-                      <h3 className="mt-2 font-medium text-sm line-clamp-1 text-primary group-hover/viewall:text-primary/80 transition-colors">
-                        Explore More
-                      </h3>
-                      <p className="text-xs text-muted-foreground">
-                        {title}
-                      </p>
-                    </div>
-                  )}
-                </>
+                  <h3 className="mt-2 font-medium text-sm line-clamp-1 text-primary group-hover/viewall:text-primary/80 transition-colors">
+                    Explore More
+                  </h3>
+                  <p className="text-xs text-muted-foreground">{title}</p>
+                </div>
               )}
+            </>
+          )}
         </div>
       </div>
     </section>
