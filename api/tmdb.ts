@@ -6,6 +6,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
+const TMDB_BEARER_TOKEN = process.env.TMDB_BEARER_TOKEN;
 
 const ALLOWED_PREFIXES = [
   "/trending/",
@@ -59,8 +60,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  if (!TMDB_API_KEY) {
-    return res.status(500).json({ error: "TMDB API key is not configured" });
+  if (!TMDB_API_KEY && !TMDB_BEARER_TOKEN) {
+    return res.status(500).json({ error: "TMDB credentials are not configured" });
   }
 
   const endpoint =
@@ -74,7 +75,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
-    url.searchParams.set("api_key", TMDB_API_KEY);
+    const requestHeaders: Record<string, string> = { Accept: "application/json" };
+    if (TMDB_BEARER_TOKEN) {
+      requestHeaders.Authorization = `Bearer ${TMDB_BEARER_TOKEN}`;
+    } else if (TMDB_API_KEY) {
+      url.searchParams.set("api_key", TMDB_API_KEY);
+    }
 
     for (const [key, value] of Object.entries(params)) {
       if (value !== undefined && value !== null && value !== "") {
@@ -82,9 +88,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    const response = await fetch(url.toString(), {
-      headers: { Accept: "application/json" },
-    });
+    const response = await fetch(url.toString(), { headers: requestHeaders });
 
     if (!response.ok) {
       return res.status(response.status).json({ error: `TMDB request failed (${response.status})` });

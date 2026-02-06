@@ -6,6 +6,7 @@ const FALLBACK_POSTER = "/fallbacks/poster.svg";
 const FALLBACK_BACKDROP = "/fallbacks/backdrop.svg";
 const FALLBACK_PROFILE = "/fallbacks/profile.svg";
 const FALLBACK_STILL = "/fallbacks/still.svg";
+const API_BASE_URL = (import.meta.env.VITE_MONGODB_API_URL || "").replace(/\/+$/, "");
 
 // Image size configurations
 export const IMAGE_SIZES = {
@@ -184,7 +185,7 @@ async function fetchTMDB<T>(
   endpoint: string,
   params: Record<string, string | number | undefined> = {},
 ): Promise<T> {
-  const response = await fetch("/api/tmdb", {
+  const response = await fetch(`${API_BASE_URL}/api/tmdb`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ endpoint, params }),
