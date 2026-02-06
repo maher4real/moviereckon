@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, memo, useRef } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -110,6 +110,7 @@ PosterCard.displayName = "PosterCard";
 export default function Browse() {
   const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
@@ -251,7 +252,10 @@ export default function Browse() {
 
   const handleItemClick = (item: Movie | TVShow) => {
     const isTV = "first_air_date" in item;
-    navigate(`/${isTV ? "tv" : "movie"}/${item.id}`);
+    const fromPath = `${location.pathname}${location.search}${location.hash}`;
+    navigate(`/${isTV ? "tv" : "movie"}/${item.id}`, {
+      state: { from: fromPath },
+    });
   };
 
   const isSpecialCategory = contentType === "now_playing" || contentType === "upcoming";

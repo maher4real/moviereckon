@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, memo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserData } from "@/hooks/useUserData";
@@ -40,7 +40,6 @@ import {
   Calendar,
   Globe,
   Tv,
-  ExternalLink,
   X,
   Clock,
   ChevronDown,
@@ -53,6 +52,7 @@ const MemoizedCarousel = memo(ContentCarousel);
 export default function TVDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, isLoading: authLoading } = useAuth();
   const { addToWatchHistory, isWatched, toggleLike, isLiked } = useUserData();
   const [showTrailer, setShowTrailer] = useState(false);
@@ -61,7 +61,6 @@ export default function TVDetail() {
   const [watchAnimating, setWatchAnimating] = useState(false);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [bgVideoIndex, setBgVideoIndex] = useState(0);
-  const [isBgVideoPaused, setIsBgVideoPaused] = useState(false);
   const [bgFrameSize, setBgFrameSize] = useState({ width: 0, height: 0 });
   const heroMediaRef = useRef<HTMLDivElement>(null);
 
@@ -73,6 +72,19 @@ export default function TVDetail() {
       navigate("/");
     }
   }, [user, authLoading, navigate]);
+
+  const handleBack = () => {
+    const from = (location.state as { from?: string } | null)?.from;
+    if (from) {
+      navigate(from);
+      return;
+    }
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate("/home");
+  };
 
   // Always open detail page from top
   useEffect(() => {
@@ -158,16 +170,15 @@ export default function TVDetail() {
 
   useEffect(() => {
     setBgVideoIndex(0);
-    setIsBgVideoPaused(false);
   }, [tvId, backgroundTrailerKeys.length]);
 
   useEffect(() => {
-    if (backgroundTrailerKeys.length <= 1 || isBgVideoPaused) return;
+    if (backgroundTrailerKeys.length <= 1) return;
     const intervalId = window.setInterval(() => {
       setBgVideoIndex((prev) => (prev + 1) % backgroundTrailerKeys.length);
     }, 12000);
     return () => window.clearInterval(intervalId);
-  }, [backgroundTrailerKeys, isBgVideoPaused]);
+  }, [backgroundTrailerKeys]);
 
   useEffect(() => {
     const updateFrameSize = () => {
@@ -199,16 +210,6 @@ export default function TVDetail() {
     };
   }, []);
 
-  const handlePlayOnYouTube = () => {
-    if (!activeBgVideoKey) return;
-    setIsBgVideoPaused(true);
-    window.open(
-      `https://www.youtube.com/watch?v=${activeBgVideoKey}`,
-      "_blank",
-      "noopener,noreferrer",
-    );
-  };
-  
   // Filter out "Specials" (season 0) from seasons list
   const seasons = tvShow?.seasons?.filter((s) => s.season_number > 0) || [];
 
@@ -303,7 +304,7 @@ export default function TVDetail() {
           className="absolute inset-0 w-full h-full object-cover"
           fallbackSrc="/fallbacks/poster.svg"
         />
-        {activeBgVideoKey && !isBgVideoPaused && (
+        {activeBgVideoKey && !showTrailer && (
           <div className="absolute inset-0">
             <iframe
               src={`https://www.youtube.com/embed/${activeBgVideoKey}?autoplay=1&mute=1&controls=0&loop=1&playlist=${activeBgVideoKey}&modestbranding=1&rel=0&playsinline=1&iv_load_policy=3`}
@@ -315,22 +316,22 @@ export default function TVDetail() {
             />
           </div>
         )}
-        {activeBgVideoKey && !isBgVideoPaused && (
+        {activeBgVideoKey && !showTrailer && (
           <div className="absolute inset-x-0 bottom-0 h-3 bg-background/85 pointer-events-none z-[3]" />
         )}
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-background/25" />
         <div className="absolute inset-0 hero-gradient" />
 
-        {activeBgVideoKey && (
-          <div className="absolute inset-x-0 bottom-4 z-10 flex justify-end px-4 md:px-6">
+        {trailerUrl && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
             <Button
               type="button"
-              size="sm"
-              onClick={handlePlayOnYouTube}
-              className="bg-background/70 border border-white/15 text-foreground hover:bg-primary hover:text-primary-foreground backdrop-blur-md transition-all opacity-100 md:opacity-0 md:group-hover/hero:opacity-100"
+              size="icon"
+              onClick={() => setShowTrailer(true)}
+              className="pointer-events-auto h-16 w-16 rounded-full bg-background/70 border border-white/20 text-foreground backdrop-blur-md opacity-0 group-hover/hero:opacity-100 transition-all duration-300 hover:bg-primary hover:text-primary-foreground"
+              aria-label="Play trailer"
             >
-              <ExternalLink className="w-4 h-4 mr-2" />
-              Play on YouTube
+              <Play className="w-7 h-7 fill-current" />
             </Button>
           </div>
         )}
@@ -339,7 +340,7 @@ export default function TVDetail() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate(-1)}
+          onClick={handleBack}
           className="absolute top-20 left-4 z-10 bg-background/50 backdrop-blur-sm"
         >
           <ArrowLeft className="w-5 h-5" />

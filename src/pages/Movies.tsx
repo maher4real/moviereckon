@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, memo, useRef } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -86,6 +86,7 @@ PosterCard.displayName = "PosterCard";
 export default function Movies() {
   const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
@@ -292,7 +293,17 @@ export default function Movies() {
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                 {allMovies.map((item) => (
-                  <PosterCard key={item.id} item={item} onClick={() => navigate(`/movie/${item.id}`)} />
+                  <PosterCard
+                    key={item.id}
+                    item={item}
+                    onClick={() =>
+                      navigate(`/movie/${item.id}`, {
+                        state: {
+                          from: `${location.pathname}${location.search}${location.hash}`,
+                        },
+                      })
+                    }
+                  />
                 ))}
               </div>
 

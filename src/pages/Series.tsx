@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, memo, useRef } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -108,6 +108,7 @@ PosterCard.displayName = "PosterCard";
 export default function Series() {
   const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
@@ -376,7 +377,13 @@ export default function Series() {
                   <PosterCard
                     key={item.id}
                     item={item}
-                    onClick={() => navigate(`/tv/${item.id}`)}
+                    onClick={() =>
+                      navigate(`/tv/${item.id}`, {
+                        state: {
+                          from: `${location.pathname}${location.search}${location.hash}`,
+                        },
+                      })
+                    }
                     ottLabel={cardOttLabel}
                   />
                 ))}

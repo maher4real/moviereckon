@@ -1,5 +1,5 @@
 import { memo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Eye, Heart } from "lucide-react";
 import { Movie, TVShow, getPosterUrl, getLanguageLabel } from "@/lib/tmdb";
 import { useUserData } from "@/hooks/useUserData";
@@ -14,6 +14,7 @@ interface ContentCardProps {
 
 function ContentCardComponent({ item, type, showActions = true }: ContentCardProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isWatched, isLiked, addToWatchHistory, toggleLike } = useUserData();
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [watchAnimating, setWatchAnimating] = useState(false);
@@ -29,7 +30,8 @@ function ContentCardComponent({ item, type, showActions = true }: ContentCardPro
   const liked = isLiked(item.id, contentType);
 
   const handleClick = () => {
-    navigate(`/${itemType}/${item.id}`);
+    const fromPath = `${location.pathname}${location.search}${location.hash}`;
+    navigate(`/${itemType}/${item.id}`, { state: { from: fromPath } });
   };
 
   const handleWatched = async (e: React.MouseEvent) => {

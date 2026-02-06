@@ -1,5 +1,5 @@
 import { useEffect, useMemo, memo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserData } from "@/hooks/useUserData";
 import Header from "@/components/Header";
@@ -63,6 +63,7 @@ export default function Profile() {
   const { user, profile, isLoading: authLoading, signOut } = useAuth();
   const { watchHistory, likedItems, isLoading: dataLoading, removeFromWatchHistory, clearHistory } = useUserData();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Redirect if no user
   useEffect(() => {
@@ -77,7 +78,8 @@ export default function Profile() {
   };
 
   const handleItemClick = (id: number, type: "movie" | "tv") => {
-    navigate(`/${type}/${id}`);
+    const fromPath = `${location.pathname}${location.search}${location.hash}`;
+    navigate(`/${type}/${id}`, { state: { from: fromPath } });
   };
 
   // Calculate stats

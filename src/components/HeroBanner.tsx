@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Movie, getBackdropUrl } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
 import { Play, Info } from "lucide-react";
@@ -21,6 +21,8 @@ export default function HeroBanner({
   onDotClick,
 }: HeroBannerProps) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromPath = `${location.pathname}${location.search}${location.hash}`;
 
   if (isLoading || !movie) {
     return (
@@ -87,7 +89,9 @@ export default function HeroBanner({
               <Button
                 size="lg"
                 className="bg-primary hover:bg-primary/90 glow-primary font-semibold text-primary-foreground"
-                onClick={() => navigate(`/movie/${movie.id}`)}
+                onClick={() =>
+                  navigate(`/movie/${movie.id}`, { state: { from: fromPath } })
+                }
               >
                 <Play className="w-5 h-5 mr-2 fill-current" />
                 Watch Trailer
@@ -96,7 +100,9 @@ export default function HeroBanner({
                 size="lg"
                 variant="secondary"
                 className="font-semibold"
-                onClick={() => navigate(`/movie/${movie.id}`)}
+                onClick={() =>
+                  navigate(`/movie/${movie.id}`, { state: { from: fromPath } })
+                }
               >
                 <Info className="w-5 h-5 mr-2" />
                 More Info

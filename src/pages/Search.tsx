@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, memo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { searchMulti, Movie, TVShow, getPosterUrl, getLanguageBadgeClass } from "@/lib/tmdb";
@@ -69,6 +69,7 @@ ResultCard.displayName = "ResultCard";
 export default function Search() {
   const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
@@ -148,8 +149,11 @@ export default function Search() {
       saveRecentSearch(debouncedQuery);
     }
     const isTV = "first_air_date" in item;
-    navigate(`/${isTV ? "tv" : "movie"}/${item.id}`);
-  }, [navigate, debouncedQuery, saveRecentSearch]);
+    const fromPath = `${location.pathname}${location.search}${location.hash}`;
+    navigate(`/${isTV ? "tv" : "movie"}/${item.id}`, {
+      state: { from: fromPath },
+    });
+  }, [navigate, debouncedQuery, saveRecentSearch, location.pathname, location.search, location.hash]);
 
   const handleRecentSearchClick = useCallback((searchTerm: string) => {
     setQuery(searchTerm);

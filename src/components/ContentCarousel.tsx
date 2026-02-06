@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
 import { Movie, TVShow, getPosterUrl } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,8 @@ export default function ContentCarousel({
 }: ContentCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromPath = `${location.pathname}${location.search}${location.hash}`;
 
   const scroll = (direction: "left" | "right") => {
     if (!scrollRef.current) return;
@@ -41,13 +43,15 @@ export default function ContentCarousel({
 
   const handleItemClick = (item: Movie | TVShow | ContentItem) => {
     if ("_content_type" in item && item._content_type) {
-      navigate(`/${item._content_type}/${item.id}`);
+      navigate(`/${item._content_type}/${item.id}`, {
+        state: { from: fromPath },
+      });
       return;
     }
 
     const isTV = "first_air_date" in item && item.first_air_date;
     const itemType = type === "mixed" ? (isTV ? "tv" : "movie") : type;
-    navigate(`/${itemType}/${item.id}`);
+    navigate(`/${itemType}/${item.id}`, { state: { from: fromPath } });
   };
 
   const getTitle = (item: Movie | TVShow): string => {
