@@ -46,6 +46,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const MemoizedCarousel = memo(ContentCarousel);
+const PREVIEW_AUTOPLAY_TIMEOUT_MS = 12000;
 
 export default function MovieDetail() {
   const { id } = useParams<{ id: string }>();
@@ -239,8 +240,8 @@ export default function MovieDetail() {
       : null;
   const controlBackgroundPreview = useCallback(
     (
-      func: "addEventListener" | "mute" | "playVideo" | "pauseVideo",
-      args: string[] = [],
+      func: "addEventListener" | "mute" | "playVideo" | "pauseVideo" | "seekTo",
+      args: Array<string | number | boolean> = [],
     ) => {
       const frame = bgPlayerRef.current;
       if (!frame?.contentWindow) return;
@@ -275,7 +276,7 @@ export default function MovieDetail() {
 
     const fallbackTimeout = window.setTimeout(() => {
       setIsBackgroundVideoVisible(false);
-    }, 4000);
+    }, PREVIEW_AUTOPLAY_TIMEOUT_MS);
 
     return () => window.clearTimeout(fallbackTimeout);
   }, [backgroundTrailerEmbedUrl, isBackgroundVideoVisible, isBackgroundVideoPlaying]);
@@ -302,9 +303,30 @@ export default function MovieDetail() {
       }
 
       if (!payload || typeof payload !== "object") return;
-      const message = payload as { event?: string; info?: number | string };
+      const message = payload as {
+        event?: string;
+        info?: number | string | { currentTime?: number };
+      };
 
-      if (message.event === "onStateChange" && Number(message.info) === 1) {
+      if (message.event === "onStateChange") {
+        const state = Number(message.info);
+        if (state === 1) {
+          setIsBackgroundVideoPlaying(true);
+          setIsBackgroundVideoVisible(true);
+        }
+        if (state === 0) {
+          controlBackgroundPreview("seekTo", [0, true]);
+          controlBackgroundPreview("playVideo");
+        }
+      }
+
+      if (
+        message.event === "infoDelivery" &&
+        message.info &&
+        typeof message.info === "object" &&
+        typeof message.info.currentTime === "number" &&
+        message.info.currentTime > 0.5
+      ) {
         setIsBackgroundVideoPlaying(true);
         setIsBackgroundVideoVisible(true);
       }
@@ -316,7 +338,7 @@ export default function MovieDetail() {
 
     window.addEventListener("message", onPlayerMessage);
     return () => window.removeEventListener("message", onPlayerMessage);
-  }, [activeBgVideoKey]);
+  }, [activeBgVideoKey, controlBackgroundPreview]);
 
   useEffect(() => {
     if (!backgroundTrailerEmbedUrl || !isBackgroundVideoVisible) return;
@@ -617,7 +639,7 @@ export default function MovieDetail() {
       </div>
 
       <Dialog open={isTrailerModalOpen} onOpenChange={setIsTrailerModalOpen}>
-        <DialogContent className="w-[96vw] max-w-5xl border border-white/15 bg-black p-0 text-white [&>button]:text-white [&>button]:opacity-90 [&>button]:ring-offset-black">
+        <DialogContent className="w-[96vw] max-w-5xl border border-white/15 bg-black p-0 text-white [&>button]:-top-12 [&>button]:right-0 [&>button]:h-10 [&>button]:w-10 [&>button]:rounded-full [&>button]:border [&>button]:border-white/25 [&>button]:bg-primary [&>button]:text-primary-foreground [&>button]:opacity-100 [&>button]:shadow-lg [&>button]:ring-offset-black [&>button]:transition-colors [&>button:hover]:bg-primary/90">
           <DialogTitle className="sr-only">{movie.title} trailer</DialogTitle>
           <DialogDescription className="sr-only">
             Trailer player with sound and playback controls.
