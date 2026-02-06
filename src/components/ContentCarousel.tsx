@@ -91,17 +91,14 @@ export default function ContentCarousel({
 
   const resolvedViewAllHref = viewAllHref || getDefaultViewAllHref();
   const shouldRenderViewAllCard =
-    !isLoading &&
-    showViewAllCard &&
-    !!items?.length &&
-    !!resolvedViewAllHref;
+    !isLoading && showViewAllCard && !!items?.length && !!resolvedViewAllHref;
 
   if (!isLoading && (!items || items.length === 0)) {
     return null;
   }
 
   return (
-    <section className="px-2 md:px-8">
+    <section className="px-2 md:px-6">
       {title && (
         <h2 className="text-xl md:text-2xl font-bold tracking-tight mb-3 md:mb-4">
           {title}
