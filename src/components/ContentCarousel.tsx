@@ -102,7 +102,7 @@ export default function ContentCarousel({
       )}
 
       <div className="relative group">
-        <div
+        {/* <div
           className={cn(
             "pointer-events-none absolute left-0 top-0 bottom-3 md:bottom-4 w-8 md:w-12 bg-gradient-to-r from-background via-background/85 to-transparent z-[5] transition-opacity duration-200",
             showLeftFade ? "opacity-10" : "opacity-0",
@@ -113,7 +113,7 @@ export default function ContentCarousel({
             "pointer-events-none absolute right-0 top-0 bottom-3 md:bottom-4 w-8 md:w-12 bg-gradient-to-l from-background via-background/85 to-transparent z-[5] transition-opacity duration-200",
             showRightFade ? "opacity-10" : "opacity-0",
           )}
-        />
+        /> */}
 
         <Button
           variant="ghost"
