@@ -2,7 +2,12 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
-import { getTrendingMovies, getTrendingTVShows, getPosterUrl } from "@/lib/tmdb";
+import {
+  getTrendingMovies,
+  getTrendingTVShows,
+  getBollywoodMovies,
+  getPosterUrl,
+} from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,10 +52,17 @@ export default function Auth() {
     staleTime: 1000 * 60 * 10,
   });
 
+  const { data: bollywoodData } = useQuery({
+    queryKey: ["auth-bg-bollywood"],
+    queryFn: () => getBollywoodMovies(1),
+    staleTime: 1000 * 60 * 10,
+  });
+
   const backgroundPosters = useMemo(() => {
-    const combined = [...(trendingMovies || []), ...(trendingTV || [])]
+    const bollywood = bollywoodData?.results || [];
+    const combined = [...bollywood, ...(trendingMovies || []), ...(trendingTV || [])]
       .filter((item) => item.poster_path)
-      .slice(0, 28);
+      .slice(0, 36);
 
     if (combined.length > 0) {
       return combined.map((item, index) => ({
@@ -59,11 +71,11 @@ export default function Auth() {
       }));
     }
 
-    return Array.from({ length: 28 }, (_, index) => ({
+    return Array.from({ length: 36 }, (_, index) => ({
       id: `fallback-${index}`,
       src: "/fallbacks/poster.svg",
     }));
-  }, [trendingMovies, trendingTV]);
+  }, [bollywoodData, trendingMovies, trendingTV]);
 
   const posterRows = useMemo(() => {
     if (!backgroundPosters.length) return [];
@@ -176,7 +188,7 @@ export default function Auth() {
             ))}
           </div>
         </div>
-        <div className="absolute inset-0 bg-gradient-to-br from-background/87 via-background/66 to-background/92" />
+        <div className="absolute inset-0 bg-gradient-to-br from-background/82 via-background/66 to-background/92" />
         <div className="absolute top-1/4 -left-1/4 w-1/2 h-1/2 bg-primary/10 rounded-full blur-[100px]" />
         <div className="absolute bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-secondary/15 rounded-full blur-[100px]" />
       </div>
@@ -194,7 +206,7 @@ export default function Auth() {
         </div>
 
         {/* Auth Card */}
-        <div className="bg-card/50 backdrop-blur-xl rounded-2xl p-8 border border-border/50 shadow-2xl">
+        <div className="bg-card/75 backdrop-blur-xl rounded-2xl p-8 border border-border/70 shadow-2xl">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "signin" | "signup")}>
             <TabsList className="grid w-full grid-cols-2 mb-6">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
