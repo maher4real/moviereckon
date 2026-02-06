@@ -291,27 +291,39 @@ export default function TVDetail() {
     backgroundTrailerKeys.length > 0
       ? getBackdropUrl(tvShow.backdrop_path, "original")
       : getPosterUrl(tvShow.poster_path, "large");
+  const backgroundTrailerEmbedUrl = activeBgVideoKey
+    ? `https://www.youtube.com/embed/${activeBgVideoKey}?autoplay=1&mute=1&controls=0&loop=1&playlist=${activeBgVideoKey}&modestbranding=1&rel=0&playsinline=1&iv_load_policy=3&disablekb=1&fs=0`
+    : null;
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0 overflow-x-hidden">
       <Header />
 
       {/* Backdrop */}
-      <div ref={heroMediaRef} className="relative h-[50vh] md:h-[70vh] overflow-hidden group/hero">
+      <div
+        ref={heroMediaRef}
+        className="relative h-[54vh] sm:h-[60vh] md:h-[70vh] lg:h-[74vh] xl:h-[78vh] overflow-hidden group/hero"
+      >
         <MediaImage
           src={heroVisualSrc}
           alt={`${tvShow.name} visual`}
           className="absolute inset-0 w-full h-full object-cover"
           fallbackSrc="/fallbacks/poster.svg"
         />
-        {activeBgVideoKey && !showTrailer && (
+        {backgroundTrailerEmbedUrl && !showTrailer && (
           <div className="absolute inset-0">
             <iframe
-              src={`https://www.youtube.com/embed/${activeBgVideoKey}?autoplay=1&mute=1&controls=0&loop=1&playlist=${activeBgVideoKey}&modestbranding=1&rel=0&playsinline=1&iv_load_policy=3`}
+              src={backgroundTrailerEmbedUrl}
               title={`${tvShow.name} background trailer`}
               className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-              style={{ width: `${bgFrameSize.width}px`, height: `${bgFrameSize.height}px` }}
+              style={{
+                width: `${bgFrameSize.width}px`,
+                height: `${bgFrameSize.height}px`,
+                willChange: "transform",
+              }}
               allow="autoplay; encrypted-media; picture-in-picture"
+              loading="eager"
+              referrerPolicy="strict-origin-when-cross-origin"
               tabIndex={-1}
             />
           </div>
