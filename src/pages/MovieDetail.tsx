@@ -28,6 +28,12 @@ import CommentsSection from "@/components/CommentsSection";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   ArrowLeft,
   Play,
   Heart,
@@ -49,8 +55,11 @@ export default function MovieDetail() {
   const { addToWatchHistory, isWatched, toggleLike, isLiked } = useUserData();
   const [watchAnimating, setWatchAnimating] = useState(false);
   const [likeAnimating, setLikeAnimating] = useState(false);
-  const [bgVideoIndex, setBgVideoIndex] = useState(0);
-  const [bgFrameSize, setBgFrameSize] = useState({ width: 0, height: 0 });
+  const [isTrailerModalOpen, setIsTrailerModalOpen] = useState(false);
+  const [trailerSessionId, setTrailerSessionId] = useState(0);
+  const [isBackgroundVideoVisible, setIsBackgroundVideoVisible] = useState(true);
+  const [isBackgroundVideoPlaying, setIsBackgroundVideoPlaying] = useState(false);
+  const [bgFrameSize, setBgFrameSize] = useState({ width: 1920, height: 1080 });
   const heroMediaRef = useRef<HTMLDivElement>(null);
   const bgPlayerRef = useRef<HTMLIFrameElement>(null);
 
@@ -119,11 +128,6 @@ export default function MovieDetail() {
   const cast = creditsData?.cast.slice(0, 12) || [];
   const trailerUrl = videosData ? getYouTubeTrailerUrl(videosData.results) : null;
   const preferredTrailerKey = trailerUrl?.split("/embed/")[1]?.split("?")[0] || null;
-  const trailerWatchUrl = useMemo(() => {
-    if (!trailerUrl) return null;
-    const embedKey = trailerUrl.split("/embed/")[1]?.split("?")[0];
-    return embedKey ? `https://www.youtube.com/watch?v=${embedKey}` : trailerUrl;
-  }, [trailerUrl]);
   const backgroundTrailerKeys = useMemo(() => {
     const results = videosData?.results || [];
     const ranked = results
@@ -149,7 +153,8 @@ export default function MovieDetail() {
     ].filter((key): key is string => Boolean(key));
     return Array.from(new Set(candidateKeys)).slice(0, 3);
   }, [videosData, preferredTrailerKey]);
-  const activeBgVideoKey = backgroundTrailerKeys[bgVideoIndex];
+  const activeBgVideoKey = backgroundTrailerKeys[0] || null;
+  const trailerModalKey = preferredTrailerKey || activeBgVideoKey;
   const youtubeOrigin = useMemo(
     () =>
       typeof window !== "undefined" ? encodeURIComponent(window.location.origin) : "",
@@ -157,16 +162,8 @@ export default function MovieDetail() {
   );
 
   useEffect(() => {
-    setBgVideoIndex(0);
-  }, [movieId, backgroundTrailerKeys.length]);
-
-  useEffect(() => {
-    if (backgroundTrailerKeys.length <= 1) return;
-    const intervalId = window.setInterval(() => {
-      setBgVideoIndex((prev) => (prev + 1) % backgroundTrailerKeys.length);
-    }, 12000);
-    return () => window.clearInterval(intervalId);
-  }, [backgroundTrailerKeys]);
+    setIsTrailerModalOpen(false);
+  }, [movieId]);
 
   useEffect(() => {
     const updateFrameSize = () => {
@@ -183,8 +180,8 @@ export default function MovieDetail() {
         width = height * aspectRatio;
       }
 
-      // Slight overscan prevents micro letterboxing across devices.
-      setBgFrameSize({ width: Math.ceil(width * 1.08), height: Math.ceil(height * 1.08) });
+      // Extra overscan keeps the trailer in cover mode across unusual aspect ratios.
+      setBgFrameSize({ width: Math.ceil(width * 1.16), height: Math.ceil(height * 1.16) });
     };
 
     updateFrameSize();
@@ -233,6 +230,120 @@ export default function MovieDetail() {
     const mins = minutes % 60;
     return `${hours}h ${mins}m`;
   };
+  const backgroundTrailerEmbedUrl = activeBgVideoKey
+    ? `https://www.youtube.com/embed/${activeBgVideoKey}?autoplay=1&mute=1&controls=0&loop=1&playlist=${activeBgVideoKey}&modestbranding=1&rel=0&playsinline=1&iv_load_policy=3&disablekb=1&fs=0&enablejsapi=1${youtubeOrigin ? `&origin=${youtubeOrigin}` : ""}`
+    : null;
+  const modalTrailerEmbedUrl =
+    trailerModalKey && isTrailerModalOpen
+      ? `https://www.youtube.com/embed/${trailerModalKey}?autoplay=1&mute=0&controls=1&loop=0&modestbranding=1&rel=0&playsinline=1&iv_load_policy=3&start=0&enablejsapi=1${youtubeOrigin ? `&origin=${youtubeOrigin}` : ""}`
+      : null;
+  const controlBackgroundPreview = useCallback(
+    (
+      func: "addEventListener" | "mute" | "playVideo" | "pauseVideo",
+      args: string[] = [],
+    ) => {
+      const frame = bgPlayerRef.current;
+      if (!frame?.contentWindow) return;
+      frame.contentWindow.postMessage(
+        JSON.stringify({ event: "command", func, args }),
+        "*",
+      );
+    },
+    [],
+  );
+
+  useEffect(() => {
+    setIsBackgroundVideoVisible(Boolean(activeBgVideoKey));
+    setIsBackgroundVideoPlaying(false);
+  }, [activeBgVideoKey]);
+
+  useEffect(() => {
+    if (!backgroundTrailerEmbedUrl || !isBackgroundVideoVisible) return;
+    const timer = window.setTimeout(() => {
+      controlBackgroundPreview("addEventListener", ["onStateChange"]);
+      controlBackgroundPreview("addEventListener", ["onError"]);
+      controlBackgroundPreview("mute");
+      controlBackgroundPreview("playVideo");
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [backgroundTrailerEmbedUrl, controlBackgroundPreview, isBackgroundVideoVisible]);
+
+  useEffect(() => {
+    if (!backgroundTrailerEmbedUrl || !isBackgroundVideoVisible || isBackgroundVideoPlaying) {
+      return;
+    }
+
+    const fallbackTimeout = window.setTimeout(() => {
+      setIsBackgroundVideoVisible(false);
+    }, 4000);
+
+    return () => window.clearTimeout(fallbackTimeout);
+  }, [backgroundTrailerEmbedUrl, isBackgroundVideoVisible, isBackgroundVideoPlaying]);
+
+  useEffect(() => {
+    if (!activeBgVideoKey) return;
+
+    const onPlayerMessage = (event: MessageEvent) => {
+      if (
+        event.origin !== "https://www.youtube.com" &&
+        event.origin !== "https://www.youtube-nocookie.com"
+      ) {
+        return;
+      }
+
+      let payload = event.data as unknown;
+      if (typeof payload === "string") {
+        if (!payload.startsWith("{")) return;
+        try {
+          payload = JSON.parse(payload);
+        } catch {
+          return;
+        }
+      }
+
+      if (!payload || typeof payload !== "object") return;
+      const message = payload as { event?: string; info?: number | string };
+
+      if (message.event === "onStateChange" && Number(message.info) === 1) {
+        setIsBackgroundVideoPlaying(true);
+        setIsBackgroundVideoVisible(true);
+      }
+
+      if (message.event === "onError") {
+        setIsBackgroundVideoVisible(false);
+      }
+    };
+
+    window.addEventListener("message", onPlayerMessage);
+    return () => window.removeEventListener("message", onPlayerMessage);
+  }, [activeBgVideoKey]);
+
+  useEffect(() => {
+    if (!backgroundTrailerEmbedUrl || !isBackgroundVideoVisible) return;
+
+    if (isTrailerModalOpen) {
+      controlBackgroundPreview("pauseVideo");
+      return;
+    }
+
+    const resumeTimeout = window.setTimeout(() => {
+      controlBackgroundPreview("mute");
+      controlBackgroundPreview("playVideo");
+    }, 120);
+
+    return () => window.clearTimeout(resumeTimeout);
+  }, [
+    backgroundTrailerEmbedUrl,
+    controlBackgroundPreview,
+    isBackgroundVideoVisible,
+    isTrailerModalOpen,
+  ]);
+
+  const openTrailerModal = () => {
+    if (!trailerModalKey) return;
+    setTrailerSessionId((prev) => prev + 1);
+    setIsTrailerModalOpen(true);
+  };
 
   if (authLoading || movieLoading) {
     return (
@@ -272,36 +383,9 @@ export default function MovieDetail() {
   const liked = isLiked(movie.id, "movie");
   const year = movie.release_date?.split("-")[0] || "";
   const heroVisualSrc =
-    backgroundTrailerKeys.length > 0
+    activeBgVideoKey
       ? getBackdropUrl(movie.backdrop_path, "original")
       : getPosterUrl(movie.poster_path, "large");
-  const backgroundTrailerEmbedUrl = activeBgVideoKey
-    ? `https://www.youtube.com/embed/${activeBgVideoKey}?autoplay=1&mute=1&controls=0&loop=1&playlist=${activeBgVideoKey}&modestbranding=1&rel=0&playsinline=1&iv_load_policy=3&disablekb=1&fs=0&enablejsapi=1${youtubeOrigin ? `&origin=${youtubeOrigin}` : ""}`
-    : null;
-  const openTrailerOnYouTube = () => {
-    if (!trailerWatchUrl) return;
-    window.open(trailerWatchUrl, "_blank", "noopener,noreferrer");
-  };
-  const controlBackgroundPreview = useCallback(
-    (func: "mute" | "playVideo") => {
-      const frame = bgPlayerRef.current;
-      if (!frame?.contentWindow) return;
-      frame.contentWindow.postMessage(
-        JSON.stringify({ event: "command", func, args: [] }),
-        "*",
-      );
-    },
-    [],
-  );
-
-  useEffect(() => {
-    if (!backgroundTrailerEmbedUrl) return;
-    const timer = window.setTimeout(() => {
-      controlBackgroundPreview("mute");
-      controlBackgroundPreview("playVideo");
-    }, 350);
-    return () => window.clearTimeout(timer);
-  }, [backgroundTrailerEmbedUrl, activeBgVideoKey, controlBackgroundPreview]);
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0 overflow-x-hidden">
@@ -318,7 +402,7 @@ export default function MovieDetail() {
           className="absolute inset-0 w-full h-full object-cover"
           fallbackSrc="/fallbacks/poster.svg"
         />
-        {backgroundTrailerEmbedUrl && (
+        {backgroundTrailerEmbedUrl && isBackgroundVideoVisible && (
           <div className="absolute inset-0">
             <iframe
               key={activeBgVideoKey}
@@ -335,6 +419,8 @@ export default function MovieDetail() {
               loading="eager"
               referrerPolicy="strict-origin-when-cross-origin"
               onLoad={() => {
+                controlBackgroundPreview("addEventListener", ["onStateChange"]);
+                controlBackgroundPreview("addEventListener", ["onError"]);
                 controlBackgroundPreview("mute");
                 controlBackgroundPreview("playVideo");
               }}
@@ -342,20 +428,21 @@ export default function MovieDetail() {
             />
           </div>
         )}
-        {activeBgVideoKey && (
-          <div className="absolute inset-x-0 bottom-0 h-3 bg-background/85 pointer-events-none z-[3]" />
-        )}
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-background/25" />
         <div className="absolute inset-0 hero-gradient" />
 
-        {trailerUrl && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+        {trailerModalKey && (
+          <div className="absolute inset-0 z-[7] hidden md:block pointer-events-none bg-black/0 opacity-0 transition-opacity duration-300 group-hover/hero:opacity-100 group-hover/hero:bg-black/45" />
+        )}
+
+        {trailerModalKey && (
+          <div className="absolute inset-0 z-10 hidden md:flex items-center justify-center pointer-events-none">
             <Button
               type="button"
               size="icon"
-              onClick={openTrailerOnYouTube}
+              onClick={openTrailerModal}
               className="pointer-events-auto h-16 w-16 rounded-full bg-background/70 border border-white/20 text-foreground backdrop-blur-md opacity-0 group-hover/hero:opacity-100 transition-all duration-300 hover:bg-primary hover:text-primary-foreground"
-              aria-label="Play trailer on YouTube"
+              aria-label={`Play ${movie.title} trailer`}
             >
               <Play className="w-7 h-7 fill-current" />
             </Button>
@@ -449,11 +536,11 @@ export default function MovieDetail() {
 
             {/* Action Buttons - All using primary red color */}
             <div className="flex flex-wrap gap-3 mb-8">
-              {trailerUrl && (
+              {trailerModalKey && (
                 <Button
                   size="lg"
                   className="bg-primary hover:bg-primary/90 text-primary-foreground action-btn"
-                  onClick={openTrailerOnYouTube}
+                  onClick={openTrailerModal}
                 >
                   <Play className="w-5 h-5 mr-2 fill-current" />
                   Watch Trailer
@@ -528,6 +615,28 @@ export default function MovieDetail() {
           </div>
         )}
       </div>
+
+      <Dialog open={isTrailerModalOpen} onOpenChange={setIsTrailerModalOpen}>
+        <DialogContent className="w-[96vw] max-w-5xl border border-white/15 bg-black p-0 text-white [&>button]:text-white [&>button]:opacity-90 [&>button]:ring-offset-black">
+          <DialogTitle className="sr-only">{movie.title} trailer</DialogTitle>
+          <DialogDescription className="sr-only">
+            Trailer player with sound and playback controls.
+          </DialogDescription>
+          <div className="relative w-full aspect-video bg-black">
+            {modalTrailerEmbedUrl && (
+              <iframe
+                key={`movie-trailer-${trailerSessionId}`}
+                src={modalTrailerEmbedUrl}
+                title={`${movie.title} trailer`}
+                className="absolute inset-0 h-full w-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                referrerPolicy="strict-origin-when-cross-origin"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Footer />
       <BottomNav />
