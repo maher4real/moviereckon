@@ -6,7 +6,12 @@ const FALLBACK_POSTER = "/fallbacks/poster.svg";
 const FALLBACK_BACKDROP = "/fallbacks/backdrop.svg";
 const FALLBACK_PROFILE = "/fallbacks/profile.svg";
 const FALLBACK_STILL = "/fallbacks/still.svg";
-const API_BASE_URL = (import.meta.env.VITE_MONGODB_API_URL || "").replace(/\/+$/, "");
+const normalizeApiBaseUrl = (url: string): string => {
+  const trimmed = url.trim().replace(/\/+$/, "");
+  if (trimmed.endsWith("/api")) return trimmed.slice(0, -4);
+  return trimmed;
+};
+const API_BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_MONGODB_API_URL || "");
 
 // Image size configurations
 export const IMAGE_SIZES = {

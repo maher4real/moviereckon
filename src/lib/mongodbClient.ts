@@ -10,11 +10,17 @@ const USER_KEY = "moviereckon_user";
 
 // Backend URL - relative path for same-origin requests on Vercel
 // In production, API routes are at /api/* on the same domain
+const normalizeApiBaseUrl = (url: string): string => {
+  const trimmed = url.trim().replace(/\/+$/, "");
+  if (trimmed.endsWith("/api")) return trimmed.slice(0, -4);
+  return trimmed;
+};
+
 const getApiUrl = () => {
   // If VITE_MONGODB_API_URL is set, use it (for cross-origin development)
   const configuredUrl = import.meta.env.VITE_MONGODB_API_URL;
   if (configuredUrl && configuredUrl.length > 0) {
-    return configuredUrl;
+    return normalizeApiBaseUrl(configuredUrl);
   }
   // In production on Vercel, use relative paths
   return "";
