@@ -28,7 +28,7 @@ import { Sparkles } from "lucide-react";
 // Memoized carousel for performance
 const MemoizedCarousel = memo(ContentCarousel);
 const STARTUP_SOUND_SRC =
-  "https://cdn.jsdelivr.net/gh/maher4real/moviereckon@main/startup.mp3";
+  "https://cdn.jsdelivr.net/gh/maher4real/moviereckon@main/startupIntro.mp3";
 const STARTUP_SOUND_PENDING_KEY = "startupSoundPending";
 const STARTUP_SOUND_PLAYED_KEY = "startupSoundPlayed";
 const isAnimeLike = (item: Movie | TVShow) =>
