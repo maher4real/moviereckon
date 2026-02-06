@@ -24,7 +24,7 @@
     --muted: 0 0% 15%;
     --muted-foreground: 0 0% 64%;
 
-    --accent: 38 92% 50%;
+    --accent: 0 70% 44%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -71,7 +71,7 @@
     --muted: 0 0% 15%;
     --muted-foreground: 0 0% 64%;
 
-    --accent: 38 92% 50%;
+    --accent: 0 70% 44%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -98,6 +98,20 @@
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
     text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.35);
+    color: hsl(var(--foreground));
+  }
+
+  a,
+  button,
+  [role="button"],
+  input,
+  textarea,
+  select {
+    -webkit-tap-highlight-color: hsl(var(--primary) / 0.28);
   }
 
   /* Custom scrollbar */

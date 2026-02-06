@@ -207,7 +207,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0">
+    <div className="min-h-screen bg-background pb-16 md:pb-0">
       <Header />
 
       {/* Hero Banner */}
@@ -220,7 +220,7 @@ export default function Home() {
       />
 
       {/* Content Sections */}
-      <main className="relative z-10 -mt-20 md:-mt-24 pt-6 md:pt-8 pb-20">
+      <main className="relative z-10 -mt-20 md:-mt-24 pt-6 md:pt-8 pb-16">
         <div className="space-y-8">
           {/* Reckon - Personalized Recommendations */}
           {reckonItems.length > 0 && (

@@ -105,7 +105,7 @@ export default function Profile() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col pb-20 md:pb-0">
+    <div className="min-h-screen bg-background flex flex-col pb-16 md:pb-0">
       <Header />
 
       <main className="flex-1 pt-20 pb-12">

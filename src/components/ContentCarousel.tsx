@@ -63,23 +63,23 @@ export default function ContentCarousel({
   }
 
   return (
-    <section className="px-4 md:px-8">
+    <section className="px-3 sm:px-4 md:px-8">
       {/* Title */}
-      {title && <h2 className="text-xl md:text-2xl font-bold mb-4">{title}</h2>}
+      {title && <h2 className="mb-3 md:mb-4 text-lg sm:text-xl md:text-2xl font-bold tracking-tight">{title}</h2>}
 
       {/* Carousel Container */}
       <div className="relative group">
         {/* Left fade effect */}
-        <div className="absolute left-0 top-0 bottom-4 w-8 bg-gradient-to-r from-background to-transparent z-[5] pointer-events-none" />
+        <div className="hidden md:block absolute left-0 top-0 bottom-2 md:bottom-4 w-6 lg:w-8 bg-gradient-to-r from-background/95 via-background/35 to-transparent z-[5] pointer-events-none" />
         {/* Right fade effect */}
-        <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-background to-transparent z-[5] pointer-events-none" />
+        <div className="hidden md:block absolute right-0 top-0 bottom-2 md:bottom-4 w-6 lg:w-8 bg-gradient-to-l from-background/95 via-background/35 to-transparent z-[5] pointer-events-none" />
 
         {/* Scroll Buttons */}
         <Button
           variant="ghost"
           size="icon"
           onClick={() => scroll("left")}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
+          className="absolute left-1 top-1/2 -translate-y-1/2 z-10 bg-background/70 border border-white/10 text-foreground/90 shadow-md backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
         >
           <ChevronLeft className="w-6 h-6" />
         </Button>
@@ -88,7 +88,7 @@ export default function ContentCarousel({
           variant="ghost"
           size="icon"
           onClick={() => scroll("right")}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
+          className="absolute right-1 top-1/2 -translate-y-1/2 z-10 bg-background/70 border border-white/10 text-foreground/90 shadow-md backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
         >
           <ChevronRight className="w-6 h-6" />
         </Button>
@@ -96,14 +96,14 @@ export default function ContentCarousel({
         {/* Scrollable Content */}
         <div
           ref={scrollRef}
-          className="flex gap-3 md:gap-4 overflow-x-auto scrollbar-hide scroll-smooth pb-4"
+          className="flex gap-3 md:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory pb-2 md:pb-4"
         >
           {isLoading
             ? // Loading Skeletons
               Array.from({ length: 8 }).map((_, i) => (
                 <div
                   key={i}
-                  className="flex-shrink-0 w-[140px] md:w-[180px] lg:w-[200px]"
+                  className="flex-shrink-0 snap-start w-[132px] md:w-[180px] lg:w-[200px]"
                 >
                   <div className="aspect-[2/3] rounded-lg bg-muted animate-pulse" />
                   <div className="mt-2 h-4 bg-muted rounded animate-pulse w-3/4" />
@@ -115,7 +115,7 @@ export default function ContentCarousel({
                 <div
                   key={item.id}
                   onClick={() => handleItemClick(item)}
-                  className="flex-shrink-0 w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/card"
+                  className="flex-shrink-0 snap-start w-[132px] md:w-[180px] lg:w-[200px] cursor-pointer group/card"
                 >
                   {/* Poster */}
                   <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
