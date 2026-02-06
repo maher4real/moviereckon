@@ -135,7 +135,7 @@ export default function ContentCarousel({
 
         <div
           ref={scrollRef}
-          className="className=flex gap-3 md:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory px-0 pb-3 md:pb-4"
+          className="flex gap-3 md:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory px-4 md:px-8 pb-3 md:pb-4"
         >
           {isLoading
             ? Array.from({ length: 8 }).map((_, i) => (
