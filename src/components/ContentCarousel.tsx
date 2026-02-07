@@ -98,7 +98,7 @@ export default function ContentCarousel({
   }
 
   return (
-    <section className="px-2 md:px-2">
+    <section className="px-4 md:px-6 lg:px-8">
       {title && (
         <h2 className="text-xl md:text-2xl font-bold tracking-tight mb-3 md:mb-4">
           {title}
@@ -126,7 +126,7 @@ export default function ContentCarousel({
 
         <div
           ref={scrollRef}
-          className="flex gap-2 md:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory px-2 md:px-8 pb-2 md:pb-4"
+          className="flex gap-2 md:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory px-2 md:px-4 pb-2 md:pb-4"
         >
           {isLoading ? (
             Array.from({ length: 8 }).map((_, i) => (
