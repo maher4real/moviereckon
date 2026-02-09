@@ -1,23 +1,31 @@
 <svg width="684" height="1026" viewBox="0 0 684 1026" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="posterBg" x1="0" y1="0" x2="684" y2="1026" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#131820"/>
-      <stop offset="1" stop-color="#0B0F15"/>
+    <linearGradient id="bgDark" x1="0" y1="0" x2="684" y2="1026" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#070A11" />
+      <stop offset="1" stop-color="#101825" />
     </linearGradient>
-    <linearGradient id="posterGlow" x1="342" y1="128" x2="342" y2="898" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#EE3C3C" stop-opacity="0.3"/>
-      <stop offset="1" stop-color="#EE3C3C" stop-opacity="0"/>
+    <linearGradient id="logoGrad" x1="244" y1="286" x2="440" y2="482" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E50914" />
+      <stop offset="0.56" stop-color="#F97316" />
+      <stop offset="1" stop-color="#FACC15" />
     </linearGradient>
+    <radialGradient id="bgGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(516 216) rotate(130) scale(542 466)">
+      <stop stop-color="#B01313" stop-opacity="0.13" />
+      <stop offset="1" stop-color="#B01313" stop-opacity="0" />
+    </radialGradient>
   </defs>
 
-  <rect width="684" height="1026" rx="32" fill="url(#posterBg)"/>
-  <rect x="84" y="128" width="516" height="770" rx="24" fill="#151B24"/>
-  <rect x="84" y="128" width="516" height="770" rx="24" fill="url(#posterGlow)"/>
+  <rect width="684" height="1026" rx="32" fill="url(#bgDark)" />
+  <rect width="684" height="1026" rx="32" fill="url(#bgGlow)" />
 
-  <circle cx="342" cy="414" r="106" fill="#EE3C3C" fill-opacity="0.2"/>
-  <path d="M314 364.5C314 357.088 322.066 352.292 328.734 355.969L410.816 401.257C417.701 405.053 417.701 414.947 410.816 418.743L328.734 464.031C322.066 467.708 314 462.912 314 455.5V364.5Z" fill="#EE3C3C"/>
-
-  <rect x="150" y="760" width="384" height="16" rx="8" fill="#2D3645"/>
-  <rect x="190" y="792" width="304" height="14" rx="7" fill="#29303D"/>
-  <rect x="220" y="820" width="244" height="14" rx="7" fill="#242B37"/>
+  <g transform="translate(0 129)" stroke="url(#logoGrad)" stroke-opacity="0.92" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="244" y="286" width="196" height="196" rx="30" />
+    <path d="M286 286V482" />
+    <path d="M398 286V482" />
+    <path d="M244 334H286" />
+    <path d="M244 384H440" />
+    <path d="M244 434H286" />
+    <path d="M398 334H440" />
+    <path d="M398 434H440" />
+  </g>
 </svg>
