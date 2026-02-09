@@ -12,6 +12,7 @@ import {
   getBackdropUrl,
   getPosterUrl,
   getYouTubeTrailerUrl,
+  getLanguageLabel,
   Movie,
 } from "@/lib/tmdb";
 import Header from "@/components/Header";
@@ -33,9 +34,13 @@ import {
 } from "@/components/ui/dialog";
 import {
   ArrowLeft,
+  Calendar,
+  Clock,
+  Globe,
   Play,
   Heart,
   Check,
+  Star,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -400,16 +405,7 @@ export default function MovieDetail() {
   const liked = isLiked(movie.id, "movie");
   const year = movie.release_date?.split("-")[0] || "";
   const matchScore = movie.vote_average > 0 ? Math.round(movie.vote_average * 10) : null;
-  const languageTag = movie.original_language?.toUpperCase() || "N/A";
-  const runtimeText = movie.runtime > 0 ? formatRuntime(movie.runtime) : null;
-  const ratingText = movie.vote_average > 0 ? `${movie.vote_average.toFixed(1)} / 10 IMDb` : null;
-  const detailFacts = [year || null, runtimeText, ratingText].filter(
-    (value): value is string => Boolean(value),
-  );
-  const genresText =
-    movie.genres.length > 0
-      ? movie.genres.map((genre) => genre.name).join(" • ")
-      : "Genre information unavailable";
+  const languageLabel = getLanguageLabel(movie.original_language);
   const heroVisualSrc =
     activeBgVideoKey
       ? getBackdropUrl(movie.backdrop_path, "original")
@@ -528,27 +524,51 @@ export default function MovieDetail() {
             </div>
 
             {/* Meta Info */}
-            <div className="mb-6 rounded-xl border border-white/10 bg-black/35 px-4 py-3 backdrop-blur-sm">
-              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 text-sm">
+            <div className="mb-6">
+              <div className="flex flex-wrap gap-2.5">
                 {matchScore !== null && (
-                  <span className="rounded-md bg-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-300">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/35 bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-300">
+                    <Star className="h-3.5 w-3.5 fill-current" />
                     {matchScore}% Match
                   </span>
                 )}
-                {detailFacts.map((fact) => (
-                  <span key={fact} className="text-foreground/90">
-                    {fact}
-                  </span>
-                ))}
-                <span className="rounded-sm border border-foreground/30 bg-black/40 px-1.5 py-0.5 text-[11px] font-medium tracking-wide text-foreground/90">
-                  {languageTag}
+
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-card/70 px-3 py-1.5 text-xs font-medium text-foreground/90">
+                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                  {year || "TBA"}
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-card/70 px-3 py-1.5 text-xs font-medium text-foreground/90">
+                  <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                  {movie.runtime > 0 ? formatRuntime(movie.runtime) : "N/A"}
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-card/70 px-3 py-1.5 text-xs font-medium text-foreground/90">
+                  <Star className="h-3.5 w-3.5 text-primary fill-current" />
+                  {movie.vote_average > 0
+                    ? `${movie.vote_average.toFixed(1)} IMDb`
+                    : "Not Rated"}
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-card/70 px-3 py-1.5 text-xs font-medium text-foreground/90">
+                  <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+                  {languageLabel}
                 </span>
               </div>
 
-              <p className="mt-3 text-sm text-muted-foreground">
-                <span className="text-foreground/80">Genres: </span>
-                {genresText}
-              </p>
+              {movie.genres.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {movie.genres.map((genre) => (
+                    <span
+                      key={genre.id}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border/65 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground"
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary/80" />
+                      {genre.name}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Action Buttons - All using primary red color */}
