@@ -12,7 +12,6 @@ import {
   getBackdropUrl,
   getPosterUrl,
   getYouTubeTrailerUrl,
-  getLanguageLabel,
   Movie,
 } from "@/lib/tmdb";
 import Header from "@/components/Header";
@@ -402,6 +401,10 @@ export default function MovieDetail() {
   const year = movie.release_date?.split("-")[0] || "";
   const matchScore = movie.vote_average > 0 ? Math.round(movie.vote_average * 10) : null;
   const languageTag = movie.original_language?.toUpperCase() || "N/A";
+  const genresText =
+    movie.genres.length > 0
+      ? movie.genres.map((genre) => genre.name).join(" • ")
+      : "Genre information unavailable";
   const heroVisualSrc =
     activeBgVideoKey
       ? getBackdropUrl(movie.backdrop_path, "original")
@@ -521,33 +524,28 @@ export default function MovieDetail() {
 
             {/* Meta Info */}
             <div className="mb-6">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm md:text-base">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm md:text-[15px]">
                 {matchScore !== null && (
                   <span className="font-semibold text-emerald-400">
                     {matchScore}% Match
                   </span>
                 )}
-                {year && <span className="text-foreground/95">{year}</span>}
+                {year && <span className="text-foreground/90">{year}</span>}
                 {movie.runtime > 0 && (
-                  <span className="text-foreground/95">{formatRuntime(movie.runtime)}</span>
+                  <span className="text-foreground/90">{formatRuntime(movie.runtime)}</span>
+                )}
+                {movie.vote_average > 0 && (
+                  <span className="text-foreground/90">
+                    {movie.vote_average.toFixed(1)} IMDb
+                  </span>
                 )}
                 <span className="rounded-sm border border-foreground/35 bg-black/35 px-1.5 py-0.5 text-[11px] font-medium tracking-wide text-foreground/90">
                   {languageTag}
                 </span>
-                {movie.vote_average > 0 && (
-                  <span className="rounded-sm border border-primary/45 bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary">
-                    {movie.vote_average.toFixed(1)}
-                  </span>
-                )}
               </div>
 
-              <p className="mt-3 text-sm text-muted-foreground">
-                {movie.genres.length > 0
-                  ? movie.genres.map((genre) => genre.name).join(" • ")
-                  : "Genre information unavailable"}
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground/85">
-                {getLanguageLabel(movie.original_language)}
+              <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
+                {genresText}
               </p>
             </div>
 
