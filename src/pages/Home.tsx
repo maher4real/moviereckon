@@ -31,8 +31,16 @@ const STARTUP_SOUND_SRC =
   "https://cdn.jsdelivr.net/gh/maher4real/moviereckon@main/startupIntro.mp3";
 const STARTUP_SOUND_PENDING_KEY = "startupSoundPending";
 const STARTUP_SOUND_PLAYED_KEY = "startupSoundPlayed";
+const HOME_UPCOMING_PAGES = [1, 2, 3] as const;
 const isAnimeLike = (item: Movie | TVShow) =>
   item.original_language === "ja" && item.genre_ids?.includes(16);
+
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 export default function Home() {
   const { user, isLoading: authLoading, profile } = useAuth();
@@ -186,31 +194,67 @@ export default function Home() {
     ...queryConfig,
   });
 
-  const { data: upcomingData, isLoading: upcomingLoading } = useQuery({
-    queryKey: ["upcoming-movies"],
-    queryFn: () => getUpcomingMovies(),
+  const { data: upcomingMovies, isLoading: upcomingLoading } = useQuery({
+    queryKey: ["upcoming-movies-home"],
+    queryFn: async () => {
+      const responses = await Promise.all(
+        HOME_UPCOMING_PAGES.map((page) => getUpcomingMovies(page).catch(() => null)),
+      );
+
+      const deduped = new Map<number, Movie>();
+      responses.forEach((response) => {
+        response?.results?.forEach((movie) => {
+          if (!deduped.has(movie.id)) {
+            deduped.set(movie.id, movie);
+          }
+        });
+      });
+
+      return Array.from(deduped.values()).sort((a, b) =>
+        (a.release_date || "9999-12-31").localeCompare(
+          b.release_date || "9999-12-31",
+        ),
+      );
+    },
     ...queryConfig,
   });
 
   // Filter Now Playing to only show movies released today or earlier
   const filteredNowPlaying = useMemo(() => {
     if (!nowPlayingData?.results) return [];
-    const today = new Date().toISOString().split("T")[0];
+    const today = formatLocalDate(new Date());
     return nowPlayingData.results.filter(
       (movie) => movie.release_date <= today && !isAnimeLike(movie),
     );
   }, [nowPlayingData]);
 
-  // Filter Upcoming to only show movies releasing tomorrow or later
+  // Keep Upcoming populated: strict tomorrow+ filter first, then relax if list is too small.
   const filteredUpcoming = useMemo(() => {
-    if (!upcomingData?.results) return [];
-    const tomorrow = new Date();
+    if (!upcomingMovies?.length) return [];
+
+    const today = new Date();
+    const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split("T")[0];
-    return upcomingData.results.filter(
-      (movie) => movie.release_date >= tomorrowStr && !isAnimeLike(movie),
+
+    const todayStr = formatLocalDate(today);
+    const tomorrowStr = formatLocalDate(tomorrow);
+
+    const candidates = upcomingMovies.filter(
+      (movie) => Boolean(movie.release_date) && !isAnimeLike(movie),
     );
-  }, [upcomingData]);
+
+    const strictUpcoming = candidates.filter(
+      (movie) => movie.release_date >= tomorrowStr,
+    );
+    if (strictUpcoming.length >= 8) return strictUpcoming;
+
+    const relaxedUpcoming = candidates.filter(
+      (movie) => movie.release_date >= todayStr,
+    );
+    if (relaxedUpcoming.length > strictUpcoming.length) return relaxedUpcoming;
+
+    return candidates;
+  }, [upcomingMovies]);
 
   const filteredTrendingMovies = useMemo(
     () => (trendingMovies || []).filter((movie) => !isAnimeLike(movie)),
