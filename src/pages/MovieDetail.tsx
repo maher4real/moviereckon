@@ -13,7 +13,6 @@ import {
   getPosterUrl,
   getYouTubeTrailerUrl,
   getLanguageLabel,
-  getLanguageBadgeClass,
   Movie,
 } from "@/lib/tmdb";
 import Header from "@/components/Header";
@@ -525,24 +524,24 @@ export default function MovieDetail() {
 
             {/* Meta Info */}
             <div className="flex flex-wrap items-center gap-3 mb-6">
-              <Badge className={getLanguageBadgeClass(movie.original_language)}>
+              <Badge className="bg-white text-black border border-white/80">
                 <Globe className="w-3 h-3 mr-1" />
                 {getLanguageLabel(movie.original_language)}
               </Badge>
               {year && (
-                <Badge variant="outline">
+                <Badge variant="outline" className="border-white/80 bg-white text-black">
                   <Calendar className="w-3 h-3 mr-1" />
                   {year}
                 </Badge>
               )}
               {movie.runtime > 0 && (
-                <Badge variant="outline">
+                <Badge variant="outline" className="border-white/80 bg-white text-black">
                   <Clock className="w-3 h-3 mr-1" />
                   {formatRuntime(movie.runtime)}
                 </Badge>
               )}
               {movie.vote_average > 0 && (
-                <Badge variant="secondary" className="bg-primary/20 text-primary">
+                <Badge variant="secondary" className="border border-white/80 bg-white text-black">
                   <Star className="w-3 h-3 mr-1 fill-current" />
                   {movie.vote_average.toFixed(1)} / 10
                 </Badge>
@@ -552,7 +551,11 @@ export default function MovieDetail() {
             {/* Genres */}
             <div className="flex flex-wrap gap-2 mb-6">
               {movie.genres.map((genre) => (
-                <Badge key={genre.id} variant="secondary">
+                <Badge
+                  key={genre.id}
+                  variant="secondary"
+                  className="border border-white/80 bg-white text-black"
+                >
                   {genre.name}
                 </Badge>
               ))}

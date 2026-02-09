@@ -268,7 +268,7 @@ export default function Search() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleRecentSearchClick(search)}
-                        className="rounded-full"
+                        className="rounded-full border-white/80 bg-white text-black hover:bg-white/90 hover:text-black"
                       >
                         {search}
                       </Button>
@@ -288,10 +288,10 @@ export default function Search() {
                     popularSuggestions.map((suggestion) => (
                       <Button
                         key={suggestion}
-                        variant="secondary"
+                        variant="outline"
                         size="sm"
                         onClick={() => setQuery(suggestion)}
-                        className="rounded-full"
+                        className="rounded-full border-white/80 bg-white text-black hover:bg-white/90 hover:text-black"
                       >
                         {suggestion}
                       </Button>
