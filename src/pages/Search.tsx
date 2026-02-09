@@ -2,7 +2,15 @@ import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
-import { searchMulti, Movie, TVShow, getPosterUrl, getLanguageBadgeClass } from "@/lib/tmdb";
+import {
+  searchMulti,
+  getTrendingMovies,
+  getTrendingTVShows,
+  Movie,
+  TVShow,
+  getPosterUrl,
+  getLanguageBadgeClass,
+} from "@/lib/tmdb";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
@@ -109,6 +117,31 @@ export default function Search() {
     queryFn: () => searchMulti(debouncedQuery),
     enabled: debouncedQuery.length >= 2,
     staleTime: 1000 * 60 * 5,
+  });
+
+  // Dynamic popular search suggestions from TMDB trending content
+  const { data: popularSuggestions = [] } = useQuery({
+    queryKey: ["search-popular-suggestions"],
+    queryFn: async () => {
+      const [moviesResult, tvResult] = await Promise.allSettled([
+        getTrendingMovies("week"),
+        getTrendingTVShows("week"),
+      ]);
+
+      const movies = moviesResult.status === "fulfilled" ? moviesResult.value : [];
+      const tvShows = tvResult.status === "fulfilled" ? tvResult.value : [];
+
+      const titleMap = new Map<string, string>();
+      [...movies, ...tvShows].forEach((item) => {
+        const title = "title" in item ? item.title : item.name;
+        const normalized = title?.trim().toLowerCase();
+        if (!title || !normalized || titleMap.has(normalized)) return;
+        titleMap.set(normalized, title);
+      });
+
+      return Array.from(titleMap.values()).slice(0, 12);
+    },
+    staleTime: 1000 * 60 * 30,
   });
 
   // Filter results
@@ -251,26 +284,23 @@ export default function Search() {
                   Popular Searches
                 </h2>
                 <div className="flex flex-wrap gap-2">
-                  {[
-                    "Pathaan",
-                    "Oppenheimer",
-                    "Jawan",
-                    "Barbie",
-                    "Animal",
-                    "Dune",
-                    "The Bear",
-                    "Wednesday",
-                  ].map((suggestion) => (
-                    <Button
-                      key={suggestion}
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setQuery(suggestion)}
-                      className="rounded-full"
-                    >
-                      {suggestion}
-                    </Button>
-                  ))}
+                  {popularSuggestions.length > 0 ? (
+                    popularSuggestions.map((suggestion) => (
+                      <Button
+                        key={suggestion}
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setQuery(suggestion)}
+                        className="rounded-full"
+                      >
+                        {suggestion}
+                      </Button>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Popular suggestions are loading.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
