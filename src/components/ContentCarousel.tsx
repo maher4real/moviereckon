@@ -145,9 +145,9 @@ export default function ContentCarousel({
                 <div
                   key={item.id}
                   onClick={() => handleItemClick(item)}
-                  className="flex-shrink-0 snap-start w-[128px] sm:w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/card"
+                  className="flex-shrink-0 snap-start w-[128px] sm:w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/card relative transition-transform duration-300 hover:-translate-y-1 hover:scale-[1.04] hover:z-10"
                 >
-                  <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
+                  <div className="relative aspect-[2/3] rounded-lg overflow-hidden transition-shadow duration-300 group-hover/card:shadow-[0_10px_40px_rgba(0,0,0,0.5)]">
                     <MediaImage
                       src={getPosterUrl(item.poster_path, "medium")}
                       alt={getTitle(item)}
