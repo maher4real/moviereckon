@@ -98,8 +98,8 @@ export default function HeroBanner({
               </Button>
               <Button
                 size="lg"
-                variant="secondary"
-                className="font-semibold"
+                variant="outline"
+                className="font-semibold border-border/80 bg-background/75 text-foreground backdrop-blur-sm hover:bg-background/95 hover:text-foreground"
                 onClick={() =>
                   navigate(`/movie/${movie.id}`, { state: { from: fromPath } })
                 }
