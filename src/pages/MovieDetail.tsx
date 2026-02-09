@@ -696,19 +696,27 @@ export default function MovieDetail() {
                 </span>
               </div>
 
-              <div className="mt-3 space-y-1.5 text-sm text-foreground/90">
-                <p>
-                  <span className="text-muted-foreground">Director: </span>
-                  {directors.length > 0 ? directors.join(", ") : "N/A"}
-                </p>
-                <p>
-                  <span className="text-muted-foreground">Writer: </span>
-                  {writers.length > 0 ? writers.join(", ") : "N/A"}
-                </p>
-                <p>
-                  <span className="text-muted-foreground">Producer: </span>
-                  {producers.length > 0 ? producers.join(", ") : "N/A"}
-                </p>
+              <div className="mt-3 rounded-lg border border-border/60 bg-card/45 px-3 py-2.5">
+                <dl className="space-y-2 text-sm">
+                  <div className="grid grid-cols-[88px_1fr] items-start gap-2">
+                    <dt className="text-muted-foreground">Director</dt>
+                    <dd className="text-foreground/90 leading-relaxed">
+                      {directors.length > 0 ? directors.join(", ") : "N/A"}
+                    </dd>
+                  </div>
+                  <div className="grid grid-cols-[88px_1fr] items-start gap-2">
+                    <dt className="text-muted-foreground">Writer</dt>
+                    <dd className="text-foreground/90 leading-relaxed">
+                      {writers.length > 0 ? writers.join(", ") : "N/A"}
+                    </dd>
+                  </div>
+                  <div className="grid grid-cols-[88px_1fr] items-start gap-2">
+                    <dt className="text-muted-foreground">Producer</dt>
+                    <dd className="text-foreground/90 leading-relaxed">
+                      {producers.length > 0 ? producers.join(", ") : "N/A"}
+                    </dd>
+                  </div>
+                </dl>
               </div>
 
               {movie.genres.length > 0 && (
@@ -797,17 +805,17 @@ export default function MovieDetail() {
                 )}
               </div>
 
-              {/* Details Side Panel */}
+              {/* Right Side Panel */}
               <aside className="h-fit rounded-xl border border-border/70 bg-card/55 p-4 backdrop-blur-sm">
-                <h3 className="text-lg font-semibold mb-4">Details</h3>
+                <h3 className="text-lg font-semibold mb-4">Quick Facts</h3>
                 <div className="space-y-3">
                   {detailRows.map((row) => (
-                    <div key={row.label} className="flex items-start justify-between gap-4">
+                    <div key={row.label} className="grid grid-cols-[140px_1fr] items-start gap-3">
                       <p className="flex items-center gap-2 text-sm text-muted-foreground">
                         <row.icon className="h-4 w-4" />
                         {row.label}
                       </p>
-                      <p className="text-sm font-medium text-right text-foreground">
+                      <p className="text-sm font-medium text-left text-foreground break-words">
                         {row.value}
                       </p>
                     </div>
