@@ -401,6 +401,11 @@ export default function MovieDetail() {
   const year = movie.release_date?.split("-")[0] || "";
   const matchScore = movie.vote_average > 0 ? Math.round(movie.vote_average * 10) : null;
   const languageTag = movie.original_language?.toUpperCase() || "N/A";
+  const runtimeText = movie.runtime > 0 ? formatRuntime(movie.runtime) : null;
+  const ratingText = movie.vote_average > 0 ? `${movie.vote_average.toFixed(1)} / 10 IMDb` : null;
+  const detailFacts = [year || null, runtimeText, ratingText].filter(
+    (value): value is string => Boolean(value),
+  );
   const genresText =
     movie.genres.length > 0
       ? movie.genres.map((genre) => genre.name).join(" • ")
@@ -523,28 +528,25 @@ export default function MovieDetail() {
             </div>
 
             {/* Meta Info */}
-            <div className="mb-6">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm md:text-[15px]">
+            <div className="mb-6 rounded-xl border border-white/10 bg-black/35 px-4 py-3 backdrop-blur-sm">
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 text-sm">
                 {matchScore !== null && (
-                  <span className="font-semibold text-emerald-400">
+                  <span className="rounded-md bg-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-300">
                     {matchScore}% Match
                   </span>
                 )}
-                {year && <span className="text-foreground/90">{year}</span>}
-                {movie.runtime > 0 && (
-                  <span className="text-foreground/90">{formatRuntime(movie.runtime)}</span>
-                )}
-                {movie.vote_average > 0 && (
-                  <span className="text-foreground/90">
-                    {movie.vote_average.toFixed(1)} IMDb
+                {detailFacts.map((fact) => (
+                  <span key={fact} className="text-foreground/90">
+                    {fact}
                   </span>
-                )}
-                <span className="rounded-sm border border-foreground/35 bg-black/35 px-1.5 py-0.5 text-[11px] font-medium tracking-wide text-foreground/90">
+                ))}
+                <span className="rounded-sm border border-foreground/30 bg-black/40 px-1.5 py-0.5 text-[11px] font-medium tracking-wide text-foreground/90">
                   {languageTag}
                 </span>
               </div>
 
-              <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
+              <p className="mt-3 text-sm text-muted-foreground">
+                <span className="text-foreground/80">Genres: </span>
                 {genresText}
               </p>
             </div>
