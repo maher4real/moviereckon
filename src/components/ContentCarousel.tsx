@@ -126,7 +126,7 @@ export default function ContentCarousel({
 
         <div
           ref={scrollRef}
-          className="flex gap-2 md:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory px-2 md:px-4 pb-2 md:pb-4"
+          className="flex gap-2 md:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory px-2 md:px-4 pt-2 md:pt-3 pb-2 md:pb-4"
         >
           {isLoading ? (
             Array.from({ length: 8 }).map((_, i) => (
@@ -145,9 +145,9 @@ export default function ContentCarousel({
                 <div
                   key={item.id}
                   onClick={() => handleItemClick(item)}
-                  className="flex-shrink-0 snap-start w-[128px] sm:w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/card relative transition-transform duration-300 hover:-translate-y-1 hover:scale-[1.04] hover:z-10"
+                  className="flex-shrink-0 snap-start w-[128px] sm:w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/card relative"
                 >
-                  <div className="relative aspect-[2/3] rounded-lg overflow-hidden transition-shadow duration-300 group-hover/card:shadow-[0_10px_40px_rgba(0,0,0,0.5)]">
+                  <div className="relative aspect-[2/3] rounded-lg overflow-hidden transform-gpu transition-[transform,box-shadow] duration-300 group-hover/card:-translate-y-1.5 group-hover/card:shadow-[0_12px_36px_rgba(0,0,0,0.48)]">
                     <MediaImage
                       src={getPosterUrl(item.poster_path, "medium")}
                       alt={getTitle(item)}
