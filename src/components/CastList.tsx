@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 interface CastListProps {
   cast: Cast[];
+  title?: string;
 }
 
 interface CastCardProps {
@@ -44,18 +45,18 @@ function CastCard({ actor, compact = false }: CastCardProps) {
   );
 }
 
-function CastList({ cast }: CastListProps) {
+function CastList({ cast, title = "Top Cast" }: CastListProps) {
   if (cast.length === 0) return null;
 
   return (
     <div className="mb-10">
-      <h2 className="text-xl font-semibold mb-4">Top Cast</h2>
+      <h2 className="text-xl font-semibold mb-4">{title}</h2>
 
       <div className="sm:hidden">
         <ScrollArea className="w-full">
           <div className="flex gap-3 pb-4 pr-2">
-            {cast.map((actor) => (
-              <CastCard key={actor.id} actor={actor} compact />
+            {cast.map((actor, index) => (
+              <CastCard key={`${actor.id}-${actor.character}-${index}`} actor={actor} compact />
             ))}
           </div>
           <ScrollBar orientation="horizontal" />
@@ -63,8 +64,8 @@ function CastList({ cast }: CastListProps) {
       </div>
 
       <div className="hidden sm:grid sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-        {cast.map((actor) => (
-          <CastCard key={actor.id} actor={actor} />
+        {cast.map((actor, index) => (
+          <CastCard key={`${actor.id}-${actor.character}-${index}`} actor={actor} />
         ))}
       </div>
     </div>

@@ -128,6 +128,42 @@ export interface Cast {
   order: number;
 }
 
+export interface CrewMember {
+  id: number;
+  name: string;
+  job: string;
+  department: string;
+  profile_path: string | null;
+  credit_id: string;
+}
+
+export interface MovieKeyword {
+  id: number;
+  name: string;
+}
+
+export interface MovieReleaseDate {
+  certification: string;
+  iso_639_1: string;
+  release_date: string;
+  type: number;
+}
+
+export interface MovieReleaseDatesResult {
+  iso_3166_1: string;
+  release_dates: MovieReleaseDate[];
+}
+
+export interface MovieReleaseDatesResponse {
+  id: number;
+  results: MovieReleaseDatesResult[];
+}
+
+export interface MovieKeywordsResponse {
+  id: number;
+  keywords: MovieKeyword[];
+}
+
 export interface Video {
   id: string;
   key: string;
@@ -300,8 +336,10 @@ export async function getMovieDetails(movieId: number): Promise<MovieDetails> {
   return fetchTMDB<MovieDetails>(`/movie/${movieId}`);
 }
 
-export async function getMovieCredits(movieId: number): Promise<{ cast: Cast[] }> {
-  return fetchTMDB<{ cast: Cast[] }>(`/movie/${movieId}/credits`);
+export async function getMovieCredits(
+  movieId: number,
+): Promise<{ cast: Cast[]; crew: CrewMember[] }> {
+  return fetchTMDB<{ cast: Cast[]; crew: CrewMember[] }>(`/movie/${movieId}/credits`);
 }
 
 export async function getMovieVideos(movieId: number): Promise<{ results: Video[] }> {
@@ -318,6 +356,19 @@ export async function getMovieRecommendations(movieId: number): Promise<TMDBResp
 
 export async function getMovieWatchProviders(movieId: number): Promise<WatchProviders> {
   return fetchTMDB<WatchProviders>(`/movie/${movieId}/watch/providers`);
+}
+
+export async function getMovieReleaseDates(
+  movieId: number,
+): Promise<MovieReleaseDatesResponse> {
+  return fetchTMDB<MovieReleaseDatesResponse>(`/movie/${movieId}/release_dates`);
+}
+
+export async function getMovieKeywords(
+  movieId: number,
+): Promise<MovieKeyword[]> {
+  const data = await fetchTMDB<MovieKeywordsResponse>(`/movie/${movieId}/keywords`);
+  return data.keywords || [];
 }
 
 export async function getMovieReviews(movieId: number, page = 1): Promise<TMDBReview[]> {

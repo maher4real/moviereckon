@@ -6,13 +6,17 @@ import { useUserData } from "@/hooks/useUserData";
 import {
   getMovieDetails,
   getMovieCredits,
+  getMovieReleaseDates,
   getMovieVideos,
+  getMovieKeywords,
   getSimilarMovies,
   getMovieWatchProviders,
   getBackdropUrl,
   getPosterUrl,
   getYouTubeTrailerUrl,
   getLanguageLabel,
+  CrewMember,
+  MovieKeyword,
   Movie,
 } from "@/lib/tmdb";
 import Header from "@/components/Header";
@@ -36,11 +40,16 @@ import {
   ArrowLeft,
   Calendar,
   Clock,
+  DollarSign,
   Globe,
   Play,
   Heart,
   Check,
+  CircleDollarSign,
   Star,
+  Tag,
+  Users,
+  BadgeCheck,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -126,7 +135,83 @@ export default function MovieDetail() {
     enabled: !!movieId,
   });
 
-  const cast = creditsData?.cast.slice(0, 12) || [];
+  const { data: releaseDatesData } = useQuery({
+    queryKey: ["movie-release-dates", movieId],
+    queryFn: () => getMovieReleaseDates(movieId),
+    enabled: !!movieId,
+  });
+
+  const { data: keywords = [] } = useQuery<MovieKeyword[]>({
+    queryKey: ["movie-keywords", movieId],
+    queryFn: () => getMovieKeywords(movieId),
+    enabled: !!movieId,
+    staleTime: 1000 * 60 * 30,
+  });
+
+  const cast = useMemo(
+    () => [...(creditsData?.cast || [])].sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999)),
+    [creditsData],
+  );
+  const crew = useMemo(
+    () =>
+      [...(creditsData?.crew || [])].sort(
+        (a, b) =>
+          a.department.localeCompare(b.department) ||
+          a.job.localeCompare(b.job) ||
+          a.name.localeCompare(b.name),
+      ),
+    [creditsData],
+  );
+
+  const pickUniqueNames = (members: CrewMember[]) =>
+    Array.from(new Set(members.map((member) => member.name)));
+
+  const directors = useMemo(
+    () => pickUniqueNames(crew.filter((member) => member.job === "Director")).slice(0, 3),
+    [crew],
+  );
+  const writers = useMemo(
+    () =>
+      pickUniqueNames(
+        crew.filter((member) =>
+          ["Writer", "Screenplay", "Story", "Novel"].includes(member.job),
+        ),
+      ).slice(0, 4),
+    [crew],
+  );
+  const producers = useMemo(
+    () =>
+      pickUniqueNames(
+        crew.filter((member) =>
+          ["Producer", "Executive Producer"].includes(member.job),
+        ),
+      ).slice(0, 4),
+    [crew],
+  );
+
+  const certification = useMemo(() => {
+    const preferredRegions = ["US", "GB", "CA", "AU", "IN"];
+    const results = releaseDatesData?.results || [];
+
+    const findCertification = (regionCode: string) => {
+      const region = results.find((entry) => entry.iso_3166_1 === regionCode);
+      if (!region) return null;
+      const release = region.release_dates.find((entry) => entry.certification?.trim());
+      return release?.certification?.trim() || null;
+    };
+
+    for (const regionCode of preferredRegions) {
+      const value = findCertification(regionCode);
+      if (value) return value;
+    }
+
+    for (const region of results) {
+      const release = region.release_dates.find((entry) => entry.certification?.trim());
+      if (release?.certification?.trim()) return release.certification.trim();
+    }
+
+    return null;
+  }, [releaseDatesData]);
   const trailerUrl = videosData ? getYouTubeTrailerUrl(videosData.results) : null;
   const preferredTrailerKey = trailerUrl?.split("/embed/")[1]?.split("?")[0] || null;
   const backgroundTrailerKeys = useMemo(() => {
@@ -231,6 +316,28 @@ export default function MovieDetail() {
     const mins = minutes % 60;
     return `${hours}h ${mins}m`;
   };
+
+  const formatReleaseDate = (date: string): string => {
+    if (!date) return "N/A";
+    const parsed = new Date(date);
+    if (Number.isNaN(parsed.getTime())) return date;
+    return parsed.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
+  const formatMoney = (amount: number): string => {
+    if (!amount || amount <= 0) return "N/A";
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  };
+
   const backgroundTrailerEmbedUrl = activeBgVideoKey
     ? `https://www.youtube.com/embed/${activeBgVideoKey}?autoplay=1&mute=1&controls=0&loop=1&playlist=${activeBgVideoKey}&modestbranding=1&rel=0&playsinline=1&iv_load_policy=3&disablekb=1&fs=0&enablejsapi=1${youtubeOrigin ? `&origin=${youtubeOrigin}` : ""}`
     : null;
@@ -406,6 +513,14 @@ export default function MovieDetail() {
   const year = movie.release_date?.split("-")[0] || "";
   const matchScore = movie.vote_average > 0 ? Math.round(movie.vote_average * 10) : null;
   const languageLabel = getLanguageLabel(movie.original_language);
+  const releasedAt = formatReleaseDate(movie.release_date);
+  const detailRows = [
+    { label: "Status", value: movie.status || "N/A", icon: BadgeCheck },
+    { label: "Released", value: releasedAt, icon: Calendar },
+    { label: "Original Language", value: languageLabel, icon: Globe },
+    { label: "Budget", value: formatMoney(movie.budget), icon: DollarSign },
+    { label: "Revenue", value: formatMoney(movie.revenue), icon: CircleDollarSign },
+  ];
   const heroVisualSrc =
     activeBgVideoKey
       ? getBackdropUrl(movie.backdrop_path, "original")
@@ -533,6 +648,13 @@ export default function MovieDetail() {
                   </span>
                 )}
 
+                {certification && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-300">
+                    <BadgeCheck className="h-3.5 w-3.5" />
+                    {certification}
+                  </span>
+                )}
+
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-card/70 px-3 py-1.5 text-xs font-medium text-foreground/90">
                   <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
                   {year || "TBA"}
@@ -554,6 +676,21 @@ export default function MovieDetail() {
                   <Globe className="h-3.5 w-3.5 text-muted-foreground" />
                   {languageLabel}
                 </span>
+              </div>
+
+              <div className="mt-3 space-y-1.5 text-sm text-foreground/90">
+                <p>
+                  <span className="text-muted-foreground">Director: </span>
+                  {directors.length > 0 ? directors.join(", ") : "N/A"}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Writer: </span>
+                  {writers.length > 0 ? writers.join(", ") : "N/A"}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Producer: </span>
+                  {producers.length > 0 ? producers.join(", ") : "N/A"}
+                </p>
               </div>
 
               {movie.genres.length > 0 && (
@@ -613,19 +750,89 @@ export default function MovieDetail() {
               </Button>
             </div>
 
-            {/* Overview */}
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold mb-3">Overview</h2>
-              <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">
-                {movie.overview || "No overview available."}
-              </p>
+            <div className="mb-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div>
+                {/* Overview */}
+                <h2 className="text-xl font-semibold mb-3">Overview</h2>
+                <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">
+                  {movie.overview || "No overview available."}
+                </p>
+
+                {/* Keywords */}
+                {keywords.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                      <Tag className="w-4 h-4" />
+                      Keywords
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {keywords.map((keyword) => (
+                        <span
+                          key={keyword.id}
+                          className="rounded-full border border-border/70 bg-card/70 px-3 py-1 text-xs text-foreground/90"
+                        >
+                          {keyword.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Details Side Panel */}
+              <aside className="h-fit rounded-xl border border-border/70 bg-card/55 p-4 backdrop-blur-sm">
+                <h3 className="text-lg font-semibold mb-4">Details</h3>
+                <div className="space-y-3">
+                  {detailRows.map((row) => (
+                    <div key={row.label} className="flex items-start justify-between gap-4">
+                      <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <row.icon className="h-4 w-4" />
+                        {row.label}
+                      </p>
+                      <p className="text-sm font-medium text-right text-foreground">
+                        {row.value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </aside>
             </div>
 
             {/* Where to Watch */}
             <WhereToWatch providers={providers} link={watchLink} />
 
             {/* Cast */}
-            <CastList cast={cast} />
+            <CastList cast={cast} title="Cast" />
+
+            {/* Crew */}
+            {crew.length > 0 && (
+              <div className="mb-10">
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Crew
+                </h2>
+
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {crew.map((member, index) => (
+                    <article
+                      key={`${member.credit_id}-${member.id}-${index}`}
+                      className="rounded-lg border border-border/70 bg-card/40 px-3 py-2.5"
+                    >
+                      <p className="text-sm font-semibold text-foreground line-clamp-1">
+                        {member.name}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">
+                        {member.job}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground/80 line-clamp-1">
+                        {member.department}
+                      </p>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <FeedbackButtons
               contentId={movie.id}
               contentType="movie"
