@@ -43,6 +43,7 @@ import {
   Clock,
   DollarSign,
   Globe,
+  IndianRupee,
   Play,
   Heart,
   Check,
@@ -356,6 +357,19 @@ export default function MovieDetail() {
     }).format(amount);
   };
 
+  const formatMoneyIndian = (amount: number): string => {
+    if (!amount || amount <= 0) return "N/A";
+
+    const formatCompact = (value: number) =>
+      (value >= 100 ? value.toFixed(0) : value.toFixed(2)).replace(/\.00$/, "");
+
+    if (amount >= 10000000) {
+      return `₹${formatCompact(amount / 10000000)} CR`;
+    }
+
+    return `₹${formatCompact(amount / 100000)} Lakh`;
+  };
+
   const backgroundTrailerEmbedUrl = activeBgVideoKey
     ? `https://www.youtube.com/embed/${activeBgVideoKey}?autoplay=1&mute=1&controls=0&loop=1&playlist=${activeBgVideoKey}&modestbranding=1&rel=0&playsinline=1&iv_load_policy=3&disablekb=1&fs=0&enablejsapi=1${youtubeOrigin ? `&origin=${youtubeOrigin}` : ""}`
     : null;
@@ -529,15 +543,20 @@ export default function MovieDetail() {
   const watched = isWatched(movie.id, "movie");
   const liked = isLiked(movie.id, "movie");
   const year = movie.release_date?.split("-")[0] || "";
+  const isHindiContent = movie.original_language === "hi";
   const matchScore = movie.vote_average > 0 ? Math.round(movie.vote_average * 10) : null;
   const languageLabel = getLanguageLabel(movie.original_language);
   const releasedAt = formatReleaseDate(movie.release_date);
+  const budgetValue = isHindiContent ? formatMoneyIndian(movie.budget) : formatMoney(movie.budget);
+  const revenueValue = isHindiContent ? formatMoneyIndian(movie.revenue) : formatMoney(movie.revenue);
+  const budgetIcon = isHindiContent ? IndianRupee : DollarSign;
+  const revenueIcon = isHindiContent ? IndianRupee : CircleDollarSign;
   const detailRows = [
     { label: "Status", value: movie.status || "N/A", icon: BadgeCheck },
     { label: "Released", value: releasedAt, icon: Calendar },
     { label: "Original Language", value: languageLabel, icon: Globe },
-    { label: "Budget", value: formatMoney(movie.budget), icon: DollarSign },
-    { label: "Revenue", value: formatMoney(movie.revenue), icon: CircleDollarSign },
+    { label: "Budget", value: budgetValue, icon: budgetIcon },
+    { label: "Revenue", value: revenueValue, icon: revenueIcon },
   ];
   const heroVisualSrc =
     activeBgVideoKey
