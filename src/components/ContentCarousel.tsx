@@ -147,7 +147,7 @@ export default function ContentCarousel({
                   onClick={() => handleItemClick(item)}
                   className="flex-shrink-0 snap-start w-[128px] sm:w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/card"
                 >
-                  <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card transition-transform duration-300 ease-out group-hover/card:scale-105">
+                  <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
                     <MediaImage
                       src={getPosterUrl(item.poster_path, "medium")}
                       alt={getTitle(item)}
@@ -156,21 +156,21 @@ export default function ContentCarousel({
                       fallbackSrc="/fallbacks/poster.svg"
                     />
 
-                    <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/20 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                      <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center glow-primary transform scale-75 group-hover/card:scale-100 transition-transform duration-300">
+                    <div className="absolute inset-0 bg-background/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
+                      <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center glow-primary">
                         <span className="text-xl">▶</span>
                       </div>
                     </div>
 
                     {item.vote_average > 0 && (
-                      <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold transition-transform duration-300 group-hover/card:scale-110">
+                      <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
                         ⭐ {item.vote_average.toFixed(1)}
                       </div>
                     )}
 
                     <div
                       className={cn(
-                        "absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold transition-transform duration-300 group-hover/card:scale-110",
+                        "absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold",
                         item.original_language === "hi"
                           ? "badge-hindi"
                           : item.original_language === "en"
@@ -184,7 +184,7 @@ export default function ContentCarousel({
                     </div>
                   </div>
 
-                  <h3 className="mt-2 font-medium text-sm line-clamp-1 group-hover/card:text-primary transition-colors duration-300">
+                  <h3 className="mt-2 font-medium text-sm line-clamp-1 group-hover/card:text-primary transition-colors">
                     {getTitle(item)}
                   </h3>
                   <p className="text-xs text-muted-foreground">
@@ -198,9 +198,9 @@ export default function ContentCarousel({
                   onClick={() => navigate(resolvedViewAllHref)}
                   className="flex-shrink-0 snap-start w-[128px] sm:w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/viewall"
                 >
-                  <div className="relative aspect-[2/3] rounded-lg overflow-hidden border border-border bg-gradient-to-br from-card to-muted/40 transition-all duration-300 group-hover/viewall:scale-105 group-hover/viewall:border-primary/40 group-hover/viewall:shadow-[0_10px_30px_rgba(0,0,0,0.35)] flex items-center justify-center">
+                  <div className="relative aspect-[2/3] rounded-lg overflow-hidden border border-border bg-gradient-to-br from-card to-muted/40 transition-all duration-300 group-hover/viewall:border-primary/40 group-hover/viewall:shadow-[0_10px_30px_rgba(0,0,0,0.35)] flex items-center justify-center">
                     <div className="flex flex-col items-center justify-center gap-3 px-4 text-center">
-                      <div className="w-12 h-12 rounded-full bg-primary/20 text-primary flex items-center justify-center group-hover/viewall:bg-primary group-hover/viewall:text-primary-foreground transition-all duration-300 transform group-hover/viewall:scale-110">
+                      <div className="w-12 h-12 rounded-full bg-primary/20 text-primary flex items-center justify-center group-hover/viewall:bg-primary group-hover/viewall:text-primary-foreground transition-all duration-300">
                         <ArrowRight className="w-6 h-6" />
                       </div>
                       <p className="text-base md:text-lg font-semibold text-foreground">
@@ -209,7 +209,7 @@ export default function ContentCarousel({
                     </div>
                   </div>
 
-                  <h3 className="mt-2 font-medium text-sm line-clamp-1 text-primary group-hover/viewall:text-primary/80 transition-colors duration-300">
+                  <h3 className="mt-2 font-medium text-sm line-clamp-1 text-primary group-hover/viewall:text-primary/80 transition-colors">
                     Explore More
                   </h3>
                   {title && (
