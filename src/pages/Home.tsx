@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, memo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserData } from "@/hooks/useUserData";
@@ -25,6 +25,8 @@ import ContentCarousel from "@/components/ContentCarousel";
 import Footer from "@/components/Footer";
 import { Sparkles } from "lucide-react";
 
+// Memoized carousel for performance
+const MemoizedCarousel = memo(ContentCarousel);
 const STARTUP_SOUND_SRC =
   "https://cdn.jsdelivr.net/gh/maher4real/moviereckon@main/startupIntro.mp3";
 const STARTUP_SOUND_PENDING_KEY = "startupSoundPending";
@@ -320,7 +322,7 @@ export default function Home() {
                   )}
                 </div>
               </div>
-              <ContentCarousel
+              <MemoizedCarousel
                 title=""
                 items={reckonItems as (Movie | TVShow)[]}
                 isLoading={reckonLoading}
@@ -332,7 +334,7 @@ export default function Home() {
 
           {/* Now Playing - Only movies released today or earlier */}
           {(filteredNowPlaying.length > 0 || nowPlayingLoading) && (
-            <ContentCarousel
+            <MemoizedCarousel
               title="🎬 Now Playing in Theaters"
               items={filteredNowPlaying as (Movie | TVShow)[]}
               isLoading={nowPlayingLoading}
@@ -343,7 +345,7 @@ export default function Home() {
 
           {/* Upcoming - Only movies releasing tomorrow or later */}
           {(filteredUpcoming.length > 0 || upcomingLoading) && (
-            <ContentCarousel
+            <MemoizedCarousel
               title="🗓️ Coming Soon"
               items={filteredUpcoming as (Movie | TVShow)[]}
               isLoading={upcomingLoading}
@@ -353,7 +355,7 @@ export default function Home() {
           )}
 
           {/* Trending Now */}
-          <ContentCarousel
+          <MemoizedCarousel
             title="🔥 Trending Now"
             items={filteredTrendingMovies as (Movie | TVShow)[]}
             isLoading={trendingLoading}
@@ -363,7 +365,7 @@ export default function Home() {
 
           {/* Recently Watched (if any) */}
           {recentlyWatched.length > 0 && (
-            <ContentCarousel
+            <MemoizedCarousel
               title="⏪ Continue Watching"
               items={recentlyWatched as (Movie | TVShow)[]}
               isLoading={false}
@@ -373,7 +375,7 @@ export default function Home() {
           )}
 
           {/* Bollywood Hits */}
-          <ContentCarousel
+          <MemoizedCarousel
             title="🇮🇳 Bollywood Hits"
             items={bollywoodData?.results as (Movie | TVShow)[]}
             isLoading={bollywoodLoading}
@@ -382,7 +384,7 @@ export default function Home() {
           />
 
           {/* Hollywood Blockbusters */}
-          <ContentCarousel
+          <MemoizedCarousel
             title="🎬 Hollywood Blockbusters"
             items={hollywoodData?.results as (Movie | TVShow)[]}
             isLoading={hollywoodLoading}
@@ -392,7 +394,7 @@ export default function Home() {
 
           {/* Tamil Cinema */}
           {tamilData?.results && tamilData.results.length > 0 && (
-            <ContentCarousel
+            <MemoizedCarousel
               title="🎭 Tamil Cinema"
               items={tamilData.results as (Movie | TVShow)[]}
               isLoading={tamilLoading}
@@ -403,7 +405,7 @@ export default function Home() {
 
           {/* Telugu Cinema */}
           {teluguData?.results && teluguData.results.length > 0 && (
-            <ContentCarousel
+            <MemoizedCarousel
               title="🌟 Telugu Cinema"
               items={teluguData.results as (Movie | TVShow)[]}
               isLoading={teluguLoading}
@@ -414,7 +416,7 @@ export default function Home() {
 
           {/* Gujarati Cinema */}
           {gujaratiData?.results && gujaratiData.results.length > 0 && (
-            <ContentCarousel
+            <MemoizedCarousel
               title="🎪 Gujarati Cinema"
               items={gujaratiData.results as (Movie | TVShow)[]}
               isLoading={gujaratiLoading}
@@ -424,7 +426,7 @@ export default function Home() {
           )}
 
           {/* Trending TV Series */}
-          <ContentCarousel
+          <MemoizedCarousel
             title="📺 Trending TV Series"
             items={filteredTvShows as (Movie | TVShow)[]}
             isLoading={tvLoading}
@@ -433,7 +435,7 @@ export default function Home() {
           />
 
           {/* Top Rated */}
-          <ContentCarousel
+          <MemoizedCarousel
             title="⭐ Top Rated"
             items={filteredTopRatedMovies as (Movie | TVShow)[]}
             isLoading={topRatedLoading}
