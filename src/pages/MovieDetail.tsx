@@ -15,6 +15,7 @@ import {
   getPosterUrl,
   getYouTubeTrailerUrl,
   getLanguageLabel,
+  Cast,
   CrewMember,
   MovieKeyword,
   Movie,
@@ -48,7 +49,6 @@ import {
   CircleDollarSign,
   Star,
   Tag,
-  Users,
   BadgeCheck,
   X,
 } from "lucide-react";
@@ -161,6 +161,24 @@ export default function MovieDetail() {
           a.name.localeCompare(b.name),
       ),
     [creditsData],
+  );
+  const crewAsCast = useMemo<Cast[]>(
+    () =>
+      crew.map((member, index) => {
+        const role =
+          member.job && member.department && member.department !== member.job
+            ? `${member.job} • ${member.department}`
+            : member.job || member.department || "Crew";
+
+        return {
+          id: member.id,
+          name: member.name,
+          character: role,
+          profile_path: member.profile_path,
+          order: index,
+        };
+      }),
+    [crew],
   );
 
   const pickUniqueNames = (members: CrewMember[]) =>
@@ -805,33 +823,7 @@ export default function MovieDetail() {
             <CastList cast={cast} title="Cast" />
 
             {/* Crew */}
-            {crew.length > 0 && (
-              <div className="mb-10">
-                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                  <Users className="w-5 h-5" />
-                  Crew
-                </h2>
-
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {crew.map((member, index) => (
-                    <article
-                      key={`${member.credit_id}-${member.id}-${index}`}
-                      className="rounded-lg border border-border/70 bg-card/40 px-3 py-2.5"
-                    >
-                      <p className="text-sm font-semibold text-foreground line-clamp-1">
-                        {member.name}
-                      </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">
-                        {member.job}
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground/80 line-clamp-1">
-                        {member.department}
-                      </p>
-                    </article>
-                  ))}
-                </div>
-              </div>
-            )}
+            <CastList cast={crewAsCast} title="Crew" />
 
             <FeedbackButtons
               contentId={movie.id}
