@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, memo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserData } from "@/hooks/useUserData";
@@ -25,8 +25,6 @@ import ContentCarousel from "@/components/ContentCarousel";
 import Footer from "@/components/Footer";
 import { Sparkles } from "lucide-react";
 
-// Memoized carousel for performance
-const MemoizedCarousel = memo(ContentCarousel);
 const STARTUP_SOUND_SRC =
   "https://cdn.jsdelivr.net/gh/maher4real/moviereckon@main/startupIntro.mp3";
 const STARTUP_SOUND_PENDING_KEY = "startupSoundPending";
@@ -37,7 +35,11 @@ const isAnimeLike = (item: Movie | TVShow) =>
 export default function Home() {
   const { user, isLoading: authLoading, profile } = useAuth();
   const { watchHistory, isLoading: dataLoading } = useUserData();
-  const { items: reckonItems, isLoading: reckonLoading, isPersonalized } = useRecommendations();
+  const {
+    items: reckonItems,
+    isLoading: reckonLoading,
+    isPersonalized,
+  } = useRecommendations();
   const navigate = useNavigate();
   const [heroIndex, setHeroIndex] = useState(0);
 
@@ -92,7 +94,10 @@ export default function Home() {
 
     const playOnInteraction = () => {
       cleanupFallbackListeners();
-      void audio.play().then(markStartupSoundPlayed).catch(() => undefined);
+      void audio
+        .play()
+        .then(markStartupSoundPlayed)
+        .catch(() => undefined);
     };
 
     const attachFallbackListeners = () => {
@@ -117,10 +122,13 @@ export default function Home() {
   }, [authLoading, user]);
 
   // Fetch all data with optimized query config
-  const queryConfig = useMemo(() => ({
-    staleTime: 1000 * 60 * 10, // 10 minutes
-    gcTime: 1000 * 60 * 30, // 30 minutes
-  }), []);
+  const queryConfig = useMemo(
+    () => ({
+      staleTime: 1000 * 60 * 10, // 10 minutes
+      gcTime: 1000 * 60 * 30, // 30 minutes
+    }),
+    [],
+  );
 
   const { data: trendingMovies, isLoading: trendingLoading } = useQuery({
     queryKey: ["trending-movies"],
@@ -187,7 +195,7 @@ export default function Home() {
     if (!nowPlayingData?.results) return [];
     const today = new Date().toISOString().split("T")[0];
     return nowPlayingData.results.filter(
-      (movie) => movie.release_date <= today && !isAnimeLike(movie)
+      (movie) => movie.release_date <= today && !isAnimeLike(movie),
     );
   }, [nowPlayingData]);
 
@@ -198,27 +206,30 @@ export default function Home() {
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toISOString().split("T")[0];
     return upcomingData.results.filter(
-      (movie) => movie.release_date >= tomorrowStr && !isAnimeLike(movie)
+      (movie) => movie.release_date >= tomorrowStr && !isAnimeLike(movie),
     );
   }, [upcomingData]);
 
   const filteredTrendingMovies = useMemo(
     () => (trendingMovies || []).filter((movie) => !isAnimeLike(movie)),
-    [trendingMovies]
+    [trendingMovies],
   );
 
   const filteredTopRatedMovies = useMemo(
     () => (topRatedData?.results || []).filter((movie) => !isAnimeLike(movie)),
-    [topRatedData]
+    [topRatedData],
   );
 
   const filteredTvShows = useMemo(
     () => (tvShowsData?.results || []).filter((show) => !isAnimeLike(show)),
-    [tvShowsData]
+    [tvShowsData],
   );
 
   // Hero movies (top 5 trending)
-  const heroMovies = useMemo(() => filteredTrendingMovies.slice(0, 5), [filteredTrendingMovies]);
+  const heroMovies = useMemo(
+    () => filteredTrendingMovies.slice(0, 5),
+    [filteredTrendingMovies],
+  );
   const currentHeroMovie = heroMovies[heroIndex];
 
   // Auto-rotate hero banner
@@ -242,26 +253,26 @@ export default function Home() {
     return watchHistory.slice(0, 10).map((item) => {
       const isTV = item.content_type === "tv";
       return {
-      id: item.content_id,
-      title: item.title,
-      name: item.title,
-      poster_path: item.poster_path,
-      backdrop_path: null,
-      overview: "",
-      vote_average: 0,
-      vote_count: 0,
-      popularity: 0,
-      genre_ids: item.genres,
-      original_language: item.language,
-      release_date: "",
-      first_air_date: isTV ? "2024-01-01" : "", // Mark TV shows properly for type detection
-      adult: false,
-      video: false,
-      original_title: item.title,
-      original_name: item.title,
-      origin_country: [],
-      _content_type: item.content_type, // Preserve content type for routing
-    };
+        id: item.content_id,
+        title: item.title,
+        name: item.title,
+        poster_path: item.poster_path,
+        backdrop_path: null,
+        overview: "",
+        vote_average: 0,
+        vote_count: 0,
+        popularity: 0,
+        genre_ids: item.genres,
+        original_language: item.language,
+        release_date: "",
+        first_air_date: isTV ? "2024-01-01" : "", // Mark TV shows properly for type detection
+        adult: false,
+        video: false,
+        original_title: item.title,
+        original_name: item.title,
+        origin_country: [],
+        _content_type: item.content_type, // Preserve content type for routing
+      };
     });
   }, [watchHistory]);
 
@@ -309,7 +320,7 @@ export default function Home() {
                   )}
                 </div>
               </div>
-              <MemoizedCarousel
+              <ContentCarousel
                 title=""
                 items={reckonItems as (Movie | TVShow)[]}
                 isLoading={reckonLoading}
@@ -321,7 +332,7 @@ export default function Home() {
 
           {/* Now Playing - Only movies released today or earlier */}
           {(filteredNowPlaying.length > 0 || nowPlayingLoading) && (
-            <MemoizedCarousel
+            <ContentCarousel
               title="🎬 Now Playing in Theaters"
               items={filteredNowPlaying as (Movie | TVShow)[]}
               isLoading={nowPlayingLoading}
@@ -332,7 +343,7 @@ export default function Home() {
 
           {/* Upcoming - Only movies releasing tomorrow or later */}
           {(filteredUpcoming.length > 0 || upcomingLoading) && (
-            <MemoizedCarousel
+            <ContentCarousel
               title="🗓️ Coming Soon"
               items={filteredUpcoming as (Movie | TVShow)[]}
               isLoading={upcomingLoading}
@@ -342,7 +353,7 @@ export default function Home() {
           )}
 
           {/* Trending Now */}
-          <MemoizedCarousel
+          <ContentCarousel
             title="🔥 Trending Now"
             items={filteredTrendingMovies as (Movie | TVShow)[]}
             isLoading={trendingLoading}
@@ -352,7 +363,7 @@ export default function Home() {
 
           {/* Recently Watched (if any) */}
           {recentlyWatched.length > 0 && (
-            <MemoizedCarousel
+            <ContentCarousel
               title="⏪ Continue Watching"
               items={recentlyWatched as (Movie | TVShow)[]}
               isLoading={false}
@@ -362,7 +373,7 @@ export default function Home() {
           )}
 
           {/* Bollywood Hits */}
-          <MemoizedCarousel
+          <ContentCarousel
             title="🇮🇳 Bollywood Hits"
             items={bollywoodData?.results as (Movie | TVShow)[]}
             isLoading={bollywoodLoading}
@@ -371,7 +382,7 @@ export default function Home() {
           />
 
           {/* Hollywood Blockbusters */}
-          <MemoizedCarousel
+          <ContentCarousel
             title="🎬 Hollywood Blockbusters"
             items={hollywoodData?.results as (Movie | TVShow)[]}
             isLoading={hollywoodLoading}
@@ -381,7 +392,7 @@ export default function Home() {
 
           {/* Tamil Cinema */}
           {tamilData?.results && tamilData.results.length > 0 && (
-            <MemoizedCarousel
+            <ContentCarousel
               title="🎭 Tamil Cinema"
               items={tamilData.results as (Movie | TVShow)[]}
               isLoading={tamilLoading}
@@ -392,7 +403,7 @@ export default function Home() {
 
           {/* Telugu Cinema */}
           {teluguData?.results && teluguData.results.length > 0 && (
-            <MemoizedCarousel
+            <ContentCarousel
               title="🌟 Telugu Cinema"
               items={teluguData.results as (Movie | TVShow)[]}
               isLoading={teluguLoading}
@@ -403,7 +414,7 @@ export default function Home() {
 
           {/* Gujarati Cinema */}
           {gujaratiData?.results && gujaratiData.results.length > 0 && (
-            <MemoizedCarousel
+            <ContentCarousel
               title="🎪 Gujarati Cinema"
               items={gujaratiData.results as (Movie | TVShow)[]}
               isLoading={gujaratiLoading}
@@ -413,7 +424,7 @@ export default function Home() {
           )}
 
           {/* Trending TV Series */}
-          <MemoizedCarousel
+          <ContentCarousel
             title="📺 Trending TV Series"
             items={filteredTvShows as (Movie | TVShow)[]}
             isLoading={tvLoading}
@@ -422,7 +433,7 @@ export default function Home() {
           />
 
           {/* Top Rated */}
-          <MemoizedCarousel
+          <ContentCarousel
             title="⭐ Top Rated"
             items={filteredTopRatedMovies as (Movie | TVShow)[]}
             isLoading={topRatedLoading}
