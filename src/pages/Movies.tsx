@@ -48,7 +48,8 @@ const BOLLYWOOD_LANGUAGE_OPTIONS = [
   { value: "ta", label: "Tamil" },
   { value: "te", label: "Telugu" },
 ];
-const BOLLYWOOD_LANGUAGE_CODES = new Set(["hi", "gu", "ta", "te", "ml", "kn", "bn", "mr", "pa"]);
+const BOLLYWOOD_LANGUAGE_CODES = ["hi", "gu", "ta", "te", "ml", "kn", "bn", "mr", "pa"] as const;
+const BOLLYWOOD_LANGUAGE_SET = new Set(BOLLYWOOD_LANGUAGE_CODES);
 
 const isAnimeLikeMovie = (movie: Movie) =>
   movie.original_language === "ja" && movie.genre_ids?.includes(16);
@@ -168,9 +169,11 @@ export default function Movies() {
 
       if (category === "bollywood") {
         filters.region = "IN";
-        if (bollywoodLanguage !== "all") {
-          filters.with_original_language = bollywoodLanguage;
-        }
+        // Keep "All Languages" focused on key Indian cinema languages to avoid sparse pages.
+        filters.with_original_language =
+          bollywoodLanguage === "all"
+            ? BOLLYWOOD_LANGUAGE_CODES.join(",")
+            : bollywoodLanguage;
       }
 
       return discoverMovies(filters);
@@ -225,7 +228,7 @@ export default function Movies() {
         if (
           category === "bollywood" &&
           bollywoodLanguage === "all" &&
-          !BOLLYWOOD_LANGUAGE_CODES.has(movie.original_language)
+          !BOLLYWOOD_LANGUAGE_SET.has(movie.original_language)
         ) {
           return;
         }
