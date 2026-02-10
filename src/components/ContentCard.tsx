@@ -5,14 +5,24 @@ import { Movie, TVShow, getPosterUrl, getLanguageLabel } from "@/lib/tmdb";
 import { useUserData } from "@/hooks/useUserData";
 import { cn } from "@/lib/utils";
 import MediaImage from "@/components/MediaImage";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { RecommendationReason } from "@/lib/recommendation";
 
 interface ContentCardProps {
   item: Movie | TVShow;
   type: "movie" | "tv" | "mixed";
   showActions?: boolean;
+  recommendationReasons?: RecommendationReason[];
+  recommendationSeedTitle?: string | null;
 }
 
-function ContentCardComponent({ item, type, showActions = true }: ContentCardProps) {
+function ContentCardComponent({
+  item,
+  type,
+  showActions = true,
+  recommendationReasons = [],
+  recommendationSeedTitle = null,
+}: ContentCardProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { isWatched, isLiked, addToWatchHistory, toggleLike } = useUserData();
@@ -165,7 +175,42 @@ function ContentCardComponent({ item, type, showActions = true }: ContentCardPro
       <h3 className="mt-2 font-medium text-sm line-clamp-1 group-hover/card:text-primary transition-colors">
         {title}
       </h3>
-      <p className="text-xs text-muted-foreground">{year}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">{year}</p>
+        {recommendationReasons.length > 0 && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="text-[11px] text-primary/90 hover:text-primary underline underline-offset-2"
+                onClick={(event) => event.stopPropagation()}
+              >
+                Why?
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              sideOffset={8}
+              className="w-64 p-3"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <p className="text-xs text-muted-foreground mb-2">
+                {recommendationSeedTitle
+                  ? `Because you liked ${recommendationSeedTitle}`
+                  : "Because this matches your taste"}
+              </p>
+              <div className="space-y-1">
+                {recommendationReasons.slice(0, 3).map((reason, index) => (
+                  <p key={`${reason.label}-${index}`} className="text-xs leading-snug">
+                    • {reason.label}
+                    {reason.evidence ? `: ${reason.evidence}` : ""}
+                  </p>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
+      </div>
     </div>
   );
 }

@@ -14,7 +14,7 @@ const ALLOWED_ENDPOINT_PATTERNS = [
   /^\/(movie|tv)\/(popular|top_rated|now_playing|upcoming|on_the_air|airing_today)$/,
   /^\/discover\/(movie|tv)$/,
   /^\/(movie|tv)\/\d+$/,
-  /^\/(movie|tv)\/\d+\/(credits|videos|similar|recommendations|watch\/providers|reviews)$/,
+  /^\/(movie|tv)\/\d+\/(credits|videos|similar|recommendations|watch\/providers|reviews|keywords)$/,
   /^\/movie\/\d+\/(release_dates|keywords)$/,
   /^\/tv\/\d+\/season\/\d+$/,
   /^\/search\/(movie|tv|multi)$/,

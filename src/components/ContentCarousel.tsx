@@ -5,6 +5,7 @@ import { Movie, TVShow, getPosterUrl } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import MediaImage from "@/components/MediaImage";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface ContentItem extends Movie, TVShow {
   _content_type?: "movie" | "tv";
@@ -17,6 +18,13 @@ interface ContentCarouselProps {
   type: "movie" | "tv" | "mixed";
   viewAllHref?: string;
   showViewAllCard?: boolean;
+  recommendationExplanations?: Record<
+    string,
+    {
+      reasons: Array<{ label: string; evidence?: string }>;
+      seedTitle?: string | null;
+    }
+  >;
 }
 
 export default function ContentCarousel({
@@ -26,6 +34,7 @@ export default function ContentCarousel({
   type,
   viewAllHref,
   showViewAllCard = true,
+  recommendationExplanations,
 }: ContentCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -62,6 +71,13 @@ export default function ContentCarousel({
     const date =
       "release_date" in item ? item.release_date : item.first_air_date;
     return date?.split("-")[0] || "";
+  };
+
+  const getItemType = (item: Movie | TVShow | ContentItem): "movie" | "tv" => {
+    if ("_content_type" in item && item._content_type) {
+      return item._content_type;
+    }
+    return "title" in item ? "movie" : "tv";
   };
 
   const getDefaultViewAllHref = (): string => {
@@ -141,57 +157,95 @@ export default function ContentCarousel({
             ))
           ) : (
             <>
-              {items?.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => handleItemClick(item)}
-                  className="flex-shrink-0 snap-start w-[128px] sm:w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/card relative"
-                >
-                  <div className="relative aspect-[2/3] rounded-lg overflow-hidden transform-gpu transition-[transform,box-shadow] duration-300 group-hover/card:-translate-y-1.5 group-hover/card:shadow-[0_12px_36px_rgba(0,0,0,0.48)]">
-                    <MediaImage
-                      src={getPosterUrl(item.poster_path, "medium")}
-                      alt={getTitle(item)}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                      fallbackSrc="/fallbacks/poster.svg"
-                    />
+              {items?.map((item) => {
+                const itemType = getItemType(item);
+                const explanation = recommendationExplanations?.[`${itemType}_${item.id}`];
 
-                    <div className="absolute inset-0 bg-background/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
-                      <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center glow-primary">
-                        <span className="text-xl">▶</span>
+                return (
+                  <div
+                    key={`${itemType}-${item.id}`}
+                    onClick={() => handleItemClick(item)}
+                    className="flex-shrink-0 snap-start w-[128px] sm:w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/card relative"
+                  >
+                    <div className="relative aspect-[2/3] rounded-lg overflow-hidden transform-gpu transition-[transform,box-shadow] duration-300 group-hover/card:-translate-y-1.5 group-hover/card:shadow-[0_12px_36px_rgba(0,0,0,0.48)]">
+                      <MediaImage
+                        src={getPosterUrl(item.poster_path, "medium")}
+                        alt={getTitle(item)}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        fallbackSrc="/fallbacks/poster.svg"
+                      />
+
+                      <div className="absolute inset-0 bg-background/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center glow-primary">
+                          <span className="text-xl">▶</span>
+                        </div>
+                      </div>
+
+                      {item.vote_average > 0 && (
+                        <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
+                          ⭐ {item.vote_average.toFixed(1)}
+                        </div>
+                      )}
+
+                      <div
+                        className={cn(
+                          "absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold",
+                          item.original_language === "hi"
+                            ? "badge-hindi"
+                            : item.original_language === "en"
+                              ? "badge-english"
+                              : "bg-muted",
+                        )}
+                      >
+                        {item.original_language === "hi"
+                          ? "HI"
+                          : item.original_language.toUpperCase()}
                       </div>
                     </div>
 
-                    {item.vote_average > 0 && (
-                      <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
-                        ⭐ {item.vote_average.toFixed(1)}
-                      </div>
-                    )}
-
-                    <div
-                      className={cn(
-                        "absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold",
-                        item.original_language === "hi"
-                          ? "badge-hindi"
-                          : item.original_language === "en"
-                            ? "badge-english"
-                            : "bg-muted",
-                      )}
-                    >
-                      {item.original_language === "hi"
-                        ? "HI"
-                        : item.original_language.toUpperCase()}
+                    <h3 className="mt-2 font-medium text-sm line-clamp-1 group-hover/card:text-primary transition-colors">
+                      {getTitle(item)}
+                    </h3>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs text-muted-foreground">{getYear(item)}</p>
+                      {explanation?.reasons?.length ? (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              className="text-[11px] text-primary/90 hover:text-primary underline underline-offset-2"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              Why?
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            align="end"
+                            sideOffset={8}
+                            className="w-64 p-3"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <p className="text-xs text-muted-foreground mb-2">
+                              {explanation.seedTitle
+                                ? `Because you liked ${explanation.seedTitle}`
+                                : "Because this matches your taste"}
+                            </p>
+                            <div className="space-y-1">
+                              {explanation.reasons.slice(0, 3).map((reason, index) => (
+                                <p key={`${reason.label}-${index}`} className="text-xs leading-snug">
+                                  • {reason.label}
+                                  {reason.evidence ? `: ${reason.evidence}` : ""}
+                                </p>
+                              ))}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      ) : null}
                     </div>
                   </div>
-
-                  <h3 className="mt-2 font-medium text-sm line-clamp-1 group-hover/card:text-primary transition-colors">
-                    {getTitle(item)}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {getYear(item)}
-                  </p>
-                </div>
-              ))}
+                );
+              })}
 
               {shouldRenderViewAllCard && (
                 <div

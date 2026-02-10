@@ -165,6 +165,26 @@ export interface MovieKeywordsResponse {
   keywords: MovieKeyword[];
 }
 
+export interface TVKeywordsResponse {
+  id: number;
+  results: MovieKeyword[];
+}
+
+export interface TMDBCreditsResponse {
+  cast: Cast[];
+  crew: CrewMember[];
+}
+
+export interface EnrichedMovieDetails extends MovieDetails {
+  credits?: TMDBCreditsResponse;
+  keywords?: MovieKeywordsResponse;
+}
+
+export interface EnrichedTVShowDetails extends TVShowDetails {
+  credits?: TMDBCreditsResponse;
+  keywords?: TVKeywordsResponse;
+}
+
 export interface Video {
   id: string;
   key: string;
@@ -399,6 +419,14 @@ export async function getMovieKeywords(
   return data.keywords || [];
 }
 
+export async function getMovieRecommendationProfile(
+  movieId: number,
+): Promise<EnrichedMovieDetails> {
+  return fetchTMDB<EnrichedMovieDetails>(`/movie/${movieId}`, {
+    append_to_response: "credits,keywords",
+  });
+}
+
 export async function getMovieReviews(movieId: number, page = 1): Promise<TMDBReview[]> {
   const data = await fetchTMDB<TMDBResponse<TMDBReview>>(`/movie/${movieId}/reviews`, { page });
   return data.results || [];
@@ -452,7 +480,7 @@ export async function getTVShowDetails(tvId: number): Promise<TVShowDetails> {
 }
 
 export async function getTVShowCredits(tvId: number): Promise<{ cast: Cast[] }> {
-  return fetchTMDB<{ cast: Cast[] }>(`/tv/${tvId}/credits`);
+  return fetchTMDB<TMDBCreditsResponse>(`/tv/${tvId}/credits`);
 }
 
 export async function getTVShowVideos(tvId: number): Promise<{ results: Video[] }> {
@@ -465,6 +493,17 @@ export async function getSimilarTVShows(tvId: number): Promise<TMDBResponse<TVSh
 
 export async function getTVShowRecommendations(tvId: number): Promise<TMDBResponse<TVShow>> {
   return fetchTMDB<TMDBResponse<TVShow>>(`/tv/${tvId}/recommendations`);
+}
+
+export async function getTVShowKeywords(tvId: number): Promise<MovieKeyword[]> {
+  const data = await fetchTMDB<TVKeywordsResponse>(`/tv/${tvId}/keywords`);
+  return data.results || [];
+}
+
+export async function getTVRecommendationProfile(tvId: number): Promise<EnrichedTVShowDetails> {
+  return fetchTMDB<EnrichedTVShowDetails>(`/tv/${tvId}`, {
+    append_to_response: "credits,keywords",
+  });
 }
 
 export async function getTVSeasonDetails(tvId: number, seasonNumber: number): Promise<SeasonDetails> {
@@ -549,6 +588,9 @@ export interface DiscoverFilters {
   page?: number;
   with_genres?: string;
   with_original_language?: string;
+  with_people?: string;
+  with_cast?: string;
+  with_crew?: string;
   sort_by?: string;
   with_watch_providers?: string;
   watch_region?: string;
@@ -567,6 +609,9 @@ export async function discoverMovies(filters: DiscoverFilters = {}): Promise<TMD
 
   if (filters.with_genres) params.with_genres = filters.with_genres;
   if (filters.with_original_language) params.with_original_language = filters.with_original_language;
+  if (filters.with_people) params.with_people = filters.with_people;
+  if (filters.with_cast) params.with_cast = filters.with_cast;
+  if (filters.with_crew) params.with_crew = filters.with_crew;
   if (filters.with_watch_providers) params.with_watch_providers = filters.with_watch_providers;
   if (filters.watch_region) params.watch_region = filters.watch_region;
   if (filters.with_networks) params.with_networks = filters.with_networks;
@@ -586,6 +631,9 @@ export async function discoverTVShows(filters: DiscoverFilters = {}): Promise<TM
 
   if (filters.with_genres) params.with_genres = filters.with_genres;
   if (filters.with_original_language) params.with_original_language = filters.with_original_language;
+  if (filters.with_people) params.with_people = filters.with_people;
+  if (filters.with_cast) params.with_cast = filters.with_cast;
+  if (filters.with_crew) params.with_crew = filters.with_crew;
   if (filters.with_watch_providers) params.with_watch_providers = filters.with_watch_providers;
   if (filters.watch_region) params.watch_region = filters.watch_region;
   if (filters.with_networks) params.with_networks = filters.with_networks;

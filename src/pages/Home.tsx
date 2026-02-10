@@ -49,6 +49,7 @@ export default function Home() {
     items: reckonItems,
     isLoading: reckonLoading,
     isPersonalized,
+    explanationById,
   } = useRecommendations();
   const navigate = useNavigate();
   const [heroIndex, setHeroIndex] = useState(0);
@@ -372,6 +373,7 @@ export default function Home() {
                 isLoading={reckonLoading}
                 type="mixed"
                 viewAllHref="/reckon"
+                recommendationExplanations={explanationById}
               />
             </section>
           )}

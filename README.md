@@ -33,6 +33,55 @@ MovieReckon’s recommendation engine uses a hybrid algorithm combining:
 
 This ensures personalized, relevant, and vibrant recommendations similar to modern streaming platforms.
 
+### 🧮 Weighted Content + Smart Ranking + Explainability (v2)
+The production recommendation engine is implemented in `src/lib/recommendation/` and consumed by `src/hooks/useRecommendations.tsx`.
+
+- Entry points:
+  - `getRecommendations(seedItems, candidateItems, userContext?)`
+  - `scoreCandidate(seedItem, candidateItem, userContext?)`
+  - `explainRecommendation(seedItem, candidateItem, scoreBreakdown)`
+- Candidate sources are merged from:
+  - TMDB similar/recommendations per seed
+  - Trending (week) for movie + tv
+  - Discover by top seed genres
+  - Optional discover-by-people (director/creator IDs)
+- The ranked feed now includes per-card explainability via a `Why?` popover on the Reckon page.
+
+#### Tuning Weights
+Base scoring weights live in `src/lib/recommendation/types.ts` (`DEFAULT_RECOMMENDATION_WEIGHTS`):
+
+- `genre`: 0.30
+- `keywords`: 0.25
+- `people`: 0.15
+- `year`: 0.07
+- `runtime`: 0.05
+- `quality`: 0.10
+- `popularity`: 0.08
+- `noveltyBoost`: 0.05 (post-base boost for unseen items)
+
+Notes:
+- Base weights are normalized internally so they remain stable if you tweak values.
+- `quality` uses vote-average plus vote-count confidence to avoid tiny-sample inflation.
+- `popularity` uses log scaling and caps outliers.
+
+#### How Reasons Are Generated
+`explainRecommendation(...)` generates 2–3 concise reasons from the strongest matched signals, prioritized as:
+
+1. Same director / creator
+2. Shared genres
+3. Shared lead cast
+4. Similar themes (keywords/tokens)
+5. Highly rated / similar era / popularity fallback
+
+#### Adding New Signals Later
+To add a signal (for example language affinity, country preference, providers):
+
+1. Extend `ScoreBreakdown` in `src/lib/recommendation/types.ts`.
+2. Add normalized feature extraction in `src/lib/recommendation/normalizers.ts`.
+3. Add weighted score contribution in `src/lib/recommendation/scoring.ts`.
+4. Optionally include new explainability lines in `explainRecommendation(...)`.
+5. Add/adjust tests in `src/test/recommendation-engine.test.ts`.
+
 ---
 
 ## 🎨 UI & Design

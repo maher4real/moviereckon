@@ -56,16 +56,44 @@ const LANGUAGE_MAP: Record<string, string> = {
   pt: "Portuguese",
 };
 
-const ReckonCard = memo(({ item, type }: { item: Movie | TVShow; type: "movie" | "tv" | "mixed" }) => {
-  return <ContentCard item={item} type={type} showActions={true} />;
-});
+const getRecommendationItemType = (item: Movie | TVShow): "movie" | "tv" =>
+  "title" in item ? "movie" : "tv";
+
+const ReckonCard = memo(
+  ({
+    item,
+    type,
+    reasons,
+    seedTitle,
+  }: {
+    item: Movie | TVShow;
+    type: "movie" | "tv" | "mixed";
+    reasons?: Array<{ label: string; evidence?: string }>;
+    seedTitle?: string | null;
+  }) => {
+    return (
+      <ContentCard
+        item={item}
+        type={type}
+        showActions={true}
+        recommendationReasons={reasons}
+        recommendationSeedTitle={seedTitle}
+      />
+    );
+  },
+);
 
 ReckonCard.displayName = "ReckonCard";
 
 export default function Reckon() {
   const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const { items: recommendations, isLoading: reckonLoading, isPersonalized } = useRecommendations();
+  const {
+    items: recommendations,
+    isLoading: reckonLoading,
+    isPersonalized,
+    explanationById,
+  } = useRecommendations();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const [contentTypeFilter, setContentTypeFilter] = useState<ContentTypeFilter>("all");
@@ -329,12 +357,15 @@ export default function Reckon() {
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                 {visibleItems.map((item) => {
-                  const isTV = "first_air_date" in item;
+                  const itemType = getRecommendationItemType(item);
+                  const explanation = explanationById[`${itemType}_${item.id}`];
                   return (
                     <ReckonCard
-                      key={`${item.id}-${isTV ? "tv" : "movie"}`}
+                      key={`${item.id}-${itemType}`}
                       item={item}
                       type="mixed"
+                      reasons={explanation?.reasons}
+                      seedTitle={explanation?.seedTitle}
                     />
                   );
                 })}
