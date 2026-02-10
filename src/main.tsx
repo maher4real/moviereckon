@@ -57,8 +57,9 @@ function renderFatal(message: string, details?: Record<string, unknown>) {
     const App = mod.default;
     createRoot(rootElement).render(<App />);
   } catch (error) {
-    renderFatal("Unexpected error while loading the application bundle.", {
-      error: String(error),
-    });
+    renderFatal(
+      "Unexpected error while loading the application bundle.",
+      import.meta.env.DEV ? { error: String(error) } : undefined,
+    );
   }
 })();

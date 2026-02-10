@@ -6,6 +6,29 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
 
+function normalizeLanguages(value: unknown): string[] | null {
+  if (value === undefined) return null;
+  if (!Array.isArray(value)) return null;
+
+  const normalized = value
+    .filter((item): item is string => typeof item === "string")
+    .map((language) => language.trim().toLowerCase())
+    .filter((language) => /^[a-z]{2,10}(?:-[a-z]{2,10})?$/.test(language));
+
+  return [...new Set(normalized)].slice(0, 10);
+}
+
+function normalizeGenres(value: unknown): number[] | null {
+  if (value === undefined) return null;
+  if (!Array.isArray(value)) return null;
+
+  const normalized = value
+    .map((item) => Number(item))
+    .filter((genreId) => Number.isInteger(genreId) && genreId > 0);
+
+  return [...new Set(normalized)].slice(0, 20);
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Authenticate user
   const user = await getUserFromRequest(req);
@@ -55,11 +78,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // PUT - Update preferences
     if (req.method === "PUT") {
-      const { preferred_languages, preferred_genres } = req.body;
+      const body = req.body || {};
+      const preferredLanguages = normalizeLanguages(body.preferred_languages);
+      const preferredGenres = normalizeGenres(body.preferred_genres);
 
-      const updates: any = { updated_at: new Date().toISOString() };
-      if (preferred_languages !== undefined) updates.preferred_languages = preferred_languages;
-      if (preferred_genres !== undefined) updates.preferred_genres = preferred_genres;
+      if (
+        (body.preferred_languages !== undefined && preferredLanguages === null) ||
+        (body.preferred_genres !== undefined && preferredGenres === null)
+      ) {
+        return res.status(400).json({ error: "Invalid preference payload format" });
+      }
+
+      if (preferredLanguages === null && preferredGenres === null) {
+        return res.status(400).json({ error: "At least one preference field is required" });
+      }
+
+      const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (preferredLanguages !== null) updates.preferred_languages = preferredLanguages;
+      if (preferredGenres !== null) updates.preferred_genres = preferredGenres;
 
       await db.collection("user_preferences").updateOne(
         { user_id: user.id },

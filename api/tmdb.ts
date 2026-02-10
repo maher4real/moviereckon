@@ -4,6 +4,7 @@
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { applyApiCors, applyDefaultSecurityHeaders } from "./lib/cors.js";
+import { consumeRateLimit, getClientIp } from "./lib/rate-limit.js";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 
@@ -44,6 +45,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  // Only accept browser-like requests for this public proxy.
+  if (typeof req.headers.origin !== "string" || req.headers.origin.length === 0) {
+    return res.status(403).json({ error: "Origin header is required" });
+  }
+
+  const contentType = req.headers["content-type"];
+  if (typeof contentType === "string" && !contentType.includes("application/json")) {
+    return res.status(415).json({ error: "Content-Type must be application/json" });
+  }
+
   const tmdbApiKey = process.env.TMDB_API_KEY;
   if (!tmdbApiKey) {
     return res.status(500).json({ error: "TMDB API key is not configured" });
@@ -53,6 +64,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const endpoint =
       typeof req.body?.endpoint === "string" ? req.body.endpoint.trim() : "";
     const params = req.body?.params;
+
+    const clientIp = getClientIp(req);
+    const ipRateLimit = consumeRateLimit(`tmdb:ip:${clientIp}`, 180, 15 * 60 * 1000);
+    const endpointRateLimit = consumeRateLimit(
+      `tmdb:endpoint:${clientIp}:${endpoint || "unknown"}`,
+      50,
+      5 * 60 * 1000,
+    );
+    if (!ipRateLimit.allowed || !endpointRateLimit.allowed) {
+      const retryAfter = Math.max(ipRateLimit.retryAfterSeconds, endpointRateLimit.retryAfterSeconds, 60);
+      res.setHeader("Retry-After", String(retryAfter));
+      return res.status(429).json({ error: "Too many TMDB requests. Please try again later." });
+    }
 
     if (!endpoint) {
       return res.status(400).json({ error: "Endpoint is required" });

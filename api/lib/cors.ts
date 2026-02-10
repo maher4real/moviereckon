@@ -1,21 +1,54 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-const DEFAULT_ALLOWED_ORIGINS = [
+const DEFAULT_ALLOWED_ORIGINS_PROD = [
+  "https://moviereckon.vercel.app",
+];
+
+const DEFAULT_ALLOWED_ORIGINS_DEV = [
   "https://moviereckon.vercel.app",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
 ];
 
+function isLocalhostOrigin(origin: string): boolean {
+  try {
+    const hostname = new URL(origin).hostname;
+    return hostname === "localhost" || hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
+
 function getAllowedOrigins(): Set<string> {
+  const isProduction = process.env.NODE_ENV === "production";
   const raw = process.env.CORS_ORIGIN;
+  const defaults = isProduction ? DEFAULT_ALLOWED_ORIGINS_PROD : DEFAULT_ALLOWED_ORIGINS_DEV;
+
   if (!raw || raw.trim().length === 0) {
-    return new Set(DEFAULT_ALLOWED_ORIGINS);
+    const initial = new Set(defaults);
+    if (process.env.VERCEL_URL) {
+      initial.add(`https://${process.env.VERCEL_URL}`);
+    }
+    return initial;
   }
 
-  const list = raw
+  let list = raw
     .split(",")
     .map((origin) => origin.trim())
     .filter((origin) => origin.length > 0);
+
+  if (isProduction) {
+    // Harden production CORS in case local origins were copied from development env files.
+    list = list.filter((origin) => !isLocalhostOrigin(origin));
+  }
+
+  if (process.env.VERCEL_URL) {
+    list.push(`https://${process.env.VERCEL_URL}`);
+  }
+
+  if (list.length === 0) {
+    list = [...defaults];
+  }
 
   return new Set(list);
 }

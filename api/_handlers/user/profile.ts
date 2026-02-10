@@ -6,6 +6,32 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
 
+const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
+
+function normalizeUsername(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const username = value.trim();
+  if (!USERNAME_REGEX.test(username)) return null;
+  return username;
+}
+
+function normalizeAvatarUrl(value: unknown): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  if (typeof value !== "string") return undefined;
+
+  const normalized = value.trim();
+  if (!normalized || normalized.length > 500) return undefined;
+
+  try {
+    const parsed = new URL(normalized);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return undefined;
+    return normalized;
+  } catch {
+    return undefined;
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Authenticate user
   const userPayload = await getUserFromRequest(req);
@@ -39,14 +65,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // PUT - Update profile
     if (req.method === "PUT") {
-      const { username, avatar_url } = req.body;
+      const body = req.body || {};
+      const usernameProvided = body.username !== undefined;
+      const avatarProvided = body.avatar_url !== undefined;
+      const username = usernameProvided ? normalizeUsername(body.username) : undefined;
+      const avatarUrl = normalizeAvatarUrl(body.avatar_url);
 
-      const updates: any = { updated_at: new Date().toISOString() };
-      if (username !== undefined) updates.username = username;
-      if (avatar_url !== undefined) updates.avatar_url = avatar_url;
+      if (usernameProvided && username === null) {
+        return res.status(400).json({
+          error: "Username must be 3-24 chars and only include letters, numbers, and underscores",
+        });
+      }
+
+      if (avatarProvided && avatarUrl === undefined) {
+        return res.status(400).json({ error: "avatar_url must be a valid http(s) URL or null" });
+      }
+
+      if (!usernameProvided && !avatarProvided) {
+        return res.status(400).json({ error: "No profile fields provided" });
+      }
+
+      const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (usernameProvided) updates.username = username;
+      if (avatarProvided) updates.avatar_url = avatarUrl;
 
       // Check if username is taken (if changing)
-      if (username) {
+      if (usernameProvided && username) {
         const existing = await db.collection("users").findOne({
           username,
           _id: { $ne: new ObjectId(userPayload.id) },

@@ -6,6 +6,34 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
 
+type ContentType = "movie" | "tv";
+
+function normalizeContentType(value: unknown): ContentType | null {
+  if (value === "movie" || value === "tv") return value;
+  return null;
+}
+
+function normalizeContentId(value: unknown): number | null {
+  const numeric = Number(value);
+  if (!Number.isInteger(numeric) || numeric <= 0) return null;
+  return numeric;
+}
+
+function normalizeRequiredString(value: unknown, maxLength: number): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (!normalized || normalized.length > maxLength) return null;
+  return normalized;
+}
+
+function normalizeOptionalString(value: unknown, maxLength: number): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (!normalized || normalized.length > maxLength) return null;
+  return normalized;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Authenticate user
   const user = await getUserFromRequest(req);
@@ -39,17 +67,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // POST - Toggle like (add if not exists, remove if exists)
     if (req.method === "POST") {
-      const { content_id, content_type, title, poster_path } = req.body;
+      const body = req.body || {};
+      const contentId = normalizeContentId(body.content_id);
+      const contentType = normalizeContentType(body.content_type);
+      const title = normalizeRequiredString(body.title, 220);
+      const posterPath = normalizeOptionalString(body.poster_path, 300);
 
-      if (!content_id || !content_type || !title) {
+      if (!contentId || !contentType || !title) {
         return res.status(400).json({ error: "content_id, content_type, and title are required" });
       }
 
       // Check if already liked
       const existing = await db.collection("liked_items").findOne({
         user_id: user.id,
-        content_id,
-        content_type,
+        content_id: contentId,
+        content_type: contentType,
       });
 
       if (existing) {
@@ -62,10 +94,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const now = new Date().toISOString();
       const result = await db.collection("liked_items").insertOne({
         user_id: user.id,
-        content_id,
-        content_type,
+        content_id: contentId,
+        content_type: contentType,
         title,
-        poster_path: poster_path || null,
+        poster_path: posterPath,
         liked_at: now,
       });
 
@@ -75,10 +107,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         data: {
           id: result.insertedId.toString(),
           user_id: user.id,
-          content_id,
-          content_type,
+          content_id: contentId,
+          content_type: contentType,
           title,
-          poster_path: poster_path || null,
+          poster_path: posterPath,
           liked_at: now,
         },
       });
@@ -86,16 +118,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // DELETE - Remove like
     if (req.method === "DELETE") {
-      const { content_id, content_type } = req.body;
+      const body = req.body || {};
+      const contentId = normalizeContentId(body.content_id);
+      const contentType = normalizeContentType(body.content_type);
 
-      if (!content_id || !content_type) {
+      if (!contentId || !contentType) {
         return res.status(400).json({ error: "content_id and content_type are required" });
       }
 
       await db.collection("liked_items").deleteOne({
         user_id: user.id,
-        content_id,
-        content_type,
+        content_id: contentId,
+        content_type: contentType,
       });
 
       return res.status(200).json({ message: "Unliked" });

@@ -22,9 +22,14 @@ function isProductionEnv() {
 }
 
 function shouldUseSecureCookies() {
+  // In production, force Secure cookies regardless of env overrides.
+  // Legacy fallback (disabled for security):
+  // if (process.env.SESSION_COOKIE_SECURE === "false") return false;
+  if (isProductionEnv()) return true;
+
   if (process.env.SESSION_COOKIE_SECURE === "true") return true;
   if (process.env.SESSION_COOKIE_SECURE === "false") return false;
-  return isProductionEnv();
+  return false;
 }
 
 function getSameSiteValue(): SameSite {
@@ -96,7 +101,11 @@ export function getCookieValue(cookieHeader: string | undefined, name: string): 
 
 export function setAuthCookies(res: VercelResponse, accessToken: string, refreshToken: string) {
   const secure = shouldUseSecureCookies();
-  const sameSite = getSameSiteValue();
+  let sameSite = getSameSiteValue();
+  // SameSite=None requires Secure in modern browsers.
+  if (!secure && sameSite === "none") {
+    sameSite = "lax";
+  }
 
   appendSetCookie(
     res,
@@ -123,7 +132,10 @@ export function setAuthCookies(res: VercelResponse, accessToken: string, refresh
 
 export function clearAuthCookies(res: VercelResponse) {
   const secure = shouldUseSecureCookies();
-  const sameSite = getSameSiteValue();
+  let sameSite = getSameSiteValue();
+  if (!secure && sameSite === "none") {
+    sameSite = "lax";
+  }
 
   const expired = new Date(0);
 
