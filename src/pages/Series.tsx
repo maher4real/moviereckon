@@ -50,6 +50,8 @@ const sortOptions: { value: SortOption; label: string }[] = [
   { value: "first_air_date.desc", label: "Newest" },
   { value: "first_air_date.asc", label: "Earliest Release" },
 ];
+const currentYear = new Date().getFullYear();
+const yearOptions = Array.from({ length: currentYear - 1949 }, (_, i) => currentYear - i);
 
 const OTT_OPTIONS = [
   { value: "all", label: "All OTT" },
@@ -135,6 +137,7 @@ export default function Series() {
     (searchParams.get("category") as SeriesCategory) || "all"
   );
   const [selectedGenre, setSelectedGenre] = useState<string>(searchParams.get("genre") || "");
+  const [selectedYear, setSelectedYear] = useState<string>(searchParams.get("year") || "");
   const [sortBy, setSortBy] = useState<SortOption>(
     (searchParams.get("sort") as SortOption) || "popularity.desc"
   );
@@ -174,14 +177,16 @@ export default function Series() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery<SeriesPage>({
-    queryKey: ["series-infinite", category, selectedGenre, sortBy, ottFilter, selectedLanguage],
+    queryKey: ["series-infinite", category, selectedGenre, selectedYear, sortBy, ottFilter, selectedLanguage],
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
       const page = Number(pageParam) || 1;
-      const needsFilteredDiscover = !!normalizedGenre || !!resolvedLanguage || ottFilter !== "all";
+      const needsFilteredDiscover = !!normalizedGenre || !!resolvedLanguage || !!selectedYear || ottFilter !== "all";
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       const tomorrowStr = formatLocalDate(tomorrow);
+      const yearStart = selectedYear ? `${selectedYear}-01-01` : undefined;
+      const yearEnd = selectedYear ? `${selectedYear}-12-31` : undefined;
 
       if (category === "popular" && !needsFilteredDiscover) {
         return getPopularTVShows(page);
@@ -197,7 +202,8 @@ export default function Series() {
           sort_by: sortBy === "popularity.desc" ? "first_air_date.asc" : sortBy,
           with_genres: normalizedGenre,
           with_original_language: resolvedLanguage,
-          "first_air_date.gte": tomorrowStr,
+          "first_air_date.gte": yearStart ? (yearStart > tomorrowStr ? yearStart : tomorrowStr) : tomorrowStr,
+          "first_air_date.lte": yearEnd,
         };
 
         if (ottFilter !== "all") {
@@ -217,6 +223,8 @@ export default function Series() {
           : sortBy,
         with_genres: normalizedGenre,
         with_original_language: resolvedLanguage,
+        "first_air_date.gte": yearStart,
+        "first_air_date.lte": yearEnd,
       };
 
       if (ottFilter !== "all") {
@@ -251,6 +259,7 @@ export default function Series() {
         if (category === "anime" && !animeLike) return;
         if (category !== "anime" && animeLike) return;
         if (category === "upcoming" && item.first_air_date < tomorrowStr) return;
+        if (selectedYear && !item.first_air_date?.startsWith(`${selectedYear}-`)) return;
         if (selectedLanguage !== "all" && category === "all" && item.original_language !== selectedLanguage) {
           return;
         }
@@ -261,17 +270,18 @@ export default function Series() {
     });
 
     return merged;
-  }, [contentData, category, selectedLanguage]);
+  }, [contentData, category, selectedLanguage, selectedYear]);
 
   useEffect(() => {
     const params = new URLSearchParams();
     if (category !== "all") params.set("category", category);
     if (selectedGenre) params.set("genre", selectedGenre);
+    if (selectedYear) params.set("year", selectedYear);
     if (sortBy !== "popularity.desc") params.set("sort", sortBy);
     if (ottFilter !== "all") params.set("platform", ottFilter);
     if (selectedLanguage !== "all") params.set("lang", selectedLanguage);
     setSearchParams(params, { replace: true });
-  }, [category, selectedGenre, sortBy, ottFilter, selectedLanguage, setSearchParams]);
+  }, [category, selectedGenre, selectedYear, sortBy, ottFilter, selectedLanguage, setSearchParams]);
 
   useEffect(() => {
     const node = loadMoreRef.current;
@@ -385,6 +395,21 @@ export default function Series() {
               <SelectContent className="bg-popover border-border z-50">
                 {OTT_OPTIONS.map((opt) => (
                   <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={selectedYear}
+              onValueChange={(v) => setSelectedYear(v === "all" ? "" : v)}
+            >
+              <SelectTrigger className="w-[150px] bg-card">
+                <SelectValue placeholder="All Years" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover border-border z-50 max-h-[300px]">
+                <SelectItem value="all">All Years</SelectItem>
+                {yearOptions.map((year) => (
+                  <SelectItem key={year} value={String(year)}>{year}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

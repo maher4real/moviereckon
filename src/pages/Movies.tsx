@@ -40,6 +40,8 @@ const sortOptions: { value: SortOption; label: string }[] = [
   { value: "release_date.desc", label: "Newest" },
   { value: "revenue.desc", label: "Highest Grossing" },
 ];
+const currentYear = new Date().getFullYear();
+const yearOptions = Array.from({ length: currentYear - 1949 }, (_, i) => currentYear - i);
 
 const BOLLYWOOD_LANGUAGE_OPTIONS = [
   { value: "all", label: "All Languages" },
@@ -107,6 +109,7 @@ export default function Movies() {
     (searchParams.get("category") as MovieCategory) || "all"
   );
   const [selectedGenre, setSelectedGenre] = useState<string>(searchParams.get("genre") || "");
+  const [selectedYear, setSelectedYear] = useState<string>(searchParams.get("year") || "");
   const [bollywoodLanguage, setBollywoodLanguage] = useState<string>(searchParams.get("lang") || "hi");
   const [sortBy, setSortBy] = useState<SortOption>(
     (searchParams.get("sort") as SortOption) || "popularity.desc"
@@ -133,7 +136,7 @@ export default function Movies() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery<MoviePage>({
-    queryKey: ["movies-infinite", category, selectedGenre, effectiveBollywoodLanguage, sortBy],
+    queryKey: ["movies-infinite", category, selectedGenre, selectedYear, effectiveBollywoodLanguage, sortBy],
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
       const page = Number(pageParam) || 1;
@@ -153,6 +156,8 @@ export default function Movies() {
               with_genres: selectedGenre || undefined,
               with_original_language: language,
               region: "IN",
+              "primary_release_date.gte": selectedYear ? `${selectedYear}-01-01` : undefined,
+              "primary_release_date.lte": selectedYear ? `${selectedYear}-12-31` : undefined,
             }),
           ),
         );
@@ -195,13 +200,14 @@ export default function Movies() {
       }
 
       // Fast path for common Bollywood/Hollywood tabs to reduce perceived lag.
-      if (category === "hollywood" && !selectedGenre && sortBy === "popularity.desc") {
+      if (category === "hollywood" && !selectedGenre && !selectedYear && sortBy === "popularity.desc") {
         return getHollywoodMovies(page);
       }
       if (
         category === "bollywood" &&
         bollywoodLanguage === "hi" &&
         !selectedGenre &&
+        !selectedYear &&
         sortBy === "popularity.desc"
       ) {
         return getBollywoodMovies(page);
@@ -211,6 +217,8 @@ export default function Movies() {
         page,
         sort_by: sortBy,
         with_genres: selectedGenre || undefined,
+        "primary_release_date.gte": selectedYear ? `${selectedYear}-01-01` : undefined,
+        "primary_release_date.lte": selectedYear ? `${selectedYear}-12-31` : undefined,
       };
 
       if (category === "hollywood") {
@@ -274,6 +282,7 @@ export default function Movies() {
         if (dedupe.has(movie.id)) return;
 
         if (category === "now_playing" && movie.release_date > today) return;
+        if (selectedYear && !movie.release_date?.startsWith(`${selectedYear}-`)) return;
         if (
           category === "bollywood" &&
           bollywoodLanguage === "all" &&
@@ -296,16 +305,17 @@ export default function Movies() {
     });
 
     return merged;
-  }, [contentData, category, bollywoodLanguage]);
+  }, [contentData, category, selectedYear, bollywoodLanguage]);
 
   useEffect(() => {
     const params = new URLSearchParams();
     if (category !== "all") params.set("category", category);
     if (selectedGenre) params.set("genre", selectedGenre);
+    if (selectedYear) params.set("year", selectedYear);
     if (category === "bollywood" && bollywoodLanguage !== "hi") params.set("lang", bollywoodLanguage);
     if (sortBy !== "popularity.desc") params.set("sort", sortBy);
     setSearchParams(params, { replace: true });
-  }, [category, selectedGenre, bollywoodLanguage, sortBy, setSearchParams]);
+  }, [category, selectedGenre, selectedYear, bollywoodLanguage, sortBy, setSearchParams]);
 
   useEffect(() => {
     const node = loadMoreRef.current;
@@ -395,6 +405,21 @@ export default function Movies() {
               <SelectContent className="bg-popover border-border z-50">
                 {sortOptions.map((opt) => (
                   <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={selectedYear}
+              onValueChange={(v) => setSelectedYear(v === "all" ? "" : v)}
+            >
+              <SelectTrigger className="w-[150px] bg-card">
+                <SelectValue placeholder="All Years" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover border-border z-50 max-h-[300px]">
+                <SelectItem value="all">All Years</SelectItem>
+                {yearOptions.map((year) => (
+                  <SelectItem key={year} value={String(year)}>{year}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
