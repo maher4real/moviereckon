@@ -1,7 +1,8 @@
 // TMDB API Configuration and Service Layer
 // All API calls go through secure edge function
 
-import { supabase } from "@/lib/backendClient";
+// Legacy fallback (disabled to avoid client-side provider key exposure):
+// import { supabase } from "@/lib/backendClient";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 const FALLBACK_POSTER = "/fallbacks/poster.svg";
@@ -217,25 +218,52 @@ interface TMDBResponse<T> {
   total_results: number;
 }
 
+const getApiBase = () => {
+  const configuredUrl = import.meta.env.VITE_MONGODB_API_URL;
+  if (configuredUrl && configuredUrl.length > 0) {
+    return configuredUrl;
+  }
+  return "";
+};
+
+const API_BASE = getApiBase();
+
 // Helper function for API calls via edge function
 async function fetchTMDB<T>(
   endpoint: string,
   params: Record<string, string | number | undefined> = {},
 ): Promise<T> {
-  const { data, error } = await supabase.functions.invoke("tmdb-proxy", {
-    body: { endpoint, params },
+  const response = await fetch(`${API_BASE}/api/tmdb`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ endpoint, params }),
   });
 
-  if (error) {
-    console.error("TMDB API Error:", error);
-    throw new Error(`TMDB API Error: ${error.message}`);
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const message =
+      data && typeof data === "object" && "error" in data
+        ? String((data as { error?: unknown }).error)
+        : `TMDB API Error: ${response.status}`;
+    throw new Error(message);
   }
 
-  if (data.error) {
-    throw new Error(data.error);
-  }
+  // Legacy fallback (disabled to avoid client-side provider key exposure):
+  // const { data, error } = await supabase.functions.invoke("tmdb-proxy", {
+  //   body: { endpoint, params },
+  // });
+  //
+  // if (error) {
+  //   console.error("TMDB API Error:", error);
+  //   throw new Error(`TMDB API Error: ${error.message}`);
+  // }
+  //
+  // if (data.error) {
+  //   throw new Error(data.error);
+  // }
 
-  return data;
+  return data as T;
 }
 
 // Image URL helpers
