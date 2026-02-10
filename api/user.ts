@@ -38,7 +38,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const url = new URL(req.url || "", `http://${req.headers.host}`);
   const pathParts = url.pathname.split("/").filter(Boolean);
   // pathParts = ['api', 'user', 'watch-history'] etc.
-  const route = pathParts[2] || "";
+  const routeFromQuery = url.searchParams.get("route") || "";
+  const routeFromPath = pathParts[2] || "";
+  const route = routeFromQuery || routeFromPath;
 
   try {
     switch (route) {
