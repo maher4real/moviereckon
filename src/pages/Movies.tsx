@@ -49,7 +49,8 @@ const BOLLYWOOD_LANGUAGE_OPTIONS = [
   { value: "te", label: "Telugu" },
   { value: "kn", label: "Kannada" },
 ];
-const BOLLYWOOD_LANGUAGE_CODES = new Set(["hi", "gu", "ta", "te", "kn"]);
+const BOLLYWOOD_LANGUAGE_CODES = ["hi", "gu", "ta", "te", "kn"] as const;
+const BOLLYWOOD_LANGUAGE_SET = new Set(BOLLYWOOD_LANGUAGE_CODES);
 
 const isAnimeLikeMovie = (movie: Movie) =>
   movie.original_language === "ja" && movie.genre_ids?.includes(16);
@@ -143,6 +144,56 @@ export default function Movies() {
         return { results, total_pages: 1, page: 1, total_results: results.length };
       }
 
+      if (category === "bollywood" && bollywoodLanguage === "all") {
+        const languageResponses = await Promise.allSettled(
+          BOLLYWOOD_LANGUAGE_CODES.map((language) =>
+            discoverMovies({
+              page,
+              sort_by: sortBy,
+              with_genres: selectedGenre || undefined,
+              with_original_language: language,
+              region: "IN",
+            }),
+          ),
+        );
+
+        const successfulPages = languageResponses.flatMap((response) =>
+          response.status === "fulfilled" ? [response.value] : [],
+        );
+
+        if (successfulPages.length === 0) {
+          return { page, results: [], total_pages: 1, total_results: 0 };
+        }
+
+        const deduped = new Map<number, Movie>();
+        successfulPages.forEach((data) => {
+          (data.results || []).forEach((movie) => {
+            if (!deduped.has(movie.id)) {
+              deduped.set(movie.id, movie);
+            }
+          });
+        });
+
+        const sortMovies = (a: Movie, b: Movie) => {
+          if (sortBy === "vote_average.desc") return b.vote_average - a.vote_average;
+          if (sortBy === "release_date.desc") {
+            return (b.release_date || "").localeCompare(a.release_date || "");
+          }
+          // `revenue.desc` is not present on discover payloads, fallback to popularity.
+          return b.popularity - a.popularity;
+        };
+
+        return {
+          page,
+          results: Array.from(deduped.values()).sort(sortMovies),
+          total_pages: Math.max(...successfulPages.map((data) => data.total_pages || 1)),
+          total_results: successfulPages.reduce(
+            (total, data) => total + (data.total_results || 0),
+            0,
+          ),
+        };
+      }
+
       // Fast path for common Bollywood/Hollywood tabs to reduce perceived lag.
       if (category === "hollywood" && !selectedGenre && sortBy === "popularity.desc") {
         return getHollywoodMovies(page);
@@ -226,7 +277,7 @@ export default function Movies() {
         if (
           category === "bollywood" &&
           bollywoodLanguage === "all" &&
-          !BOLLYWOOD_LANGUAGE_CODES.has(movie.original_language)
+          !BOLLYWOOD_LANGUAGE_SET.has(movie.original_language)
         ) {
           return;
         }
