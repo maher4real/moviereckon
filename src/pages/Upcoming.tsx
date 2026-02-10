@@ -8,8 +8,6 @@ import {
   discoverTVShows,
   getMovieGenres,
   getTVGenres,
-  getUpcomingMovies,
-  getUpcomingTVShows,
   Movie,
   TVShow,
   Genre,
@@ -90,6 +88,10 @@ const isTVShow = (item: Movie | TVShow): item is TVShow => "first_air_date" in i
 const getReleaseDate = (item: Movie | TVShow) =>
   isTVShow(item) ? item.first_air_date : item.release_date;
 
+const getMonthStart = (date: Date) => new Date(date.getFullYear(), date.getMonth(), 1);
+
+const getMonthEnd = (date: Date) => new Date(date.getFullYear(), date.getMonth() + 1, 0);
+
 const parseDateKey = (value: string): Date | null => {
   const [year, month, day] = value.split("-").map(Number);
   if (!year || !month || !day) return null;
@@ -148,6 +150,7 @@ export default function Upcoming() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const calendarLoadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const [section, setSection] = useState<UpcomingSection>(
     (searchParams.get("section") as UpcomingSection) || "all",
@@ -164,6 +167,7 @@ export default function Upcoming() {
   const [seriesOtt, setSeriesOtt] = useState<string>(searchParams.get("ott") || "all");
   const [seriesLanguage, setSeriesLanguage] = useState<string>(searchParams.get("lang") || "all");
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(undefined);
+  const [calendarMonth, setCalendarMonth] = useState<Date>(() => getMonthStart(new Date()));
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -244,13 +248,21 @@ export default function Upcoming() {
       }
 
       const [upcomingMovies, upcomingSeries] = await Promise.all([
-        getUpcomingMovies(page).catch(() => ({
+        discoverMovies({
+          page,
+          sort_by: "primary_release_date.asc",
+          "primary_release_date.gte": tomorrowStr,
+        }).catch(() => ({
           page,
           results: [] as Movie[],
           total_pages: 1,
           total_results: 0,
         })),
-        getUpcomingTVShows(page, tomorrowStr).catch(() => ({
+        discoverTVShows({
+          page,
+          sort_by: "first_air_date.asc",
+          "first_air_date.gte": tomorrowStr,
+        }).catch(() => ({
           page,
           results: [] as TVShow[],
           total_pages: 1,
@@ -324,9 +336,13 @@ export default function Upcoming() {
       });
     });
 
-    return merged.sort((a, b) =>
-      (getReleaseDate(a) || "9999-12-31").localeCompare(getReleaseDate(b) || "9999-12-31"),
-    );
+    return merged.sort((a, b) => {
+      const dateComparison = (getReleaseDate(a) || "9999-12-31").localeCompare(
+        getReleaseDate(b) || "9999-12-31",
+      );
+      if (dateComparison !== 0) return dateComparison;
+      return (b.popularity || 0) - (a.popularity || 0);
+    });
   }, [
     upcomingData,
     section,
@@ -380,6 +396,24 @@ export default function Upcoming() {
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage, filteredUpcoming.length, viewMode]);
 
+  useEffect(() => {
+    if (viewMode !== "calendar") return;
+    const node = calendarLoadMoreRef.current;
+    if (!node || !hasNextPage) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { rootMargin: "500px 0px" },
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage, filteredUpcoming.length, viewMode]);
+
   const releaseDateKeys = useMemo(() => {
     const keys = new Set<string>();
     filteredUpcoming.forEach((item) => {
@@ -390,6 +424,22 @@ export default function Upcoming() {
   }, [filteredUpcoming]);
 
   const releaseDateKeySet = useMemo(() => new Set(releaseDateKeys), [releaseDateKeys]);
+
+  const releasesByDate = useMemo(() => {
+    const map = new Map<string, (Movie | TVShow)[]>();
+    filteredUpcoming.forEach((item) => {
+      const dateKey = getReleaseDate(item);
+      if (!dateKey) return;
+
+      const existing = map.get(dateKey);
+      if (existing) {
+        existing.push(item);
+      } else {
+        map.set(dateKey, [item]);
+      }
+    });
+    return map;
+  }, [filteredUpcoming]);
 
   const releaseCalendarDates = useMemo(
     () =>
@@ -413,14 +463,57 @@ export default function Upcoming() {
     });
   }, [releaseDateKeys, releaseDateKeySet]);
 
+  useEffect(() => {
+    if (!selectedCalendarDate) return;
+    setCalendarMonth(getMonthStart(selectedCalendarDate));
+  }, [selectedCalendarDate]);
+
   const selectedCalendarDateKey = selectedCalendarDate
     ? formatLocalDate(selectedCalendarDate)
     : "";
 
   const selectedCalendarItems = useMemo(() => {
     if (!selectedCalendarDateKey) return [];
-    return filteredUpcoming.filter((item) => getReleaseDate(item) === selectedCalendarDateKey);
-  }, [filteredUpcoming, selectedCalendarDateKey]);
+    return releasesByDate.get(selectedCalendarDateKey) || [];
+  }, [releasesByDate, selectedCalendarDateKey]);
+
+  const selectedCalendarMonthEndKey = formatLocalDate(getMonthEnd(calendarMonth));
+  const maxLoadedDateKey = releaseDateKeys.length ? releaseDateKeys[releaseDateKeys.length - 1] : "";
+
+  useEffect(() => {
+    if (viewMode !== "calendar") return;
+    if (!hasNextPage || isLoading || isFetchingNextPage) return;
+
+    if (!maxLoadedDateKey || maxLoadedDateKey < selectedCalendarMonthEndKey) {
+      fetchNextPage();
+    }
+  }, [
+    viewMode,
+    hasNextPage,
+    isLoading,
+    isFetchingNextPage,
+    maxLoadedDateKey,
+    selectedCalendarMonthEndKey,
+    fetchNextPage,
+  ]);
+
+  useEffect(() => {
+    if (viewMode !== "calendar") return;
+    if (!selectedCalendarDateKey || !maxLoadedDateKey) return;
+    if (!hasNextPage || isLoading || isFetchingNextPage) return;
+
+    if (selectedCalendarDateKey > maxLoadedDateKey) {
+      fetchNextPage();
+    }
+  }, [
+    viewMode,
+    selectedCalendarDateKey,
+    maxLoadedDateKey,
+    hasNextPage,
+    isLoading,
+    isFetchingNextPage,
+    fetchNextPage,
+  ]);
 
   const selectedCalendarDateLabel = selectedCalendarDate
     ? selectedCalendarDate.toLocaleDateString("en-US", {
@@ -620,6 +713,8 @@ export default function Upcoming() {
                   <Calendar
                     mode="single"
                     selected={selectedCalendarDate}
+                    month={calendarMonth}
+                    onMonthChange={setCalendarMonth}
                     onSelect={(date) => {
                       if (date) setSelectedCalendarDate(date);
                     }}
@@ -647,6 +742,11 @@ export default function Upcoming() {
                       />
                     ))}
                   </div>
+                ) : isFetchingNextPage ? (
+                  <div className="text-center py-12 border rounded-lg bg-card/40">
+                    <div className="mx-auto w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    <p className="text-sm text-muted-foreground mt-3">Loading more releases...</p>
+                  </div>
                 ) : (
                   <div className="text-center py-12 border rounded-lg bg-card/40">
                     <p className="text-muted-foreground">
@@ -666,6 +766,8 @@ export default function Upcoming() {
                     </Button>
                   </div>
                 )}
+
+                <div ref={calendarLoadMoreRef} className="h-10 w-full" />
               </div>
             </div>
           ) : (
