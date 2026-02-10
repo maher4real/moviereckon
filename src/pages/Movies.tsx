@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo, memo, useRef } from "react";
 import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import {
   discoverMovies,
   getMovieGenres,
+  getBollywoodMovies,
+  getHollywoodMovies,
   getNowPlayingMovies,
   getTrendingMovies,
   Movie,
@@ -93,6 +95,7 @@ PosterCard.displayName = "PosterCard";
 
 export default function Movies() {
   const { user, isLoading: authLoading } = useAuth();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -102,10 +105,12 @@ export default function Movies() {
     (searchParams.get("category") as MovieCategory) || "all"
   );
   const [selectedGenre, setSelectedGenre] = useState<string>(searchParams.get("genre") || "");
-  const [bollywoodLanguage, setBollywoodLanguage] = useState<string>(searchParams.get("lang") || "all");
+  const [bollywoodLanguage, setBollywoodLanguage] = useState<string>(searchParams.get("lang") || "hi");
   const [sortBy, setSortBy] = useState<SortOption>(
     (searchParams.get("sort") as SortOption) || "popularity.desc"
   );
+
+  const effectiveBollywoodLanguage = category === "bollywood" ? bollywoodLanguage : "all";
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -126,7 +131,7 @@ export default function Movies() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery<MoviePage>({
-    queryKey: ["movies-infinite", category, selectedGenre, bollywoodLanguage, sortBy],
+    queryKey: ["movies-infinite", category, selectedGenre, effectiveBollywoodLanguage, sortBy],
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
       const page = Number(pageParam) || 1;
@@ -137,6 +142,19 @@ export default function Movies() {
         return { results, total_pages: 1, page: 1, total_results: results.length };
       }
 
+      // Fast path for common Bollywood/Hollywood tabs to reduce perceived lag.
+      if (category === "hollywood" && !selectedGenre && sortBy === "popularity.desc") {
+        return getHollywoodMovies(page);
+      }
+      if (
+        category === "bollywood" &&
+        bollywoodLanguage === "hi" &&
+        !selectedGenre &&
+        sortBy === "popularity.desc"
+      ) {
+        return getBollywoodMovies(page);
+      }
+
       const filters: DiscoverFilters = {
         page,
         sort_by: sortBy,
@@ -145,10 +163,14 @@ export default function Movies() {
 
       if (category === "hollywood") {
         filters.with_original_language = "en";
+        filters.region = "US";
       }
 
-      if (category === "bollywood" && bollywoodLanguage !== "all") {
-        filters.with_original_language = bollywoodLanguage;
+      if (category === "bollywood") {
+        filters.region = "IN";
+        if (bollywoodLanguage !== "all") {
+          filters.with_original_language = bollywoodLanguage;
+        }
       }
 
       return discoverMovies(filters);
@@ -160,6 +182,32 @@ export default function Movies() {
     staleTime: 1000 * 60 * 5,
     enabled: !authLoading && !!user,
   });
+
+  useEffect(() => {
+    if (authLoading || !user) return;
+
+    void queryClient.prefetchInfiniteQuery({
+      queryKey: ["movies-infinite", "hollywood", "", "all", "popularity.desc"],
+      initialPageParam: 1,
+      queryFn: async ({ pageParam }) => getHollywoodMovies(Number(pageParam) || 1),
+      getNextPageParam: (lastPage) => {
+        if (!lastPage?.page || !lastPage?.total_pages) return undefined;
+        return lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined;
+      },
+      staleTime: 1000 * 60 * 10,
+    });
+
+    void queryClient.prefetchInfiniteQuery({
+      queryKey: ["movies-infinite", "bollywood", "", "hi", "popularity.desc"],
+      initialPageParam: 1,
+      queryFn: async ({ pageParam }) => getBollywoodMovies(Number(pageParam) || 1),
+      getNextPageParam: (lastPage) => {
+        if (!lastPage?.page || !lastPage?.total_pages) return undefined;
+        return lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined;
+      },
+      staleTime: 1000 * 60 * 10,
+    });
+  }, [authLoading, user, queryClient]);
 
   const allMovies = useMemo(() => {
     if (!contentData?.pages) return [];
@@ -202,7 +250,7 @@ export default function Movies() {
     const params = new URLSearchParams();
     if (category !== "all") params.set("category", category);
     if (selectedGenre) params.set("genre", selectedGenre);
-    if (category === "bollywood" && bollywoodLanguage !== "all") params.set("lang", bollywoodLanguage);
+    if (category === "bollywood" && bollywoodLanguage !== "hi") params.set("lang", bollywoodLanguage);
     if (sortBy !== "popularity.desc") params.set("sort", sortBy);
     setSearchParams(params, { replace: true });
   }, [category, selectedGenre, bollywoodLanguage, sortBy, setSearchParams]);

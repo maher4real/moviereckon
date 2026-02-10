@@ -603,6 +603,7 @@ export interface DiscoverFilters {
   page?: number;
   with_genres?: string;
   with_original_language?: string;
+  region?: string;
   with_people?: string;
   with_cast?: string;
   with_crew?: string;
@@ -626,6 +627,7 @@ export async function discoverMovies(filters: DiscoverFilters = {}): Promise<TMD
 
   if (filters.with_genres) params.with_genres = filters.with_genres;
   if (filters.with_original_language) params.with_original_language = filters.with_original_language;
+  if (filters.region) params.region = filters.region;
   if (filters.with_people) params.with_people = filters.with_people;
   if (filters.with_cast) params.with_cast = filters.with_cast;
   if (filters.with_crew) params.with_crew = filters.with_crew;
