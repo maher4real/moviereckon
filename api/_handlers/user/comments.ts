@@ -4,7 +4,7 @@
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
-import { extractTokenFromHeader, verifyAccessToken } from "../../lib/auth.js";
+import { getUserFromRequest } from "../../lib/auth.js";
 
 function getQueryParam(req: VercelRequest, key: string): string | undefined {
   const value = req.query?.[key];
@@ -13,12 +13,7 @@ function getQueryParam(req: VercelRequest, key: string): string | undefined {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const token = extractTokenFromHeader(req.headers.authorization as string | null);
-  if (!token) {
-    return res.status(401).json({ error: "Not authenticated" });
-  }
-
-  const user = verifyAccessToken(token);
+  const user = await getUserFromRequest(req);
   if (!user) {
     return res.status(401).json({ error: "Invalid or expired token" });
   }

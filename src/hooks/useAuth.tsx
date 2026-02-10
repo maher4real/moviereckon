@@ -36,14 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Initialize auth from stored tokens
   const initAuth = useCallback(async () => {
     try {
-      // Check for existing token
-      const token = mongoClient.getAccessToken();
-      if (!token) {
-        setIsLoading(false);
-        return;
-      }
-
-      // Try to get current user
+      // Try to get current user from cookie-based session first
       const currentUser = await mongoClient.getCurrentUser();
       if (currentUser) {
         setUser(currentUser);
@@ -56,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           updated_at: currentUser.updated_at,
         });
       } else {
-        // Token invalid, try refresh
+        // Access cookie may be expired; try refresh cookie flow.
         const refreshed = await mongoClient.refreshAccessToken();
         if (refreshed) {
           const refreshedUser = await mongoClient.getCurrentUser();

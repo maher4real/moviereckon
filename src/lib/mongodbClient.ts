@@ -3,10 +3,11 @@
  * Uses MongoDB backend exclusively - no fallback to other services
  */
 
-// Token storage keys
-const ACCESS_TOKEN_KEY = "moviereckon_access_token";
-const REFRESH_TOKEN_KEY = "moviereckon_refresh_token";
+// User cache key (non-sensitive profile data only).
 const USER_KEY = "moviereckon_user";
+// Legacy token storage keys (disabled for security):
+// const ACCESS_TOKEN_KEY = "moviereckon_access_token";
+// const REFRESH_TOKEN_KEY = "moviereckon_refresh_token";
 
 // Backend URL - relative path for same-origin requests on Vercel
 // In production, API routes are at /api/* on the same domain
@@ -25,37 +26,32 @@ const MONGODB_API_URL = getApiUrl();
 // Always return true since MongoDB is the only backend
 export const isMongoDBConfigured = (): boolean => true;
 
-// Helper for making authenticated requests
-async function fetchWithAuth(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<Response> {
-  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-  
-  const headers: HeadersInit = {
-    "Content-Type": "application/json",
-    ...(options.headers || {}),
-  };
+function getBrowserStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  return window.sessionStorage;
+}
 
-  if (token) {
-    (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
+// Helper for making authenticated requests with HttpOnly cookie sessions.
+async function fetchWithAuth(endpoint: string, options: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(options.headers || {});
+  if (options.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
   }
 
   const response = await fetch(`${MONGODB_API_URL}${endpoint}`, {
     ...options,
     headers,
+    credentials: "include",
   });
 
-  // Handle token refresh if unauthorized
-  if (response.status === 401 && token) {
+  // Handle access-cookie refresh if unauthorized
+  if (response.status === 401) {
     const refreshed = await refreshAccessToken();
     if (refreshed) {
-      // Retry with new token
-      const newToken = localStorage.getItem(ACCESS_TOKEN_KEY);
-      (headers as Record<string, string>)["Authorization"] = `Bearer ${newToken}`;
       return fetch(`${MONGODB_API_URL}${endpoint}`, {
         ...options,
         headers,
+        credentials: "include",
       });
     }
   }
@@ -65,26 +61,37 @@ async function fetchWithAuth(
 
 // Token management
 export function getAccessToken(): string | null {
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
+  // Legacy fallback (disabled for security):
+  // return localStorage.getItem(ACCESS_TOKEN_KEY);
+  return null;
 }
 
 export function getRefreshToken(): string | null {
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
+  // Legacy fallback (disabled for security):
+  // return localStorage.getItem(REFRESH_TOKEN_KEY);
+  return null;
 }
 
 export function setTokens(accessToken: string, refreshToken: string): void {
-  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  void accessToken;
+  void refreshToken;
+  // Legacy fallback (disabled for security):
+  // localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  // localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
 }
 
 export function clearTokens(): void {
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
+  const storage = getBrowserStorage();
+  storage?.removeItem(USER_KEY);
+  // Legacy fallback (disabled for security):
+  // localStorage.removeItem(ACCESS_TOKEN_KEY);
+  // localStorage.removeItem(REFRESH_TOKEN_KEY);
+  // localStorage.removeItem(USER_KEY);
 }
 
 export function getStoredUser(): MongoUser | null {
-  const stored = localStorage.getItem(USER_KEY);
+  const storage = getBrowserStorage();
+  const stored = storage?.getItem(USER_KEY);
   if (!stored) return null;
   try {
     return JSON.parse(stored);
@@ -94,7 +101,8 @@ export function getStoredUser(): MongoUser | null {
 }
 
 export function setStoredUser(user: MongoUser): void {
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  const storage = getBrowserStorage();
+  storage?.setItem(USER_KEY, JSON.stringify(user));
 }
 
 // Types
@@ -109,8 +117,10 @@ export interface MongoUser {
 
 export interface AuthResponse {
   user: MongoUser;
-  accessToken: string;
-  refreshToken: string;
+  // Cookie-based sessions do not return raw tokens in the response body.
+  // Legacy fallback fields (disabled by backend):
+  // accessToken: string;
+  // refreshToken: string;
 }
 
 export interface WatchedItem {
@@ -188,6 +198,7 @@ export async function register(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password, username }),
+      credentials: "include",
     });
 
     const data = await response.json();
@@ -196,7 +207,8 @@ export async function register(
       return { user: null, error: data.error || "Registration failed" };
     }
 
-    setTokens(data.accessToken, data.refreshToken);
+    // Legacy fallback (disabled for security):
+    // setTokens(data.accessToken, data.refreshToken);
     setStoredUser(data.user);
 
     return { user: data.user, error: null };
@@ -215,6 +227,7 @@ export async function login(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
+      credentials: "include",
     });
 
     const data = await response.json();
@@ -223,7 +236,8 @@ export async function login(
       return { user: null, error: data.error || "Login failed" };
     }
 
-    setTokens(data.accessToken, data.refreshToken);
+    // Legacy fallback (disabled for security):
+    // setTokens(data.accessToken, data.refreshToken);
     setStoredUser(data.user);
 
     return { user: data.user, error: null };
@@ -235,14 +249,20 @@ export async function login(
 
 export async function logout(): Promise<void> {
   try {
-    const refreshToken = getRefreshToken();
-    if (refreshToken) {
-      await fetch(`${MONGODB_API_URL}/api/auth/logout`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken }),
-      });
-    }
+    await fetch(`${MONGODB_API_URL}/api/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
+
+    // Legacy fallback (disabled for security):
+    // const refreshToken = getRefreshToken();
+    // if (refreshToken) {
+    //   await fetch(`${MONGODB_API_URL}/api/auth/logout`, {
+    //     method: "POST",
+    //     headers: { "Content-Type": "application/json" },
+    //     body: JSON.stringify({ refreshToken }),
+    //   });
+    // }
   } catch {
     // Ignore errors during logout
   } finally {
@@ -252,14 +272,19 @@ export async function logout(): Promise<void> {
 
 export async function refreshAccessToken(): Promise<boolean> {
   try {
-    const refreshToken = getRefreshToken();
-    if (!refreshToken) return false;
-
     const response = await fetch(`${MONGODB_API_URL}/api/auth/refresh`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken }),
+      credentials: "include",
     });
+
+    // Legacy fallback (disabled for security):
+    // const refreshToken = getRefreshToken();
+    // if (!refreshToken) return false;
+    // const response = await fetch(`${MONGODB_API_URL}/api/auth/refresh`, {
+    //   method: "POST",
+    //   headers: { "Content-Type": "application/json" },
+    //   body: JSON.stringify({ refreshToken }),
+    // });
 
     if (!response.ok) {
       clearTokens();
@@ -267,7 +292,8 @@ export async function refreshAccessToken(): Promise<boolean> {
     }
 
     const data = await response.json();
-    setTokens(data.accessToken, data.refreshToken);
+    // Legacy fallback (disabled for security):
+    // setTokens(data.accessToken, data.refreshToken);
     setStoredUser(data.user);
 
     return true;

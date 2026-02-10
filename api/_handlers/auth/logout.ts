@@ -4,7 +4,12 @@
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase } from "../../lib/mongodb.js";
-import { getUserFromRequest } from "../../lib/auth.js";
+import { getUserFromRequest, hashRefreshToken } from "../../lib/auth.js";
+import {
+  REFRESH_TOKEN_COOKIE_NAME,
+  clearAuthCookies,
+  getCookieValue,
+} from "../../lib/cookies.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -12,14 +17,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { refreshToken } = req.body;
+    const bodyRefreshToken = typeof req.body?.refreshToken === "string" ? req.body.refreshToken : "";
+    const cookieRefreshToken = getCookieValue(req.headers.cookie, REFRESH_TOKEN_COOKIE_NAME) || "";
+    const refreshToken = bodyRefreshToken || cookieRefreshToken;
 
     if (refreshToken) {
       const { db } = await connectToDatabase();
-      
-      // Delete the specific refresh token
-      await db.collection("refresh_tokens").deleteOne({ token: refreshToken });
+
+      // Delete the specific refresh token hash
+      await db.collection("refresh_tokens").deleteOne({ token_hash: hashRefreshToken(refreshToken) });
+
+      // Legacy fallback (disabled for security):
+      // await db.collection("refresh_tokens").deleteOne({ token: refreshToken });
     }
+
+    clearAuthCookies(res);
 
     // Optionally also clear all tokens for this user if they want to log out everywhere
     const user = await getUserFromRequest(req);

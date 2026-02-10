@@ -4,7 +4,18 @@
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
-import { verifyRefreshToken, generateTokens, UserPayload } from "../../lib/auth.js";
+import {
+  verifyRefreshToken,
+  generateTokens,
+  hashRefreshToken,
+  UserPayload,
+} from "../../lib/auth.js";
+import {
+  REFRESH_TOKEN_COOKIE_NAME,
+  getCookieValue,
+  setAuthCookies,
+} from "../../lib/cookies.js";
+import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -12,8 +23,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { refreshToken } = req.body;
+    const clientIp = getClientIp(req);
+    const ipRateLimit = consumeRateLimit(`auth:refresh:ip:${clientIp}`, 40, 15 * 60 * 1000);
 
+    if (!ipRateLimit.allowed) {
+      res.setHeader("Retry-After", String(Math.max(ipRateLimit.retryAfterSeconds, 60)));
+      return res.status(429).json({ error: "Too many refresh requests. Please try again later." });
+    }
+
+    const bodyRefreshToken = typeof req.body?.refreshToken === "string" ? req.body.refreshToken : "";
+    const cookieRefreshToken = getCookieValue(req.headers.cookie, REFRESH_TOKEN_COOKIE_NAME) || "";
+
+    const refreshToken = bodyRefreshToken || cookieRefreshToken;
     if (!refreshToken) {
       return res.status(400).json({ error: "Refresh token is required" });
     }
@@ -29,7 +50,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Check if refresh token exists in database
     const storedToken = await db.collection("refresh_tokens").findOne({
       user_id: payload.id,
-      token: refreshToken,
+      token_hash: hashRefreshToken(refreshToken),
+      // Legacy fallback (disabled for security):
+      // token: refreshToken,
     });
 
     if (!storedToken) {
@@ -58,14 +81,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Delete old refresh token and store new one
     await db.collection("refresh_tokens").deleteOne({ _id: storedToken._id });
-    
+
     const now = new Date().toISOString();
     await db.collection("refresh_tokens").insertOne({
       user_id: user._id.toString(),
-      token: tokens.refreshToken,
+      token_hash: hashRefreshToken(tokens.refreshToken),
+      // Legacy fallback (disabled for security):
+      // token: tokens.refreshToken,
       created_at: now,
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
+
+    setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
 
     return res.status(200).json({
       user: {
@@ -76,7 +103,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         created_at: user.created_at,
         updated_at: user.updated_at,
       },
-      ...tokens,
+      session: "cookie",
+      // Legacy fallback response (disabled for security):
+      // ...tokens,
     });
   } catch (error) {
     console.error("Refresh token error:", error);

@@ -8,17 +8,28 @@ import registerHandler from "./_handlers/auth/register.js";
 import refreshHandler from "./_handlers/auth/refresh.js";
 import meHandler from "./_handlers/auth/me.js";
 import logoutHandler from "./_handlers/auth/logout.js";
+import { applyApiCors, applyDefaultSecurityHeaders } from "./lib/cors.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS headers
-  res.setHeader("Access-Control-Allow-Origin", process.env.CORS_ORIGIN || "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.setHeader("Access-Control-Allow-Credentials", "true");
+  applyDefaultSecurityHeaders(res);
+  const { originAllowed } = applyApiCors(req, res);
 
   if (req.method === "OPTIONS") {
+    if (!originAllowed) {
+      return res.status(403).json({ error: "Origin not allowed" });
+    }
     return res.status(204).end();
   }
+
+  if (!originAllowed) {
+    return res.status(403).json({ error: "Origin not allowed" });
+  }
+
+  // Legacy CORS fallback (disabled for security):
+  // res.setHeader("Access-Control-Allow-Origin", process.env.CORS_ORIGIN || "*");
+  // res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  // res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  // res.setHeader("Access-Control-Allow-Credentials", "true");
 
   // Parse the route from the URL
   const url = new URL(req.url || "", `http://${req.headers.host}`);

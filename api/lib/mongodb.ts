@@ -10,6 +10,10 @@ const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || "moviereckon";
 // Do NOT use in production unless you understand the security implications.
 const MONGODB_TLS_INSECURE = process.env.MONGODB_TLS_INSECURE === "true";
 
+if (MONGODB_TLS_INSECURE && process.env.NODE_ENV === "production") {
+  throw new Error("MONGODB_TLS_INSECURE must never be enabled in production");
+}
+
 if (!MONGODB_URI) {
   throw new Error("Please define MONGODB_URI environment variable");
 }

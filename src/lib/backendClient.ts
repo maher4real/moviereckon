@@ -13,8 +13,11 @@ const BACKEND_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOi
 
 export const supabase = createClient(BACKEND_URL, BACKEND_PUBLISHABLE_KEY, {
   auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
+    persistSession: false,
+    autoRefreshToken: false,
+    // Legacy fallback (disabled for security):
+    // storage: localStorage,
+    // persistSession: true,
+    // autoRefreshToken: true,
   },
 });
