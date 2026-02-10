@@ -68,8 +68,9 @@ const BOLLYWOOD_LANGUAGE_OPTIONS = [
   { value: "gu", label: "Gujarati" },
   { value: "ta", label: "Tamil" },
   { value: "te", label: "Telugu" },
+  { value: "kn", label: "Kannada" },
 ];
-const BOLLYWOOD_LANGUAGE_CODES = new Set(["hi", "gu", "ta", "te", "ml", "kn", "bn", "mr", "pa"]);
+const BOLLYWOOD_LANGUAGE_CODES = new Set(["hi", "gu", "ta", "te", "kn"]);
 
 const isAnimeLike = (item: Movie | TVShow) =>
   item.original_language === "ja" && item.genre_ids?.includes(16);

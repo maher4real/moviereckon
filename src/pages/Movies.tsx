@@ -47,7 +47,9 @@ const BOLLYWOOD_LANGUAGE_OPTIONS = [
   { value: "gu", label: "Gujarati" },
   { value: "ta", label: "Tamil" },
   { value: "te", label: "Telugu" },
+  { value: "kn", label: "Kannada" },
 ];
+const BOLLYWOOD_LANGUAGE_CODES = new Set(["hi", "gu", "ta", "te", "kn"]);
 
 const isAnimeLikeMovie = (movie: Movie) =>
   movie.original_language === "ja" && movie.genre_ids?.includes(16);
@@ -221,6 +223,13 @@ export default function Movies() {
         if (dedupe.has(movie.id)) return;
 
         if (category === "now_playing" && movie.release_date > today) return;
+        if (
+          category === "bollywood" &&
+          bollywoodLanguage === "all" &&
+          !BOLLYWOOD_LANGUAGE_CODES.has(movie.original_language)
+        ) {
+          return;
+        }
         if (
           category === "bollywood" &&
           bollywoodLanguage !== "all" &&
