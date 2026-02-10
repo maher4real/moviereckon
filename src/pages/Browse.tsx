@@ -177,11 +177,7 @@ export default function Browse() {
         return getNowPlayingMovies(page);
       }
 
-      if (contentType === "upcoming") {
-        return getUpcomingMovies(page);
-      }
-
-      if (contentType === "coming_soon") {
+      if (contentType === "upcoming" || contentType === "coming_soon") {
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         const tomorrowStr = formatLocalDate(tomorrow);
@@ -264,8 +260,7 @@ export default function Browse() {
         if (dedupe.has(key)) return;
 
         if (contentType === "now_playing" && "release_date" in item && item.release_date > today) return;
-        if (contentType === "upcoming" && "release_date" in item && item.release_date < tomorrowStr) return;
-        if (contentType === "coming_soon") {
+        if (contentType === "upcoming" || contentType === "coming_soon") {
           if ("release_date" in item && item.release_date < tomorrowStr) return;
           if ("first_air_date" in item && item.first_air_date < tomorrowStr) return;
         }
@@ -348,7 +343,6 @@ export default function Browse() {
                   <TabsTrigger value="all">All</TabsTrigger>
                   <TabsTrigger value="now_playing">🎬 Now Playing</TabsTrigger>
                   <TabsTrigger value="upcoming">🗓️ Upcoming</TabsTrigger>
-                  <TabsTrigger value="coming_soon">⏭️ Coming Soon</TabsTrigger>
                   <TabsTrigger value="bollywood">🇮🇳 Bollywood</TabsTrigger>
                   <TabsTrigger value="hollywood">🎬 Hollywood</TabsTrigger>
                   <TabsTrigger value="tamil">🎭 Tamil</TabsTrigger>

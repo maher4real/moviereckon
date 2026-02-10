@@ -6,7 +6,6 @@ import {
   discoverMovies,
   getMovieGenres,
   getNowPlayingMovies,
-  getUpcomingMovies,
   getTrendingMovies,
   Movie,
   Genre,
@@ -128,9 +127,19 @@ export default function Movies() {
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
       const page = Number(pageParam) || 1;
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = formatLocalDate(tomorrow);
 
       if (category === "now_playing") return getNowPlayingMovies(page);
-      if (category === "upcoming") return getUpcomingMovies(page);
+      if (category === "upcoming") {
+        return discoverMovies({
+          page,
+          sort_by: sortBy,
+          with_genres: selectedGenre || undefined,
+          "primary_release_date.gte": tomorrowStr,
+        });
+      }
       if (category === "trending") {
         const results = await getTrendingMovies("week");
         return { results, total_pages: 1, page: 1, total_results: results.length };
@@ -208,7 +217,7 @@ export default function Movies() {
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage, allMovies.length]);
 
-  const isSpecialCategory = ["now_playing", "upcoming", "trending"].includes(category);
+  const isSpecialCategory = ["now_playing", "trending"].includes(category);
 
   if (authLoading) {
     return (

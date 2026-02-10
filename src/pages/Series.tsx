@@ -23,8 +23,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { Tv } from "lucide-react";
 
-type SeriesCategory = "all" | "popular" | "top_rated" | "korean" | "indian" | "anime";
-type SortOption = "popularity.desc" | "vote_average.desc" | "first_air_date.desc";
+type SeriesCategory =
+  | "all"
+  | "popular"
+  | "top_rated"
+  | "upcoming"
+  | "korean"
+  | "indian"
+  | "anime";
+type SortOption =
+  | "popularity.desc"
+  | "vote_average.desc"
+  | "first_air_date.desc"
+  | "first_air_date.asc";
 
 interface SeriesPage {
   results: TVShow[];
@@ -37,6 +48,7 @@ const sortOptions: { value: SortOption; label: string }[] = [
   { value: "popularity.desc", label: "Most Popular" },
   { value: "vote_average.desc", label: "Top Rated" },
   { value: "first_air_date.desc", label: "Newest" },
+  { value: "first_air_date.asc", label: "Earliest Release" },
 ];
 
 const OTT_OPTIONS = [
@@ -62,6 +74,13 @@ const LANGUAGE_OPTIONS = [
 
 const isAnimeLikeSeries = (item: TVShow) =>
   item.original_language === "ja" && item.genre_ids?.includes(16);
+
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 const PosterCard = memo(
   ({ item, onClick, ottLabel }: { item: TVShow; onClick: () => void; ottLabel?: string }) => (
@@ -160,6 +179,9 @@ export default function Series() {
     queryFn: async ({ pageParam }) => {
       const page = Number(pageParam) || 1;
       const needsFilteredDiscover = !!normalizedGenre || !!resolvedLanguage || ottFilter !== "all";
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = formatLocalDate(tomorrow);
 
       if (category === "popular" && !needsFilteredDiscover) {
         return getPopularTVShows(page);
@@ -167,6 +189,23 @@ export default function Series() {
 
       if (category === "top_rated" && !needsFilteredDiscover) {
         return getTopRatedTVShows(page);
+      }
+
+      if (category === "upcoming") {
+        const filters: DiscoverFilters = {
+          page,
+          sort_by: sortBy === "popularity.desc" ? "first_air_date.asc" : sortBy,
+          with_genres: normalizedGenre,
+          with_original_language: resolvedLanguage,
+          "first_air_date.gte": tomorrowStr,
+        };
+
+        if (ottFilter !== "all") {
+          filters.with_watch_providers = ottFilter;
+          filters.watch_region = "US";
+        }
+
+        return discoverTVShows(filters);
       }
 
       const filters: DiscoverFilters = {
@@ -197,6 +236,9 @@ export default function Series() {
 
   const filteredSeries = useMemo(() => {
     if (!contentData?.pages) return [];
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = formatLocalDate(tomorrow);
 
     const dedupe = new Set<number>();
     const merged: TVShow[] = [];
@@ -208,6 +250,7 @@ export default function Series() {
         const animeLike = isAnimeLikeSeries(item);
         if (category === "anime" && !animeLike) return;
         if (category !== "anime" && animeLike) return;
+        if (category === "upcoming" && item.first_air_date < tomorrowStr) return;
         if (selectedLanguage !== "all" && category === "all" && item.original_language !== selectedLanguage) {
           return;
         }
@@ -285,6 +328,7 @@ export default function Series() {
                 { value: "all", label: "All Series" },
                 { value: "popular", label: "🔥 Popular" },
                 { value: "top_rated", label: "⭐ Top Rated" },
+                { value: "upcoming", label: "🗓️ Upcoming" },
                 { value: "korean", label: "🇰🇷 K-Drama" },
                 { value: "indian", label: "🇮🇳 Indian" },
                 { value: "anime", label: "🎌 Anime" },

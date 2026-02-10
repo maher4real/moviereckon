@@ -86,7 +86,7 @@ export default function ContentCarousel({
     if (normalized.includes("now playing"))
       return "/movies?category=now_playing";
     if (normalized.includes("coming soon") || normalized.includes("upcoming")) {
-      return "/browse?type=coming_soon";
+      return "/browse?type=upcoming";
     }
     if (normalized.includes("continue watching")) return "/profile";
     if (normalized.includes("bollywood")) return "/movies?category=bollywood";

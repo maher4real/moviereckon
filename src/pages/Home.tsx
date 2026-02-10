@@ -262,22 +262,35 @@ export default function Home() {
     );
   }, [nowPlayingData]);
 
-  // Coming soon should only include unreleased items (tomorrow onward).
+  // Upcoming section should only include releases within the next two months.
   const filteredUpcoming = useMemo(() => {
     if (!upcomingMovies?.length && !upcomingTVShows?.length) return [];
 
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
+    const twoMonthsAhead = new Date(today);
+    twoMonthsAhead.setMonth(twoMonthsAhead.getMonth() + 2);
     const tomorrowStr = formatLocalDate(tomorrow);
+    const twoMonthsAheadStr = formatLocalDate(twoMonthsAhead);
     const dedupe = new Set<string>();
 
     const upcomingMoviesOnly = (upcomingMovies || [])
-      .filter((movie) => Boolean(movie.release_date) && movie.release_date >= tomorrowStr)
+      .filter(
+        (movie) =>
+          Boolean(movie.release_date) &&
+          movie.release_date >= tomorrowStr &&
+          movie.release_date <= twoMonthsAheadStr,
+      )
       .filter((movie) => !isAnimeLike(movie));
 
     const upcomingSeriesOnly = (upcomingTVShows || [])
-      .filter((show) => Boolean(show.first_air_date) && show.first_air_date >= tomorrowStr)
+      .filter(
+        (show) =>
+          Boolean(show.first_air_date) &&
+          show.first_air_date >= tomorrowStr &&
+          show.first_air_date <= twoMonthsAheadStr,
+      )
       .filter((show) => !isAnimeLike(show));
 
     const combined = [...upcomingMoviesOnly, ...upcomingSeriesOnly]
@@ -432,11 +445,11 @@ export default function Home() {
           {/* Upcoming - Only movies releasing tomorrow or later */}
           {(filteredUpcoming.length > 0 || upcomingLoading || upcomingTVLoading) && (
             <MemoizedCarousel
-              title="🗓️ Coming Soon"
+              title="🗓️ Upcoming"
               items={filteredUpcoming as (Movie | TVShow)[]}
               isLoading={upcomingLoading || upcomingTVLoading}
               type="mixed"
-              viewAllHref="/browse?type=coming_soon"
+              viewAllHref="/browse?type=upcoming"
             />
           )}
 
