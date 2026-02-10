@@ -7,21 +7,22 @@ export default function Footer() {
 
   const footerLinks = [
     {
-      title: "Browse",
+      title: "Explore",
       links: [
+        { label: "Upcoming", href: "/upcoming" },
         { label: "Movies", href: "/movies" },
         { label: "TV Series", href: "/series" },
-        { label: "Bollywood", href: "/browse?type=bollywood" },
-        { label: "Hollywood", href: "/browse?type=hollywood" },
+        { label: "Bollywood", href: "/movies?category=bollywood" },
+        { label: "Hollywood", href: "/movies?category=hollywood" },
       ],
     },
     {
       title: "Genres",
       links: [
-        { label: "Action", href: "/browse?genre=28" },
-        { label: "Comedy", href: "/browse?genre=35" },
-        { label: "Drama", href: "/browse?genre=18" },
-        { label: "Thriller", href: "/browse?genre=53" },
+        { label: "Action", href: "/movies?genre=28" },
+        { label: "Comedy", href: "/movies?genre=35" },
+        { label: "Drama", href: "/movies?genre=18" },
+        { label: "Thriller", href: "/movies?genre=53" },
       ],
     },
     {

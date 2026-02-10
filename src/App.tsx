@@ -12,7 +12,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 
 const Auth = lazy(() => import("./pages/Auth"));
 const Home = lazy(() => import("./pages/Home"));
-const Browse = lazy(() => import("./pages/Browse"));
+const Upcoming = lazy(() => import("./pages/Upcoming"));
 const Search = lazy(() => import("./pages/Search"));
 const MovieDetail = lazy(() => import("./pages/MovieDetail"));
 const TVDetail = lazy(() => import("./pages/TVDetail"));
@@ -46,11 +46,12 @@ const App = () => (
                   <Route path="/" element={<Auth />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/home" element={<Home />} />
-                  <Route path="/browse" element={<Browse />} />
-                  <Route path="/browse/movies" element={<Navigate to="/browse?type=all" replace />} />
-                  <Route path="/browse/bollywood" element={<Navigate to="/browse?type=bollywood" replace />} />
-                  <Route path="/browse/hollywood" element={<Navigate to="/browse?type=hollywood" replace />} />
-                  <Route path="/browse/tv" element={<Navigate to="/browse?type=tv" replace />} />
+                  <Route path="/upcoming" element={<Upcoming />} />
+                  <Route path="/browse" element={<Navigate to="/upcoming" replace />} />
+                  <Route path="/browse/movies" element={<Navigate to="/upcoming?section=movies" replace />} />
+                  <Route path="/browse/bollywood" element={<Navigate to="/upcoming?section=movies&movieType=bollywood" replace />} />
+                  <Route path="/browse/hollywood" element={<Navigate to="/upcoming?section=movies&movieType=hollywood" replace />} />
+                  <Route path="/browse/tv" element={<Navigate to="/upcoming?section=series" replace />} />
                   <Route path="/search" element={<Search />} />
                   <Route path="/movie/:id" element={<MovieDetail />} />
                   <Route path="/tv/:id" element={<TVDetail />} />

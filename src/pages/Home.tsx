@@ -449,7 +449,7 @@ export default function Home() {
               items={filteredUpcoming as (Movie | TVShow)[]}
               isLoading={upcomingLoading || upcomingTVLoading}
               type="mixed"
-              viewAllHref="/browse?type=upcoming"
+              viewAllHref="/upcoming"
             />
           )}
 
@@ -520,7 +520,7 @@ export default function Home() {
               items={gujaratiData.results as (Movie | TVShow)[]}
               isLoading={gujaratiLoading}
               type="movie"
-              viewAllHref="/browse?type=gujarati"
+              viewAllHref="/movies?category=gujarati"
             />
           )}
 

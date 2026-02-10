@@ -207,7 +207,7 @@ export default function Profile() {
               {watchHistory.length === 0 ? (
                 <div className="text-center py-12">
                   <p className="text-muted-foreground mb-4">No watch history yet</p>
-                  <Button onClick={() => navigate("/browse")} className="bg-primary hover:bg-primary/90">
+                  <Button onClick={() => navigate("/upcoming")} className="bg-primary hover:bg-primary/90">
                     Start Exploring
                   </Button>
                 </div>
@@ -238,7 +238,7 @@ export default function Profile() {
               {likedItems.length === 0 ? (
                 <div className="text-center py-12">
                   <p className="text-muted-foreground mb-4">No liked content yet</p>
-                  <Button onClick={() => navigate("/browse")} className="bg-primary hover:bg-primary/90">
+                  <Button onClick={() => navigate("/upcoming")} className="bg-primary hover:bg-primary/90">
                     Find Something to Like
                   </Button>
                 </div>

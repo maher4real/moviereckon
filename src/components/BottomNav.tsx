@@ -1,9 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, Clapperboard, Search, Sparkles, Tv } from "lucide-react";
+import { Home, Clapperboard, Search, Sparkles, Tv, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/home", label: "Home", icon: Home },
+  { href: "/upcoming", label: "Upcoming", icon: CalendarDays },
   { href: "/reckon", label: "Reckon", icon: Sparkles },
   { href: "/movies", label: "Movies", icon: Clapperboard },
   { href: "/series", label: "Series", icon: Tv },

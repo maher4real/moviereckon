@@ -86,14 +86,14 @@ export default function ContentCarousel({
     if (normalized.includes("now playing"))
       return "/movies?category=now_playing";
     if (normalized.includes("coming soon") || normalized.includes("upcoming")) {
-      return "/browse?type=upcoming";
+      return "/upcoming";
     }
     if (normalized.includes("continue watching")) return "/profile";
     if (normalized.includes("bollywood")) return "/movies?category=bollywood";
     if (normalized.includes("hollywood")) return "/movies?category=hollywood";
     if (normalized.includes("tamil")) return "/movies?category=tamil";
     if (normalized.includes("telugu")) return "/movies?category=telugu";
-    if (normalized.includes("gujarati")) return "/browse?type=gujarati";
+    if (normalized.includes("gujarati")) return "/movies?category=gujarati";
     if (normalized.includes("trending tv")) return "/series?category=popular";
     if (normalized.includes("top rated"))
       return "/movies?sort=vote_average.desc";

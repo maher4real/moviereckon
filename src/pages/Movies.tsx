@@ -22,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { Film } from "lucide-react";
 
-type MovieCategory = "all" | "now_playing" | "upcoming" | "trending" | "bollywood" | "hollywood" | "tamil" | "telugu";
+type MovieCategory = "all" | "now_playing" | "upcoming" | "trending" | "bollywood" | "hollywood" | "gujarati" | "tamil" | "telugu";
 type SortOption = "popularity.desc" | "vote_average.desc" | "release_date.desc" | "revenue.desc";
 
 interface MoviePage {
@@ -42,6 +42,7 @@ const sortOptions: { value: SortOption; label: string }[] = [
 const languageMap: Record<string, string> = {
   bollywood: "hi",
   hollywood: "en",
+  gujarati: "gu",
   tamil: "ta",
   telugu: "te",
 };
@@ -247,6 +248,7 @@ export default function Movies() {
                 { value: "trending", label: "🔥 Trending" },
                 { value: "bollywood", label: "🇮🇳 Bollywood" },
                 { value: "hollywood", label: "🎬 Hollywood" },
+                { value: "gujarati", label: "🎪 Gujarati" },
                 { value: "tamil", label: "Tamil" },
                 { value: "telugu", label: "Telugu" },
               ].map((cat) => (
