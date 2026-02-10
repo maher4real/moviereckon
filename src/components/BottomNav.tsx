@@ -4,10 +4,10 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/home", label: "Home", icon: Home },
-  { href: "/upcoming", label: "Upcoming", icon: CalendarDays },
   { href: "/reckon", label: "Reckon", icon: Sparkles },
   { href: "/movies", label: "Movies", icon: Clapperboard },
   { href: "/series", label: "Series", icon: Tv },
+  { href: "/upcoming", label: "Upcoming", icon: CalendarDays },
   { href: "/search", label: "Search", icon: Search },
 ];
 

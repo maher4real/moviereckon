@@ -22,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { Film } from "lucide-react";
 
-type MovieCategory = "all" | "now_playing" | "upcoming" | "trending" | "bollywood" | "hollywood" | "gujarati" | "tamil" | "telugu";
+type MovieCategory = "all" | "now_playing" | "trending" | "bollywood" | "hollywood";
 type SortOption = "popularity.desc" | "vote_average.desc" | "release_date.desc" | "revenue.desc";
 
 interface MoviePage {
@@ -39,13 +39,14 @@ const sortOptions: { value: SortOption; label: string }[] = [
   { value: "revenue.desc", label: "Highest Grossing" },
 ];
 
-const languageMap: Record<string, string> = {
-  bollywood: "hi",
-  hollywood: "en",
-  gujarati: "gu",
-  tamil: "ta",
-  telugu: "te",
-};
+const BOLLYWOOD_LANGUAGE_OPTIONS = [
+  { value: "all", label: "All Languages" },
+  { value: "hi", label: "Hindi" },
+  { value: "gu", label: "Gujarati" },
+  { value: "ta", label: "Tamil" },
+  { value: "te", label: "Telugu" },
+];
+const BOLLYWOOD_LANGUAGE_CODES = new Set(["hi", "gu", "ta", "te", "ml", "kn", "bn", "mr", "pa"]);
 
 const isAnimeLikeMovie = (movie: Movie) =>
   movie.original_language === "ja" && movie.genre_ids?.includes(16);
@@ -101,6 +102,7 @@ export default function Movies() {
     (searchParams.get("category") as MovieCategory) || "all"
   );
   const [selectedGenre, setSelectedGenre] = useState<string>(searchParams.get("genre") || "");
+  const [bollywoodLanguage, setBollywoodLanguage] = useState<string>(searchParams.get("lang") || "all");
   const [sortBy, setSortBy] = useState<SortOption>(
     (searchParams.get("sort") as SortOption) || "popularity.desc"
   );
@@ -124,23 +126,12 @@ export default function Movies() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery<MoviePage>({
-    queryKey: ["movies-infinite", category, selectedGenre, sortBy],
+    queryKey: ["movies-infinite", category, selectedGenre, bollywoodLanguage, sortBy],
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
       const page = Number(pageParam) || 1;
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowStr = formatLocalDate(tomorrow);
 
       if (category === "now_playing") return getNowPlayingMovies(page);
-      if (category === "upcoming") {
-        return discoverMovies({
-          page,
-          sort_by: sortBy,
-          with_genres: selectedGenre || undefined,
-          "primary_release_date.gte": tomorrowStr,
-        });
-      }
       if (category === "trending") {
         const results = await getTrendingMovies("week");
         return { results, total_pages: 1, page: 1, total_results: results.length };
@@ -152,8 +143,12 @@ export default function Movies() {
         with_genres: selectedGenre || undefined,
       };
 
-      if (languageMap[category]) {
-        filters.with_original_language = languageMap[category];
+      if (category === "hollywood") {
+        filters.with_original_language = "en";
+      }
+
+      if (category === "bollywood" && bollywoodLanguage !== "all") {
+        filters.with_original_language = bollywoodLanguage;
       }
 
       return discoverMovies(filters);
@@ -170,9 +165,6 @@ export default function Movies() {
     if (!contentData?.pages) return [];
 
     const today = formatLocalDate(new Date());
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = formatLocalDate(tomorrow);
 
     const dedupe = new Set<number>();
     const merged: Movie[] = [];
@@ -182,7 +174,20 @@ export default function Movies() {
         if (dedupe.has(movie.id)) return;
 
         if (category === "now_playing" && movie.release_date > today) return;
-        if (category === "upcoming" && movie.release_date < tomorrowStr) return;
+        if (
+          category === "bollywood" &&
+          bollywoodLanguage === "all" &&
+          !BOLLYWOOD_LANGUAGE_CODES.has(movie.original_language)
+        ) {
+          return;
+        }
+        if (
+          category === "bollywood" &&
+          bollywoodLanguage !== "all" &&
+          movie.original_language !== bollywoodLanguage
+        ) {
+          return;
+        }
         if (isAnimeLikeMovie(movie)) return;
 
         dedupe.add(movie.id);
@@ -191,15 +196,16 @@ export default function Movies() {
     });
 
     return merged;
-  }, [contentData, category]);
+  }, [contentData, category, bollywoodLanguage]);
 
   useEffect(() => {
     const params = new URLSearchParams();
     if (category !== "all") params.set("category", category);
     if (selectedGenre) params.set("genre", selectedGenre);
+    if (category === "bollywood" && bollywoodLanguage !== "all") params.set("lang", bollywoodLanguage);
     if (sortBy !== "popularity.desc") params.set("sort", sortBy);
     setSearchParams(params, { replace: true });
-  }, [category, selectedGenre, sortBy, setSearchParams]);
+  }, [category, selectedGenre, bollywoodLanguage, sortBy, setSearchParams]);
 
   useEffect(() => {
     const node = loadMoreRef.current;
@@ -244,13 +250,9 @@ export default function Movies() {
               {[
                 { value: "all", label: "All Movies" },
                 { value: "now_playing", label: "🎬 Now Playing" },
-                { value: "upcoming", label: "🗓️ Upcoming" },
                 { value: "trending", label: "🔥 Trending" },
                 { value: "bollywood", label: "🇮🇳 Bollywood" },
                 { value: "hollywood", label: "🎬 Hollywood" },
-                { value: "gujarati", label: "🎪 Gujarati" },
-                { value: "tamil", label: "Tamil" },
-                { value: "telugu", label: "Telugu" },
               ].map((cat) => (
                 <Button
                   key={cat.value}
@@ -296,6 +298,21 @@ export default function Movies() {
                 ))}
               </SelectContent>
             </Select>
+
+            {category === "bollywood" && (
+              <Select value={bollywoodLanguage} onValueChange={setBollywoodLanguage}>
+                <SelectTrigger className="w-[170px] bg-card">
+                  <SelectValue placeholder="Language" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border-border z-50">
+                  {BOLLYWOOD_LANGUAGE_OPTIONS.map((language) => (
+                    <SelectItem key={language.value} value={language.value}>
+                      {language.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           {isLoading ? (

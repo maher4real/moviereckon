@@ -91,9 +91,9 @@ export default function ContentCarousel({
     if (normalized.includes("continue watching")) return "/profile";
     if (normalized.includes("bollywood")) return "/movies?category=bollywood";
     if (normalized.includes("hollywood")) return "/movies?category=hollywood";
-    if (normalized.includes("tamil")) return "/movies?category=tamil";
-    if (normalized.includes("telugu")) return "/movies?category=telugu";
-    if (normalized.includes("gujarati")) return "/movies?category=gujarati";
+    if (normalized.includes("tamil")) return "/movies?category=bollywood&lang=ta";
+    if (normalized.includes("telugu")) return "/movies?category=bollywood&lang=te";
+    if (normalized.includes("gujarati")) return "/movies?category=bollywood&lang=gu";
     if (normalized.includes("trending tv")) return "/series?category=popular";
     if (normalized.includes("top rated"))
       return "/movies?sort=vote_average.desc";

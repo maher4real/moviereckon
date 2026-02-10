@@ -498,7 +498,7 @@ export default function Home() {
               items={tamilData.results as (Movie | TVShow)[]}
               isLoading={tamilLoading}
               type="movie"
-              viewAllHref="/movies?category=tamil"
+              viewAllHref="/movies?category=bollywood&lang=ta"
             />
           )}
 
@@ -509,7 +509,7 @@ export default function Home() {
               items={teluguData.results as (Movie | TVShow)[]}
               isLoading={teluguLoading}
               type="movie"
-              viewAllHref="/movies?category=telugu"
+              viewAllHref="/movies?category=bollywood&lang=te"
             />
           )}
 
@@ -520,7 +520,7 @@ export default function Home() {
               items={gujaratiData.results as (Movie | TVShow)[]}
               isLoading={gujaratiLoading}
               type="movie"
-              viewAllHref="/movies?category=gujarati"
+              viewAllHref="/movies?category=bollywood&lang=gu"
             />
           )}
 

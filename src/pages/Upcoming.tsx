@@ -62,11 +62,14 @@ const LANGUAGE_OPTIONS = [
   { value: "fr", label: "French" },
 ];
 
-const movieLanguageMap: Record<MovieSectionFilter, string | undefined> = {
-  all: undefined,
-  bollywood: "hi",
-  hollywood: "en",
-};
+const BOLLYWOOD_LANGUAGE_OPTIONS = [
+  { value: "all", label: "All Languages" },
+  { value: "hi", label: "Hindi" },
+  { value: "gu", label: "Gujarati" },
+  { value: "ta", label: "Tamil" },
+  { value: "te", label: "Telugu" },
+];
+const BOLLYWOOD_LANGUAGE_CODES = new Set(["hi", "gu", "ta", "te", "ml", "kn", "bn", "mr", "pa"]);
 
 const isAnimeLike = (item: Movie | TVShow) =>
   item.original_language === "ja" && item.genre_ids?.includes(16);
@@ -142,6 +145,7 @@ export default function Upcoming() {
   const [movieSectionFilter, setMovieSectionFilter] = useState<MovieSectionFilter>(
     (searchParams.get("movieType") as MovieSectionFilter) || "all",
   );
+  const [bollywoodLanguage, setBollywoodLanguage] = useState<string>(searchParams.get("bollyLang") || "all");
   const [movieGenre, setMovieGenre] = useState<string>(searchParams.get("movieGenre") || "");
   const [seriesGenre, setSeriesGenre] = useState<string>(searchParams.get("seriesGenre") || "");
   const [seriesOtt, setSeriesOtt] = useState<string>(searchParams.get("ott") || "all");
@@ -176,6 +180,7 @@ export default function Upcoming() {
       "upcoming-infinite",
       section,
       movieSectionFilter,
+      bollywoodLanguage,
       movieGenre,
       seriesGenre,
       seriesOtt,
@@ -196,9 +201,12 @@ export default function Upcoming() {
           "primary_release_date.gte": tomorrowStr,
         };
 
-        const language = movieLanguageMap[movieSectionFilter];
-        if (language) {
-          filters.with_original_language = language;
+        if (movieSectionFilter === "hollywood") {
+          filters.with_original_language = "en";
+        }
+
+        if (movieSectionFilter === "bollywood" && bollywoodLanguage !== "all") {
+          filters.with_original_language = bollywoodLanguage;
         }
 
         return discoverMovies(filters);
@@ -272,8 +280,21 @@ export default function Upcoming() {
         if (isAnimeLike(item)) return;
 
         if (section === "movies") {
-          if (movieSectionFilter === "bollywood" && item.original_language !== "hi") return;
           if (movieSectionFilter === "hollywood" && item.original_language !== "en") return;
+          if (
+            movieSectionFilter === "bollywood" &&
+            bollywoodLanguage === "all" &&
+            !BOLLYWOOD_LANGUAGE_CODES.has(item.original_language)
+          ) {
+            return;
+          }
+          if (
+            movieSectionFilter === "bollywood" &&
+            bollywoodLanguage !== "all" &&
+            item.original_language !== bollywoodLanguage
+          ) {
+            return;
+          }
           if (movieGenre && !item.genre_ids?.includes(Number(movieGenre))) return;
         }
 
@@ -292,12 +313,23 @@ export default function Upcoming() {
     return merged.sort((a, b) =>
       (getReleaseDate(a) || "9999-12-31").localeCompare(getReleaseDate(b) || "9999-12-31"),
     );
-  }, [upcomingData, section, movieSectionFilter, movieGenre, seriesLanguage, seriesGenre]);
+  }, [
+    upcomingData,
+    section,
+    movieSectionFilter,
+    bollywoodLanguage,
+    movieGenre,
+    seriesLanguage,
+    seriesGenre,
+  ]);
 
   useEffect(() => {
     const params = new URLSearchParams();
     if (section !== "all") params.set("section", section);
     if (movieSectionFilter !== "all") params.set("movieType", movieSectionFilter);
+    if (movieSectionFilter === "bollywood" && bollywoodLanguage !== "all") {
+      params.set("bollyLang", bollywoodLanguage);
+    }
     if (movieGenre) params.set("movieGenre", movieGenre);
     if (seriesGenre) params.set("seriesGenre", seriesGenre);
     if (seriesOtt !== "all") params.set("ott", seriesOtt);
@@ -306,6 +338,7 @@ export default function Upcoming() {
   }, [
     section,
     movieSectionFilter,
+    bollywoodLanguage,
     movieGenre,
     seriesGenre,
     seriesOtt,
@@ -399,6 +432,21 @@ export default function Upcoming() {
               </div>
 
               <div className="flex gap-3 flex-wrap">
+                {movieSectionFilter === "bollywood" && (
+                  <Select value={bollywoodLanguage} onValueChange={setBollywoodLanguage}>
+                    <SelectTrigger className="w-[170px] bg-card">
+                      <SelectValue placeholder="Language" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover border-border z-50">
+                      {BOLLYWOOD_LANGUAGE_OPTIONS.map((language) => (
+                        <SelectItem key={language.value} value={language.value}>
+                          {language.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
                 <Select
                   value={movieGenre}
                   onValueChange={(value) => setMovieGenre(value === "all" ? "" : value)}
