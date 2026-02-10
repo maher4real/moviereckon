@@ -103,7 +103,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       for (const [key, value] of entries) {
-        if (!/^[a-zA-Z0-9_]+$/.test(key)) {
+        if (!/^[a-zA-Z0-9_.]+$/.test(key)) {
           return res.status(400).json({ error: "Invalid query param key" });
         }
 

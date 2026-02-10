@@ -142,7 +142,7 @@ serve(async (req) => {
       }
 
       for (const [key, value] of entries) {
-        if (!/^[a-zA-Z0-9_]+$/.test(key)) {
+        if (!/^[a-zA-Z0-9_.]+$/.test(key)) {
           return new Response(JSON.stringify({ error: "Invalid query param key" }), {
             status: 400,
             headers: { ...baseHeaders, "Content-Type": "application/json" },

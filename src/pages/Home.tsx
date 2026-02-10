@@ -15,6 +15,7 @@ import {
   getTopRatedMovies,
   getNowPlayingMovies,
   getUpcomingMovies,
+  getUpcomingTVShows,
   Movie,
   TVShow,
 } from "@/lib/tmdb";
@@ -32,6 +33,7 @@ const STARTUP_SOUND_SRC =
 const STARTUP_SOUND_PENDING_KEY = "startupSoundPending";
 const STARTUP_SOUND_PLAYED_KEY = "startupSoundPlayed";
 const HOME_UPCOMING_PAGES = [1, 2, 3] as const;
+const HOME_UPCOMING_TV_PAGES = [1, 2] as const;
 const isAnimeLike = (item: Movie | TVShow) =>
   item.original_language === "ja" && item.genre_ids?.includes(16);
 
@@ -220,6 +222,37 @@ export default function Home() {
     ...queryConfig,
   });
 
+  const { data: upcomingTVShows, isLoading: upcomingTVLoading } = useQuery({
+    queryKey: ["upcoming-tv-home"],
+    queryFn: async () => {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = formatLocalDate(tomorrow);
+
+      const responses = await Promise.all(
+        HOME_UPCOMING_TV_PAGES.map((page) =>
+          getUpcomingTVShows(page, tomorrowStr).catch(() => null),
+        ),
+      );
+
+      const deduped = new Map<number, TVShow>();
+      responses.forEach((response) => {
+        response?.results?.forEach((show) => {
+          if (!deduped.has(show.id)) {
+            deduped.set(show.id, show);
+          }
+        });
+      });
+
+      return Array.from(deduped.values()).sort((a, b) =>
+        (a.first_air_date || "9999-12-31").localeCompare(
+          b.first_air_date || "9999-12-31",
+        ),
+      );
+    },
+    ...queryConfig,
+  });
+
   // Filter Now Playing to only show movies released today or earlier
   const filteredNowPlaying = useMemo(() => {
     if (!nowPlayingData?.results) return [];
@@ -229,33 +262,40 @@ export default function Home() {
     );
   }, [nowPlayingData]);
 
-  // Keep Upcoming populated: strict tomorrow+ filter first, then relax if list is too small.
+  // Coming soon should only include unreleased items (tomorrow onward).
   const filteredUpcoming = useMemo(() => {
-    if (!upcomingMovies?.length) return [];
+    if (!upcomingMovies?.length && !upcomingTVShows?.length) return [];
 
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const todayStr = formatLocalDate(today);
     const tomorrowStr = formatLocalDate(tomorrow);
+    const dedupe = new Set<string>();
 
-    const candidates = upcomingMovies.filter(
-      (movie) => Boolean(movie.release_date) && !isAnimeLike(movie),
-    );
+    const upcomingMoviesOnly = (upcomingMovies || [])
+      .filter((movie) => Boolean(movie.release_date) && movie.release_date >= tomorrowStr)
+      .filter((movie) => !isAnimeLike(movie));
 
-    const strictUpcoming = candidates.filter(
-      (movie) => movie.release_date >= tomorrowStr,
-    );
-    if (strictUpcoming.length >= 8) return strictUpcoming;
+    const upcomingSeriesOnly = (upcomingTVShows || [])
+      .filter((show) => Boolean(show.first_air_date) && show.first_air_date >= tomorrowStr)
+      .filter((show) => !isAnimeLike(show));
 
-    const relaxedUpcoming = candidates.filter(
-      (movie) => movie.release_date >= todayStr,
-    );
-    if (relaxedUpcoming.length > strictUpcoming.length) return relaxedUpcoming;
+    const combined = [...upcomingMoviesOnly, ...upcomingSeriesOnly]
+      .filter((item) => {
+        const isTV = "first_air_date" in item;
+        const key = `${isTV ? "tv" : "movie"}:${item.id}`;
+        if (dedupe.has(key)) return false;
+        dedupe.add(key);
+        return true;
+      })
+      .sort((a, b) => {
+        const dateA = "release_date" in a ? a.release_date : a.first_air_date;
+        const dateB = "release_date" in b ? b.release_date : b.first_air_date;
+        return (dateA || "9999-12-31").localeCompare(dateB || "9999-12-31");
+      });
 
-    return candidates;
-  }, [upcomingMovies]);
+    return combined;
+  }, [upcomingMovies, upcomingTVShows]);
 
   const filteredTrendingMovies = useMemo(
     () => (trendingMovies || []).filter((movie) => !isAnimeLike(movie)),
@@ -390,13 +430,13 @@ export default function Home() {
           )}
 
           {/* Upcoming - Only movies releasing tomorrow or later */}
-          {(filteredUpcoming.length > 0 || upcomingLoading) && (
+          {(filteredUpcoming.length > 0 || upcomingLoading || upcomingTVLoading) && (
             <MemoizedCarousel
               title="🗓️ Coming Soon"
               items={filteredUpcoming as (Movie | TVShow)[]}
-              isLoading={upcomingLoading}
-              type="movie"
-              viewAllHref="/movies?category=upcoming"
+              isLoading={upcomingLoading || upcomingTVLoading}
+              type="mixed"
+              viewAllHref="/browse?type=coming_soon"
             />
           )}
 

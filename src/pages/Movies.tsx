@@ -50,6 +50,13 @@ const languageMap: Record<string, string> = {
 const isAnimeLikeMovie = (movie: Movie) =>
   movie.original_language === "ja" && movie.genre_ids?.includes(16);
 
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const PosterCard = memo(({ item, onClick }: { item: Movie; onClick: () => void }) => (
   <div onClick={onClick} className="cursor-pointer group">
     <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
@@ -152,10 +159,10 @@ export default function Movies() {
   const allMovies = useMemo(() => {
     if (!contentData?.pages) return [];
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = formatLocalDate(new Date());
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split("T")[0];
+    const tomorrowStr = formatLocalDate(tomorrow);
 
     const dedupe = new Set<number>();
     const merged: Movie[] = [];

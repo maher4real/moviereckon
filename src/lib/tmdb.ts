@@ -465,6 +465,21 @@ export async function getTopRatedTVShows(page = 1): Promise<TMDBResponse<TVShow>
   return fetchTMDB<TMDBResponse<TVShow>>("/tv/top_rated", { page });
 }
 
+export async function getUpcomingTVShows(
+  page = 1,
+  fromDate?: string,
+): Promise<TMDBResponse<TVShow>> {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const gteDate = fromDate || tomorrow.toISOString().split("T")[0];
+
+  return fetchTMDB<TMDBResponse<TVShow>>("/discover/tv", {
+    page,
+    sort_by: "first_air_date.asc",
+    "first_air_date.gte": gteDate,
+  });
+}
+
 // Indian TV Shows
 export async function getIndianTVShows(page = 1): Promise<TMDBResponse<TVShow>> {
   return fetchTMDB<TMDBResponse<TVShow>>("/discover/tv", {
@@ -597,6 +612,8 @@ export interface DiscoverFilters {
   with_networks?: string;
   "primary_release_date.gte"?: string;
   "primary_release_date.lte"?: string;
+  "first_air_date.gte"?: string;
+  "first_air_date.lte"?: string;
   "vote_average.gte"?: string | number;
   "vote_count.gte"?: string | number;
 }
@@ -637,6 +654,8 @@ export async function discoverTVShows(filters: DiscoverFilters = {}): Promise<TM
   if (filters.with_watch_providers) params.with_watch_providers = filters.with_watch_providers;
   if (filters.watch_region) params.watch_region = filters.watch_region;
   if (filters.with_networks) params.with_networks = filters.with_networks;
+  if (filters["first_air_date.gte"]) params["first_air_date.gte"] = filters["first_air_date.gte"];
+  if (filters["first_air_date.lte"]) params["first_air_date.lte"] = filters["first_air_date.lte"];
   if (filters["vote_average.gte"]) params["vote_average.gte"] = filters["vote_average.gte"];
   if (filters["vote_count.gte"]) params["vote_count.gte"] = filters["vote_count.gte"];
 

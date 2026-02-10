@@ -9,6 +9,7 @@ import {
   getTVGenres,
   getNowPlayingMovies,
   getUpcomingMovies,
+  getUpcomingTVShows,
   Movie,
   TVShow,
   Genre,
@@ -25,7 +26,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
-type ContentType = "all" | "bollywood" | "hollywood" | "gujarati" | "tamil" | "telugu" | "tv" | "now_playing" | "upcoming";
+type ContentType =
+  | "all"
+  | "bollywood"
+  | "hollywood"
+  | "gujarati"
+  | "tamil"
+  | "telugu"
+  | "tv"
+  | "now_playing"
+  | "upcoming"
+  | "coming_soon";
 type SortOption = "popularity.desc" | "popularity.asc" | "vote_average.desc" | "vote_average.asc" | "release_date.desc" | "release_date.asc" | "revenue.desc";
 
 interface ContentPage {
@@ -58,6 +69,13 @@ const languageMap: Record<string, string> = {
 
 const isAnimeLike = (item: Movie | TVShow) =>
   item.original_language === "ja" && item.genre_ids?.includes(16);
+
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 const PosterCard = memo(({ item, onClick }: { item: Movie | TVShow; onClick: () => void }) => {
   const getTitle = (entry: Movie | TVShow): string => {
@@ -163,6 +181,39 @@ export default function Browse() {
         return getUpcomingMovies(page);
       }
 
+      if (contentType === "coming_soon") {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = formatLocalDate(tomorrow);
+
+        const [upcomingMovies, upcomingSeries] = await Promise.all([
+          getUpcomingMovies(page).catch(() => ({
+            page,
+            results: [] as Movie[],
+            total_pages: 1,
+            total_results: 0,
+          })),
+          getUpcomingTVShows(page, tomorrowStr).catch(() => ({
+            page,
+            results: [] as TVShow[],
+            total_pages: 1,
+            total_results: 0,
+          })),
+        ]);
+
+        const results = [
+          ...(upcomingMovies.results || []),
+          ...(upcomingSeries.results || []),
+        ];
+
+        return {
+          page,
+          results,
+          total_pages: Math.max(upcomingMovies.total_pages || 1, upcomingSeries.total_pages || 1),
+          total_results: (upcomingMovies.total_results || 0) + (upcomingSeries.total_results || 0),
+        };
+      }
+
       const filters: DiscoverFilters = {
         page,
         sort_by: sortBy,
@@ -198,10 +249,10 @@ export default function Browse() {
   const filteredContent = useMemo(() => {
     if (!contentData?.pages) return [];
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = formatLocalDate(new Date());
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split("T")[0];
+    const tomorrowStr = formatLocalDate(tomorrow);
 
     const dedupe = new Set<string>();
     const merged: (Movie | TVShow)[] = [];
@@ -214,6 +265,10 @@ export default function Browse() {
 
         if (contentType === "now_playing" && "release_date" in item && item.release_date > today) return;
         if (contentType === "upcoming" && "release_date" in item && item.release_date < tomorrowStr) return;
+        if (contentType === "coming_soon") {
+          if ("release_date" in item && item.release_date < tomorrowStr) return;
+          if ("first_air_date" in item && item.first_air_date < tomorrowStr) return;
+        }
         if (isAnimeLike(item)) return;
 
         dedupe.add(key);
@@ -258,7 +313,10 @@ export default function Browse() {
     });
   };
 
-  const isSpecialCategory = contentType === "now_playing" || contentType === "upcoming";
+  const isSpecialCategory =
+    contentType === "now_playing" ||
+    contentType === "upcoming" ||
+    contentType === "coming_soon";
 
   if (authLoading) {
     return (
@@ -290,6 +348,7 @@ export default function Browse() {
                   <TabsTrigger value="all">All</TabsTrigger>
                   <TabsTrigger value="now_playing">🎬 Now Playing</TabsTrigger>
                   <TabsTrigger value="upcoming">🗓️ Upcoming</TabsTrigger>
+                  <TabsTrigger value="coming_soon">⏭️ Coming Soon</TabsTrigger>
                   <TabsTrigger value="bollywood">🇮🇳 Bollywood</TabsTrigger>
                   <TabsTrigger value="hollywood">🎬 Hollywood</TabsTrigger>
                   <TabsTrigger value="tamil">🎭 Tamil</TabsTrigger>
