@@ -741,63 +741,75 @@ export default function Upcoming() {
                 </p>
               </div>
 
-              <div className="rounded-xl border border-border/70 bg-card/35 px-2 py-2">
-                <div className="mb-2 px-2">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              <div className="rounded-2xl border border-border/70 bg-card/35 overflow-hidden">
+                <div className="flex items-center justify-between gap-3 border-b border-border/70 bg-background/40 px-4 py-2.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground/85">
                     Full Calendar Timeline
                   </p>
+                  <p className="hidden sm:flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                    Release dates
+                  </p>
                 </div>
-                <div className="overflow-x-auto scrollbar-hide">
-                  <div className="flex w-max items-stretch gap-2 px-2 pb-1">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedFilterDate("all")}
-                      className={cn(
-                        "min-w-[100px] rounded-xl border px-3 py-2 text-left transition-colors",
-                        selectedFilterDate === "all"
-                          ? "border-primary bg-primary/12 text-primary"
-                          : "border-border/80 bg-background/70 text-muted-foreground hover:border-primary/60 hover:text-foreground",
-                      )}
-                    >
-                      <p className="text-[10px] uppercase tracking-wide">Filter</p>
-                      <p className="mt-1 text-sm font-semibold">All Dates</p>
-                    </button>
+                <div className="relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-background to-transparent" />
+                  <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-background to-transparent" />
 
-                    {calendarTimelineDates.map((entry) => {
-                      const isSelected = selectedFilterDate === entry.dateKey;
-                      const hasRelease = releaseDateKeySet.has(entry.dateKey);
-                      return (
-                        <button
-                          key={`timeline-${entry.dateKey}`}
-                          type="button"
-                          onClick={() => setSelectedFilterDate(entry.dateKey)}
-                          className={cn(
-                            "min-w-[92px] rounded-xl border px-3 py-2 text-left transition-colors",
-                            isSelected
-                              ? "border-primary bg-primary/12 text-primary"
-                              : "border-border/80 bg-background/70 text-muted-foreground hover:border-primary/60 hover:text-foreground",
-                          )}
-                        >
-                          <p className="text-[10px] uppercase tracking-wide">
-                            {entry.date.toLocaleDateString("en-US", { weekday: "short" })}
-                          </p>
-                          <p className="mt-1 text-sm font-semibold">
-                            {entry.date.toLocaleDateString("en-US", { day: "numeric" })}
-                          </p>
-                          <p className="text-[10px] uppercase tracking-wide">
-                            {entry.date.toLocaleDateString("en-US", { month: "short" })}
-                          </p>
-                          {hasRelease && (
-                            <span className="mt-1 inline-block h-1.5 w-1.5 rounded-full bg-primary" />
-                          )}
-                          {entry.showMonthLabel && (
-                            <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-foreground/70">
-                              {entry.date.toLocaleDateString("en-US", { month: "long" })}
-                            </p>
-                          )}
-                        </button>
-                      );
-                    })}
+                  <div className="overflow-x-auto scrollbar-hide px-3 py-3">
+                    <div className="flex w-max items-stretch gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedFilterDate("all")}
+                        className={cn(
+                          "min-w-[108px] rounded-xl border px-3 py-2 text-left transition-all",
+                          selectedFilterDate === "all"
+                            ? "border-primary bg-gradient-to-b from-primary/20 to-primary/8 text-foreground shadow-[0_0_0_1px_hsl(var(--primary)/0.25)]"
+                            : "border-border/70 bg-gradient-to-b from-background/90 to-background/65 text-muted-foreground hover:-translate-y-0.5 hover:border-primary/45 hover:text-foreground",
+                        )}
+                      >
+                        <p className="text-[10px] uppercase tracking-wide">Filter</p>
+                        <p className="mt-1 text-sm font-semibold">All Dates</p>
+                        <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">Reset</p>
+                      </button>
+
+                      {calendarTimelineDates.map((entry) => {
+                        const isSelected = selectedFilterDate === entry.dateKey;
+                        const hasRelease = releaseDateKeySet.has(entry.dateKey);
+                        const isWeekend = entry.date.getDay() === 0 || entry.date.getDay() === 6;
+                        const dayNumber = entry.date.getDate();
+                        const monthShort = entry.date.toLocaleDateString("en-US", { month: "short" });
+                        const weekdayShort = entry.date.toLocaleDateString("en-US", { weekday: "short" });
+
+                        return (
+                          <button
+                            key={`timeline-${entry.dateKey}`}
+                            type="button"
+                            onClick={() => setSelectedFilterDate(entry.dateKey)}
+                            className={cn(
+                              "relative min-w-[98px] rounded-xl border px-3 py-2 text-left transition-all",
+                              isSelected
+                                ? "border-primary bg-gradient-to-b from-primary/20 to-primary/8 text-foreground shadow-[0_0_0_1px_hsl(var(--primary)/0.25)]"
+                                : "border-border/70 bg-gradient-to-b from-background/90 to-background/65 text-muted-foreground hover:-translate-y-0.5 hover:border-primary/45 hover:text-foreground",
+                              isWeekend && !isSelected && "border-primary/20",
+                            )}
+                          >
+                            <div className="flex items-center justify-between">
+                              <p className="text-[10px] uppercase tracking-wide">{weekdayShort}</p>
+                              {entry.showMonthLabel && (
+                                <span className="rounded-full border border-border/60 bg-background/80 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-foreground/75">
+                                  {monthShort}
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-1 text-lg font-semibold leading-none">{dayNumber}</p>
+                            <p className="mt-1 text-[10px] uppercase tracking-wide">{monthShort}</p>
+                            {hasRelease && (
+                              <span className="mt-1.5 inline-block h-1.5 w-1.5 rounded-full bg-primary" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>
