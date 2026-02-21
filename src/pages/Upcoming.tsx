@@ -76,7 +76,8 @@ const BOLLYWOOD_LANGUAGE_OPTIONS = [
   { value: "te", label: "Telugu" },
   { value: "kn", label: "Kannada" },
 ];
-const BOLLYWOOD_LANGUAGE_CODES = new Set(["hi", "gu", "ta", "te", "kn"]);
+const BOLLYWOOD_LANGUAGE_LIST = ["hi", "gu", "ta", "te", "kn"] as const;
+const BOLLYWOOD_LANGUAGE_CODES = new Set<string>(BOLLYWOOD_LANGUAGE_LIST);
 
 const isAnimeLike = (item: Movie | TVShow) =>
   item.original_language === "ja" && item.genre_ids?.includes(16);
@@ -101,6 +102,26 @@ const parseDateKey = (value: string): Date | null => {
   const [year, month, day] = value.split("-").map(Number);
   if (!year || !month || !day) return null;
   return new Date(year, month - 1, day);
+};
+
+const formatDateHeading = (date: Date) =>
+  date.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "long",
+    day: "numeric",
+  });
+
+const getRelativeReleaseLabel = (date: Date) => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.round((target.getTime() - today.getTime()) / 86_400_000);
+
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Tomorrow";
+  if (diffDays > 1) return `In ${diffDays} days`;
+  if (diffDays === -1) return "Yesterday";
+  return `${Math.abs(diffDays)} days ago`;
 };
 
 const PosterCard = memo(({ item, onClick }: { item: Movie | TVShow; onClick: () => void }) => {
@@ -156,6 +177,7 @@ export default function Upcoming() {
   const [searchParams, setSearchParams] = useSearchParams();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const calendarLoadMoreRef = useRef<HTMLDivElement | null>(null);
+  const calendarDateRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const [section, setSection] = useState<UpcomingSection>(
     (searchParams.get("section") as UpcomingSection) || "all",
@@ -173,6 +195,7 @@ export default function Upcoming() {
   const [seriesLanguage, setSeriesLanguage] = useState<string>(searchParams.get("lang") || "all");
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(undefined);
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => getMonthStart(new Date()));
+  const [calendarGroupLimit, setCalendarGroupLimit] = useState(8);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -217,19 +240,72 @@ export default function Upcoming() {
       const tomorrowStr = formatLocalDate(tomorrow);
 
       if (section === "movies") {
-        const filters: DiscoverFilters = {
+        const baseFilters: DiscoverFilters = {
           page,
           sort_by: "primary_release_date.asc",
           with_genres: movieGenre || undefined,
           "primary_release_date.gte": tomorrowStr,
         };
 
-        if (movieSectionFilter === "hollywood") {
-          filters.with_original_language = "en";
+        if (movieSectionFilter === "bollywood" && bollywoodLanguage === "all") {
+          const languageResponses = await Promise.allSettled(
+            BOLLYWOOD_LANGUAGE_LIST.map((language) =>
+              discoverMovies({
+                ...baseFilters,
+                with_original_language: language,
+                region: "IN",
+              }),
+            ),
+          );
+
+          const successfulPages = languageResponses.flatMap((response) =>
+            response.status === "fulfilled" ? [response.value] : [],
+          );
+
+          if (successfulPages.length === 0) {
+            return { page, results: [], total_pages: 1, total_results: 0 };
+          }
+
+          const deduped = new Map<number, Movie>();
+          successfulPages.forEach((data) => {
+            (data.results || []).forEach((movie) => {
+              if (!deduped.has(movie.id)) {
+                deduped.set(movie.id, movie);
+              }
+            });
+          });
+
+          const mergedResults = Array.from(deduped.values()).sort((a, b) => {
+            const dateCompare = (a.release_date || "9999-12-31").localeCompare(
+              b.release_date || "9999-12-31",
+            );
+            if (dateCompare !== 0) return dateCompare;
+            return (b.popularity || 0) - (a.popularity || 0);
+          });
+
+          return {
+            page,
+            results: mergedResults,
+            total_pages: Math.max(...successfulPages.map((data) => data.total_pages || 1)),
+            total_results: successfulPages.reduce(
+              (total, data) => total + (data.total_results || 0),
+              0,
+            ),
+          };
         }
 
-        if (movieSectionFilter === "bollywood" && bollywoodLanguage !== "all") {
-          filters.with_original_language = bollywoodLanguage;
+        const filters: DiscoverFilters = { ...baseFilters };
+
+        if (movieSectionFilter === "hollywood") {
+          filters.with_original_language = "en";
+          filters.region = "US";
+        }
+
+        if (movieSectionFilter === "bollywood") {
+          filters.region = "IN";
+          if (bollywoodLanguage !== "all") {
+            filters.with_original_language = bollywoodLanguage;
+          }
         }
 
         return discoverMovies(filters);
@@ -477,10 +553,40 @@ export default function Upcoming() {
     ? formatLocalDate(selectedCalendarDate)
     : "";
 
-  const selectedCalendarItems = useMemo(() => {
-    if (!selectedCalendarDateKey) return [];
-    return releasesByDate.get(selectedCalendarDateKey) || [];
-  }, [releasesByDate, selectedCalendarDateKey]);
+  const allReleaseDateGroups = useMemo(
+    () =>
+      releaseDateKeys
+        .map((dateKey) => {
+          const date = parseDateKey(dateKey);
+          if (!date) return null;
+          return {
+            dateKey,
+            date,
+            items: releasesByDate.get(dateKey) || [],
+          };
+        })
+        .filter(
+          (
+            group,
+          ): group is { dateKey: string; date: Date; items: (Movie | TVShow)[] } => group !== null,
+        ),
+    [releaseDateKeys, releasesByDate],
+  );
+
+  const monthReleaseDateGroups = useMemo(
+    () =>
+      allReleaseDateGroups.filter(
+        (group) =>
+          group.date.getMonth() === calendarMonth.getMonth() &&
+          group.date.getFullYear() === calendarMonth.getFullYear(),
+      ),
+    [allReleaseDateGroups, calendarMonth],
+  );
+
+  const activeReleaseDateGroups =
+    monthReleaseDateGroups.length > 0 ? monthReleaseDateGroups : allReleaseDateGroups;
+  const visibleReleaseDateGroups = activeReleaseDateGroups.slice(0, calendarGroupLimit);
+  const hasMoreReleaseDateGroups = activeReleaseDateGroups.length > calendarGroupLimit;
 
   const selectedCalendarMonthEndKey = formatLocalDate(getMonthEnd(calendarMonth));
   const maxLoadedDateKey = releaseDateKeys.length ? releaseDateKeys[releaseDateKeys.length - 1] : "";
@@ -527,7 +633,39 @@ export default function Upcoming() {
         day: "numeric",
         year: "numeric",
       })
-    : "Select a date";
+    : "Pick a release date";
+
+  useEffect(() => {
+    setCalendarGroupLimit(8);
+  }, [
+    section,
+    movieSectionFilter,
+    bollywoodLanguage,
+    movieGenre,
+    seriesGenre,
+    seriesOtt,
+    seriesLanguage,
+    calendarMonth,
+  ]);
+
+  useEffect(() => {
+    if (!selectedCalendarDateKey) return;
+    const selectedIndex = activeReleaseDateGroups.findIndex(
+      (group) => group.dateKey === selectedCalendarDateKey,
+    );
+    if (selectedIndex !== -1 && selectedIndex + 1 > calendarGroupLimit) {
+      setCalendarGroupLimit(selectedIndex + 1);
+    }
+  }, [selectedCalendarDateKey, activeReleaseDateGroups, calendarGroupLimit]);
+
+  useEffect(() => {
+    if (viewMode !== "calendar") return;
+    if (!selectedCalendarDateKey) return;
+    const node = calendarDateRefs.current[selectedCalendarDateKey];
+    if (node) {
+      node.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [viewMode, selectedCalendarDateKey, visibleReleaseDateGroups.length]);
 
   const handleItemClick = (item: Movie | TVShow) => {
     const isTV = isTVShow(item);
@@ -698,12 +836,15 @@ export default function Upcoming() {
           {isLoading ? (
             <PosterGridSkeleton count={18} />
           ) : viewMode === "calendar" ? (
-            <div className="grid grid-cols-1 lg:grid-cols-[340px,1fr] gap-6">
-              <Card className="h-fit">
-                <CardHeader className="pb-2">
+            <div className="grid grid-cols-1 xl:grid-cols-[340px,1fr] gap-6">
+              <Card className="h-fit overflow-hidden border-border/80 bg-card/55 xl:sticky xl:top-24">
+                <CardHeader className="pb-3 border-b border-border/70">
                   <CardTitle className="text-lg">Release Calendar</CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Pick a date to jump to the matching schedule section.
+                  </p>
                 </CardHeader>
-                <CardContent className="pt-0">
+                <CardContent className="pt-4 space-y-3">
                   <Calendar
                     mode="single"
                     selected={selectedCalendarDate}
@@ -716,49 +857,119 @@ export default function Upcoming() {
                     modifiersClassNames={{
                       release: "bg-primary/15 text-primary font-semibold rounded-md",
                     }}
-                    className="rounded-md border bg-card"
+                    className="rounded-xl border border-border/70 bg-background/75 p-2"
                   />
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Highlighted dates have upcoming releases.
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-lg border border-border/70 bg-background/80 px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Loaded dates</p>
+                      <p className="mt-1 text-base font-semibold text-foreground">{releaseDateKeys.length}</p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 bg-background/80 px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Loaded titles</p>
+                      <p className="mt-1 text-base font-semibold text-foreground">{filteredUpcoming.length}</p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    {monthReleaseDateGroups.length > 0
+                      ? "Showing date-wise releases for the selected month."
+                      : "No loaded releases in this month yet. Showing nearest upcoming dates."}
                   </p>
                 </CardContent>
               </Card>
 
-              <div>
-                <h3 className="text-xl font-semibold mb-4">{selectedCalendarDateLabel}</h3>
-                {selectedCalendarItems.length > 0 ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {selectedCalendarItems.map((item) => (
-                      <PosterCard
-                        key={`${item.id}-${isTVShow(item) ? "tv" : "movie"}-calendar`}
-                        item={item}
-                        onClick={() => handleItemClick(item)}
-                      />
-                    ))}
-                  </div>
+              <div className="space-y-4">
+                <div className="rounded-xl border border-border/80 bg-card/45 px-4 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/90">
+                    Date-wise Schedule
+                  </p>
+                  <h3 className="mt-1 text-lg font-semibold text-foreground">{selectedCalendarDateLabel}</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {activeReleaseDateGroups.length} release dates in current loaded results.
+                  </p>
+                </div>
+
+                {visibleReleaseDateGroups.length > 0 ? (
+                  visibleReleaseDateGroups.map((group) => {
+                    const isSelected = group.dateKey === selectedCalendarDateKey;
+                    return (
+                      <div
+                        key={group.dateKey}
+                        ref={(node) => {
+                          calendarDateRefs.current[group.dateKey] = node;
+                        }}
+                      >
+                        <Card
+                          className={cn(
+                            "border-border/70 bg-card/35",
+                            isSelected && "border-primary/60 ring-1 ring-primary/25",
+                          )}
+                        >
+                          <CardHeader className="pb-2">
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div>
+                                <CardTitle className="text-base">{formatDateHeading(group.date)}</CardTitle>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {getRelativeReleaseLabel(group.date)}
+                                </p>
+                              </div>
+                              <span className="rounded-full border border-border/70 bg-background/75 px-2.5 py-1 text-xs font-medium text-foreground">
+                                {group.items.length} {group.items.length === 1 ? "release" : "releases"}
+                              </span>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-3">
+                              {group.items.map((item) => (
+                                <PosterCard
+                                  key={`${item.id}-${isTVShow(item) ? "tv" : "movie"}-${group.dateKey}`}
+                                  item={item}
+                                  onClick={() => handleItemClick(item)}
+                                />
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    );
+                  })
                 ) : isFetchingNextPage ? (
                   <div className="text-center py-12 border rounded-lg bg-card/40">
                     <InlineLoadMoreSkeleton className="py-0 justify-center" />
-                    <p className="text-sm text-muted-foreground mt-3">Loading more releases...</p>
+                    <p className="text-sm text-muted-foreground mt-3">Loading release schedule...</p>
                   </div>
                 ) : (
                   <div className="text-center py-12 border rounded-lg bg-card/40">
-                    <p className="text-muted-foreground">
-                      No releases found for this date.
-                    </p>
+                    <p className="text-muted-foreground">No date-wise releases found yet.</p>
+                  </div>
+                )}
+
+                {hasMoreReleaseDateGroups && (
+                  <div className="flex justify-center">
+                    <Button
+                      variant="outline"
+                      onClick={() => setCalendarGroupLimit((current) => current + 8)}
+                    >
+                      Show More Dates
+                    </Button>
                   </div>
                 )}
 
                 {hasNextPage && (
-                  <div className="flex justify-center mt-6">
+                  <div className="flex justify-center">
                     <Button
                       variant="outline"
                       onClick={() => fetchNextPage()}
                       disabled={isFetchingNextPage}
                     >
-                      {isFetchingNextPage ? "Loading..." : "Load More Dates"}
+                      {isFetchingNextPage ? "Loading..." : "Load More From API"}
                     </Button>
                   </div>
+                )}
+
+                {isFetchingNextPage && (
+                  <InlineLoadMoreSkeleton />
                 )}
 
                 <div ref={calendarLoadMoreRef} className="h-10 w-full" />
