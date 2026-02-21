@@ -76,6 +76,7 @@ const BOLLYWOOD_LANGUAGE_OPTIONS = [
 ];
 const BOLLYWOOD_LANGUAGE_LIST = ["hi", "gu", "ta", "te", "kn"] as const;
 const BOLLYWOOD_LANGUAGE_CODES = new Set<string>(BOLLYWOOD_LANGUAGE_LIST);
+const CALENDAR_TIMELINE_DAYS = 180;
 
 const isAnimeLike = (item: Movie | TVShow) =>
   item.original_language === "ja" && item.genre_ids?.includes(16);
@@ -97,6 +98,8 @@ const parseDateKey = (value: string): Date | null => {
   if (!year || !month || !day) return null;
   return new Date(year, month - 1, day);
 };
+
+const isValidDateKey = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
 
 const formatDateHeading = (date: Date) =>
   date.toLocaleDateString("en-US", {
@@ -170,7 +173,6 @@ export default function Upcoming() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const calendarLoadMoreRef = useRef<HTMLDivElement | null>(null);
-  const dateSectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const [section, setSection] = useState<UpcomingSection>(
     (searchParams.get("section") as UpcomingSection) || "all",
@@ -183,8 +185,11 @@ export default function Upcoming() {
   const [seriesGenre, setSeriesGenre] = useState<string>(searchParams.get("seriesGenre") || "");
   const [seriesOtt, setSeriesOtt] = useState<string>(searchParams.get("ott") || "all");
   const [seriesLanguage, setSeriesLanguage] = useState<string>(searchParams.get("lang") || "all");
+  const [selectedFilterDate, setSelectedFilterDate] = useState<string>(() => {
+    const dateParam = searchParams.get("date") || "";
+    return isValidDateKey(dateParam) ? dateParam : "all";
+  });
   const [calendarGroupLimit, setCalendarGroupLimit] = useState(8);
-  const [selectedDateKey, setSelectedDateKey] = useState<string>("");
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -220,6 +225,7 @@ export default function Upcoming() {
       seriesGenre,
       seriesOtt,
       seriesLanguage,
+      selectedFilterDate,
     ],
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
@@ -227,13 +233,16 @@ export default function Upcoming() {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       const tomorrowStr = formatLocalDate(tomorrow);
+      const releaseDateGte = selectedFilterDate === "all" ? tomorrowStr : selectedFilterDate;
+      const releaseDateLte = selectedFilterDate === "all" ? undefined : selectedFilterDate;
 
       if (section === "movies") {
         const baseFilters: DiscoverFilters = {
           page,
           sort_by: "primary_release_date.asc",
           with_genres: movieGenre || undefined,
-          "primary_release_date.gte": tomorrowStr,
+          "primary_release_date.gte": releaseDateGte,
+          "primary_release_date.lte": releaseDateLte,
         };
 
         if (movieSectionFilter === "bollywood" && bollywoodLanguage === "all") {
@@ -306,7 +315,8 @@ export default function Upcoming() {
           sort_by: "first_air_date.asc",
           with_genres: seriesGenre || undefined,
           with_original_language: seriesLanguage === "all" ? undefined : seriesLanguage,
-          "first_air_date.gte": tomorrowStr,
+          "first_air_date.gte": releaseDateGte,
+          "first_air_date.lte": releaseDateLte,
         };
 
         if (seriesOtt !== "all") {
@@ -321,7 +331,8 @@ export default function Upcoming() {
         discoverMovies({
           page,
           sort_by: "primary_release_date.asc",
-          "primary_release_date.gte": tomorrowStr,
+          "primary_release_date.gte": releaseDateGte,
+          "primary_release_date.lte": releaseDateLte,
         }).catch(() => ({
           page,
           results: [] as Movie[],
@@ -331,7 +342,8 @@ export default function Upcoming() {
         discoverTVShows({
           page,
           sort_by: "first_air_date.asc",
-          "first_air_date.gte": tomorrowStr,
+          "first_air_date.gte": releaseDateGte,
+          "first_air_date.lte": releaseDateLte,
         }).catch(() => ({
           page,
           results: [] as TVShow[],
@@ -372,7 +384,12 @@ export default function Upcoming() {
         if (section === "series" && !itemIsTV) return;
 
         const releaseDate = getReleaseDate(item);
-        if (!releaseDate || releaseDate < tomorrowStr) return;
+        if (!releaseDate) return;
+        if (selectedFilterDate === "all") {
+          if (releaseDate < tomorrowStr) return;
+        } else if (releaseDate !== selectedFilterDate) {
+          return;
+        }
         if (isAnimeLike(item)) return;
 
         if (section === "movies") {
@@ -421,6 +438,7 @@ export default function Upcoming() {
     movieGenre,
     seriesLanguage,
     seriesGenre,
+    selectedFilterDate,
   ]);
 
   useEffect(() => {
@@ -434,6 +452,7 @@ export default function Upcoming() {
     if (seriesGenre) params.set("seriesGenre", seriesGenre);
     if (seriesOtt !== "all") params.set("ott", seriesOtt);
     if (seriesLanguage !== "all") params.set("lang", seriesLanguage);
+    if (selectedFilterDate !== "all") params.set("date", selectedFilterDate);
     setSearchParams(params, { replace: true });
   }, [
     section,
@@ -443,6 +462,7 @@ export default function Upcoming() {
     seriesGenre,
     seriesOtt,
     seriesLanguage,
+    selectedFilterDate,
     setSearchParams,
   ]);
 
@@ -508,24 +528,44 @@ export default function Upcoming() {
     [releaseDateKeys, releasesByDate],
   );
 
+  const releaseDateKeySet = useMemo(() => new Set(releaseDateKeys), [releaseDateKeys]);
+
+  const calendarTimelineDates = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() + 1);
+
+    return Array.from({ length: CALENDAR_TIMELINE_DAYS }, (_, index) => {
+      const date = new Date(start);
+      date.setDate(start.getDate() + index);
+      return {
+        date,
+        dateKey: formatLocalDate(date),
+        showMonthLabel: index === 0 || date.getDate() === 1,
+      };
+    });
+  }, []);
+
   const activeReleaseDateGroups = allReleaseDateGroups;
   const visibleReleaseDateGroups = activeReleaseDateGroups.slice(0, calendarGroupLimit);
-  const hasMoreReleaseDateGroups = activeReleaseDateGroups.length > calendarGroupLimit;
-  const nextReleaseDateLabel = visibleReleaseDateGroups[0]
+  const hasMoreReleaseDateGroups =
+    selectedFilterDate === "all" && activeReleaseDateGroups.length > calendarGroupLimit;
+  const defaultReleaseDateLabel = visibleReleaseDateGroups[0]
     ? visibleReleaseDateGroups[0].date.toLocaleDateString("en-US", {
         weekday: "long",
         month: "long",
         day: "numeric",
       })
     : "No releases yet";
-  const selectedReleaseDate = activeReleaseDateGroups.find((group) => group.dateKey === selectedDateKey);
-  const selectedReleaseDateLabel = selectedReleaseDate
-    ? selectedReleaseDate.date.toLocaleDateString("en-US", {
+  const selectedFilterDateObject =
+    selectedFilterDate !== "all" ? parseDateKey(selectedFilterDate) : null;
+  const selectedReleaseDateLabel = selectedFilterDateObject
+    ? selectedFilterDateObject.toLocaleDateString("en-US", {
         weekday: "long",
         month: "long",
         day: "numeric",
       })
-    : nextReleaseDateLabel;
+    : defaultReleaseDateLabel;
 
   useEffect(() => {
     setCalendarGroupLimit(8);
@@ -537,37 +577,8 @@ export default function Upcoming() {
     seriesGenre,
     seriesOtt,
     seriesLanguage,
+    selectedFilterDate,
   ]);
-
-  useEffect(() => {
-    if (!activeReleaseDateGroups.length) {
-      setSelectedDateKey("");
-      return;
-    }
-
-    setSelectedDateKey((current) => {
-      if (current && activeReleaseDateGroups.some((group) => group.dateKey === current)) {
-        return current;
-      }
-      return activeReleaseDateGroups[0]?.dateKey || "";
-    });
-  }, [activeReleaseDateGroups]);
-
-  useEffect(() => {
-    if (!selectedDateKey) return;
-    const selectedIndex = activeReleaseDateGroups.findIndex((group) => group.dateKey === selectedDateKey);
-    if (selectedIndex !== -1 && selectedIndex + 1 > calendarGroupLimit) {
-      setCalendarGroupLimit(selectedIndex + 1);
-    }
-  }, [selectedDateKey, activeReleaseDateGroups, calendarGroupLimit]);
-
-  useEffect(() => {
-    if (!selectedDateKey) return;
-    const node = dateSectionRefs.current[selectedDateKey];
-    if (node) {
-      node.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, [selectedDateKey, visibleReleaseDateGroups.length]);
 
   const handleItemClick = (item: Movie | TVShow) => {
     const isTV = isTVShow(item);
@@ -730,45 +741,73 @@ export default function Upcoming() {
                 </p>
               </div>
 
-              {activeReleaseDateGroups.length > 0 && (
-                <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
-                  <div className="flex w-max gap-2">
-                    {activeReleaseDateGroups.map((group) => {
-                      const isSelected = group.dateKey === selectedDateKey;
+              <div className="rounded-xl border border-border/70 bg-card/35 px-2 py-2">
+                <div className="mb-2 px-2">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Full Calendar Timeline
+                  </p>
+                </div>
+                <div className="overflow-x-auto scrollbar-hide">
+                  <div className="flex w-max items-stretch gap-2 px-2 pb-1">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedFilterDate("all")}
+                      className={cn(
+                        "min-w-[100px] rounded-xl border px-3 py-2 text-left transition-colors",
+                        selectedFilterDate === "all"
+                          ? "border-primary bg-primary/12 text-primary"
+                          : "border-border/80 bg-background/70 text-muted-foreground hover:border-primary/60 hover:text-foreground",
+                      )}
+                    >
+                      <p className="text-[10px] uppercase tracking-wide">Filter</p>
+                      <p className="mt-1 text-sm font-semibold">All Dates</p>
+                    </button>
+
+                    {calendarTimelineDates.map((entry) => {
+                      const isSelected = selectedFilterDate === entry.dateKey;
+                      const hasRelease = releaseDateKeySet.has(entry.dateKey);
                       return (
                         <button
-                          key={`date-chip-${group.dateKey}`}
+                          key={`timeline-${entry.dateKey}`}
                           type="button"
-                          onClick={() => setSelectedDateKey(group.dateKey)}
+                          onClick={() => setSelectedFilterDate(entry.dateKey)}
                           className={cn(
                             "min-w-[92px] rounded-xl border px-3 py-2 text-left transition-colors",
                             isSelected
                               ? "border-primary bg-primary/12 text-primary"
-                              : "border-border/80 bg-card/35 text-muted-foreground hover:border-primary/60 hover:text-foreground",
+                              : "border-border/80 bg-background/70 text-muted-foreground hover:border-primary/60 hover:text-foreground",
                           )}
                         >
                           <p className="text-[10px] uppercase tracking-wide">
-                            {group.date.toLocaleDateString("en-US", { weekday: "short" })}
+                            {entry.date.toLocaleDateString("en-US", { weekday: "short" })}
                           </p>
                           <p className="mt-1 text-sm font-semibold">
-                            {group.date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            {entry.date.toLocaleDateString("en-US", { day: "numeric" })}
                           </p>
+                          <p className="text-[10px] uppercase tracking-wide">
+                            {entry.date.toLocaleDateString("en-US", { month: "short" })}
+                          </p>
+                          {hasRelease && (
+                            <span className="mt-1 inline-block h-1.5 w-1.5 rounded-full bg-primary" />
+                          )}
+                          {entry.showMonthLabel && (
+                            <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-foreground/70">
+                              {entry.date.toLocaleDateString("en-US", { month: "long" })}
+                            </p>
+                          )}
                         </button>
                       );
                     })}
                   </div>
                 </div>
-              )}
+              </div>
 
               {visibleReleaseDateGroups.length > 0 ? (
                 visibleReleaseDateGroups.map((group) => {
-                  const isSelected = group.dateKey === selectedDateKey;
+                  const isSelected = selectedFilterDate !== "all" && group.dateKey === selectedFilterDate;
                   return (
                     <div
                       key={group.dateKey}
-                      ref={(node) => {
-                        dateSectionRefs.current[group.dateKey] = node;
-                      }}
                     >
                       <Card
                         className={cn(
