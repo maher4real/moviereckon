@@ -29,6 +29,26 @@ const usernameSchema = z
   .max(50, "Username is too long");
 const STARTUP_SOUND_PENDING_KEY = "startupSoundPending";
 
+function AuthSubmitSkeleton({
+  srLabel,
+  widthClass,
+}: {
+  srLabel: string;
+  widthClass: string;
+}) {
+  return (
+    <span
+      className="flex w-full items-center justify-center gap-2.5"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <span aria-hidden="true" className="h-4 w-4 rounded-full bg-white/50 animate-pulse" />
+      <span aria-hidden="true" className={cn("h-3.5 rounded bg-white/40 animate-pulse", widthClass)} />
+      <span className="sr-only">{srLabel}</span>
+    </span>
+  );
+}
+
 export default function Auth() {
   const navigate = useNavigate();
   const { user, isLoading, signUp, signIn } = useAuth();
@@ -335,13 +355,7 @@ export default function Auth() {
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? (
-                    <span className="flex items-center gap-2">
-                      <span
-                        aria-hidden="true"
-                        className="h-4 w-10 rounded bg-white/35 animate-pulse"
-                      />
-                      Signing in...
-                    </span>
+                    <AuthSubmitSkeleton srLabel="Signing in" widthClass="w-20" />
                   ) : (
                     "Sign In"
                   )}
@@ -429,13 +443,7 @@ export default function Auth() {
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? (
-                    <span className="flex items-center gap-2">
-                      <span
-                        aria-hidden="true"
-                        className="h-4 w-20 rounded bg-white/35 animate-pulse"
-                      />
-                      Creating account...
-                    </span>
+                    <AuthSubmitSkeleton srLabel="Creating account" widthClass="w-28" />
                   ) : (
                     "Create Account"
                   )}
