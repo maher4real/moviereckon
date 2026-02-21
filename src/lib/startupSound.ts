@@ -2,7 +2,7 @@ const STARTUP_SOUND_PENDING_KEY = "startupSoundPending";
 const STARTUP_SOUND_PLAYED_KEY = "startupSoundPlayed";
 const STARTUP_SOUND_ENABLED_KEY = "startupSoundEnabled";
 
-export const STARTUP_SOUND_SRC = "/startup.mp3";
+export const STARTUP_SOUND_SRC = "/startupintro.mp3";
 
 const safeGetSession = (key: string) => {
   try {
@@ -58,4 +58,3 @@ export const isStartupSoundEnabled = () => {
   const value = safeGetLocal(STARTUP_SOUND_ENABLED_KEY);
   return value !== "0" && value !== "false";
 };
-
