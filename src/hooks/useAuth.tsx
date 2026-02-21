@@ -161,7 +161,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const updated = await mongoClient.updateProfile({
       username: updates.username,
-      avatar_url: updates.avatar_url || undefined,
+      avatar_url:
+        updates.avatar_url === undefined ? undefined : updates.avatar_url,
     });
 
     if (!updated) {
@@ -173,7 +174,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    setProfile((prev) => (prev ? { ...prev, ...updates } : null));
+    setUser(updated);
+    setProfile({
+      id: updated.id,
+      user_id: updated.id,
+      username: updated.username,
+      avatar_url: updated.avatar_url,
+      created_at: updated.created_at,
+      updated_at: updated.updated_at,
+    });
     toast({
       title: "Profile updated",
       description: "Your profile has been updated successfully.",

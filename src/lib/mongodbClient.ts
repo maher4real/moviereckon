@@ -544,7 +544,10 @@ export async function clearAllHistory(): Promise<boolean> {
   }
 }
 
-export async function updateProfile(updates: { username?: string; avatar_url?: string }): Promise<MongoUser | null> {
+export async function updateProfile(updates: {
+  username?: string;
+  avatar_url?: string | null;
+}): Promise<MongoUser | null> {
   try {
     const response = await fetchWithAuth("/api/user/profile", {
       method: "PUT",
