@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, memo, useCallback } from "react";
+import { useEffect, useState, useMemo, memo, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserData } from "@/hooks/useUserData";
@@ -26,6 +26,7 @@ import ContentCarousel from "@/components/ContentCarousel";
 import Footer from "@/components/Footer";
 import { AppPageSkeleton } from "@/components/AppSkeletons";
 import { Sparkles } from "lucide-react";
+import { announceHomeHeroReady } from "@/lib/startupSound";
 
 // Memoized carousel for performance
 const MemoizedCarousel = memo(ContentCarousel);
@@ -52,6 +53,7 @@ export default function Home() {
   } = useRecommendations();
   const navigate = useNavigate();
   const [heroIndex, setHeroIndex] = useState(0);
+  const hasAnnouncedHeroReadyRef = useRef(false);
 
   // Redirect to auth if no user
   useEffect(() => {
@@ -306,6 +308,12 @@ export default function Home() {
     setHeroIndex(index);
   }, []);
 
+  const handleHeroBackdropReady = useCallback(() => {
+    if (hasAnnouncedHeroReadyRef.current) return;
+    hasAnnouncedHeroReadyRef.current = true;
+    announceHomeHeroReady();
+  }, []);
+
   if (authLoading) {
     return <AppPageSkeleton cardCount={10} showFilterRow={false} />;
   }
@@ -321,6 +329,7 @@ export default function Home() {
         currentIndex={heroIndex}
         totalSlides={heroMovies.length}
         onDotClick={handleDotClick}
+        onBackdropReady={handleHeroBackdropReady}
       />
 
       {/* Content Sections */}

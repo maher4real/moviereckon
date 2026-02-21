@@ -11,6 +11,7 @@ interface HeroBannerProps {
   currentIndex: number;
   totalSlides: number;
   onDotClick: (index: number) => void;
+  onBackdropReady?: () => void;
 }
 
 export default function HeroBanner({
@@ -19,6 +20,7 @@ export default function HeroBanner({
   currentIndex,
   totalSlides,
   onDotClick,
+  onBackdropReady,
 }: HeroBannerProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -43,6 +45,7 @@ export default function HeroBanner({
         className="absolute inset-0 w-full h-full object-cover transition-all duration-700"
         fallbackSrc="/fallbacks/backdrop.svg"
         fadeIn
+        onLoad={onBackdropReady}
       />
 
       {/* Gradient Overlays */}

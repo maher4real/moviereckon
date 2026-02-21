@@ -1,13 +1,17 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  STARTUP_SOUND_SRC,
+  consumeHomeHeroReady,
+  HOME_HERO_READY_EVENT,
   clearStartupSoundPending,
   hasStartupSoundPlayed,
   isStartupSoundEnabled,
   isStartupSoundPending,
   markStartupSoundPlayed,
+  playStartupSound,
+  releaseStartupSoundAudio,
+  warmStartupSound,
 } from "@/lib/startupSound";
 
 const isAuthRoute = (pathname: string) => pathname === "/" || pathname.startsWith("/auth");
@@ -15,10 +19,8 @@ const isAuthRoute = (pathname: string) => pathname === "/" || pathname.startsWit
 export default function StartupSoundManager() {
   const { user, isLoading: authLoading } = useAuth();
   const location = useLocation();
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    if (authLoading || !user) return;
     if (isAuthRoute(location.pathname)) return;
     if (!isStartupSoundEnabled()) {
       clearStartupSoundPending();
@@ -27,15 +29,16 @@ export default function StartupSoundManager() {
 
     const pending = isStartupSoundPending();
     const alreadyPlayed = hasStartupSoundPlayed();
+    if (!pending && (authLoading || !user)) return;
     if (!pending && alreadyPlayed) return;
 
-    const audio = audioRef.current ?? new Audio(STARTUP_SOUND_SRC);
-    audio.preload = "auto";
-    audio.volume = 0.85;
-    audioRef.current = audio;
+    warmStartupSound();
 
     let disposed = false;
     let fallbackAttached = false;
+    let visibilityAttached = false;
+    let homeReadyAttached = false;
+    let homeTimer: number | null = null;
 
     const detachFallback = () => {
       if (!fallbackAttached) return;
@@ -44,16 +47,32 @@ export default function StartupSoundManager() {
       fallbackAttached = false;
     };
 
+    const detachVisibility = () => {
+      if (!visibilityAttached) return;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      visibilityAttached = false;
+    };
+
+    const detachHomeReady = () => {
+      if (!homeReadyAttached) return;
+      window.removeEventListener(HOME_HERO_READY_EVENT, onHomeReady);
+      homeReadyAttached = false;
+      if (homeTimer !== null) {
+        window.clearTimeout(homeTimer);
+        homeTimer = null;
+      }
+    };
+
     const markPlayed = () => {
       markStartupSoundPlayed();
+      detachHomeReady();
+      detachVisibility();
       detachFallback();
     };
 
     const tryPlay = () => {
       if (disposed) return;
-      audio.currentTime = 0;
-      void audio
-        .play()
+      void playStartupSound()
         .then(() => {
           if (disposed) return;
           markPlayed();
@@ -66,42 +85,62 @@ export default function StartupSoundManager() {
         });
     };
 
+    const playWhenVisible = () => {
+      if (disposed) return;
+      if (document.visibilityState === "visible") {
+        tryPlay();
+        return;
+      }
+      if (!visibilityAttached) {
+        document.addEventListener("visibilitychange", onVisibilityChange);
+        visibilityAttached = true;
+      }
+    };
+
     const onUserInteraction = () => {
       detachFallback();
-      tryPlay();
+      playWhenVisible();
     };
 
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        document.removeEventListener("visibilitychange", onVisibilityChange);
-        tryPlay();
+        detachVisibility();
+        playWhenVisible();
       }
     };
 
-    if (document.visibilityState === "visible") {
-      tryPlay();
+    const onHomeReady = () => {
+      detachHomeReady();
+      playWhenVisible();
+    };
+
+    if (location.pathname === "/home") {
+      if (consumeHomeHeroReady()) {
+        playWhenVisible();
+      } else {
+        window.addEventListener(HOME_HERO_READY_EVENT, onHomeReady, { once: true });
+        homeReadyAttached = true;
+        // Fallback in case the ready signal is missed by the listener.
+        homeTimer = window.setTimeout(onHomeReady, 350);
+      }
     } else {
-      document.addEventListener("visibilitychange", onVisibilityChange);
+      playWhenVisible();
     }
 
     return () => {
       disposed = true;
+      detachHomeReady();
+      detachVisibility();
       detachFallback();
-      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [authLoading, user, location.pathname]);
 
   useEffect(
     () => () => {
-      const audio = audioRef.current;
-      if (!audio) return;
-      audio.pause();
-      audio.src = "";
-      audioRef.current = null;
+      releaseStartupSoundAudio();
     },
     [],
   );
 
   return null;
 }
-

@@ -17,7 +17,11 @@ import MediaImage from "@/components/MediaImage";
 import { Film, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
-import { queueStartupSound } from "@/lib/startupSound";
+import {
+  primeStartupSoundFromGesture,
+  queueStartupSound,
+  warmStartupSound,
+} from "@/lib/startupSound";
 
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z
@@ -171,6 +175,10 @@ export default function Auth() {
     }
   }, [user, isLoading, navigate]);
 
+  useEffect(() => {
+    warmStartupSound();
+  }, []);
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
@@ -199,6 +207,9 @@ export default function Auth() {
     e.preventDefault();
 
     if (!validateForm()) return;
+
+    // Prime audio in direct user gesture path to reduce autoplay delays after navigation.
+    void primeStartupSoundFromGesture();
 
     setIsSubmitting(true);
 
