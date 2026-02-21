@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Default avatar sky">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#1e3a8a"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <circle cx="256" cy="190" r="104" fill="#e0f2fe"/>
+  <path d="M96 472c20-96 92-156 160-156s140 60 160 156H96z" fill="#e0f2fe"/>
+  <path d="M176 178c16-42 46-65 80-65s64 23 80 65c-24 8-53 12-80 12s-56-4-80-12z" fill="#1f2937"/>
+  <circle cx="222" cy="206" r="10" fill="#0f172a"/>
+  <circle cx="290" cy="206" r="10" fill="#0f172a"/>
+  <path d="M219 250c9 13 22 20 37 20s28-7 37-20" fill="none" stroke="#0f172a" stroke-width="12" stroke-linecap="round"/>
+</svg>

@@ -43,37 +43,39 @@ const MAX_AVATAR_FILE_SIZE_BYTES = 3 * 1024 * 1024;
 const MAX_AVATAR_DATA_URL_LENGTH = 2_500_000;
 const DATA_IMAGE_REGEX =
   /^data:image\/(?:png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/i;
+const LOCAL_AVATAR_PATH_REGEX =
+  /^\/avatars\/[a-z0-9-_]+\.(?:svg|png|jpe?g|webp|gif)$/i;
 
 const DEFAULT_AVATAR_OPTIONS = [
   {
     id: "net-red",
     label: "Red Hero",
-    url: "https://api.dicebear.com/9.x/fun-emoji/svg?seed=RedHero&backgroundColor=ef4444",
+    url: "/avatars/net-red.svg",
   },
   {
     id: "shadow",
     label: "Shadow",
-    url: "https://api.dicebear.com/9.x/fun-emoji/svg?seed=Shadow&backgroundColor=111827",
+    url: "/avatars/net-shadow.svg",
   },
   {
     id: "ember",
     label: "Ember",
-    url: "https://api.dicebear.com/9.x/fun-emoji/svg?seed=Ember&backgroundColor=f97316",
+    url: "/avatars/net-ember.svg",
   },
   {
     id: "sky",
     label: "Sky",
-    url: "https://api.dicebear.com/9.x/fun-emoji/svg?seed=Sky&backgroundColor=3b82f6",
+    url: "/avatars/net-sky.svg",
   },
   {
     id: "mint",
     label: "Mint",
-    url: "https://api.dicebear.com/9.x/fun-emoji/svg?seed=Mint&backgroundColor=10b981",
+    url: "/avatars/net-mint.svg",
   },
   {
     id: "violet",
     label: "Violet",
-    url: "https://api.dicebear.com/9.x/fun-emoji/svg?seed=Violet&backgroundColor=8b5cf6",
+    url: "/avatars/net-violet.svg",
   },
 ];
 
@@ -100,6 +102,10 @@ const isSupportedAvatarValue = (value: string) => {
     return value.length <= MAX_AVATAR_DATA_URL_LENGTH && DATA_IMAGE_REGEX.test(value);
   }
 
+  if (LOCAL_AVATAR_PATH_REGEX.test(value)) {
+    return true;
+  }
+
   return isValidHttpUrl(value);
 };
 
@@ -108,6 +114,18 @@ const getInitials = (value: string) => {
   if (parts.length === 0) return "U";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return `${parts[0][0] || ""}${parts[1][0] || ""}`.toUpperCase();
+};
+
+const isDefaultAvatarSelected = (currentValue: string, candidatePath: string) => {
+  if (!currentValue) return false;
+  if (currentValue === candidatePath) return true;
+
+  try {
+    const parsed = new URL(currentValue);
+    return parsed.pathname === candidatePath;
+  } catch {
+    return false;
+  }
 };
 
 type ActivityItem = {
@@ -290,9 +308,17 @@ export default function Profile() {
     }
 
     setIsSavingProfile(true);
+    const avatarForSave = (() => {
+      if (!avatar) return null;
+      if (LOCAL_AVATAR_PATH_REGEX.test(avatar) && typeof window !== "undefined") {
+        return `${window.location.origin}${avatar}`;
+      }
+      return avatar;
+    })();
+
     await updateProfile({
       username,
-      avatar_url: avatar ? avatar : null,
+      avatar_url: avatarForSave,
     });
     setIsSavingProfile(false);
     setEditOpen(false);
@@ -618,7 +644,8 @@ export default function Profile() {
                     onClick={() => setAvatarInput(candidate.url)}
                     className={cn(
                       "rounded-full border border-border p-1.5 hover:border-primary transition-colors",
-                      avatarInput === candidate.url && "border-primary ring-2 ring-primary/30",
+                      isDefaultAvatarSelected(avatarInput, candidate.url) &&
+                        "border-primary ring-2 ring-primary/30",
                     )}
                     title={candidate.label}
                   >
