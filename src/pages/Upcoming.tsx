@@ -26,13 +26,11 @@ import {
 import MediaImage from "@/components/MediaImage";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 type UpcomingSection = "all" | "movies" | "series";
 type MovieSectionFilter = "all" | "bollywood" | "hollywood";
-type UpcomingViewMode = "grid" | "calendar";
 
 interface UpcomingPage {
   results: (Movie | TVShow)[];
@@ -93,10 +91,6 @@ const isTVShow = (item: Movie | TVShow): item is TVShow => "first_air_date" in i
 
 const getReleaseDate = (item: Movie | TVShow) =>
   isTVShow(item) ? item.first_air_date : item.release_date;
-
-const getMonthStart = (date: Date) => new Date(date.getFullYear(), date.getMonth(), 1);
-
-const getMonthEnd = (date: Date) => new Date(date.getFullYear(), date.getMonth() + 1, 0);
 
 const parseDateKey = (value: string): Date | null => {
   const [year, month, day] = value.split("-").map(Number);
@@ -175,9 +169,7 @@ export default function Upcoming() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const calendarLoadMoreRef = useRef<HTMLDivElement | null>(null);
-  const calendarDateRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const [section, setSection] = useState<UpcomingSection>(
     (searchParams.get("section") as UpcomingSection) || "all",
@@ -185,16 +177,11 @@ export default function Upcoming() {
   const [movieSectionFilter, setMovieSectionFilter] = useState<MovieSectionFilter>(
     (searchParams.get("movieType") as MovieSectionFilter) || "all",
   );
-  const [viewMode, setViewMode] = useState<UpcomingViewMode>(
-    searchParams.get("view") === "calendar" ? "calendar" : "grid",
-  );
   const [bollywoodLanguage, setBollywoodLanguage] = useState<string>(searchParams.get("bollyLang") || "all");
   const [movieGenre, setMovieGenre] = useState<string>(searchParams.get("movieGenre") || "");
   const [seriesGenre, setSeriesGenre] = useState<string>(searchParams.get("seriesGenre") || "");
   const [seriesOtt, setSeriesOtt] = useState<string>(searchParams.get("ott") || "all");
   const [seriesLanguage, setSeriesLanguage] = useState<string>(searchParams.get("lang") || "all");
-  const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(undefined);
-  const [calendarMonth, setCalendarMonth] = useState<Date>(() => getMonthStart(new Date()));
   const [calendarGroupLimit, setCalendarGroupLimit] = useState(8);
 
   useEffect(() => {
@@ -437,7 +424,6 @@ export default function Upcoming() {
   useEffect(() => {
     const params = new URLSearchParams();
     if (section !== "all") params.set("section", section);
-    if (viewMode !== "grid") params.set("view", viewMode);
     if (movieSectionFilter !== "all") params.set("movieType", movieSectionFilter);
     if (movieSectionFilter === "bollywood" && bollywoodLanguage !== "all") {
       params.set("bollyLang", bollywoodLanguage);
@@ -449,7 +435,6 @@ export default function Upcoming() {
     setSearchParams(params, { replace: true });
   }, [
     section,
-    viewMode,
     movieSectionFilter,
     bollywoodLanguage,
     movieGenre,
@@ -460,25 +445,6 @@ export default function Upcoming() {
   ]);
 
   useEffect(() => {
-    if (viewMode !== "grid") return;
-    const node = loadMoreRef.current;
-    if (!node || !hasNextPage) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      },
-      { rootMargin: "600px 0px" },
-    );
-
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage, filteredUpcoming.length, viewMode]);
-
-  useEffect(() => {
-    if (viewMode !== "calendar") return;
     const node = calendarLoadMoreRef.current;
     if (!node || !hasNextPage) return;
 
@@ -493,7 +459,7 @@ export default function Upcoming() {
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage, filteredUpcoming.length, viewMode]);
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage, filteredUpcoming.length]);
 
   const releaseDateKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -503,8 +469,6 @@ export default function Upcoming() {
     });
     return Array.from(keys).sort((a, b) => a.localeCompare(b));
   }, [filteredUpcoming]);
-
-  const releaseDateKeySet = useMemo(() => new Set(releaseDateKeys), [releaseDateKeys]);
 
   const releasesByDate = useMemo(() => {
     const map = new Map<string, (Movie | TVShow)[]>();
@@ -521,37 +485,6 @@ export default function Upcoming() {
     });
     return map;
   }, [filteredUpcoming]);
-
-  const releaseCalendarDates = useMemo(
-    () =>
-      releaseDateKeys
-        .map((key) => parseDateKey(key))
-        .filter((value): value is Date => value !== null),
-    [releaseDateKeys],
-  );
-
-  useEffect(() => {
-    if (!releaseDateKeys.length) {
-      setSelectedCalendarDate(undefined);
-      return;
-    }
-
-    setSelectedCalendarDate((current) => {
-      if (current && releaseDateKeySet.has(formatLocalDate(current))) {
-        return current;
-      }
-      return parseDateKey(releaseDateKeys[0]) || current;
-    });
-  }, [releaseDateKeys, releaseDateKeySet]);
-
-  useEffect(() => {
-    if (!selectedCalendarDate) return;
-    setCalendarMonth(getMonthStart(selectedCalendarDate));
-  }, [selectedCalendarDate]);
-
-  const selectedCalendarDateKey = selectedCalendarDate
-    ? formatLocalDate(selectedCalendarDate)
-    : "";
 
   const allReleaseDateGroups = useMemo(
     () =>
@@ -573,67 +506,16 @@ export default function Upcoming() {
     [releaseDateKeys, releasesByDate],
   );
 
-  const monthReleaseDateGroups = useMemo(
-    () =>
-      allReleaseDateGroups.filter(
-        (group) =>
-          group.date.getMonth() === calendarMonth.getMonth() &&
-          group.date.getFullYear() === calendarMonth.getFullYear(),
-      ),
-    [allReleaseDateGroups, calendarMonth],
-  );
-
-  const activeReleaseDateGroups =
-    monthReleaseDateGroups.length > 0 ? monthReleaseDateGroups : allReleaseDateGroups;
+  const activeReleaseDateGroups = allReleaseDateGroups;
   const visibleReleaseDateGroups = activeReleaseDateGroups.slice(0, calendarGroupLimit);
   const hasMoreReleaseDateGroups = activeReleaseDateGroups.length > calendarGroupLimit;
-
-  const selectedCalendarMonthEndKey = formatLocalDate(getMonthEnd(calendarMonth));
-  const maxLoadedDateKey = releaseDateKeys.length ? releaseDateKeys[releaseDateKeys.length - 1] : "";
-
-  useEffect(() => {
-    if (viewMode !== "calendar") return;
-    if (!hasNextPage || isLoading || isFetchingNextPage) return;
-
-    if (!maxLoadedDateKey || maxLoadedDateKey < selectedCalendarMonthEndKey) {
-      fetchNextPage();
-    }
-  }, [
-    viewMode,
-    hasNextPage,
-    isLoading,
-    isFetchingNextPage,
-    maxLoadedDateKey,
-    selectedCalendarMonthEndKey,
-    fetchNextPage,
-  ]);
-
-  useEffect(() => {
-    if (viewMode !== "calendar") return;
-    if (!selectedCalendarDateKey || !maxLoadedDateKey) return;
-    if (!hasNextPage || isLoading || isFetchingNextPage) return;
-
-    if (selectedCalendarDateKey > maxLoadedDateKey) {
-      fetchNextPage();
-    }
-  }, [
-    viewMode,
-    selectedCalendarDateKey,
-    maxLoadedDateKey,
-    hasNextPage,
-    isLoading,
-    isFetchingNextPage,
-    fetchNextPage,
-  ]);
-
-  const selectedCalendarDateLabel = selectedCalendarDate
-    ? selectedCalendarDate.toLocaleDateString("en-US", {
+  const nextReleaseDateLabel = visibleReleaseDateGroups[0]
+    ? visibleReleaseDateGroups[0].date.toLocaleDateString("en-US", {
         weekday: "long",
         month: "long",
         day: "numeric",
-        year: "numeric",
       })
-    : "Pick a release date";
+    : "No releases yet";
 
   useEffect(() => {
     setCalendarGroupLimit(8);
@@ -645,27 +527,7 @@ export default function Upcoming() {
     seriesGenre,
     seriesOtt,
     seriesLanguage,
-    calendarMonth,
   ]);
-
-  useEffect(() => {
-    if (!selectedCalendarDateKey) return;
-    const selectedIndex = activeReleaseDateGroups.findIndex(
-      (group) => group.dateKey === selectedCalendarDateKey,
-    );
-    if (selectedIndex !== -1 && selectedIndex + 1 > calendarGroupLimit) {
-      setCalendarGroupLimit(selectedIndex + 1);
-    }
-  }, [selectedCalendarDateKey, activeReleaseDateGroups, calendarGroupLimit]);
-
-  useEffect(() => {
-    if (viewMode !== "calendar") return;
-    if (!selectedCalendarDateKey) return;
-    const node = calendarDateRefs.current[selectedCalendarDateKey];
-    if (node) {
-      node.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, [viewMode, selectedCalendarDateKey, visibleReleaseDateGroups.length]);
 
   const handleItemClick = (item: Movie | TVShow) => {
     const isTV = isTVShow(item);
@@ -705,25 +567,6 @@ export default function Upcoming() {
                   variant={section === entry.value ? "default" : "outline"}
                   size="sm"
                   onClick={() => setSection(entry.value as UpcomingSection)}
-                  className="whitespace-nowrap"
-                >
-                  {entry.label}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 mb-6">
-            <div className="flex gap-2">
-              {[
-                { value: "grid", label: "Grid View" },
-                { value: "calendar", label: "Calendar View" },
-              ].map((entry) => (
-                <Button
-                  key={entry.value}
-                  variant={viewMode === entry.value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setViewMode(entry.value as UpcomingViewMode)}
                   className="whitespace-nowrap"
                 >
                   {entry.label}
@@ -835,165 +678,83 @@ export default function Upcoming() {
 
           {isLoading ? (
             <PosterGridSkeleton count={18} />
-          ) : viewMode === "calendar" ? (
-            <div className="grid grid-cols-1 xl:grid-cols-[340px,1fr] gap-6">
-              <Card className="h-fit overflow-hidden border-border/80 bg-card/55 xl:sticky xl:top-24">
-                <CardHeader className="pb-3 border-b border-border/70">
-                  <CardTitle className="text-lg">Release Calendar</CardTitle>
-                  <p className="text-xs text-muted-foreground">
-                    Pick a date to jump to the matching schedule section.
-                  </p>
-                </CardHeader>
-                <CardContent className="pt-4 space-y-3">
-                  <Calendar
-                    mode="single"
-                    selected={selectedCalendarDate}
-                    month={calendarMonth}
-                    onMonthChange={setCalendarMonth}
-                    onSelect={(date) => {
-                      if (date) setSelectedCalendarDate(date);
-                    }}
-                    modifiers={{ release: releaseCalendarDates }}
-                    modifiersClassNames={{
-                      release: "bg-primary/15 text-primary font-semibold rounded-md",
-                    }}
-                    className="rounded-xl border border-border/70 bg-background/75 p-2"
-                  />
-
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded-lg border border-border/70 bg-background/80 px-3 py-2">
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Loaded dates</p>
-                      <p className="mt-1 text-base font-semibold text-foreground">{releaseDateKeys.length}</p>
-                    </div>
-                    <div className="rounded-lg border border-border/70 bg-background/80 px-3 py-2">
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Loaded titles</p>
-                      <p className="mt-1 text-base font-semibold text-foreground">{filteredUpcoming.length}</p>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-muted-foreground">
-                    {monthReleaseDateGroups.length > 0
-                      ? "Showing date-wise releases for the selected month."
-                      : "No loaded releases in this month yet. Showing nearest upcoming dates."}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <div className="space-y-4">
-                <div className="rounded-xl border border-border/80 bg-card/45 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/90">
-                    Date-wise Schedule
-                  </p>
-                  <h3 className="mt-1 text-lg font-semibold text-foreground">{selectedCalendarDateLabel}</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {activeReleaseDateGroups.length} release dates in current loaded results.
-                  </p>
-                </div>
-
-                {visibleReleaseDateGroups.length > 0 ? (
-                  visibleReleaseDateGroups.map((group) => {
-                    const isSelected = group.dateKey === selectedCalendarDateKey;
-                    return (
-                      <div
-                        key={group.dateKey}
-                        ref={(node) => {
-                          calendarDateRefs.current[group.dateKey] = node;
-                        }}
-                      >
-                        <Card
-                          className={cn(
-                            "border-border/70 bg-card/35",
-                            isSelected && "border-primary/60 ring-1 ring-primary/25",
-                          )}
-                        >
-                          <CardHeader className="pb-2">
-                            <div className="flex flex-wrap items-start justify-between gap-2">
-                              <div>
-                                <CardTitle className="text-base">{formatDateHeading(group.date)}</CardTitle>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  {getRelativeReleaseLabel(group.date)}
-                                </p>
-                              </div>
-                              <span className="rounded-full border border-border/70 bg-background/75 px-2.5 py-1 text-xs font-medium text-foreground">
-                                {group.items.length} {group.items.length === 1 ? "release" : "releases"}
-                              </span>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="pt-0">
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-3">
-                              {group.items.map((item) => (
-                                <PosterCard
-                                  key={`${item.id}-${isTVShow(item) ? "tv" : "movie"}-${group.dateKey}`}
-                                  item={item}
-                                  onClick={() => handleItemClick(item)}
-                                />
-                              ))}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </div>
-                    );
-                  })
-                ) : isFetchingNextPage ? (
-                  <div className="text-center py-12 border rounded-lg bg-card/40">
-                    <InlineLoadMoreSkeleton className="py-0 justify-center" />
-                    <p className="text-sm text-muted-foreground mt-3">Loading release schedule...</p>
-                  </div>
-                ) : (
-                  <div className="text-center py-12 border rounded-lg bg-card/40">
-                    <p className="text-muted-foreground">No date-wise releases found yet.</p>
-                  </div>
-                )}
-
-                {hasMoreReleaseDateGroups && (
-                  <div className="flex justify-center">
-                    <Button
-                      variant="outline"
-                      onClick={() => setCalendarGroupLimit((current) => current + 8)}
-                    >
-                      Show More Dates
-                    </Button>
-                  </div>
-                )}
-
-                {hasNextPage && (
-                  <div className="flex justify-center">
-                    <Button
-                      variant="outline"
-                      onClick={() => fetchNextPage()}
-                      disabled={isFetchingNextPage}
-                    >
-                      {isFetchingNextPage ? "Loading..." : "Load More From API"}
-                    </Button>
-                  </div>
-                )}
-
-                {isFetchingNextPage && (
-                  <InlineLoadMoreSkeleton />
-                )}
-
-                <div ref={calendarLoadMoreRef} className="h-10 w-full" />
-              </div>
-            </div>
           ) : (
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {filteredUpcoming.map((item) => (
-                  <PosterCard
-                    key={`${item.id}-${isTVShow(item) ? "tv" : "movie"}`}
-                    item={item}
-                    onClick={() => handleItemClick(item)}
-                  />
-                ))}
+            <div className="space-y-4">
+              <div className="rounded-xl border border-border/80 bg-card/45 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/90">
+                  Date-wise Schedule
+                </p>
+                <h3 className="mt-1 text-lg font-semibold text-foreground">{nextReleaseDateLabel}</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {activeReleaseDateGroups.length} release dates and {filteredUpcoming.length} titles loaded.
+                </p>
               </div>
 
-              {filteredUpcoming.length === 0 && (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground">No upcoming content found for the selected filters.</p>
+              {visibleReleaseDateGroups.length > 0 ? (
+                visibleReleaseDateGroups.map((group) => (
+                  <Card
+                    key={group.dateKey}
+                    className="border-border/70 bg-card/35"
+                  >
+                    <CardHeader className="pb-2">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <CardTitle className="text-base">{formatDateHeading(group.date)}</CardTitle>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {getRelativeReleaseLabel(group.date)}
+                          </p>
+                        </div>
+                        <span className="rounded-full border border-border/70 bg-background/75 px-2.5 py-1 text-xs font-medium text-foreground">
+                          {group.items.length} {group.items.length === 1 ? "release" : "releases"}
+                        </span>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-3">
+                        {group.items.map((item) => (
+                          <PosterCard
+                            key={`${item.id}-${isTVShow(item) ? "tv" : "movie"}-${group.dateKey}`}
+                            item={item}
+                            onClick={() => handleItemClick(item)}
+                          />
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              ) : isFetchingNextPage ? (
+                <div className="text-center py-12 border rounded-lg bg-card/40">
+                  <InlineLoadMoreSkeleton className="py-0 justify-center" />
+                  <p className="text-sm text-muted-foreground mt-3">Loading release schedule...</p>
+                </div>
+              ) : (
+                <div className="text-center py-12 border rounded-lg bg-card/40">
+                  <p className="text-muted-foreground">No date-wise releases found yet.</p>
                 </div>
               )}
 
-              <div ref={loadMoreRef} className="h-12 w-full" />
+              {hasMoreReleaseDateGroups && (
+                <div className="flex justify-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => setCalendarGroupLimit((current) => current + 8)}
+                  >
+                    Show More Dates
+                  </Button>
+                </div>
+              )}
+
+              {hasNextPage && (
+                <div className="flex justify-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => fetchNextPage()}
+                    disabled={isFetchingNextPage}
+                  >
+                    {isFetchingNextPage ? "Loading..." : "Load More From API"}
+                  </Button>
+                </div>
+              )}
 
               {isFetchingNextPage && (
                 <InlineLoadMoreSkeleton />
@@ -1004,7 +765,9 @@ export default function Upcoming() {
                   You are all caught up.
                 </p>
               )}
-            </>
+
+              <div ref={calendarLoadMoreRef} className="h-10 w-full" />
+            </div>
           )}
         </div>
       </main>
