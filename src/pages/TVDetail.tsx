@@ -436,10 +436,7 @@ export default function TVDetail() {
   const watched = isWatched(tvShow.id, "tv");
   const liked = isLiked(tvShow.id, "tv");
   const year = tvShow.first_air_date?.split("-")[0] || "";
-  const heroVisualSrc =
-    activeBgVideoKey
-      ? getBackdropUrl(tvShow.backdrop_path, "original")
-      : getPosterUrl(tvShow.poster_path, "large");
+  const heroVisualSrc = getBackdropUrl(tvShow.backdrop_path, "original");
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0 overflow-x-hidden">
@@ -454,7 +451,8 @@ export default function TVDetail() {
           src={heroVisualSrc}
           alt={`${tvShow.name} visual`}
           className="absolute inset-0 w-full h-full object-cover"
-          fallbackSrc="/fallbacks/poster.svg"
+          fallbackSrc="/fallbacks/backdrop.svg"
+          fadeIn
         />
         {backgroundTrailerEmbedUrl && isBackgroundVideoVisible && (
           <div className="absolute inset-0">
@@ -482,7 +480,7 @@ export default function TVDetail() {
             />
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-background/25" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-background/55 to-background/10" />
         <div className="absolute inset-0 hero-gradient" />
 
         {trailerModalKey && (

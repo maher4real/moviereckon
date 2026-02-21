@@ -539,10 +539,7 @@ export default function MovieDetail() {
     { label: "Budget", value: formatMoney(movie.budget), icon: DollarSign },
     { label: "Revenue", value: formatMoney(movie.revenue), icon: CircleDollarSign },
   ];
-  const heroVisualSrc =
-    activeBgVideoKey
-      ? getBackdropUrl(movie.backdrop_path, "original")
-      : getPosterUrl(movie.poster_path, "large");
+  const heroVisualSrc = getBackdropUrl(movie.backdrop_path, "original");
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0 overflow-x-hidden">
@@ -557,7 +554,8 @@ export default function MovieDetail() {
           src={heroVisualSrc}
           alt={`${movie.title} visual`}
           className="absolute inset-0 w-full h-full object-cover"
-          fallbackSrc="/fallbacks/poster.svg"
+          fallbackSrc="/fallbacks/backdrop.svg"
+          fadeIn
         />
         {backgroundTrailerEmbedUrl && isBackgroundVideoVisible && (
           <div className="absolute inset-0">
@@ -585,7 +583,7 @@ export default function MovieDetail() {
             />
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-background/25" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-background/55 to-background/10" />
         <div className="absolute inset-0 hero-gradient" />
 
         {trailerModalKey && (

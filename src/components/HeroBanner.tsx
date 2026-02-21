@@ -42,10 +42,11 @@ export default function HeroBanner({
         alt={`${movie.title} backdrop`}
         className="absolute inset-0 w-full h-full object-cover transition-all duration-700"
         fallbackSrc="/fallbacks/backdrop.svg"
+        fadeIn
       />
 
       {/* Gradient Overlays */}
-      <div className="absolute inset-0 bg-gradient-to-r from-background via-background/60 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-background/45 to-transparent" />
       <div className="absolute inset-0 hero-gradient" />
 
       {/* Content */}

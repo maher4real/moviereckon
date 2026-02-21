@@ -80,19 +80,62 @@ export function CenteredAppSkeleton() {
 }
 
 export function AuthPageSkeleton() {
+  const rowCount = 4;
+  const postersPerRow = 12;
+
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-6">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 relative overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute inset-0 scale-110 -rotate-2">
+          <div className="flex h-full flex-col justify-center gap-3 opacity-40">
+            {Array.from({ length: rowCount }).map((_, rowIndex) => (
+              <div
+                key={`auth-skeleton-row-${rowIndex}`}
+                className={cn(
+                  "auth-poster-row",
+                  rowIndex % 2 === 1 && "auth-poster-row-reverse",
+                )}
+                style={{ animationDuration: `${34 + rowIndex * 4}s` }}
+              >
+                {Array.from({ length: postersPerRow * 2 }).map((_, posterIndex) => (
+                  <div
+                    key={`auth-skeleton-tile-${rowIndex}-${posterIndex}`}
+                    className="auth-poster-tile"
+                  >
+                    <Skeleton className="h-full w-full rounded-none" />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="absolute inset-0 bg-gradient-to-br from-background/90 via-background/74 to-background/94" />
+        <div className="absolute top-1/4 -left-1/4 w-1/2 h-1/2 bg-primary/10 rounded-full blur-[100px]" />
+        <div className="absolute bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-secondary/15 rounded-full blur-[100px]" />
+      </div>
+
+      <div className="relative z-10 w-full max-w-md space-y-6">
         <div className="space-y-3 text-center">
-          <Skeleton className="h-10 w-56 mx-auto" />
+          <div className="flex items-center justify-center gap-2">
+            <Skeleton className="h-10 w-10 rounded-full" />
+            <Skeleton className="h-10 w-48" />
+          </div>
           <Skeleton className="h-4 w-64 mx-auto" />
         </div>
 
-        <div className="rounded-2xl border border-border bg-card/80 p-8 space-y-4">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
+        <div className="rounded-2xl border border-border bg-card/80 backdrop-blur-md p-8 shadow-2xl">
+          <Skeleton className="h-10 w-full rounded-md" />
+          <div className="space-y-4 mt-6">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+            <Skeleton className="h-12 w-full" />
+          </div>
         </div>
 
         <Skeleton className="h-4 w-44 mx-auto" />

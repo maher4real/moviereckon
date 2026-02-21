@@ -135,7 +135,13 @@
 
 @layer components {
   .hero-gradient {
-    background: linear-gradient(to top, hsl(var(--background)) 0%, transparent 50%, transparent 100%);
+    background: linear-gradient(
+      to top,
+      hsl(var(--background) / 0.88) 0%,
+      hsl(var(--background) / 0.45) 38%,
+      transparent 68%,
+      transparent 100%
+    );
   }
 
   .card-gradient {
