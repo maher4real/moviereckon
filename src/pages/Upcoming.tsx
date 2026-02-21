@@ -20,7 +20,7 @@ import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
 import {
   AppPageSkeleton,
-  PosterGridSkeleton,
+  UpcomingTimelineSkeleton,
   InlineLoadMoreSkeleton,
 } from "@/components/AppSkeletons";
 import MediaImage from "@/components/MediaImage";
@@ -728,7 +728,7 @@ export default function Upcoming() {
           )}
 
           {isLoading ? (
-            <PosterGridSkeleton count={18} />
+            <UpcomingTimelineSkeleton />
           ) : (
             <div className="space-y-4">
               <div className="rounded-xl border border-border/80 bg-card/45 px-4 py-3">

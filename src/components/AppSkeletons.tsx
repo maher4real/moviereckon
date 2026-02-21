@@ -28,6 +28,62 @@ export function PosterGridSkeleton({
   );
 }
 
+interface UpcomingTimelineSkeletonProps {
+  dateChipCount?: number;
+  sectionCount?: number;
+}
+
+export function UpcomingTimelineSkeleton({
+  dateChipCount = 14,
+  sectionCount = 3,
+}: UpcomingTimelineSkeletonProps) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-border/80 bg-card/45 px-4 py-3">
+        <Skeleton className="h-3 w-36" />
+        <Skeleton className="mt-2 h-7 w-60" />
+        <Skeleton className="mt-2 h-3 w-72" />
+      </div>
+
+      <div className="rounded-2xl border border-border/70 bg-card/35 overflow-hidden">
+        <div className="flex items-center justify-between gap-3 border-b border-border/70 bg-background/40 px-4 py-2.5">
+          <Skeleton className="h-3 w-36" />
+          <Skeleton className="hidden sm:block h-3 w-24" />
+        </div>
+        <div className="overflow-x-auto scrollbar-hide px-3 py-3">
+          <div className="flex w-max items-stretch gap-2">
+            <Skeleton className="h-[74px] w-[108px] rounded-xl" />
+            {Array.from({ length: dateChipCount }).map((_, index) => (
+              <Skeleton key={`upcoming-date-chip-skeleton-${index}`} className="h-[74px] w-[98px] rounded-xl" />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {Array.from({ length: sectionCount }).map((_, sectionIndex) => (
+        <div key={`upcoming-section-skeleton-${sectionIndex}`} className="rounded-xl border border-border/70 bg-card/35 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="mt-2 h-3 w-24" />
+            </div>
+            <Skeleton className="h-6 w-20 rounded-full" />
+          </div>
+          <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-3">
+            {Array.from({ length: 5 }).map((_, itemIndex) => (
+              <div key={`upcoming-poster-skeleton-${sectionIndex}-${itemIndex}`}>
+                <Skeleton className="aspect-[2/3] rounded-lg" />
+                <Skeleton className="mt-2 h-4 w-3/4" />
+                <Skeleton className="mt-1 h-3 w-1/2" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 interface AppPageSkeletonProps {
   cardCount?: number;
   showFilterRow?: boolean;

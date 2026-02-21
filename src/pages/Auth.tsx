@@ -17,6 +17,7 @@ import MediaImage from "@/components/MediaImage";
 import { Film, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
+import { queueStartupSound } from "@/lib/startupSound";
 
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z
@@ -27,8 +28,6 @@ const usernameSchema = z
   .string()
   .min(2, "Username must be at least 2 characters")
   .max(50, "Username is too long");
-const STARTUP_SOUND_PENDING_KEY = "startupSoundPending";
-
 function AuthSubmitSkeleton({
   srLabel,
   widthClass,
@@ -61,14 +60,6 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
-
-  const queueStartupSound = () => {
-    try {
-      sessionStorage.setItem(STARTUP_SOUND_PENDING_KEY, "1");
-    } catch {
-      // Ignore storage errors (private mode, strict browser settings).
-    }
-  };
 
   const { data: trendingMovies } = useQuery({
     queryKey: ["auth-bg-trending-movies"],

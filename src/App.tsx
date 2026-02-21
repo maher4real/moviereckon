@@ -9,6 +9,7 @@ import { lazy, Suspense } from "react";
 import { AuthProvider } from "@/hooks/useAuth";
 import { UserDataProvider } from "@/hooks/useUserData";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import StartupSoundManager from "@/components/StartupSoundManager";
 
 const Auth = lazy(() => import("./pages/Auth"));
 const Home = lazy(() => import("./pages/Home"));
@@ -41,6 +42,7 @@ const App = () => (
             <Toaster />
             <Sonner />
             <BrowserRouter>
+              <StartupSoundManager />
               <Suspense fallback={<div className="min-h-screen bg-background" />}>
                 <Routes>
                   <Route path="/" element={<Auth />} />
