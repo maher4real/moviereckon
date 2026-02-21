@@ -10,7 +10,14 @@ const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
 const DATA_IMAGE_REGEX =
   /^data:image\/(?:png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/i;
 const MAX_AVATAR_URL_LENGTH = 500;
-const MAX_AVATAR_DATA_URL_LENGTH = 2_500_000;
+const MAX_AVATAR_DATA_URL_LENGTH = 700_000;
+const PROFILE_PROJECTION = {
+  email: 1,
+  username: 1,
+  avatar_url: 1,
+  created_at: 1,
+  updated_at: 1,
+} as const;
 
 function normalizeUsername(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -56,7 +63,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // GET - Fetch profile
     if (req.method === "GET") {
-      const user = await db.collection("users").findOne({ _id: new ObjectId(userPayload.id) });
+      const user = await db.collection("users").findOne(
+        { _id: new ObjectId(userPayload.id) },
+        { projection: PROFILE_PROJECTION }
+      );
 
       if (!user) {
         return res.status(404).json({ error: "User not found" });
@@ -92,7 +102,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (avatarProvided && avatarUrl === undefined) {
         return res.status(400).json({
           error:
-            "avatar_url must be a valid http(s) URL, a base64 data:image URL, or null",
+            "avatar_url must be a valid http(s) URL, a base64 data:image URL under ~700KB, or null",
         });
       }
 
@@ -109,7 +119,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const existing = await db.collection("users").findOne({
           username,
           _id: { $ne: new ObjectId(userPayload.id) },
-        });
+        }, { projection: { _id: 1 } });
         if (existing) {
           return res.status(400).json({ error: "Username already taken" });
         }
@@ -120,7 +130,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         { $set: updates }
       );
 
-      const user = await db.collection("users").findOne({ _id: new ObjectId(userPayload.id) });
+      const user = await db.collection("users").findOne(
+        { _id: new ObjectId(userPayload.id) },
+        { projection: PROFILE_PROJECTION }
+      );
 
       return res.status(200).json({
         data: {

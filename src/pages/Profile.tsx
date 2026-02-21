@@ -40,11 +40,14 @@ import {
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
 const MAX_AVATAR_FILE_SIZE_BYTES = 3 * 1024 * 1024;
-const MAX_AVATAR_DATA_URL_LENGTH = 2_500_000;
+const TARGET_AVATAR_DATA_URL_LENGTH = 520_000;
+const MAX_AVATAR_DATA_URL_LENGTH = 700_000;
 const DATA_IMAGE_REGEX =
   /^data:image\/(?:png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/i;
 const LOCAL_AVATAR_PATH_REGEX =
   /^\/avatars\/[a-z0-9-_]+\.(?:svg|png|jpe?g|webp|gif)$/i;
+const MAX_AVATAR_DIMENSION = 512;
+const MIN_AVATAR_DIMENSION = 160;
 
 const DEFAULT_AVATAR_OPTIONS = [
   {
@@ -107,6 +110,105 @@ const isSupportedAvatarValue = (value: string) => {
   }
 
   return isValidHttpUrl(value);
+};
+
+const readFileAsDataUrl = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("Invalid file reader result"));
+    };
+    reader.onerror = () => reject(new Error("Failed to read image file"));
+    reader.readAsDataURL(file);
+  });
+
+const loadImageFromDataUrl = (dataUrl: string) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Failed to decode uploaded image"));
+    image.src = dataUrl;
+  });
+
+const compressAvatarImage = async (file: File) => {
+  const dataUrl = await readFileAsDataUrl(file);
+  const image = await loadImageFromDataUrl(dataUrl);
+
+  const largestSide = Math.max(image.naturalWidth, image.naturalHeight);
+  const scale = largestSide > MAX_AVATAR_DIMENSION ? MAX_AVATAR_DIMENSION / largestSide : 1;
+
+  const targetWidth = Math.max(1, Math.round(image.naturalWidth * scale));
+  const targetHeight = Math.max(1, Math.round(image.naturalHeight * scale));
+
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Canvas is not available for image optimization");
+  }
+
+  const drawResizedImage = (width: number, height: number) => {
+    canvas.width = width;
+    canvas.height = height;
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.clearRect(0, 0, width, height);
+    context.drawImage(image, 0, 0, width, height);
+  };
+
+  const findBestEncodedImage = () => {
+    let best = canvas.toDataURL("image/webp", 0.94);
+    if (best.length <= TARGET_AVATAR_DATA_URL_LENGTH) return best;
+
+    let low = 0.62;
+    let high = 0.94;
+    let bestUnderTarget = "";
+
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const quality = (low + high) / 2;
+      const candidate = canvas.toDataURL("image/webp", quality);
+
+      if (candidate.length <= TARGET_AVATAR_DATA_URL_LENGTH) {
+        bestUnderTarget = candidate;
+        low = quality;
+      } else {
+        high = quality;
+      }
+    }
+
+    if (bestUnderTarget) return bestUnderTarget;
+
+    best = canvas.toDataURL("image/webp", 0.72);
+    if (best.length <= MAX_AVATAR_DATA_URL_LENGTH) return best;
+
+    return best;
+  };
+
+  let width = targetWidth;
+  let height = targetHeight;
+  drawResizedImage(width, height);
+
+  let output = findBestEncodedImage();
+
+  while (
+    output.length > MAX_AVATAR_DATA_URL_LENGTH &&
+    width > MIN_AVATAR_DIMENSION &&
+    height > MIN_AVATAR_DIMENSION
+  ) {
+    width = Math.max(MIN_AVATAR_DIMENSION, Math.round(width * 0.88));
+    height = Math.max(MIN_AVATAR_DIMENSION, Math.round(height * 0.88));
+    drawResizedImage(width, height);
+    output = findBestEncodedImage();
+  }
+
+  if (output.length > MAX_AVATAR_DATA_URL_LENGTH) {
+    throw new Error("Unable to compress avatar image within size limits");
+  }
+
+  return output;
 };
 
 const getInitials = (value: string) => {
@@ -212,6 +314,7 @@ export default function Profile() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isProcessingAvatar, setIsProcessingAvatar] = useState(false);
   const [usernameInput, setUsernameInput] = useState("");
   const [avatarInput, setAvatarInput] = useState("");
   const avatarFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -324,7 +427,7 @@ export default function Profile() {
     setEditOpen(false);
   };
 
-  const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
@@ -347,27 +450,26 @@ export default function Profile() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = typeof reader.result === "string" ? reader.result : "";
-      if (!result.startsWith("data:image/")) {
-        toast({
-          variant: "destructive",
-          title: "Upload failed",
-          description: "Could not read this image. Try a different file.",
-        });
-        return;
+    try {
+      setIsProcessingAvatar(true);
+      const optimized = await compressAvatarImage(file);
+      if (!isSupportedAvatarValue(optimized)) {
+        throw new Error("Optimized image payload is still too large");
       }
-      setAvatarInput(result);
-    };
-    reader.onerror = () => {
+      setAvatarInput(optimized);
+      toast({
+        title: "Avatar optimized",
+        description: "Image compressed for faster upload while keeping quality.",
+      });
+    } catch {
       toast({
         variant: "destructive",
         title: "Upload failed",
-        description: "Could not process this image file.",
+        description: "Could not optimize this image. Try a smaller file.",
       });
-    };
-    reader.readAsDataURL(file);
+    } finally {
+      setIsProcessingAvatar(false);
+    }
   };
 
   if (authLoading || dataLoading) {
@@ -619,9 +721,10 @@ export default function Profile() {
                 <Button
                   type="button"
                   variant="secondary"
+                  disabled={isProcessingAvatar}
                   onClick={() => avatarFileInputRef.current?.click()}
                 >
-                  Upload Image
+                  {isProcessingAvatar ? "Optimizing..." : "Upload Image"}
                 </Button>
                 {isUploadedAvatar && (
                   <Button type="button" variant="outline" onClick={() => setAvatarInput("")}>
@@ -630,7 +733,7 @@ export default function Profile() {
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                PNG, JPG, WebP or GIF. Max size: 3MB.
+                PNG, JPG, WebP or GIF. Max size: 3MB. Uploaded images are auto-compressed.
               </p>
             </div>
 
@@ -672,7 +775,11 @@ export default function Profile() {
             <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
               Cancel
             </Button>
-            <Button type="button" onClick={handleSaveProfile} disabled={isSavingProfile}>
+            <Button
+              type="button"
+              onClick={handleSaveProfile}
+              disabled={isSavingProfile || isProcessingAvatar}
+            >
               {isSavingProfile ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
