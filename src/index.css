@@ -136,10 +136,28 @@
   .hero-gradient {
     background: linear-gradient(
       to top,
-      hsl(var(--background) / 0.88) 0%,
-      hsl(var(--background) / 0.45) 38%,
-      transparent 68%,
+      hsl(var(--background)) 0%,
+      hsl(var(--background) / 0.95) 14%,
+      hsl(var(--background) / 0.7) 36%,
+      hsl(var(--background) / 0.42) 56%,
+      hsl(var(--background) / 0.16) 76%,
       transparent 100%
+    );
+  }
+
+  .hero-bottom-blend {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: clamp(110px, 20vh, 220px);
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      hsl(var(--background) / 0) 0%,
+      hsl(var(--background) / 0.38) 34%,
+      hsl(var(--background) / 0.8) 70%,
+      hsl(var(--background)) 100%
     );
   }
 

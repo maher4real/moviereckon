@@ -28,8 +28,9 @@ export default function HeroBanner({
 
   if (isLoading || !movie) {
     return (
-      <div className="relative h-[70vh] md:h-[85vh] bg-muted animate-pulse">
+      <div className="relative h-[70vh] md:h-[85vh] bg-muted animate-pulse overflow-hidden">
         <div className="absolute inset-0 hero-gradient" />
+        <div className="hero-bottom-blend" />
       </div>
     );
   }
@@ -42,7 +43,7 @@ export default function HeroBanner({
       <MediaImage
         src={getBackdropUrl(movie.backdrop_path, "original")}
         alt={`${movie.title} backdrop`}
-        className="absolute inset-0 w-full h-full object-cover transition-all duration-700"
+        className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700"
         fallbackSrc="/fallbacks/backdrop.svg"
         fadeIn
         onLoad={onBackdropReady}
@@ -51,6 +52,7 @@ export default function HeroBanner({
       {/* Gradient Overlays */}
       <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-background/45 to-transparent" />
       <div className="absolute inset-0 hero-gradient" />
+      <div className="hero-bottom-blend" />
 
       {/* Content */}
       <div className="absolute inset-0 flex items-center">
