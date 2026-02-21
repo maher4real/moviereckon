@@ -3,8 +3,8 @@
  * Health check endpoint - verifies MongoDB connection
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { connectToDatabase } from "./lib/mongodb";
-import { applyApiCors, applyDefaultSecurityHeaders } from "./lib/cors";
+import { connectToDatabase } from "./lib/mongodb.js";
+import { applyApiCors, applyDefaultSecurityHeaders } from "./lib/cors.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   applyDefaultSecurityHeaders(res);

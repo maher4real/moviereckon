@@ -3,8 +3,8 @@
  * Manage user profile
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { connectToDatabase, ObjectId } from "../../lib/mongodb";
-import { getUserFromRequest } from "../../lib/auth";
+import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
+import { getUserFromRequest } from "../../lib/auth.js";
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
 const DATA_IMAGE_REGEX =

@@ -3,8 +3,8 @@
  * Server-side TMDB proxy to avoid client-side provider key exposure.
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { applyApiCors, applyDefaultSecurityHeaders } from "./lib/cors";
-import { consumeRateLimit, getClientIp } from "./lib/rate-limit";
+import { applyApiCors, applyDefaultSecurityHeaders } from "./lib/cors.js";
+import { consumeRateLimit, getClientIp } from "./lib/rate-limit.js";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 

@@ -3,19 +3,19 @@
  * Refresh access token using refresh token
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { connectToDatabase, ObjectId } from "../../lib/mongodb";
+import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import {
   verifyRefreshToken,
   generateTokens,
   hashRefreshToken,
   UserPayload,
-} from "../../lib/auth";
+} from "../../lib/auth.js";
 import {
   REFRESH_TOKEN_COOKIE_NAME,
   getCookieValue,
   setAuthCookies,
-} from "../../lib/cookies";
-import { consumeRateLimit, getClientIp } from "../../lib/rate-limit";
+} from "../../lib/cookies.js";
+import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {

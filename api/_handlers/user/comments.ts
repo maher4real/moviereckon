@@ -3,8 +3,8 @@
  * Manage content comments
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { connectToDatabase, ObjectId } from "../../lib/mongodb";
-import { getUserFromRequest } from "../../lib/auth";
+import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
+import { getUserFromRequest } from "../../lib/auth.js";
 
 function getQueryParam(req: VercelRequest, key: string): string | undefined {
   const value = req.query?.[key];

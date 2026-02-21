@@ -3,12 +3,12 @@
  * Routes: /api/auth/login, /api/auth/register, /api/auth/refresh, /api/auth/me, /api/auth/logout
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import loginHandler from "./_handlers/auth/login";
-import registerHandler from "./_handlers/auth/register";
-import refreshHandler from "./_handlers/auth/refresh";
-import meHandler from "./_handlers/auth/me";
-import logoutHandler from "./_handlers/auth/logout";
-import { applyApiCors, applyDefaultSecurityHeaders } from "./lib/cors";
+import loginHandler from "./_handlers/auth/login.js";
+import registerHandler from "./_handlers/auth/register.js";
+import refreshHandler from "./_handlers/auth/refresh.js";
+import meHandler from "./_handlers/auth/me.js";
+import logoutHandler from "./_handlers/auth/logout.js";
+import { applyApiCors, applyDefaultSecurityHeaders } from "./lib/cors.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   applyDefaultSecurityHeaders(res);

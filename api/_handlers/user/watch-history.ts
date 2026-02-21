@@ -3,8 +3,8 @@
  * Manage user watch history
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { connectToDatabase } from "../../lib/mongodb";
-import { getUserFromRequest } from "../../lib/auth";
+import { connectToDatabase } from "../../lib/mongodb.js";
+import { getUserFromRequest } from "../../lib/auth.js";
 
 type ContentType = "movie" | "tv";
 type Database = Awaited<ReturnType<typeof connectToDatabase>>["db"];

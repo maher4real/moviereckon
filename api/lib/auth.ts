@@ -4,8 +4,8 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { createHash } from "crypto";
-import { connectToDatabase, ObjectId } from "./mongodb";
-import { ACCESS_TOKEN_COOKIE_NAME, getCookieValue } from "./cookies";
+import { connectToDatabase, ObjectId } from "./mongodb.js";
+import { ACCESS_TOKEN_COOKIE_NAME, getCookieValue } from "./cookies.js";
 
 const JWT_SECRET = (() => {
   const value = process.env.JWT_SECRET;
