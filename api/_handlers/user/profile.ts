@@ -7,6 +7,10 @@ import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
+const DATA_IMAGE_REGEX =
+  /^data:image\/(?:png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/i;
+const MAX_AVATAR_URL_LENGTH = 500;
+const MAX_AVATAR_DATA_URL_LENGTH = 2_500_000;
 
 function normalizeUsername(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -21,7 +25,15 @@ function normalizeAvatarUrl(value: unknown): string | null | undefined {
   if (typeof value !== "string") return undefined;
 
   const normalized = value.trim();
-  if (!normalized || normalized.length > 500) return undefined;
+  if (!normalized) return null;
+
+  if (normalized.startsWith("data:image/")) {
+    if (normalized.length > MAX_AVATAR_DATA_URL_LENGTH) return undefined;
+    if (!DATA_IMAGE_REGEX.test(normalized)) return undefined;
+    return normalized;
+  }
+
+  if (normalized.length > MAX_AVATAR_URL_LENGTH) return undefined;
 
   try {
     const parsed = new URL(normalized);
@@ -78,7 +90,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       if (avatarProvided && avatarUrl === undefined) {
-        return res.status(400).json({ error: "avatar_url must be a valid http(s) URL or null" });
+        return res.status(400).json({
+          error:
+            "avatar_url must be a valid http(s) URL, a base64 data:image URL, or null",
+        });
       }
 
       if (!usernameProvided && !avatarProvided) {

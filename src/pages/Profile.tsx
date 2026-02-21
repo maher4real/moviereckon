@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserData } from "@/hooks/useUserData";
@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { getPosterUrl } from "@/lib/tmdb";
+import { cn } from "@/lib/utils";
 import {
   ArrowUpRight,
   Calendar,
@@ -31,15 +32,50 @@ import {
   Film,
   Heart,
   LogOut,
+  Sparkles,
   Trash2,
   Tv,
   UserRound,
 } from "lucide-react";
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
+const MAX_AVATAR_FILE_SIZE_BYTES = 3 * 1024 * 1024;
+const MAX_AVATAR_DATA_URL_LENGTH = 2_500_000;
+const DATA_IMAGE_REGEX =
+  /^data:image\/(?:png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/i;
 
-const buildAvatarUrl = (seed: string) =>
-  `https://api.dicebear.com/9.x/thumbs/svg?seed=${encodeURIComponent(seed)}`;
+const DEFAULT_AVATAR_OPTIONS = [
+  {
+    id: "net-red",
+    label: "Red Hero",
+    url: "https://api.dicebear.com/9.x/fun-emoji/svg?seed=RedHero&backgroundColor=ef4444",
+  },
+  {
+    id: "shadow",
+    label: "Shadow",
+    url: "https://api.dicebear.com/9.x/fun-emoji/svg?seed=Shadow&backgroundColor=111827",
+  },
+  {
+    id: "ember",
+    label: "Ember",
+    url: "https://api.dicebear.com/9.x/fun-emoji/svg?seed=Ember&backgroundColor=f97316",
+  },
+  {
+    id: "sky",
+    label: "Sky",
+    url: "https://api.dicebear.com/9.x/fun-emoji/svg?seed=Sky&backgroundColor=3b82f6",
+  },
+  {
+    id: "mint",
+    label: "Mint",
+    url: "https://api.dicebear.com/9.x/fun-emoji/svg?seed=Mint&backgroundColor=10b981",
+  },
+  {
+    id: "violet",
+    label: "Violet",
+    url: "https://api.dicebear.com/9.x/fun-emoji/svg?seed=Violet&backgroundColor=8b5cf6",
+  },
+];
 
 const formatDateLabel = (value: string) =>
   new Date(value).toLocaleDateString("en-US", {
@@ -55,6 +91,16 @@ const isValidHttpUrl = (value: string) => {
   } catch {
     return false;
   }
+};
+
+const isSupportedAvatarValue = (value: string) => {
+  if (!value.trim()) return true;
+
+  if (value.startsWith("data:image/")) {
+    return value.length <= MAX_AVATAR_DATA_URL_LENGTH && DATA_IMAGE_REGEX.test(value);
+  }
+
+  return isValidHttpUrl(value);
 };
 
 const getInitials = (value: string) => {
@@ -150,6 +196,7 @@ export default function Profile() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [usernameInput, setUsernameInput] = useState("");
   const [avatarInput, setAvatarInput] = useState("");
+  const avatarFileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -164,6 +211,7 @@ export default function Profile() {
 
   const displayName = profile?.username || user?.username || "User";
   const avatarUrl = profile?.avatar_url || null;
+  const isUploadedAvatar = avatarInput.trim().startsWith("data:image/");
 
   const memberSince = profile?.created_at
     ? new Date(profile.created_at).toLocaleDateString("en-US", {
@@ -176,8 +224,11 @@ export default function Profile() {
   const stats = useMemo(() => {
     const movies = watchHistory.filter((w) => w.content_type === "movie").length;
     const tvShows = watchHistory.filter((w) => w.content_type === "tv").length;
-    const bollywood = watchHistory.filter((w) => w.language === "hi").length;
-    return { movies, tvShows, bollywood, likes: likedItems.length };
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const activeThisWeek = watchHistory.filter(
+      (item) => new Date(item.watched_at).getTime() >= sevenDaysAgo,
+    ).length;
+    return { movies, tvShows, activeThisWeek, likes: likedItems.length };
   }, [watchHistory, likedItems]);
 
   const fromPath = `${location.pathname}${location.search}${location.hash}`;
@@ -189,13 +240,6 @@ export default function Profile() {
     await signOut();
     navigate("/");
   };
-
-  const avatarSuggestions = useMemo(() => {
-    const base = (usernameInput.trim() || displayName).toLowerCase();
-    return ["sunrise", "mocha", "ocean", "mint"].map((flavor, index) =>
-      buildAvatarUrl(`${base}-${flavor}-${index}`),
-    );
-  }, [usernameInput, displayName]);
 
   const activityHistory = useMemo<ActivityItem[]>(
     () =>
@@ -235,11 +279,12 @@ export default function Profile() {
       return;
     }
 
-    if (avatar && !isValidHttpUrl(avatar)) {
+    if (avatar && !isSupportedAvatarValue(avatar)) {
       toast({
         variant: "destructive",
-        title: "Invalid avatar URL",
-        description: "Avatar must be a valid http(s) URL.",
+        title: "Invalid avatar",
+        description:
+          "Avatar must be a valid http(s) URL or an uploaded PNG/JPG/WebP/GIF image.",
       });
       return;
     }
@@ -251,6 +296,52 @@ export default function Profile() {
     });
     setIsSavingProfile(false);
     setEditOpen(false);
+  };
+
+  const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast({
+        variant: "destructive",
+        title: "Unsupported file",
+        description: "Please upload an image file.",
+      });
+      return;
+    }
+
+    if (file.size > MAX_AVATAR_FILE_SIZE_BYTES) {
+      toast({
+        variant: "destructive",
+        title: "File too large",
+        description: "Avatar image must be 3MB or less.",
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      if (!result.startsWith("data:image/")) {
+        toast({
+          variant: "destructive",
+          title: "Upload failed",
+          description: "Could not read this image. Try a different file.",
+        });
+        return;
+      }
+      setAvatarInput(result);
+    };
+    reader.onerror = () => {
+      toast({
+        variant: "destructive",
+        title: "Upload failed",
+        description: "Could not process this image file.",
+      });
+    };
+    reader.readAsDataURL(file);
   };
 
   if (authLoading || dataLoading) {
@@ -328,10 +419,10 @@ export default function Profile() {
                 </Card>
                 <Card className="bg-background/55 border-border/50">
                   <CardContent className="p-4">
-                    <p className="text-xl font-bold">{stats.bollywood}</p>
+                    <p className="text-xl font-bold">{stats.activeThisWeek}</p>
                     <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
-                      <Film className="w-3.5 h-3.5" />
-                      Bollywood Picks
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Active Last 7 Days
                     </p>
                   </CardContent>
                 </Card>
@@ -439,7 +530,7 @@ export default function Profile() {
           <DialogHeader>
             <DialogTitle>Edit Profile</DialogTitle>
             <DialogDescription>
-              Update your username and avatar. You can paste any public image URL.
+              Update your username, upload your own image, or choose a default avatar pack.
             </DialogDescription>
           </DialogHeader>
 
@@ -455,7 +546,7 @@ export default function Profile() {
                 </AvatarFallback>
               </Avatar>
               <div className="text-sm text-muted-foreground">
-                Use one of the generated avatars or provide your own URL.
+                Upload your image or select a default avatar.
               </div>
             </div>
 
@@ -474,24 +565,65 @@ export default function Profile() {
               <Label htmlFor="profile-avatar-url">Avatar URL</Label>
               <Input
                 id="profile-avatar-url"
-                value={avatarInput}
+                value={isUploadedAvatar ? "" : avatarInput}
                 onChange={(event) => setAvatarInput(event.target.value)}
-                placeholder="https://example.com/avatar.jpg"
+                placeholder={
+                  isUploadedAvatar
+                    ? "Uploaded image selected (clear to use URL)"
+                    : "https://example.com/avatar.jpg"
+                }
               />
+              {isUploadedAvatar && (
+                <p className="text-xs text-muted-foreground">
+                  Uploaded image is currently selected.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Upload Your Image</Label>
+              <input
+                ref={avatarFileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                onChange={handleAvatarUpload}
+                className="hidden"
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => avatarFileInputRef.current?.click()}
+                >
+                  Upload Image
+                </Button>
+                {isUploadedAvatar && (
+                  <Button type="button" variant="outline" onClick={() => setAvatarInput("")}>
+                    Remove Upload
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                PNG, JPG, WebP or GIF. Max size: 3MB.
+              </p>
             </div>
 
             <div>
-              <p className="text-xs text-muted-foreground mb-2">Quick avatars</p>
-              <div className="flex flex-wrap gap-2">
-                {avatarSuggestions.map((candidate) => (
+              <p className="text-xs text-muted-foreground mb-2">Default Avatar Pack</p>
+              <div className="flex flex-wrap gap-2.5">
+                {DEFAULT_AVATAR_OPTIONS.map((candidate) => (
                   <button
-                    key={candidate}
+                    key={candidate.id}
                     type="button"
-                    onClick={() => setAvatarInput(candidate)}
-                    className="rounded-full border border-border p-1.5 hover:border-primary transition-colors"
+                    onClick={() => setAvatarInput(candidate.url)}
+                    className={cn(
+                      "rounded-full border border-border p-1.5 hover:border-primary transition-colors",
+                      avatarInput === candidate.url && "border-primary ring-2 ring-primary/30",
+                    )}
+                    title={candidate.label}
                   >
                     <Avatar className="h-9 w-9">
-                      <AvatarImage src={candidate} alt="Avatar suggestion" />
+                      <AvatarImage src={candidate.url} alt={candidate.label} />
                       <AvatarFallback>AV</AvatarFallback>
                     </Avatar>
                   </button>
