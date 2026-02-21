@@ -170,6 +170,7 @@ export default function Upcoming() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const calendarLoadMoreRef = useRef<HTMLDivElement | null>(null);
+  const dateSectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const [section, setSection] = useState<UpcomingSection>(
     (searchParams.get("section") as UpcomingSection) || "all",
@@ -183,6 +184,7 @@ export default function Upcoming() {
   const [seriesOtt, setSeriesOtt] = useState<string>(searchParams.get("ott") || "all");
   const [seriesLanguage, setSeriesLanguage] = useState<string>(searchParams.get("lang") || "all");
   const [calendarGroupLimit, setCalendarGroupLimit] = useState(8);
+  const [selectedDateKey, setSelectedDateKey] = useState<string>("");
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -516,6 +518,14 @@ export default function Upcoming() {
         day: "numeric",
       })
     : "No releases yet";
+  const selectedReleaseDate = activeReleaseDateGroups.find((group) => group.dateKey === selectedDateKey);
+  const selectedReleaseDateLabel = selectedReleaseDate
+    ? selectedReleaseDate.date.toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      })
+    : nextReleaseDateLabel;
 
   useEffect(() => {
     setCalendarGroupLimit(8);
@@ -528,6 +538,36 @@ export default function Upcoming() {
     seriesOtt,
     seriesLanguage,
   ]);
+
+  useEffect(() => {
+    if (!activeReleaseDateGroups.length) {
+      setSelectedDateKey("");
+      return;
+    }
+
+    setSelectedDateKey((current) => {
+      if (current && activeReleaseDateGroups.some((group) => group.dateKey === current)) {
+        return current;
+      }
+      return activeReleaseDateGroups[0]?.dateKey || "";
+    });
+  }, [activeReleaseDateGroups]);
+
+  useEffect(() => {
+    if (!selectedDateKey) return;
+    const selectedIndex = activeReleaseDateGroups.findIndex((group) => group.dateKey === selectedDateKey);
+    if (selectedIndex !== -1 && selectedIndex + 1 > calendarGroupLimit) {
+      setCalendarGroupLimit(selectedIndex + 1);
+    }
+  }, [selectedDateKey, activeReleaseDateGroups, calendarGroupLimit]);
+
+  useEffect(() => {
+    if (!selectedDateKey) return;
+    const node = dateSectionRefs.current[selectedDateKey];
+    if (node) {
+      node.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [selectedDateKey, visibleReleaseDateGroups.length]);
 
   const handleItemClick = (item: Movie | TVShow) => {
     const isTV = isTVShow(item);
@@ -684,44 +724,86 @@ export default function Upcoming() {
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/90">
                   Date-wise Schedule
                 </p>
-                <h3 className="mt-1 text-lg font-semibold text-foreground">{nextReleaseDateLabel}</h3>
+                <h3 className="mt-1 text-lg font-semibold text-foreground">{selectedReleaseDateLabel}</h3>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {activeReleaseDateGroups.length} release dates and {filteredUpcoming.length} titles loaded.
                 </p>
               </div>
 
-              {visibleReleaseDateGroups.length > 0 ? (
-                visibleReleaseDateGroups.map((group) => (
-                  <Card
-                    key={group.dateKey}
-                    className="border-border/70 bg-card/35"
-                  >
-                    <CardHeader className="pb-2">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div>
-                          <CardTitle className="text-base">{formatDateHeading(group.date)}</CardTitle>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {getRelativeReleaseLabel(group.date)}
+              {activeReleaseDateGroups.length > 0 && (
+                <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
+                  <div className="flex w-max gap-2">
+                    {activeReleaseDateGroups.map((group) => {
+                      const isSelected = group.dateKey === selectedDateKey;
+                      return (
+                        <button
+                          key={`date-chip-${group.dateKey}`}
+                          type="button"
+                          onClick={() => setSelectedDateKey(group.dateKey)}
+                          className={cn(
+                            "min-w-[92px] rounded-xl border px-3 py-2 text-left transition-colors",
+                            isSelected
+                              ? "border-primary bg-primary/12 text-primary"
+                              : "border-border/80 bg-card/35 text-muted-foreground hover:border-primary/60 hover:text-foreground",
+                          )}
+                        >
+                          <p className="text-[10px] uppercase tracking-wide">
+                            {group.date.toLocaleDateString("en-US", { weekday: "short" })}
                           </p>
-                        </div>
-                        <span className="rounded-full border border-border/70 bg-background/75 px-2.5 py-1 text-xs font-medium text-foreground">
-                          {group.items.length} {group.items.length === 1 ? "release" : "releases"}
-                        </span>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-3">
-                        {group.items.map((item) => (
-                          <PosterCard
-                            key={`${item.id}-${isTVShow(item) ? "tv" : "movie"}-${group.dateKey}`}
-                            item={item}
-                            onClick={() => handleItemClick(item)}
-                          />
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
+                          <p className="mt-1 text-sm font-semibold">
+                            {group.date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {visibleReleaseDateGroups.length > 0 ? (
+                visibleReleaseDateGroups.map((group) => {
+                  const isSelected = group.dateKey === selectedDateKey;
+                  return (
+                    <div
+                      key={group.dateKey}
+                      ref={(node) => {
+                        dateSectionRefs.current[group.dateKey] = node;
+                      }}
+                    >
+                      <Card
+                        className={cn(
+                          "border-border/70 bg-card/35",
+                          isSelected && "border-primary/60 ring-1 ring-primary/25",
+                        )}
+                      >
+                        <CardHeader className="pb-2">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <CardTitle className="text-base">{formatDateHeading(group.date)}</CardTitle>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {getRelativeReleaseLabel(group.date)}
+                              </p>
+                            </div>
+                            <span className="rounded-full border border-border/70 bg-background/75 px-2.5 py-1 text-xs font-medium text-foreground">
+                              {group.items.length} {group.items.length === 1 ? "release" : "releases"}
+                            </span>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-3">
+                            {group.items.map((item) => (
+                              <PosterCard
+                                key={`${item.id}-${isTVShow(item) ? "tv" : "movie"}-${group.dateKey}`}
+                                item={item}
+                                onClick={() => handleItemClick(item)}
+                              />
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  );
+                })
               ) : isFetchingNextPage ? (
                 <div className="text-center py-12 border rounded-lg bg-card/40">
                   <InlineLoadMoreSkeleton className="py-0 justify-center" />
