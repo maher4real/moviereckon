@@ -15,6 +15,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
 import MediaImage from "@/components/MediaImage";
+import { AppPageSkeleton, PosterGridSkeleton } from "@/components/AppSkeletons";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -193,11 +194,7 @@ export default function Search() {
   }, []);
 
   if (authLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <AppPageSkeleton cardCount={12} />;
   }
 
   return (
@@ -306,15 +303,7 @@ export default function Search() {
             </div>
           ) : isLoading ? (
             // Loading State
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i}>
-                  <div className="aspect-[2/3] rounded-lg bg-muted animate-pulse" />
-                  <div className="mt-2 h-4 bg-muted rounded animate-pulse w-3/4" />
-                  <div className="mt-1 h-3 bg-muted rounded animate-pulse w-1/2" />
-                </div>
-              ))}
-            </div>
+            <PosterGridSkeleton count={12} />
           ) : filteredResults.length === 0 ? (
             // No Results
             <div className="text-center py-12">

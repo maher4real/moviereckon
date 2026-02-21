@@ -18,6 +18,11 @@ import {
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
+import {
+  AppPageSkeleton,
+  PosterGridSkeleton,
+  InlineLoadMoreSkeleton,
+} from "@/components/AppSkeletons";
 import MediaImage from "@/components/MediaImage";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -533,11 +538,7 @@ export default function Upcoming() {
   };
 
   if (authLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <AppPageSkeleton cardCount={18} />;
   }
 
   return (
@@ -695,14 +696,7 @@ export default function Upcoming() {
           )}
 
           {isLoading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {Array.from({ length: 18 }).map((_, i) => (
-                <div key={i}>
-                  <div className="aspect-[2/3] rounded-lg bg-muted animate-pulse" />
-                  <div className="mt-2 h-4 bg-muted rounded animate-pulse w-3/4" />
-                </div>
-              ))}
-            </div>
+            <PosterGridSkeleton count={18} />
           ) : viewMode === "calendar" ? (
             <div className="grid grid-cols-1 lg:grid-cols-[340px,1fr] gap-6">
               <Card className="h-fit">
@@ -744,7 +738,7 @@ export default function Upcoming() {
                   </div>
                 ) : isFetchingNextPage ? (
                   <div className="text-center py-12 border rounded-lg bg-card/40">
-                    <div className="mx-auto w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    <InlineLoadMoreSkeleton className="py-0 justify-center" />
                     <p className="text-sm text-muted-foreground mt-3">Loading more releases...</p>
                   </div>
                 ) : (
@@ -791,9 +785,7 @@ export default function Upcoming() {
               <div ref={loadMoreRef} className="h-12 w-full" />
 
               {isFetchingNextPage && (
-                <div className="flex items-center justify-center py-4">
-                  <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                </div>
+                <InlineLoadMoreSkeleton />
               )}
 
               {!hasNextPage && filteredUpcoming.length > 0 && (

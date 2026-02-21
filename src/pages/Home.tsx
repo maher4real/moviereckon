@@ -24,6 +24,7 @@ import BottomNav from "@/components/BottomNav";
 import HeroBanner from "@/components/HeroBanner";
 import ContentCarousel from "@/components/ContentCarousel";
 import Footer from "@/components/Footer";
+import { AppPageSkeleton } from "@/components/AppSkeletons";
 import { Sparkles } from "lucide-react";
 
 // Memoized carousel for performance
@@ -381,11 +382,7 @@ export default function Home() {
   }, []);
 
   if (authLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <AppPageSkeleton cardCount={10} showFilterRow={false} />;
   }
 
   return (

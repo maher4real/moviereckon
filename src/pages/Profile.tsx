@@ -5,6 +5,7 @@ import { useUserData } from "@/hooks/useUserData";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
+import { AppPageSkeleton } from "@/components/AppSkeletons";
 import MediaImage from "@/components/MediaImage";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -99,11 +100,7 @@ export default function Profile() {
     : "today";
 
   if (authLoading || dataLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <AppPageSkeleton cardCount={16} showFilterRow={false} />;
   }
 
   return (

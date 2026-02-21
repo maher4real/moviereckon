@@ -8,6 +8,7 @@ import {
   getBollywoodMovies,
   getPosterUrl,
 } from "@/lib/tmdb";
+import { AuthPageSkeleton } from "@/components/AppSkeletons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -210,11 +211,7 @@ export default function Auth() {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <AuthPageSkeleton />;
   }
 
   return (
@@ -339,7 +336,10 @@ export default function Auth() {
                 >
                   {isSubmitting ? (
                     <span className="flex items-center gap-2">
-                      <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span
+                        aria-hidden="true"
+                        className="h-4 w-10 rounded bg-white/35 animate-pulse"
+                      />
                       Signing in...
                     </span>
                   ) : (
@@ -430,7 +430,10 @@ export default function Auth() {
                 >
                   {isSubmitting ? (
                     <span className="flex items-center gap-2">
-                      <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span
+                        aria-hidden="true"
+                        className="h-4 w-20 rounded bg-white/35 animate-pulse"
+                      />
                       Creating account...
                     </span>
                   ) : (

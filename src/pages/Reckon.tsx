@@ -6,6 +6,7 @@ import { Movie, TVShow } from "@/lib/tmdb";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
+import { AppPageSkeleton, PosterGridSkeleton } from "@/components/AppSkeletons";
 import { ContentCard } from "@/components/ContentCard";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -218,11 +219,7 @@ export default function Reckon() {
   };
 
   if (authLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <AppPageSkeleton cardCount={18} />;
   }
 
   return (
@@ -344,15 +341,7 @@ export default function Reckon() {
           </div>
 
           {reckonLoading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {Array.from({ length: INITIAL_VISIBLE_ITEMS }).map((_, i) => (
-                <div key={i}>
-                  <div className="aspect-[2/3] rounded-lg bg-muted animate-pulse" />
-                  <div className="mt-2 h-4 bg-muted rounded animate-pulse w-3/4" />
-                  <div className="mt-1 h-3 bg-muted rounded animate-pulse w-1/2" />
-                </div>
-              ))}
-            </div>
+            <PosterGridSkeleton count={INITIAL_VISIBLE_ITEMS} />
           ) : visibleItems.length > 0 ? (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
