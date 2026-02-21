@@ -3,15 +3,15 @@
  * Register a new user
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { connectToDatabase } from "../../lib/mongodb.js";
+import { connectToDatabase } from "../../lib/mongodb";
 import {
   hashPassword,
   generateTokens,
   hashRefreshToken,
   UserPayload,
-} from "../../lib/auth.js";
-import { setAuthCookies } from "../../lib/cookies.js";
-import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
+} from "../../lib/auth";
+import { setAuthCookies } from "../../lib/cookies";
+import { consumeRateLimit, getClientIp } from "../../lib/rate-limit";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;

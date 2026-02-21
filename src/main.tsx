@@ -53,13 +53,13 @@ function renderFatal(message: string, details?: Record<string, unknown>) {
   }
 
   try {
-    const mod = await import("./App.tsx");
+    const mod = await import("./App");
     const App = mod.default;
     createRoot(rootElement).render(<App />);
   } catch (error) {
     renderFatal(
       "Unexpected error while loading the application bundle.",
-      import.meta.env.DEV ? { error: String(error) } : undefined,
+      process.env.NODE_ENV !== "production" ? { error: String(error) } : undefined,
     );
   }
 })();

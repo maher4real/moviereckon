@@ -11,17 +11,17 @@ import { UserDataProvider } from "@/hooks/useUserData";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import StartupSoundManager from "@/components/StartupSoundManager";
 
-const Auth = lazy(() => import("./pages/Auth"));
-const Home = lazy(() => import("./pages/Home"));
-const Upcoming = lazy(() => import("./pages/Upcoming"));
-const Search = lazy(() => import("./pages/Search"));
-const MovieDetail = lazy(() => import("./pages/MovieDetail"));
-const TVDetail = lazy(() => import("./pages/TVDetail"));
-const Profile = lazy(() => import("./pages/Profile"));
-const Reckon = lazy(() => import("./pages/Reckon"));
-const NotFound = lazy(() => import("./pages/NotFound"));
-const Movies = lazy(() => import("./pages/Movies"));
-const Series = lazy(() => import("./pages/Series"));
+const Auth = lazy(() => import("./screens/Auth"));
+const Home = lazy(() => import("./screens/Home"));
+const Upcoming = lazy(() => import("./screens/Upcoming"));
+const Search = lazy(() => import("./screens/Search"));
+const MovieDetail = lazy(() => import("./screens/MovieDetail"));
+const TVDetail = lazy(() => import("./screens/TVDetail"));
+const Profile = lazy(() => import("./screens/Profile"));
+const Reckon = lazy(() => import("./screens/Reckon"));
+const NotFound = lazy(() => import("./screens/NotFound"));
+const Movies = lazy(() => import("./screens/Movies"));
+const Series = lazy(() => import("./screens/Series"));
 
 const queryClient = new QueryClient({
   defaultOptions: {

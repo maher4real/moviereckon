@@ -3,7 +3,7 @@
  * Get current authenticated user
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getUserFromRequest, getUserById } from "../../lib/auth.js";
+import { getUserFromRequest, getUserById } from "../../lib/auth";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET") {

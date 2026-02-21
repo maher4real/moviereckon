@@ -3,8 +3,8 @@
  * Manage community feedback signals
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { connectToDatabase } from "../../lib/mongodb.js";
-import { getUserFromRequest } from "../../lib/auth.js";
+import { connectToDatabase } from "../../lib/mongodb";
+import { getUserFromRequest } from "../../lib/auth";
 
 const FEEDBACK_TYPES = ["give_it_a_go", "one_time_watch", "must_watch", "skip"] as const;
 type FeedbackType = (typeof FEEDBACK_TYPES)[number];

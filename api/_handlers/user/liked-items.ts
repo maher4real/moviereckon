@@ -3,8 +3,8 @@
  * Manage user liked items
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { connectToDatabase } from "../../lib/mongodb.js";
-import { getUserFromRequest } from "../../lib/auth.js";
+import { connectToDatabase } from "../../lib/mongodb";
+import { getUserFromRequest } from "../../lib/auth";
 
 type ContentType = "movie" | "tv";
 

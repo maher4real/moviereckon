@@ -3,13 +3,13 @@
  * Invalidate refresh token
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { connectToDatabase } from "../../lib/mongodb.js";
-import { getUserFromRequest, hashRefreshToken } from "../../lib/auth.js";
+import { connectToDatabase } from "../../lib/mongodb";
+import { getUserFromRequest, hashRefreshToken } from "../../lib/auth";
 import {
   REFRESH_TOKEN_COOKIE_NAME,
   clearAuthCookies,
   getCookieValue,
-} from "../../lib/cookies.js";
+} from "../../lib/cookies";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {

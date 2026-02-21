@@ -3,15 +3,15 @@
  * Authenticate user and return JWT tokens
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { connectToDatabase } from "../../lib/mongodb.js";
+import { connectToDatabase } from "../../lib/mongodb";
 import {
   comparePassword,
   generateTokens,
   hashRefreshToken,
   UserPayload,
-} from "../../lib/auth.js";
-import { setAuthCookies } from "../../lib/cookies.js";
-import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
+} from "../../lib/auth";
+import { setAuthCookies } from "../../lib/cookies";
+import { consumeRateLimit, getClientIp } from "../../lib/rate-limit";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {

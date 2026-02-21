@@ -24,6 +24,7 @@ import {
   getRecommendations,
   normalizeTmdbItem,
 } from "@/lib/recommendation";
+import { isDevelopment } from "@/lib/runtimeEnv";
 
 interface RecommendationExplanation {
   reasons: RecommendationReason[];
@@ -95,10 +96,10 @@ function toDisplayItem(item: UnifiedContentItem): Movie | TVShow {
     const source = raw as Record<string, unknown>;
     if (item.type === "movie") {
       if (typeof source.title === "string") {
-        return source as Movie;
+        return source as unknown as Movie;
       }
     } else if (typeof source.name === "string") {
-      return source as TVShow;
+      return source as unknown as TVShow;
     }
   }
 
@@ -557,7 +558,7 @@ export function useRecommendations(): RecommendationResult {
   }, [rankedRecommendations]);
 
   useEffect(() => {
-    if (!import.meta.env.DEV) return;
+    if (!isDevelopment()) return;
 
     const sourceCoverage = rankedRecommendations.reduce((acc, entry) => {
       entry.sourceTags.forEach((source) => {

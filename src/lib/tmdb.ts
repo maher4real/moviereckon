@@ -3,6 +3,7 @@
 
 // Legacy fallback (disabled to avoid client-side provider key exposure):
 // import { supabase } from "@/lib/backendClient";
+import { getPublicMongoApiUrl } from "@/lib/runtimeEnv";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 const FALLBACK_POSTER = "/fallbacks/poster.svg";
@@ -239,7 +240,7 @@ interface TMDBResponse<T> {
 }
 
 const getApiBase = () => {
-  const configuredUrl = import.meta.env.VITE_MONGODB_API_URL;
+  const configuredUrl = getPublicMongoApiUrl();
   if (configuredUrl && configuredUrl.length > 0) {
     return configuredUrl;
   }

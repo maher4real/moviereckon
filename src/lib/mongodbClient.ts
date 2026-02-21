@@ -2,6 +2,7 @@
  * MongoDB Backend API Client
  * Uses MongoDB backend exclusively - no fallback to other services
  */
+import { getPublicMongoApiUrl } from "@/lib/runtimeEnv";
 
 // User cache key (non-sensitive profile data only).
 const USER_KEY = "moviereckon_user";
@@ -12,8 +13,8 @@ const USER_KEY = "moviereckon_user";
 // Backend URL - relative path for same-origin requests on Vercel
 // In production, API routes are at /api/* on the same domain
 const getApiUrl = () => {
-  // If VITE_MONGODB_API_URL is set, use it (for cross-origin development)
-  const configuredUrl = import.meta.env.VITE_MONGODB_API_URL;
+  // If NEXT_PUBLIC_MONGODB_API_URL is set, use it (for cross-origin development)
+  const configuredUrl = getPublicMongoApiUrl();
   if (configuredUrl && configuredUrl.length > 0) {
     return configuredUrl;
   }

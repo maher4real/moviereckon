@@ -57,7 +57,7 @@ const BOLLYWOOD_LANGUAGE_OPTIONS = [
   { value: "kn", label: "Kannada" },
 ];
 const BOLLYWOOD_LANGUAGE_CODES = ["hi", "gu", "ta", "te", "kn"] as const;
-const BOLLYWOOD_LANGUAGE_SET = new Set(BOLLYWOOD_LANGUAGE_CODES);
+const BOLLYWOOD_LANGUAGE_SET: ReadonlySet<string> = new Set(BOLLYWOOD_LANGUAGE_CODES);
 
 const isAnimeLikeMovie = (movie: Movie) =>
   movie.original_language === "ja" && movie.genre_ids?.includes(16);

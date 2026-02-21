@@ -4,16 +4,18 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { createHash } from "crypto";
-import { connectToDatabase, ObjectId } from "./mongodb.js";
-import { ACCESS_TOKEN_COOKIE_NAME, getCookieValue } from "./cookies.js";
+import { connectToDatabase, ObjectId } from "./mongodb";
+import { ACCESS_TOKEN_COOKIE_NAME, getCookieValue } from "./cookies";
 
-const JWT_SECRET = process.env.JWT_SECRET;
-// Legacy fallback (disabled for security):
-// const JWT_SECRET = process.env.JWT_SECRET || "your-super-secret-jwt-key-change-in-production";
-
-if (!JWT_SECRET || JWT_SECRET.length < 32) {
-  throw new Error("JWT_SECRET must be configured and at least 32 characters");
-}
+const JWT_SECRET = (() => {
+  const value = process.env.JWT_SECRET;
+  // Legacy fallback (disabled for security):
+  // const value = process.env.JWT_SECRET || "your-super-secret-jwt-key-change-in-production";
+  if (!value || value.length < 32) {
+    throw new Error("JWT_SECRET must be configured and at least 32 characters");
+  }
+  return value;
+})();
 
 const JWT_ISSUER = "moviereckon";
 const JWT_AUDIENCE = "moviereckon-web";
