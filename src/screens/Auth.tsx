@@ -218,7 +218,6 @@ export default function Auth() {
 
     // Prime audio in direct user gesture path to reduce autoplay delays after navigation.
     void primeStartupSoundFromGesture();
-    triggerAuthTransition();
 
     setIsSubmitting(true);
 
@@ -226,12 +225,14 @@ export default function Auth() {
       if (activeTab === "signup") {
         const { error } = await signUp(email, password, username);
         if (!error) {
+          triggerAuthTransition();
           queueStartupSound();
           navigate("/home");
         }
       } else {
         const { error } = await signIn(email, password);
         if (!error) {
+          triggerAuthTransition();
           queueStartupSound();
           navigate("/home");
         }
