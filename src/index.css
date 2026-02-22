@@ -352,11 +352,11 @@
   }
 
   .animate-auth-brand-pulse {
-    animation: auth-brand-pulse 1.8s ease-in-out infinite;
+    animation: auth-brand-pulse 2.6s ease-in-out infinite;
   }
 
   .animate-auth-brand-shimmer {
-    animation: auth-brand-shimmer 1.4s linear infinite;
+    animation: auth-brand-shimmer 2.2s linear infinite;
   }
 
   @keyframes fade-in {

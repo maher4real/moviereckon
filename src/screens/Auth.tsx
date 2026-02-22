@@ -16,15 +16,11 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import MediaImage from "@/components/MediaImage";
 import {
   ArrowRight,
-  Clapperboard,
   Eye,
   EyeOff,
   Film,
   Lock,
   Mail,
-  ShieldCheck,
-  Sparkles,
-  Tv,
   User,
 } from "lucide-react";
 import { z } from "zod";
@@ -254,10 +250,10 @@ export default function Auth() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background">
+    <div className="relative min-h-screen overflow-hidden bg-background p-4">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute inset-0 scale-[1.1] -rotate-2">
-          <div className="flex h-full flex-col justify-center gap-3 opacity-30">
+        <div className="absolute inset-0 scale-[1.08] -rotate-2">
+          <div className="flex h-full flex-col justify-center gap-3 opacity-45">
             {posterRows.map((row, rowIndex) => (
               <div
                 key={`row-${rowIndex}`}
@@ -286,62 +282,25 @@ export default function Auth() {
             ))}
           </div>
         </div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,hsl(var(--secondary)/0.26),transparent_38%),radial-gradient(circle_at_86%_78%,hsl(var(--primary)/0.3),transparent_44%)]" />
-        <div className="absolute inset-0 bg-gradient-to-br from-background/95 via-background/82 to-background/94" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_22%,hsl(var(--secondary)/0.2),transparent_42%),radial-gradient(circle_at_84%_74%,hsl(var(--primary)/0.24),transparent_45%)]" />
+        <div className="absolute inset-0 bg-gradient-to-br from-background/76 via-background/56 to-background/72" />
+        <div className="absolute top-1/4 -left-1/4 h-1/2 w-1/2 rounded-full bg-primary/12 blur-[120px]" />
+        <div className="absolute bottom-1/4 -right-1/4 h-1/2 w-1/2 rounded-full bg-secondary/12 blur-[120px]" />
       </div>
 
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl items-center px-4 py-10 sm:px-6 lg:px-8">
-        <div className="grid w-full items-stretch gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <section className="hidden rounded-3xl border border-white/10 bg-black/30 p-8 backdrop-blur-sm lg:flex lg:flex-col lg:justify-between">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/50 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-primary">
-                <Sparkles className="h-3.5 w-3.5" />
-                Cinematic Recommendations
-              </div>
-              <h1 className="mt-5 text-5xl font-bold leading-tight text-foreground">
-                Find your next
-                <span className="block text-gradient">must-watch in seconds</span>
-              </h1>
-              <p className="mt-4 max-w-xl text-base text-muted-foreground">
-                One account unlocks smarter picks across Bollywood and Hollywood.
-                Sign in to continue your watch journey, or create your profile to
-                get personalized recommendations from day one.
-              </p>
+      <div className="relative z-10 flex min-h-screen w-full items-center justify-center">
+        <div className="w-full max-w-md animate-fade-in">
+          <div className="mb-8 flex flex-col items-center">
+            <div className="mb-4 flex items-center gap-2">
+              <Film className="h-10 w-10 text-primary" />
+              <h1 className="text-4xl font-bold text-gradient">MovieReckon</h1>
             </div>
+            <p className="text-center text-muted-foreground">
+              Your personalized gateway to Bollywood & Hollywood
+            </p>
+          </div>
 
-            <div className="mt-8 grid gap-3">
-              <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-black/35 px-4 py-3">
-                <Clapperboard className="mt-0.5 h-4 w-4 text-primary" />
-                <p className="text-sm text-muted-foreground">
-                  Curated suggestions from trending, top-rated, and hidden gems.
-                </p>
-              </div>
-              <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-black/35 px-4 py-3">
-                <Tv className="mt-0.5 h-4 w-4 text-secondary" />
-                <p className="text-sm text-muted-foreground">
-                  Track your movie and series history in one place.
-                </p>
-              </div>
-              <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-black/35 px-4 py-3">
-                <ShieldCheck className="mt-0.5 h-4 w-4 text-emerald-400" />
-                <p className="text-sm text-muted-foreground">
-                  Secure session-based login with fast re-entry on returning visits.
-                </p>
-              </div>
-            </div>
-          </section>
-
-          <section className="animate-fade-in rounded-3xl border border-white/10 bg-card/82 p-6 shadow-2xl backdrop-blur-md sm:p-8">
-            <div className="mb-7">
-              <div className="flex items-center gap-2">
-                <Film className="h-8 w-8 text-primary" />
-                <h2 className="text-3xl font-bold text-gradient">MovieReckon</h2>
-              </div>
-              <p className="mt-3 text-sm text-muted-foreground sm:text-base">
-                Sign in to continue or create a new account to start personalizing your feed.
-              </p>
-            </div>
-
+          <section className="rounded-2xl border border-white/10 bg-card/78 p-8 shadow-2xl backdrop-blur-md">
             <Tabs
               value={activeTab}
               onValueChange={(value) => {
@@ -349,16 +308,16 @@ export default function Auth() {
                 setErrors({});
               }}
             >
-              <TabsList className="mb-6 grid h-12 w-full grid-cols-2 rounded-2xl border border-white/10 bg-background/65 p-1">
+              <TabsList className="mb-6 grid h-12 w-full grid-cols-2 rounded-xl border border-white/10 bg-background/65 p-1">
                 <TabsTrigger
                   value="signin"
-                  className="rounded-xl text-sm font-semibold tracking-wide data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-primary/35"
+                  className="rounded-lg text-sm font-semibold tracking-wide data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-primary/35"
                 >
                   Sign In
                 </TabsTrigger>
                 <TabsTrigger
                   value="signup"
-                  className="rounded-xl text-sm font-semibold tracking-wide data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-primary/35"
+                  className="rounded-lg text-sm font-semibold tracking-wide data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-primary/35"
                 >
                   Sign Up
                 </TabsTrigger>
@@ -538,6 +497,10 @@ export default function Auth() {
               </TabsContent>
             </Tabs>
           </section>
+
+          <p className="mt-6 text-center text-sm text-muted-foreground">
+            Discover movies from Bollywood, Hollywood & more
+          </p>
         </div>
       </div>
     </div>

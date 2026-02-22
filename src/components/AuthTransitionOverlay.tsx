@@ -1,14 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Film } from "lucide-react";
+import MediaImage from "@/components/MediaImage";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  getBollywoodMovies,
+  getPosterUrl,
+  getTrendingMovies,
+  getTrendingTVShows,
+} from "@/lib/tmdb";
 import { cn } from "@/lib/utils";
 
 type OverlayPhase = "hidden" | "center" | "moving" | "fading";
 
-const MIN_CENTER_DURATION_MS = 800;
-const MOVE_DURATION_MS = 900;
-const FADE_DURATION_MS = 320;
+const MIN_CENTER_DURATION_MS = 900;
+const MOVE_DURATION_MS = 1450;
+const FADE_DURATION_MS = 450;
 const ANCHOR_LOOKUP_TIMEOUT_MS = 5000;
 
 const INITIAL_TRANSFORM = {
@@ -16,10 +23,11 @@ const INITIAL_TRANSFORM = {
   y: 0,
   scale: 1,
 };
+const ROW_COUNT = 4;
+const POSTERS_PER_ROW = 12;
 
 export default function AuthTransitionOverlay() {
   const { user, isLoading, isAuthenticating, authTransitionRunId } = useAuth();
-  const location = useLocation();
   const logoRef = useRef<HTMLDivElement | null>(null);
   const runIdRef = useRef(0);
   const timerRef = useRef<number | null>(null);
@@ -28,6 +36,106 @@ export default function AuthTransitionOverlay() {
 
   const [phase, setPhase] = useState<OverlayPhase>("hidden");
   const [transform, setTransform] = useState(INITIAL_TRANSFORM);
+
+  const { data: trendingMovies } = useQuery({
+    queryKey: ["auth-overlay-bg-trending-movies"],
+    queryFn: () => getTrendingMovies("week"),
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const { data: trendingTV } = useQuery({
+    queryKey: ["auth-overlay-bg-trending-tv"],
+    queryFn: () => getTrendingTVShows("week"),
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const { data: bollywoodData } = useQuery({
+    queryKey: ["auth-overlay-bg-bollywood"],
+    queryFn: () => getBollywoodMovies(1),
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const backgroundPosters = useMemo(() => {
+    const maxItems = 36;
+
+    const moviePosters = (trendingMovies || [])
+      .filter((item) => item.poster_path)
+      .map((item, index) => ({
+        id: `overlay-movie-${item.id}-${index}`,
+        src: getPosterUrl(item.poster_path, "small"),
+      }));
+
+    const tvPosters = (trendingTV || [])
+      .filter((item) => item.poster_path)
+      .map((item, index) => ({
+        id: `overlay-tv-${item.id}-${index}`,
+        src: getPosterUrl(item.poster_path, "small"),
+      }));
+
+    const bollywoodPosters = (bollywoodData?.results || [])
+      .filter((item) => item.poster_path)
+      .map((item, index) => ({
+        id: `overlay-bollywood-${item.id}-${index}`,
+        src: getPosterUrl(item.poster_path, "small"),
+      }));
+
+    const curatedPools = {
+      movie: moviePosters.slice(0, 14),
+      tv: tvPosters.slice(0, 14),
+      bollywood: bollywoodPosters.slice(0, 8),
+    };
+
+    const orderedKeys: (keyof typeof curatedPools)[] = [
+      "movie",
+      "tv",
+      "bollywood",
+    ];
+    const mixed: { id: string; src: string }[] = [];
+    let cursor = 0;
+
+    while (
+      mixed.length < maxItems &&
+      orderedKeys.some((key) => cursor < curatedPools[key].length)
+    ) {
+      orderedKeys.forEach((key) => {
+        if (mixed.length >= maxItems) return;
+        const item = curatedPools[key][cursor];
+        if (item) mixed.push(item);
+      });
+      cursor += 1;
+    }
+
+    if (mixed.length < maxItems) {
+      const extraPool = [
+        ...moviePosters.slice(14),
+        ...tvPosters.slice(14),
+        ...bollywoodPosters.slice(8),
+      ];
+
+      for (const item of extraPool) {
+        if (mixed.length >= maxItems) break;
+        mixed.push(item);
+      }
+    }
+
+    if (mixed.length > 0) return mixed;
+
+    return Array.from({ length: 36 }, (_, index) => ({
+      id: `overlay-fallback-${index}`,
+      src: "/fallbacks/poster.svg",
+    }));
+  }, [bollywoodData, trendingMovies, trendingTV]);
+
+  const posterRows = useMemo(() => {
+    if (!backgroundPosters.length) return [];
+
+    return Array.from({ length: ROW_COUNT }, (_, rowIndex) => {
+      const start = (rowIndex * 6) % backgroundPosters.length;
+      return Array.from({ length: POSTERS_PER_ROW }, (_, offset) => {
+        return backgroundPosters[(start + offset) % backgroundPosters.length];
+      });
+    });
+  }, [backgroundPosters]);
 
   const clearPendingWork = useCallback(() => {
     if (timerRef.current !== null) {
@@ -120,17 +228,32 @@ export default function AuthTransitionOverlay() {
         timerRef.current = null;
       }
     };
-  }, [phase, isLoading, isAuthenticating, user, location.pathname, beginMoveToNavbar]);
+  }, [phase, isLoading, isAuthenticating, user, beginMoveToNavbar]);
 
   useEffect(() => {
-    if (phase !== "moving" && phase !== "fading") return;
+    if (phase !== "moving") return;
 
-    const timeoutMs = phase === "moving" ? MOVE_DURATION_MS : FADE_DURATION_MS;
+    timerRef.current = window.setTimeout(() => {
+      timerRef.current = null;
+      setPhase("fading");
+    }, MOVE_DURATION_MS);
+
+    return () => {
+      if (timerRef.current !== null) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "fading") return;
+
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null;
       setPhase("hidden");
       setTransform(INITIAL_TRANSFORM);
-    }, timeoutMs);
+    }, FADE_DURATION_MS);
 
     return () => {
       if (timerRef.current !== null) {
@@ -149,20 +272,55 @@ export default function AuthTransitionOverlay() {
   const isCenter = phase === "center";
 
   return (
-    <div className="pointer-events-auto fixed inset-0 z-[120] cursor-progress">
-      <div
-        className={cn(
-          "absolute inset-0 bg-background/96 backdrop-blur-md transition-opacity duration-500",
-          phase === "moving" || phase === "fading" ? "opacity-0" : "opacity-100",
-        )}
-      />
+    <div
+      className={cn(
+        "pointer-events-auto fixed inset-0 z-[120] cursor-progress transition-opacity duration-[450ms]",
+        phase === "fading" ? "opacity-0" : "opacity-100",
+      )}
+    >
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute inset-0 scale-[1.08] -rotate-2">
+          <div className="flex h-full flex-col justify-center gap-3 opacity-42">
+            {posterRows.map((row, rowIndex) => (
+              <div
+                key={`overlay-row-${rowIndex}`}
+                className={cn(
+                  "auth-poster-row",
+                  rowIndex % 2 === 1 && "auth-poster-row-reverse",
+                )}
+                style={{ animationDuration: `${38 + rowIndex * 4}s` }}
+              >
+                {[...row, ...row].map((poster, index) => (
+                  <div
+                    key={`${poster.id}-${rowIndex}-${index}`}
+                    className="auth-poster-tile"
+                  >
+                    <MediaImage
+                      src={poster.src}
+                      alt=""
+                      aria-hidden="true"
+                      className="h-full w-full object-cover"
+                      fallbackSrc="/fallbacks/poster.svg"
+                      loading="lazy"
+                    />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_22%,hsl(var(--secondary)/0.16),transparent_42%),radial-gradient(circle_at_84%_74%,hsl(var(--primary)/0.2),transparent_45%)]" />
+        <div className="absolute inset-0 bg-gradient-to-br from-background/74 via-background/54 to-background/70" />
+        <div className="absolute top-1/4 -left-1/4 h-1/2 w-1/2 rounded-full bg-primary/10 blur-[120px]" />
+        <div className="absolute bottom-1/4 -right-1/4 h-1/2 w-1/2 rounded-full bg-secondary/10 blur-[120px]" />
+      </div>
+
       <div
         ref={logoRef}
         className={cn(
           "absolute left-1/2 top-1/2 flex items-center gap-2 sm:gap-3 will-change-transform",
-          isCenter
-            ? "duration-300 ease-out"
-            : "transition-[transform,opacity,filter] duration-[900ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+          "transition-[transform,opacity,filter] duration-[1450ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
           phase === "fading" ? "opacity-0" : "opacity-100",
         )}
         style={{
