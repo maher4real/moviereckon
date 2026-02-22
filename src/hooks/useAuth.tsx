@@ -19,6 +19,9 @@ interface AuthContextType {
   user: mongoClient.MongoUser | null;
   profile: Profile | null;
   isLoading: boolean;
+  isAuthenticating: boolean;
+  authTransitionRunId: number;
+  triggerAuthTransition: () => void;
   signUp: (email: string, password: string, username: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -43,7 +46,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return storedUser ? mapUserToProfile(storedUser) : null;
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [authTransitionRunId, setAuthTransitionRunId] = useState(1);
   const { toast } = useToast();
+
+  const triggerAuthTransition = useCallback(() => {
+    setAuthTransitionRunId((prev) => prev + 1);
+  }, []);
 
   // Initialize auth from stored tokens
   const initAuth = useCallback(async () => {
@@ -83,54 +92,64 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Sign Up
   const signUp = async (email: string, password: string, username: string) => {
-    const { user: newUser, error } = await mongoClient.register(email, password, username);
-    
-    if (error) {
+    setIsAuthenticating(true);
+    try {
+      const { user: newUser, error } = await mongoClient.register(email, password, username);
+
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Sign up failed",
+          description: error,
+        });
+        return { error: new Error(error) };
+      }
+
+      if (newUser) {
+        setUser(newUser);
+        setProfile(mapUserToProfile(newUser));
+      }
+
       toast({
-        variant: "destructive",
-        title: "Sign up failed",
-        description: error,
+        title: "Welcome!",
+        description: "Your account has been created successfully.",
       });
-      return { error: new Error(error) };
+
+      return { error: null };
+    } finally {
+      setIsAuthenticating(false);
     }
-
-    if (newUser) {
-      setUser(newUser);
-      setProfile(mapUserToProfile(newUser));
-    }
-
-    toast({
-      title: "Welcome!",
-      description: "Your account has been created successfully.",
-    });
-
-    return { error: null };
   };
 
   // Sign In
   const signIn = async (email: string, password: string) => {
-    const { user: loggedInUser, error } = await mongoClient.login(email, password);
-    
-    if (error) {
+    setIsAuthenticating(true);
+    try {
+      const { user: loggedInUser, error } = await mongoClient.login(email, password);
+
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Sign in failed",
+          description: error,
+        });
+        return { error: new Error(error) };
+      }
+
+      if (loggedInUser) {
+        setUser(loggedInUser);
+        setProfile(mapUserToProfile(loggedInUser));
+      }
+
       toast({
-        variant: "destructive",
-        title: "Sign in failed",
-        description: error,
+        title: "Welcome back!",
+        description: "You've been signed in successfully.",
       });
-      return { error: new Error(error) };
+
+      return { error: null };
+    } finally {
+      setIsAuthenticating(false);
     }
-
-    if (loggedInUser) {
-      setUser(loggedInUser);
-      setProfile(mapUserToProfile(loggedInUser));
-    }
-
-    toast({
-      title: "Welcome back!",
-      description: "You've been signed in successfully.",
-    });
-
-    return { error: null };
   };
 
   // Sign Out
@@ -178,6 +197,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         profile,
         isLoading,
+        isAuthenticating,
+        authTransitionRunId,
+        triggerAuthTransition,
         signUp,
         signIn,
         signOut,

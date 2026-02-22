@@ -48,7 +48,11 @@ export default function Header() {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to="/home" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <Link
+            to="/home"
+            data-brand-logo-anchor="true"
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+          >
             <Film className="w-7 h-7 text-primary" />
             <span className="text-xl font-bold text-gradient hidden sm:block">MovieReckon</span>
           </Link>

@@ -10,6 +10,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { UserDataProvider } from "@/hooks/useUserData";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import StartupSoundManager from "@/components/StartupSoundManager";
+import AuthTransitionOverlay from "@/components/AuthTransitionOverlay";
 
 const Auth = lazy(() => import("./screens/Auth"));
 const Home = lazy(() => import("./screens/Home"));
@@ -43,6 +44,7 @@ const App = () => (
             <Sonner />
             <BrowserRouter>
               <StartupSoundManager />
+              <AuthTransitionOverlay />
               <Suspense fallback={<div className="min-h-screen bg-background" />}>
                 <Routes>
                   <Route path="/" element={<Auth />} />
