@@ -9,6 +9,7 @@ import {
   getPosterUrl,
 } from "@/lib/tmdb";
 import { AuthPageSkeleton } from "@/components/AppSkeletons";
+import TurnstileCaptcha from "@/components/TurnstileCaptcha";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,7 +58,12 @@ export default function Auth() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
+  const [signinCaptchaToken, setSigninCaptchaToken] = useState("");
+  const [signupCaptchaToken, setSignupCaptchaToken] = useState("");
+  const [signinCaptchaResetNonce, setSigninCaptchaResetNonce] = useState(0);
+  const [signupCaptchaResetNonce, setSignupCaptchaResetNonce] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const captchaSiteKey = (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "").trim();
 
   // Form state
   const [email, setEmail] = useState("");
@@ -186,6 +192,32 @@ export default function Auth() {
     return codeToMessage[code] || "Google sign-in failed. Please try again.";
   }, [location.search]);
 
+  const emailVerificationStatus = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("email_verified") === "1") {
+      return {
+        tone: "success" as const,
+        message: "Email verified successfully. You can sign in now.",
+      };
+    }
+
+    const verifyError = params.get("verify_error");
+    if (!verifyError) return null;
+
+    const codeToMessage: Record<string, string> = {
+      missing_token: "Verification link is incomplete.",
+      invalid_token: "Verification link is invalid.",
+      expired_token: "Verification link expired. Please sign up again.",
+      user_not_found: "Account not found for this verification link.",
+      server_error: "Verification failed due to a server issue.",
+    };
+
+    return {
+      tone: "error" as const,
+      message: codeToMessage[verifyError] || "Email verification failed. Please try again.",
+    };
+  }, [location.search]);
+
   // Redirect if already authenticated
   useEffect(() => {
     if (user) {
@@ -217,6 +249,14 @@ export default function Auth() {
       }
     }
 
+    if (!captchaSiteKey) {
+      newErrors.captcha = "CAPTCHA is unavailable. Please contact support.";
+    } else if (activeTab === "signup" && !signupCaptchaToken) {
+      newErrors.captcha = "Please complete CAPTCHA verification.";
+    } else if (activeTab === "signin" && !signinCaptchaToken) {
+      newErrors.captcha = "Please complete CAPTCHA verification.";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -233,14 +273,36 @@ export default function Auth() {
 
     try {
       if (activeTab === "signup") {
-        const { error } = await signUp(email, password, username);
+        const {
+          error,
+          requiresEmailVerification,
+          verificationPreviewUrl,
+        } = await signUp(email, password, username, signupCaptchaToken);
+        setSignupCaptchaToken("");
+        setSignupCaptchaResetNonce((prev) => prev + 1);
+
         if (!error) {
+          if (requiresEmailVerification) {
+            setPassword("");
+            setShowPassword(false);
+            setActiveTab("signin");
+            setSigninCaptchaToken("");
+            setSigninCaptchaResetNonce((prev) => prev + 1);
+            if (verificationPreviewUrl) {
+              console.info("Verification preview URL:", verificationPreviewUrl);
+            }
+            return;
+          }
+
           triggerAuthTransition();
           queueStartupSound();
           navigate("/home");
         }
       } else {
-        const { error } = await signIn(email, password);
+        const { error } = await signIn(email, password, signinCaptchaToken);
+        setSigninCaptchaToken("");
+        setSigninCaptchaResetNonce((prev) => prev + 1);
+
         if (!error) {
           triggerAuthTransition();
           queueStartupSound();
@@ -323,6 +385,19 @@ export default function Auth() {
           </div>
 
           <section className="rounded-2xl border border-white/10 bg-card/78 p-8 shadow-2xl backdrop-blur-md">
+            {emailVerificationStatus ? (
+              <p
+                className={cn(
+                  "mb-5 rounded-xl border px-3 py-2 text-sm",
+                  emailVerificationStatus.tone === "success"
+                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+                    : "border-destructive/40 bg-destructive/10 text-destructive",
+                )}
+              >
+                {emailVerificationStatus.message}
+              </p>
+            ) : null}
+
             {oauthErrorMessage ? (
               <p className="mb-5 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 {oauthErrorMessage}
@@ -361,8 +436,13 @@ export default function Auth() {
             <Tabs
               value={activeTab}
               onValueChange={(value) => {
-                setActiveTab(value as "signin" | "signup");
+                const nextTab = value as "signin" | "signup";
+                setActiveTab(nextTab);
                 setErrors({});
+                setSigninCaptchaToken("");
+                setSignupCaptchaToken("");
+                setSigninCaptchaResetNonce((prev) => prev + 1);
+                setSignupCaptchaResetNonce((prev) => prev + 1);
               }}
             >
               <TabsList className="mb-6 grid h-12 w-full grid-cols-2 rounded-xl border border-white/10 bg-background/65 p-1">
@@ -441,13 +521,23 @@ export default function Auth() {
                   <Button
                     type="submit"
                     className="auth-submit-btn mt-1 h-12 w-full rounded-xl bg-gradient-to-r from-primary via-red-500 to-orange-500 text-base font-semibold text-white shadow-lg shadow-primary/35 transition-all hover:brightness-110"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isAuthenticating}
                   >
                     <span className="inline-flex items-center gap-2">
                       {isSubmitting ? "Signing In..." : "Sign In"}
                       <ArrowRight className="h-4 w-4" />
                     </span>
                   </Button>
+
+                  <TurnstileCaptcha
+                    siteKey={captchaSiteKey}
+                    action="login"
+                    onTokenChange={setSigninCaptchaToken}
+                    resetNonce={signinCaptchaResetNonce}
+                  />
+                  {errors.captcha && activeTab === "signin" ? (
+                    <p className="text-xs text-destructive">{errors.captcha}</p>
+                  ) : null}
                 </form>
               </TabsContent>
 
@@ -535,13 +625,23 @@ export default function Auth() {
                   <Button
                     type="submit"
                     className="auth-submit-btn mt-1 h-12 w-full rounded-xl bg-gradient-to-r from-primary via-red-500 to-orange-500 text-base font-semibold text-white shadow-lg shadow-primary/35 transition-all hover:brightness-110"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isAuthenticating}
                   >
                     <span className="inline-flex items-center gap-2">
                       {isSubmitting ? "Creating Account..." : "Create Account"}
                       <ArrowRight className="h-4 w-4" />
                     </span>
                   </Button>
+
+                  <TurnstileCaptcha
+                    siteKey={captchaSiteKey}
+                    action="signup"
+                    onTokenChange={setSignupCaptchaToken}
+                    resetNonce={signupCaptchaResetNonce}
+                  />
+                  {errors.captcha && activeTab === "signup" ? (
+                    <p className="text-xs text-destructive">{errors.captcha}</p>
+                  ) : null}
                 </form>
               </TabsContent>
             </Tabs>

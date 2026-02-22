@@ -82,6 +82,20 @@ async function resolveUserFromGoogleProfile(db: Db, profile: GoogleProfile) {
 
   let user = await users.findOne({ google_sub: profile.sub });
 
+  if (user && user.email_verified !== true) {
+    await users.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          email_verified: true,
+          email_verified_at: now,
+          updated_at: now,
+        },
+      },
+    );
+    user = await users.findOne({ _id: user._id });
+  }
+
   if (!user) {
     const userByEmail = await users.findOne({ email: profile.email });
     if (userByEmail) {
@@ -99,6 +113,11 @@ async function resolveUserFromGoogleProfile(db: Db, profile: GoogleProfile) {
 
       if (!userByEmail.avatar_url && profile.picture) {
         updates.avatar_url = profile.picture;
+      }
+
+      if (userByEmail.email_verified !== true) {
+        updates.email_verified = true;
+        updates.email_verified_at = now;
       }
 
       if (!userByEmail.username || typeof userByEmail.username !== "string") {
@@ -124,6 +143,8 @@ async function resolveUserFromGoogleProfile(db: Db, profile: GoogleProfile) {
       username,
       avatar_url: profile.picture || null,
       google_sub: profile.sub,
+      email_verified: true,
+      email_verified_at: now,
       created_at: now,
       updated_at: now,
     });

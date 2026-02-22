@@ -22,8 +22,13 @@ interface AuthContextType {
   isAuthenticating: boolean;
   authTransitionRunId: number;
   triggerAuthTransition: () => void;
-  signUp: (email: string, password: string, username: string) => Promise<{ error: Error | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    username: string,
+    captchaToken: string,
+  ) => Promise<{ error: Error | null; requiresEmailVerification: boolean; verificationPreviewUrl: string | null }>;
+  signIn: (email: string, password: string, captchaToken: string) => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
@@ -92,10 +97,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [initAuth]);
 
   // Sign Up
-  const signUp = async (email: string, password: string, username: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    username: string,
+    captchaToken: string,
+  ) => {
     setIsAuthenticating(true);
     try {
-      const { user: newUser, error } = await mongoClient.register(email, password, username);
+      const {
+        user: newUser,
+        error,
+        requiresEmailVerification,
+        verificationPreviewUrl,
+      } = await mongoClient.register(email, password, username, captchaToken);
 
       if (error) {
         toast({
@@ -103,7 +118,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           title: "Sign up failed",
           description: error,
         });
-        return { error: new Error(error) };
+        return {
+          error: new Error(error),
+          requiresEmailVerification: false,
+          verificationPreviewUrl: null,
+        };
+      }
+
+      if (requiresEmailVerification) {
+        setUser(null);
+        setProfile(null);
+        toast({
+          title: "Verify your email",
+          description: "Account created. Check your inbox before signing in.",
+        });
+        return {
+          error: null,
+          requiresEmailVerification: true,
+          verificationPreviewUrl,
+        };
       }
 
       if (newUser) {
@@ -116,17 +149,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         description: "Your account has been created successfully.",
       });
 
-      return { error: null };
+      return {
+        error: null,
+        requiresEmailVerification: false,
+        verificationPreviewUrl: null,
+      };
     } finally {
       setIsAuthenticating(false);
     }
   };
 
   // Sign In
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string, captchaToken: string) => {
     setIsAuthenticating(true);
     try {
-      const { user: loggedInUser, error } = await mongoClient.login(email, password);
+      const { user: loggedInUser, error } = await mongoClient.login(email, password, captchaToken);
 
       if (error) {
         toast({

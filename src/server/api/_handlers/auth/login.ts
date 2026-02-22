@@ -12,6 +12,7 @@ import {
 } from "../../lib/auth.js";
 import { setAuthCookies } from "../../lib/cookies.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
+import { verifyCaptchaToken } from "../../lib/captcha.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -21,6 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
     const password = typeof req.body?.password === "string" ? req.body.password : "";
+    const captchaToken = typeof req.body?.captcha_token === "string" ? req.body.captcha_token : "";
 
     const clientIp = getClientIp(req);
     const ipRateLimit = consumeRateLimit(`auth:login:ip:${clientIp}`, 25, 15 * 60 * 1000);
@@ -40,12 +42,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: "Email and password are required" });
     }
 
+    const captchaResult = await verifyCaptchaToken(req, captchaToken, "login");
+    if (!captchaResult.ok) {
+      return res.status(400).json({ error: captchaResult.error || "CAPTCHA verification failed" });
+    }
+
     const { db } = await connectToDatabase();
 
     // Find user
     const user = await db.collection("users").findOne({ email });
     if (!user) {
       return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    if (user.email_verified === false) {
+      return res.status(403).json({ error: "Please verify your email before signing in." });
     }
 
     // Accounts created via OAuth may not have a local password hash.

@@ -192,42 +192,70 @@ export interface CommentItem {
 export async function register(
   email: string,
   password: string,
-  username: string
-): Promise<{ user: MongoUser | null; error: string | null }> {
+  username: string,
+  captchaToken: string,
+): Promise<{
+  user: MongoUser | null;
+  error: string | null;
+  requiresEmailVerification: boolean;
+  verificationPreviewUrl: string | null;
+}> {
   try {
     const response = await fetch(`${MONGODB_API_URL}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, username }),
+      body: JSON.stringify({ email, password, username, captcha_token: captchaToken }),
       credentials: "include",
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      return { user: null, error: data.error || "Registration failed" };
+      return {
+        user: null,
+        error: data.error || "Registration failed",
+        requiresEmailVerification: false,
+        verificationPreviewUrl: null,
+      };
     }
 
-    // Legacy fallback (disabled for security):
-    // setTokens(data.accessToken, data.refreshToken);
-    setStoredUser(data.user);
+    const requiresEmailVerification = data.requires_email_verification === true;
+    const registeredUser = data.user ?? null;
 
-    return { user: data.user, error: null };
+    if (registeredUser && !requiresEmailVerification) {
+      // Legacy fallback (disabled for security):
+      // setTokens(data.accessToken, data.refreshToken);
+      setStoredUser(registeredUser);
+    }
+
+    return {
+      user: registeredUser,
+      error: null,
+      requiresEmailVerification,
+      verificationPreviewUrl:
+        typeof data.verification_preview_url === "string" ? data.verification_preview_url : null,
+    };
   } catch (error) {
     console.error("Registration error:", error);
-    return { user: null, error: "Network error. Backend may be unavailable." };
+    return {
+      user: null,
+      error: "Network error. Backend may be unavailable.",
+      requiresEmailVerification: false,
+      verificationPreviewUrl: null,
+    };
   }
 }
 
 export async function login(
   email: string,
-  password: string
+  password: string,
+  captchaToken: string,
 ): Promise<{ user: MongoUser | null; error: string | null }> {
   try {
     const response = await fetch(`${MONGODB_API_URL}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, captcha_token: captchaToken }),
       credentials: "include",
     });
 

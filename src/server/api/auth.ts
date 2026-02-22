@@ -1,7 +1,8 @@
 /**
  * Auth Router - Consolidated serverless function
  * Routes: /api/auth/login, /api/auth/register, /api/auth/refresh, /api/auth/me,
- * /api/auth/logout, /api/auth/google-start, /api/auth/google-callback
+ * /api/auth/logout, /api/auth/google-start, /api/auth/google-callback,
+ * /api/auth/verify-email
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import loginHandler from "./_handlers/auth/login.js";
@@ -11,6 +12,7 @@ import meHandler from "./_handlers/auth/me.js";
 import logoutHandler from "./_handlers/auth/logout.js";
 import googleStartHandler from "./_handlers/auth/google-start.js";
 import googleCallbackHandler from "./_handlers/auth/google-callback.js";
+import verifyEmailHandler from "./_handlers/auth/verify-email.js";
 import { applyApiCors, applyDefaultSecurityHeaders } from "./lib/cors.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -58,6 +60,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return googleStartHandler(req, res);
       case "google-callback":
         return googleCallbackHandler(req, res);
+      case "verify-email":
+        return verifyEmailHandler(req, res);
       default:
         return res.status(404).json({ error: `Auth route not found: ${route}` });
     }
