@@ -280,7 +280,7 @@ export default function AuthTransitionOverlay() {
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 scale-[1.08] -rotate-2">
-          <div className="flex h-full flex-col justify-center gap-3 opacity-42">
+          <div className="flex h-full flex-col justify-center gap-3 opacity-34">
             {posterRows.map((row, rowIndex) => (
               <div
                 key={`overlay-row-${rowIndex}`}
@@ -310,10 +310,11 @@ export default function AuthTransitionOverlay() {
           </div>
         </div>
 
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_22%,hsl(var(--secondary)/0.16),transparent_42%),radial-gradient(circle_at_84%_74%,hsl(var(--primary)/0.2),transparent_45%)]" />
-        <div className="absolute inset-0 bg-gradient-to-br from-background/74 via-background/54 to-background/70" />
-        <div className="absolute top-1/4 -left-1/4 h-1/2 w-1/2 rounded-full bg-primary/10 blur-[120px]" />
-        <div className="absolute bottom-1/4 -right-1/4 h-1/2 w-1/2 rounded-full bg-secondary/10 blur-[120px]" />
+        <div className="absolute inset-0 bg-black/48" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_22%,hsl(var(--secondary)/0.12),transparent_42%),radial-gradient(circle_at_84%_74%,hsl(var(--primary)/0.14),transparent_45%)]" />
+        <div className="absolute inset-0 bg-gradient-to-br from-background/92 via-background/84 to-background/90" />
+        <div className="absolute top-1/4 -left-1/4 h-1/2 w-1/2 rounded-full bg-primary/8 blur-[120px]" />
+        <div className="absolute bottom-1/4 -right-1/4 h-1/2 w-1/2 rounded-full bg-secondary/8 blur-[120px]" />
       </div>
 
       <div
