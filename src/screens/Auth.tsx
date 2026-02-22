@@ -384,7 +384,7 @@ export default function Auth() {
 
                   <Button
                     type="submit"
-                    className="mt-1 h-12 w-full rounded-xl bg-gradient-to-r from-primary via-red-500 to-orange-500 text-base font-semibold text-white shadow-lg shadow-primary/35 transition-all hover:brightness-110"
+                    className="auth-submit-btn mt-1 h-12 w-full rounded-xl bg-gradient-to-r from-primary via-red-500 to-orange-500 text-base font-semibold text-white shadow-lg shadow-primary/35 transition-all hover:brightness-110"
                     disabled={isSubmitting}
                   >
                     {isSubmitting ? (
@@ -482,7 +482,7 @@ export default function Auth() {
 
                   <Button
                     type="submit"
-                    className="mt-1 h-12 w-full rounded-xl bg-gradient-to-r from-primary via-red-500 to-orange-500 text-base font-semibold text-white shadow-lg shadow-primary/35 transition-all hover:brightness-110"
+                    className="auth-submit-btn mt-1 h-12 w-full rounded-xl bg-gradient-to-r from-primary via-red-500 to-orange-500 text-base font-semibold text-white shadow-lg shadow-primary/35 transition-all hover:brightness-110"
                     disabled={isSubmitting}
                   >
                     {isSubmitting ? (

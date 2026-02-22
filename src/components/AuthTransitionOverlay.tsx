@@ -332,24 +332,26 @@ export default function AuthTransitionOverlay() {
             : "drop-shadow(0 0 12px hsl(var(--primary) / 0.16))",
         }}
       >
-        <Film
-          className={cn(
-            "h-10 w-10 text-primary sm:h-12 sm:w-12",
-            isCenter && "animate-auth-brand-pulse",
-          )}
-        />
-        <span className="relative text-3xl font-bold leading-none sm:text-4xl">
-          <span className="text-gradient">MovieReckon</span>
-          <span
-            aria-hidden="true"
+        <div className={cn("flex items-center gap-2 sm:gap-3", isCenter && "animate-auth-brand-intro")}>
+          <Film
             className={cn(
-              "absolute inset-0 bg-[linear-gradient(110deg,transparent_0%,hsl(var(--foreground)/0.95)_45%,transparent_70%)] bg-[length:220%_100%] bg-clip-text text-transparent transition-opacity duration-300",
-              isCenter ? "animate-auth-brand-shimmer opacity-100" : "opacity-0",
+              "h-10 w-10 text-primary sm:h-12 sm:w-12",
+              isCenter && "animate-auth-brand-pulse",
             )}
-          >
-            MovieReckon
+          />
+          <span className="relative text-3xl font-bold leading-none sm:text-4xl">
+            <span className="text-gradient">MovieReckon</span>
+            <span
+              aria-hidden="true"
+              className={cn(
+                "absolute inset-0 bg-[linear-gradient(110deg,transparent_0%,hsl(var(--foreground)/0.95)_45%,transparent_70%)] bg-[length:220%_100%] bg-clip-text text-transparent transition-opacity duration-300",
+                isCenter ? "animate-auth-brand-shimmer opacity-100" : "opacity-0",
+              )}
+            >
+              MovieReckon
+            </span>
           </span>
-        </span>
+        </div>
       </div>
     </div>
   );

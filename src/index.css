@@ -309,6 +309,34 @@
     @apply bg-background/80 text-foreground hover:bg-background;
   }
 
+  .auth-submit-btn {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .auth-submit-btn::after {
+    content: "";
+    position: absolute;
+    inset: -2px -34%;
+    pointer-events: none;
+    background: linear-gradient(
+      110deg,
+      transparent 18%,
+      hsl(var(--foreground) / 0.48) 48%,
+      transparent 78%
+    );
+    mix-blend-mode: screen;
+    opacity: 0.52;
+    transform: translateX(-145%) skewX(-18deg);
+    animation: auth-button-shine 3s ease-in-out infinite;
+  }
+
+  .auth-submit-btn > * {
+    position: relative;
+    z-index: 1;
+  }
+
   .auth-poster-row {
     @apply flex gap-3;
     width: max-content;
@@ -357,6 +385,10 @@
 
   .animate-auth-brand-shimmer {
     animation: auth-brand-shimmer 2.2s linear infinite;
+  }
+
+  .animate-auth-brand-intro {
+    animation: auth-brand-intro 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   @keyframes fade-in {
@@ -421,6 +453,29 @@
     }
     to {
       background-position: 130% 0;
+    }
+  }
+
+  @keyframes auth-brand-intro {
+    from {
+      opacity: 0;
+      transform: scale(0.88);
+      filter: blur(2px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+      filter: blur(0);
+    }
+  }
+
+  @keyframes auth-button-shine {
+    0%,
+    60% {
+      transform: translateX(-145%) skewX(-18deg);
+    }
+    100% {
+      transform: translateX(145%) skewX(-18deg);
     }
   }
 
