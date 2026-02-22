@@ -28,8 +28,20 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<mongoClient.MongoUser | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const mapUserToProfile = (user: mongoClient.MongoUser): Profile => ({
+    id: user.id,
+    user_id: user.id,
+    username: user.username,
+    avatar_url: user.avatar_url,
+    created_at: user.created_at,
+    updated_at: user.updated_at,
+  });
+
+  const [user, setUser] = useState<mongoClient.MongoUser | null>(() => mongoClient.getStoredUser());
+  const [profile, setProfile] = useState<Profile | null>(() => {
+    const storedUser = mongoClient.getStoredUser();
+    return storedUser ? mapUserToProfile(storedUser) : null;
+  });
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
@@ -40,14 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const currentUser = await mongoClient.getCurrentUser();
       if (currentUser) {
         setUser(currentUser);
-        setProfile({
-          id: currentUser.id,
-          user_id: currentUser.id,
-          username: currentUser.username,
-          avatar_url: currentUser.avatar_url,
-          created_at: currentUser.created_at,
-          updated_at: currentUser.updated_at,
-        });
+        setProfile(mapUserToProfile(currentUser));
       } else {
         // Access cookie may be expired; try refresh cookie flow.
         const refreshed = await mongoClient.refreshAccessToken();
@@ -55,15 +60,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const refreshedUser = await mongoClient.getCurrentUser();
           if (refreshedUser) {
             setUser(refreshedUser);
-            setProfile({
-              id: refreshedUser.id,
-              user_id: refreshedUser.id,
-              username: refreshedUser.username,
-              avatar_url: refreshedUser.avatar_url,
-              created_at: refreshedUser.created_at,
-              updated_at: refreshedUser.updated_at,
-            });
+            setProfile(mapUserToProfile(refreshedUser));
+          } else {
+            setUser(null);
+            setProfile(null);
           }
+        } else {
+          setUser(null);
+          setProfile(null);
         }
       }
     } catch (error) {
@@ -92,14 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (newUser) {
       setUser(newUser);
-      setProfile({
-        id: newUser.id,
-        user_id: newUser.id,
-        username: newUser.username,
-        avatar_url: newUser.avatar_url,
-        created_at: newUser.created_at,
-        updated_at: newUser.updated_at,
-      });
+      setProfile(mapUserToProfile(newUser));
     }
 
     toast({
@@ -125,14 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (loggedInUser) {
       setUser(loggedInUser);
-      setProfile({
-        id: loggedInUser.id,
-        user_id: loggedInUser.id,
-        username: loggedInUser.username,
-        avatar_url: loggedInUser.avatar_url,
-        created_at: loggedInUser.created_at,
-        updated_at: loggedInUser.updated_at,
-      });
+      setProfile(mapUserToProfile(loggedInUser));
     }
 
     toast({
@@ -175,14 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setUser(updated);
-    setProfile({
-      id: updated.id,
-      user_id: updated.id,
-      username: updated.username,
-      avatar_url: updated.avatar_url,
-      created_at: updated.created_at,
-      updated_at: updated.updated_at,
-    });
+    setProfile(mapUserToProfile(updated));
     toast({
       title: "Profile updated",
       description: "Your profile has been updated successfully.",

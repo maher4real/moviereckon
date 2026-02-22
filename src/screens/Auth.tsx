@@ -170,10 +170,10 @@ export default function Auth() {
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (!isLoading && user) {
-      navigate("/home");
+    if (user) {
+      navigate("/home", { replace: true });
     }
-  }, [user, isLoading, navigate]);
+  }, [user, navigate]);
 
   useEffect(() => {
     warmStartupSound();
@@ -231,6 +231,10 @@ export default function Auth() {
       setIsSubmitting(false);
     }
   };
+
+  if (user) {
+    return null;
+  }
 
   if (isLoading) {
     return <AuthPageSkeleton />;
