@@ -40,25 +40,6 @@ const usernameSchema = z
   .string()
   .min(2, "Username must be at least 2 characters")
   .max(50, "Username is too long");
-function AuthSubmitSkeleton({
-  srLabel,
-  widthClass,
-}: {
-  srLabel: string;
-  widthClass: string;
-}) {
-  return (
-    <span
-      className="flex w-full items-center justify-center gap-2.5"
-      aria-live="polite"
-      aria-busy="true"
-    >
-      <span aria-hidden="true" className="h-4 w-4 rounded-full bg-white/50 animate-pulse" />
-      <span aria-hidden="true" className={cn("h-3.5 rounded bg-white/40 animate-pulse", widthClass)} />
-      <span className="sr-only">{srLabel}</span>
-    </span>
-  );
-}
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -387,14 +368,10 @@ export default function Auth() {
                     className="auth-submit-btn mt-1 h-12 w-full rounded-xl bg-gradient-to-r from-primary via-red-500 to-orange-500 text-base font-semibold text-white shadow-lg shadow-primary/35 transition-all hover:brightness-110"
                     disabled={isSubmitting}
                   >
-                    {isSubmitting ? (
-                      <AuthSubmitSkeleton srLabel="Signing in" widthClass="w-20" />
-                    ) : (
-                      <span className="inline-flex items-center gap-2">
-                        Sign In
-                        <ArrowRight className="h-4 w-4" />
-                      </span>
-                    )}
+                    <span className="inline-flex items-center gap-2">
+                      {isSubmitting ? "Signing In..." : "Sign In"}
+                      <ArrowRight className="h-4 w-4" />
+                    </span>
                   </Button>
                 </form>
               </TabsContent>
@@ -485,14 +462,10 @@ export default function Auth() {
                     className="auth-submit-btn mt-1 h-12 w-full rounded-xl bg-gradient-to-r from-primary via-red-500 to-orange-500 text-base font-semibold text-white shadow-lg shadow-primary/35 transition-all hover:brightness-110"
                     disabled={isSubmitting}
                   >
-                    {isSubmitting ? (
-                      <AuthSubmitSkeleton srLabel="Creating account" widthClass="w-28" />
-                    ) : (
-                      <span className="inline-flex items-center gap-2">
-                        Create Account
-                        <ArrowRight className="h-4 w-4" />
-                      </span>
-                    )}
+                    <span className="inline-flex items-center gap-2">
+                      {isSubmitting ? "Creating Account..." : "Create Account"}
+                      <ArrowRight className="h-4 w-4" />
+                    </span>
                   </Button>
                 </form>
               </TabsContent>

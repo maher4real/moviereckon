@@ -36,6 +36,7 @@ export default function AuthTransitionOverlay() {
 
   const [phase, setPhase] = useState<OverlayPhase>("hidden");
   const [transform, setTransform] = useState(INITIAL_TRANSFORM);
+  const [compactTarget, setCompactTarget] = useState(false);
 
   const { data: trendingMovies } = useQuery({
     queryKey: ["auth-overlay-bg-trending-movies"],
@@ -162,6 +163,19 @@ export default function AuthTransitionOverlay() {
         const targetRect = anchor.getBoundingClientRect();
 
         if (sourceRect.width > 0 && sourceRect.height > 0 && targetRect.width > 0 && targetRect.height > 0) {
+          const anchorText = anchor.querySelector<HTMLElement>("span");
+          const textRect = anchorText?.getBoundingClientRect();
+          const textStyles = anchorText ? window.getComputedStyle(anchorText) : null;
+          const labelVisible = Boolean(
+            anchorText &&
+              textRect &&
+              textRect.width > 0 &&
+              textStyles &&
+              textStyles.display !== "none" &&
+              textStyles.visibility !== "hidden",
+          );
+          setCompactTarget(!labelVisible);
+
           const sourceCenterX = sourceRect.left + sourceRect.width / 2;
           const sourceCenterY = sourceRect.top + sourceRect.height / 2;
           const targetCenterX = targetRect.left + targetRect.width / 2;
@@ -199,6 +213,7 @@ export default function AuthTransitionOverlay() {
     runIdRef.current = authTransitionRunId;
     startedAtRef.current = performance.now();
     setTransform(INITIAL_TRANSFORM);
+    setCompactTarget(false);
     setPhase("center");
 
     return clearPendingWork;
@@ -270,6 +285,7 @@ export default function AuthTransitionOverlay() {
   if (phase === "hidden") return null;
 
   const isCenter = phase === "center";
+  const morphToIcon = compactTarget && phase !== "center";
 
   return (
     <div
@@ -339,7 +355,14 @@ export default function AuthTransitionOverlay() {
               isCenter && "animate-auth-brand-pulse",
             )}
           />
-          <span className="relative text-3xl font-bold leading-none sm:text-4xl">
+          <span
+            className={cn(
+              "relative text-3xl font-bold leading-none sm:text-4xl transition-[opacity,transform,filter] duration-[900ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+              morphToIcon
+                ? "opacity-0 -translate-x-1 scale-95 blur-[1px]"
+                : "opacity-100 translate-x-0 scale-100 blur-0",
+            )}
+          >
             <span className="text-gradient">MovieReckon</span>
             <span
               aria-hidden="true"
