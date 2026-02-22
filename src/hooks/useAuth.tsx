@@ -24,6 +24,7 @@ interface AuthContextType {
   triggerAuthTransition: () => void;
   signUp: (email: string, password: string, username: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
 }
@@ -152,6 +153,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const signInWithGoogle = async () => {
+    setIsAuthenticating(true);
+    try {
+      const returnTo =
+        typeof window !== "undefined" ? `${window.location.origin}/home` : "/home";
+      mongoClient.signInWithGoogle(returnTo);
+      return { error: null };
+    } catch (error) {
+      console.error("Google sign-in error:", error);
+      toast({
+        variant: "destructive",
+        title: "Google sign in failed",
+        description: "Unable to start Google sign-in. Please try again.",
+      });
+      return { error: new Error("Failed to start Google sign-in") };
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
   // Sign Out
   const signOut = async () => {
     await mongoClient.logout();
@@ -202,6 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         triggerAuthTransition,
         signUp,
         signIn,
+        signInWithGoogle,
         signOut,
         updateProfile,
       }}

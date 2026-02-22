@@ -248,6 +248,23 @@ export async function login(
   }
 }
 
+export function getGoogleSignInUrl(returnTo: string): string {
+  const query = new URLSearchParams({ returnTo });
+  return `${MONGODB_API_URL}/api/auth/google-start?${query.toString()}`;
+}
+
+export function signInWithGoogle(returnTo?: string): void {
+  if (typeof window === "undefined") return;
+
+  const fallbackReturnTo = `${window.location.origin}/home`;
+  const targetReturnTo =
+    typeof returnTo === "string" && returnTo.trim().length > 0
+      ? returnTo
+      : fallbackReturnTo;
+
+  window.location.assign(getGoogleSignInUrl(targetReturnTo));
+}
+
 export async function logout(): Promise<void> {
   try {
     await fetch(`${MONGODB_API_URL}/api/auth/logout`, {

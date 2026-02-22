@@ -48,6 +48,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
+    // Accounts created via OAuth may not have a local password hash.
+    if (!user.password_hash || typeof user.password_hash !== "string") {
+      return res.status(401).json({ error: "This account uses Google sign-in. Continue with Google." });
+    }
+
     // Check password
     const isValid = await comparePassword(password, user.password_hash);
     if (!isValid) {

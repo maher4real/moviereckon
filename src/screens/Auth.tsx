@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -43,10 +43,20 @@ const usernameSchema = z
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { user, isLoading, signUp, signIn, triggerAuthTransition } = useAuth();
+  const location = useLocation();
+  const {
+    user,
+    isLoading,
+    isAuthenticating,
+    signUp,
+    signIn,
+    signInWithGoogle,
+    triggerAuthTransition,
+  } = useAuth();
   const [activeTab, setActiveTab] = useState<"signin" | "signup">("signin");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Form state
@@ -157,6 +167,25 @@ export default function Auth() {
     });
   }, [backgroundPosters]);
 
+  const oauthErrorMessage = useMemo(() => {
+    const code = new URLSearchParams(location.search).get("oauth_error");
+    if (!code) return "";
+
+    const codeToMessage: Record<string, string> = {
+      access_denied: "Google sign-in was canceled.",
+      invalid_oauth_state: "Google sign-in expired. Please try again.",
+      email_not_verified: "Your Google account email must be verified to continue.",
+      google_account_conflict: "This email is already linked to a different Google account.",
+      google_oauth_unavailable: "Google sign-in is not configured on the server yet.",
+      token_exchange_failed: "Google sign-in could not be completed. Please try again.",
+      userinfo_fetch_failed: "Unable to fetch your Google account details. Please try again.",
+      profile_incomplete: "Google did not return enough profile information.",
+      google_callback_failed: "Google sign-in failed. Please try again.",
+    };
+
+    return codeToMessage[code] || "Google sign-in failed. Please try again.";
+  }, [location.search]);
+
   // Redirect if already authenticated
   useEffect(() => {
     if (user) {
@@ -223,6 +252,17 @@ export default function Auth() {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    void primeStartupSoundFromGesture();
+    setIsGoogleSubmitting(true);
+
+    try {
+      await signInWithGoogle();
+    } finally {
+      setIsGoogleSubmitting(false);
+    }
+  };
+
   if (user) {
     return null;
   }
@@ -283,6 +323,41 @@ export default function Auth() {
           </div>
 
           <section className="rounded-2xl border border-white/10 bg-card/78 p-8 shadow-2xl backdrop-blur-md">
+            {oauthErrorMessage ? (
+              <p className="mb-5 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {oauthErrorMessage}
+              </p>
+            ) : null}
+
+            <Button
+              type="button"
+              variant="outline"
+              className="h-12 w-full rounded-xl border-white/20 bg-background/75 text-sm font-semibold transition-colors hover:bg-background"
+              onClick={handleGoogleSignIn}
+              disabled={isSubmitting || isGoogleSubmitting || isAuthenticating}
+            >
+              <span className="inline-flex items-center gap-3">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 48 48"
+                  className="h-5 w-5"
+                  aria-hidden="true"
+                >
+                  <path fill="#FFC107" d="M43.61 20.08H42V20H24v8h11.3A12 12 0 0 1 12 24 12 12 0 0 1 24 12c3.06 0 5.84 1.15 7.96 3.04l5.66-5.66A19.92 19.92 0 0 0 24 4C12.95 4 4 12.95 4 24s8.95 20 20 20 20-8.95 20-20c0-1.34-.14-2.65-.39-3.92" />
+                  <path fill="#FF3D00" d="M6.31 14.69 12.88 19.5A11.96 11.96 0 0 1 24 12c3.06 0 5.84 1.15 7.96 3.04l5.66-5.66A19.92 19.92 0 0 0 24 4 19.99 19.99 0 0 0 6.31 14.69" />
+                  <path fill="#4CAF50" d="M24 44c5.2 0 9.93-1.99 13.49-5.23l-6.23-5.27A11.95 11.95 0 0 1 24 36a12 12 0 0 1-11.28-7.8l-6.52 5.02A20 20 0 0 0 24 44" />
+                  <path fill="#1976D2" d="M43.61 20.08H42V20H24v8h11.3a12.03 12.03 0 0 1-4.04 5.5l6.23 5.27C36.99 39.03 44 34 44 24c0-1.34-.14-2.65-.39-3.92" />
+                </svg>
+                {isGoogleSubmitting ? "Redirecting..." : "Continue with Google"}
+              </span>
+            </Button>
+
+            <div className="my-5 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/80">
+              <span className="h-px flex-1 bg-white/15" />
+              <span>or continue with email</span>
+              <span className="h-px flex-1 bg-white/15" />
+            </div>
+
             <Tabs
               value={activeTab}
               onValueChange={(value) => {
