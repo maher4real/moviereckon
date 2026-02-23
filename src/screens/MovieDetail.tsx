@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, memo, lazy, Suspense } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
@@ -27,8 +27,6 @@ import ContentCarousel from "@/components/ContentCarousel";
 import WhereToWatch from "@/components/WhereToWatch";
 import CastList from "@/components/CastList";
 import MediaImage from "@/components/MediaImage";
-import FeedbackButtons from "@/components/FeedbackButtons";
-import CommentsSection from "@/components/CommentsSection";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -55,6 +53,8 @@ import {
 import { cn } from "@/lib/utils";
 
 const MemoizedCarousel = memo(ContentCarousel);
+const LazyFeedbackButtons = lazy(() => import("@/components/FeedbackButtons"));
+const LazyCommentsSection = lazy(() => import("@/components/CommentsSection"));
 const PREVIEW_AUTOPLAY_TIMEOUT_MS = 12000;
 const BACKGROUND_VIDEO_BOOT_DELAY_MS = 900;
 
@@ -71,9 +71,11 @@ export default function MovieDetail() {
   const [isBackgroundVideoVisible, setIsBackgroundVideoVisible] = useState(true);
   const [shouldLoadBackgroundVideo, setShouldLoadBackgroundVideo] = useState(false);
   const [isBackgroundVideoPlaying, setIsBackgroundVideoPlaying] = useState(false);
+  const [shouldRenderCommunity, setShouldRenderCommunity] = useState(false);
   const [bgFrameSize, setBgFrameSize] = useState({ width: 1920, height: 1080 });
   const heroMediaRef = useRef<HTMLDivElement>(null);
   const bgPlayerRef = useRef<HTMLIFrameElement>(null);
+  const communitySectionRef = useRef<HTMLDivElement>(null);
 
   const movieId = Number(id);
 
@@ -270,6 +272,32 @@ export default function MovieDetail() {
   useEffect(() => {
     setIsTrailerModalOpen(false);
   }, [movieId]);
+
+  useEffect(() => {
+    setShouldRenderCommunity(false);
+  }, [movieId]);
+
+  useEffect(() => {
+    if (shouldRenderCommunity) return;
+
+    const target = communitySectionRef.current;
+    if (!target || typeof IntersectionObserver === "undefined") {
+      setShouldRenderCommunity(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        setShouldRenderCommunity(true);
+        observer.disconnect();
+      },
+      { rootMargin: "280px 0px" },
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [shouldRenderCommunity, movieId]);
 
   useEffect(() => {
     const updateFrameSize = () => {
@@ -859,16 +887,34 @@ export default function MovieDetail() {
 
             {/* Crew */}
             <CastList cast={crewAsCast} title="Crew" />
-
-            <FeedbackButtons
-              contentId={movie.id}
-              contentType="movie"
-              title={movie.title}
-              posterPath={movie.poster_path}
-              genres={movie.genres.map((genre) => genre.id)}
-              language={movie.original_language}
-            />
-            <CommentsSection contentId={movie.id} contentType="movie" />
+            <div ref={communitySectionRef} className="h-px" />
+            {shouldRenderCommunity ? (
+              <Suspense
+                fallback={
+                  <div className="mb-8 mt-4 rounded-xl border border-border/70 bg-card/35 p-4 animate-pulse">
+                    <div className="h-5 w-44 rounded bg-muted" />
+                    <div className="mt-3 h-4 w-72 rounded bg-muted" />
+                    <div className="mt-6 h-28 rounded bg-muted" />
+                  </div>
+                }
+              >
+                <LazyFeedbackButtons
+                  contentId={movie.id}
+                  contentType="movie"
+                  title={movie.title}
+                  posterPath={movie.poster_path}
+                  genres={movie.genres.map((genre) => genre.id)}
+                  language={movie.original_language}
+                />
+                <LazyCommentsSection contentId={movie.id} contentType="movie" />
+              </Suspense>
+            ) : (
+              <div className="mb-8 mt-4 rounded-xl border border-border/70 bg-card/35 p-4 animate-pulse">
+                <div className="h-5 w-44 rounded bg-muted" />
+                <div className="mt-3 h-4 w-72 rounded bg-muted" />
+                <div className="mt-6 h-28 rounded bg-muted" />
+              </div>
+            )}
           </div>
         </div>
 

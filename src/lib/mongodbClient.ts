@@ -3,6 +3,7 @@
  * Uses MongoDB backend exclusively - no fallback to other services
  */
 import { getPublicMongoApiUrl } from "@/lib/runtimeEnv";
+import type { Movie, TVShow } from "@/lib/tmdb";
 
 // User cache key (non-sensitive profile data only).
 const USER_KEY = "moviereckon_user";
@@ -172,6 +173,29 @@ export interface FeedbackItem {
 export interface FeedbackSummary {
   counts: Record<FeedbackType, number>;
   user_feedback: FeedbackType | null;
+}
+
+export interface RecommendationExplanation {
+  reasons: Array<{ label: string; evidence?: string }>;
+  score: number;
+  scoreBreakdown: {
+    genre: number;
+    keywords: number;
+    people: number;
+    year: number;
+    runtime: number;
+    quality: number;
+    popularity: number;
+    novelty: number;
+    diversityPenalty: number;
+  };
+  seedTitle: string | null;
+}
+
+export interface PersonalizedRecommendationsPayload {
+  items: (Movie | TVShow)[];
+  isPersonalized: boolean;
+  explanationById: Record<string, RecommendationExplanation>;
 }
 
 export interface CommentItem {
@@ -440,6 +464,37 @@ export async function fetchUserFeedback(): Promise<FeedbackItem[]> {
     return data.data || [];
   } catch {
     return [];
+  }
+}
+
+export async function fetchRecommendationsFeed(): Promise<PersonalizedRecommendationsPayload> {
+  const emptyPayload: PersonalizedRecommendationsPayload = {
+    items: [],
+    isPersonalized: false,
+    explanationById: {},
+  };
+
+  try {
+    const response = await fetchWithAuth("/api/user/recommendations");
+    if (!response.ok) return emptyPayload;
+
+    const data = await response.json();
+    const payload = data?.data as Partial<PersonalizedRecommendationsPayload> | undefined;
+
+    if (!payload || !Array.isArray(payload.items)) {
+      return emptyPayload;
+    }
+
+    return {
+      items: payload.items,
+      isPersonalized: payload.isPersonalized === true,
+      explanationById:
+        payload.explanationById && typeof payload.explanationById === "object"
+          ? payload.explanationById
+          : {},
+    };
+  } catch {
+    return emptyPayload;
   }
 }
 

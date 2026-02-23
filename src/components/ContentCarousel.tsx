@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
 import { Movie, TVShow, getPosterUrl } from "@/lib/tmdb";
@@ -27,6 +27,21 @@ interface ContentCarouselProps {
   >;
 }
 
+const INITIAL_VISIBLE_MOBILE = 10;
+const INITIAL_VISIBLE_DESKTOP = 18;
+const LOAD_STEP_MOBILE = 8;
+const LOAD_STEP_DESKTOP = 12;
+
+function getInitialVisibleCount(): number {
+  if (typeof window === "undefined") return INITIAL_VISIBLE_DESKTOP;
+  return window.innerWidth < 768 ? INITIAL_VISIBLE_MOBILE : INITIAL_VISIBLE_DESKTOP;
+}
+
+function getLoadStep(): number {
+  if (typeof window === "undefined") return LOAD_STEP_DESKTOP;
+  return window.innerWidth < 768 ? LOAD_STEP_MOBILE : LOAD_STEP_DESKTOP;
+}
+
 export default function ContentCarousel({
   title,
   items,
@@ -39,7 +54,9 @@ export default function ContentCarousel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const [visibleCount, setVisibleCount] = useState(() => getInitialVisibleCount());
   const fromPath = `${location.pathname}${location.search}${location.hash}`;
+  const itemsLength = items?.length || 0;
 
   const scroll = (direction: "left" | "right") => {
     if (!scrollRef.current) return;
@@ -106,8 +123,51 @@ export default function ContentCarousel({
   };
 
   const resolvedViewAllHref = viewAllHref || getDefaultViewAllHref();
+  const visibleItems = useMemo(
+    () => items?.slice(0, Math.max(visibleCount, getInitialVisibleCount())) || [],
+    [items, visibleCount],
+  );
   const shouldRenderViewAllCard =
-    !isLoading && showViewAllCard && !!items?.length && !!resolvedViewAllHref;
+    !isLoading && visibleItems.length > 0 && showViewAllCard && !!resolvedViewAllHref;
+
+  useEffect(() => {
+    setVisibleCount(getInitialVisibleCount());
+  }, [itemsLength, title, type]);
+
+  useEffect(() => {
+    if (!itemsLength || isLoading) return;
+
+    const container = scrollRef.current;
+    if (!container) return;
+
+    let rafId = 0;
+    const maybeLoadMore = () => {
+      rafId = 0;
+      if (visibleCount >= itemsLength) return;
+
+      const remaining = container.scrollWidth - (container.scrollLeft + container.clientWidth);
+      if (remaining <= container.clientWidth * 1.2) {
+        setVisibleCount((current) => Math.min(itemsLength, current + getLoadStep()));
+      }
+    };
+
+    const onScroll = () => {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(maybeLoadMore);
+    };
+
+    maybeLoadMore();
+    container.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
+
+    return () => {
+      if (rafId) {
+        window.cancelAnimationFrame(rafId);
+      }
+      container.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [isLoading, itemsLength, visibleCount]);
 
   if (!isLoading && (!items || items.length === 0)) {
     return null;
@@ -157,7 +217,7 @@ export default function ContentCarousel({
             ))
           ) : (
             <>
-              {items?.map((item) => {
+              {visibleItems.map((item) => {
                 const itemType = getItemType(item);
                 const explanation = recommendationExplanations?.[`${itemType}_${item.id}`];
 

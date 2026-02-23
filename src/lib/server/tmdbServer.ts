@@ -4,6 +4,8 @@ import type {
   Cast,
   CrewMember,
   DiscoverFilters,
+  EnrichedMovieDetails,
+  EnrichedTVShowDetails,
   Genre,
   Movie,
   MovieDetails,
@@ -187,6 +189,12 @@ export async function getServerSimilarMovies(movieId: number): Promise<TMDBRespo
   return fetchTMDB<TMDBResponse<Movie>>(`/movie/${movieId}/similar`);
 }
 
+export async function getServerMovieRecommendations(
+  movieId: number,
+): Promise<TMDBResponse<Movie>> {
+  return fetchTMDB<TMDBResponse<Movie>>(`/movie/${movieId}/recommendations`);
+}
+
 export async function getServerMovieWatchProviders(movieId: number): Promise<WatchProviders> {
   return fetchTMDB<WatchProviders>(`/movie/${movieId}/watch/providers`);
 }
@@ -218,6 +226,12 @@ export async function getServerTVShowVideos(tvId: number): Promise<{ results: Vi
 
 export async function getServerSimilarTVShows(tvId: number): Promise<TMDBResponse<TVShow>> {
   return fetchTMDB<TMDBResponse<TVShow>>(`/tv/${tvId}/similar`);
+}
+
+export async function getServerTVShowRecommendations(
+  tvId: number,
+): Promise<TMDBResponse<TVShow>> {
+  return fetchTMDB<TMDBResponse<TVShow>>(`/tv/${tvId}/recommendations`);
 }
 
 export async function getServerTVSeasonDetails(
@@ -256,4 +270,20 @@ export async function discoverServerTVShows(
   filters: DiscoverFilters = {},
 ): Promise<TMDBResponse<TVShow>> {
   return fetchTMDB<TMDBResponse<TVShow>>("/discover/tv", filters as QueryParams);
+}
+
+export async function getServerMovieRecommendationProfile(
+  movieId: number,
+): Promise<EnrichedMovieDetails> {
+  return fetchTMDB<EnrichedMovieDetails>(`/movie/${movieId}`, {
+    append_to_response: "credits,keywords",
+  });
+}
+
+export async function getServerTVRecommendationProfile(
+  tvId: number,
+): Promise<EnrichedTVShowDetails> {
+  return fetchTMDB<EnrichedTVShowDetails>(`/tv/${tvId}`, {
+    append_to_response: "credits,keywords",
+  });
 }
