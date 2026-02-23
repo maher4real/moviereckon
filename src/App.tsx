@@ -12,8 +12,7 @@ import {
   type DehydratedState,
 } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, StaticRouter } from "react-router-dom";
-import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
-import { Analytics } from "@vercel/analytics/react";
+import { lazy, Suspense, useState, type ReactNode } from "react";
 import { AuthProvider } from "@/hooks/useAuth";
 import { UserDataProvider } from "@/hooks/useUserData";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -21,9 +20,9 @@ import StartupSoundManager from "@/components/StartupSoundManager";
 import AuthTransitionOverlay from "@/components/AuthTransitionOverlay";
 import { CenteredAppSkeleton } from "@/components/AppSkeletons";
 import type { MongoUser } from "@/lib/mongodbClient";
+import Auth from "./screens/Auth";
+import Home from "./screens/Home";
 
-const Auth = lazy(() => import("./screens/Auth"));
-const Home = lazy(() => import("./screens/Home"));
 const Upcoming = lazy(() => import("./screens/Upcoming"));
 const Search = lazy(() => import("./screens/Search"));
 const MovieDetail = lazy(() => import("./screens/MovieDetail"));
@@ -75,25 +74,6 @@ const App = ({
       }),
   );
 
-  useEffect(() => {
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      console.error("Unhandled rejection:", event.reason);
-      event.preventDefault();
-    };
-
-    const handleGlobalError = (event: ErrorEvent) => {
-      console.error("Uncaught error:", event.error);
-    };
-
-    window.addEventListener("unhandledrejection", handleUnhandledRejection);
-    window.addEventListener("error", handleGlobalError);
-
-    return () => {
-      window.removeEventListener("unhandledrejection", handleUnhandledRejection);
-      window.removeEventListener("error", handleGlobalError);
-    };
-  }, []);
-
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
@@ -103,7 +83,6 @@ const App = ({
               <TooltipProvider>
                 <Toaster />
                 <Sonner />
-                <Analytics />
                 <AppRouter initialLocation={initialLocation}>
                   <StartupSoundManager />
                   <AuthTransitionOverlay />

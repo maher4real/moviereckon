@@ -612,6 +612,10 @@ export default function MovieDetail() {
           alt={`${movie.title} visual`}
           className="absolute inset-0 w-full h-full object-cover"
           fallbackSrc="/fallbacks/backdrop.svg"
+          width={1280}
+          height={720}
+          sizes="100vw"
+          priority
           fadeIn
         />
         {backgroundTrailerEmbedUrl && isBackgroundVideoVisible && shouldLoadBackgroundVideo && (
@@ -682,6 +686,9 @@ export default function MovieDetail() {
               alt={movie.title}
               className="w-[280px] lg:w-[320px] rounded-lg shadow-2xl"
               fallbackSrc="/fallbacks/poster.svg"
+              width={500}
+              height={750}
+              sizes="(min-width: 1024px) 320px, (min-width: 768px) 280px, 128px"
             />
           </div>
 
@@ -694,6 +701,9 @@ export default function MovieDetail() {
                 alt={movie.title}
                 className="w-32 rounded-lg shadow-lg"
                 fallbackSrc="/fallbacks/poster.svg"
+                width={342}
+                height={513}
+                sizes="128px"
               />
               <div className="flex-1">
                 <h1 className="text-2xl font-bold mb-2">{movie.title}</h1>

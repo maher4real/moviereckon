@@ -136,8 +136,8 @@ export function CenteredAppSkeleton() {
 }
 
 export function AuthPageSkeleton() {
-  const rowCount = 4;
-  const postersPerRow = 12;
+  const rowCount = 3;
+  const postersPerRow = 8;
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 relative overflow-hidden">

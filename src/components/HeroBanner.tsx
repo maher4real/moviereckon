@@ -45,6 +45,10 @@ export default function HeroBanner({
         alt={`${movie.title} backdrop`}
         className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700"
         fallbackSrc="/fallbacks/backdrop.svg"
+        width={1280}
+        height={720}
+        sizes="100vw"
+        priority
         fadeIn
         onLoad={onBackdropReady}
       />

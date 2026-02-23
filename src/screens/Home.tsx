@@ -54,6 +54,7 @@ export default function Home() {
   const navigate = useNavigate();
   const [heroIndex, setHeroIndex] = useState(0);
   const [loadSecondaryShelves, setLoadSecondaryShelves] = useState(false);
+  const [isHeroVisualReady, setIsHeroVisualReady] = useState(false);
   const hasAnnouncedHeroReadyRef = useRef(false);
 
   // Redirect to auth if no user
@@ -65,10 +66,24 @@ export default function Home() {
 
   useEffect(() => {
     if (!user) return;
+    hasAnnouncedHeroReadyRef.current = false;
     setLoadSecondaryShelves(false);
-    const timer = window.setTimeout(() => setLoadSecondaryShelves(true), 1100);
-    return () => window.clearTimeout(timer);
+    setIsHeroVisualReady(false);
   }, [user]);
+
+  useEffect(() => {
+    if (!user || loadSecondaryShelves) return;
+    if (!isHeroVisualReady) return;
+
+    const timer = window.setTimeout(() => setLoadSecondaryShelves(true), 250);
+    return () => window.clearTimeout(timer);
+  }, [user, loadSecondaryShelves, isHeroVisualReady]);
+
+  useEffect(() => {
+    if (!user || loadSecondaryShelves) return;
+    const fallbackTimer = window.setTimeout(() => setLoadSecondaryShelves(true), 2500);
+    return () => window.clearTimeout(fallbackTimer);
+  }, [user, loadSecondaryShelves]);
 
   // Fetch all data with optimized query config
   const queryConfig = useMemo(
@@ -89,12 +104,14 @@ export default function Home() {
     queryKey: ["bollywood-movies"],
     queryFn: () => getBollywoodMovies(),
     ...queryConfig,
+    enabled: loadSecondaryShelves,
   });
 
   const { data: hollywoodData, isLoading: hollywoodLoading } = useQuery({
     queryKey: ["hollywood-movies"],
     queryFn: () => getHollywoodMovies(),
     ...queryConfig,
+    enabled: loadSecondaryShelves,
   });
 
   const { data: gujaratiData, isLoading: gujaratiLoading } = useQuery({
@@ -122,6 +139,7 @@ export default function Home() {
     queryKey: ["popular-tv"],
     queryFn: () => getPopularTVShows(),
     ...queryConfig,
+    enabled: loadSecondaryShelves,
   });
 
   const { data: topRatedData, isLoading: topRatedLoading } = useQuery({
@@ -324,10 +342,13 @@ export default function Home() {
   }, []);
 
   const handleHeroBackdropReady = useCallback(() => {
+    setIsHeroVisualReady(true);
     if (hasAnnouncedHeroReadyRef.current) return;
     hasAnnouncedHeroReadyRef.current = true;
     announceHomeHeroReady();
   }, []);
+
+  const secondaryShelvesPending = !loadSecondaryShelves;
 
   if (authLoading) {
     return <AppPageSkeleton cardCount={10} showFilterRow={false} />;
@@ -378,22 +399,22 @@ export default function Home() {
           )}
 
           {/* Now Playing - Only movies released today or earlier */}
-          {(filteredNowPlaying.length > 0 || nowPlayingLoading) && (
+          {(secondaryShelvesPending || filteredNowPlaying.length > 0 || nowPlayingLoading) && (
             <MemoizedCarousel
               title="🎬 Now Playing in Theaters"
               items={filteredNowPlaying as (Movie | TVShow)[]}
-              isLoading={nowPlayingLoading}
+              isLoading={secondaryShelvesPending || nowPlayingLoading}
               type="movie"
               viewAllHref="/movies?category=now_playing"
             />
           )}
 
           {/* Upcoming - Only movies releasing tomorrow or later */}
-          {(filteredUpcoming.length > 0 || upcomingLoading || upcomingTVLoading) && (
+          {(secondaryShelvesPending || filteredUpcoming.length > 0 || upcomingLoading || upcomingTVLoading) && (
             <MemoizedCarousel
               title="🗓️ Upcoming"
               items={filteredUpcoming as (Movie | TVShow)[]}
-              isLoading={upcomingLoading || upcomingTVLoading}
+              isLoading={secondaryShelvesPending || upcomingLoading || upcomingTVLoading}
               type="mixed"
               viewAllHref="/upcoming"
             />
@@ -423,7 +444,7 @@ export default function Home() {
           <MemoizedCarousel
             title="🇮🇳 Bollywood Hits"
             items={bollywoodData?.results as (Movie | TVShow)[]}
-            isLoading={bollywoodLoading}
+            isLoading={secondaryShelvesPending || bollywoodLoading}
             type="movie"
             viewAllHref="/movies?category=bollywood"
           />
@@ -432,7 +453,7 @@ export default function Home() {
           <MemoizedCarousel
             title="🎬 Hollywood Blockbusters"
             items={hollywoodData?.results as (Movie | TVShow)[]}
-            isLoading={hollywoodLoading}
+            isLoading={secondaryShelvesPending || hollywoodLoading}
             type="movie"
             viewAllHref="/movies?category=hollywood"
           />
@@ -474,7 +495,7 @@ export default function Home() {
           <MemoizedCarousel
             title="📺 Trending TV Series"
             items={filteredTvShows as (Movie | TVShow)[]}
-            isLoading={tvLoading}
+            isLoading={secondaryShelvesPending || tvLoading}
             type="tv"
             viewAllHref="/series?category=popular"
           />
@@ -483,7 +504,7 @@ export default function Home() {
           <MemoizedCarousel
             title="⭐ Top Rated"
             items={filteredTopRatedMovies as (Movie | TVShow)[]}
-            isLoading={topRatedLoading}
+            isLoading={secondaryShelvesPending || topRatedLoading}
             type="movie"
             viewAllHref="/movies?sort=vote_average.desc"
           />

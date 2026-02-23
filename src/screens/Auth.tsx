@@ -89,7 +89,7 @@ export default function Auth() {
   });
 
   const backgroundPosters = useMemo(() => {
-    const maxItems = 36;
+    const maxItems = 24;
 
     const moviePosters = (trendingMovies || [])
       .filter((item) => item.poster_path)
@@ -153,7 +153,7 @@ export default function Auth() {
 
     if (mixed.length > 0) return mixed;
 
-    return Array.from({ length: 36 }, (_, index) => ({
+    return Array.from({ length: 24 }, (_, index) => ({
       id: `fallback-${index}`,
       src: "/fallbacks/poster.svg",
     }));
@@ -162,8 +162,8 @@ export default function Auth() {
   const posterRows = useMemo(() => {
     if (!backgroundPosters.length) return [];
 
-    const rowCount = 4;
-    const postersPerRow = 12;
+    const rowCount = 3;
+    const postersPerRow = 8;
 
     return Array.from({ length: rowCount }, (_, rowIndex) => {
       const start = (rowIndex * 6) % backgroundPosters.length;

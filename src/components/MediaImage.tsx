@@ -5,6 +5,7 @@ interface MediaImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, "src
   src?: string | null;
   fallbackSrc?: string;
   fadeIn?: boolean;
+  priority?: boolean;
 }
 
 const TMDB_HOST = "image.tmdb.org";
@@ -97,6 +98,7 @@ export default function MediaImage({
   src,
   fallbackSrc = "/fallbacks/poster.svg",
   fadeIn = false,
+  priority = false,
   className,
   onLoad,
   onError,
@@ -121,6 +123,8 @@ export default function MediaImage({
     if (imgProps.srcSet || !resolvedSrc || resolvedSrc.startsWith("/")) return null;
     return buildTmdbResponsiveSource(resolvedSrc);
   }, [imgProps.srcSet, resolvedSrc]);
+  const loading = imgProps.loading ?? (priority ? "eager" : "lazy");
+  const fetchPriority = imgProps.fetchPriority ?? (priority ? "high" : "auto");
 
   const handleLoad: ImgHTMLAttributes<HTMLImageElement>["onLoad"] = (event) => {
     setIsLoaded(true);
@@ -141,10 +145,13 @@ export default function MediaImage({
       src={resolvedSrc}
       srcSet={imgProps.srcSet ?? responsiveSource?.srcSet}
       sizes={imgProps.sizes ?? responsiveSource?.sizes}
+      loading={loading}
+      fetchPriority={fetchPriority}
       decoding={imgProps.decoding ?? "async"}
       onLoad={handleLoad}
       onError={handleError}
       className={cn(
+        "block",
         className,
         fadeIn && "transition-opacity duration-700 ease-out",
         fadeIn && (isLoaded ? "opacity-100" : "opacity-0"),

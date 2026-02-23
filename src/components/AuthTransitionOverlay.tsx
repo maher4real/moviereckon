@@ -25,8 +25,8 @@ const INITIAL_TRANSFORM = {
   y: 0,
   scale: 1,
 };
-const ROW_COUNT = 4;
-const POSTERS_PER_ROW = 12;
+const ROW_COUNT = 3;
+const POSTERS_PER_ROW = 8;
 const isAuthRoute = (pathname: string) =>
   pathname === "/" || pathname.startsWith("/auth");
 
@@ -68,7 +68,7 @@ export default function AuthTransitionOverlay() {
   });
 
   const backgroundPosters = useMemo(() => {
-    const maxItems = 36;
+    const maxItems = 24;
 
     const moviePosters = (trendingMovies || [])
       .filter((item) => item.poster_path)
@@ -132,7 +132,7 @@ export default function AuthTransitionOverlay() {
 
     if (mixed.length > 0) return mixed;
 
-    return Array.from({ length: 36 }, (_, index) => ({
+    return Array.from({ length: 24 }, (_, index) => ({
       id: `overlay-fallback-${index}`,
       src: "/fallbacks/poster.svg",
     }));
