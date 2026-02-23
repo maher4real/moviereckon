@@ -158,23 +158,32 @@ export default function AuthTransitionOverlay() {
 
     const tick = () => {
       const movingLogo = logoRef.current;
-      const anchor = document.querySelector<HTMLElement>("[data-brand-logo-anchor='true']");
+      const anchor = document.querySelector<HTMLElement>(
+        "[data-brand-logo-anchor='true']",
+      );
 
       if (movingLogo && anchor) {
         const sourceRect = movingLogo.getBoundingClientRect();
         const targetRect = anchor.getBoundingClientRect();
 
-        if (sourceRect.width > 0 && sourceRect.height > 0 && targetRect.width > 0 && targetRect.height > 0) {
+        if (
+          sourceRect.width > 0 &&
+          sourceRect.height > 0 &&
+          targetRect.width > 0 &&
+          targetRect.height > 0
+        ) {
           const anchorText = anchor.querySelector<HTMLElement>("span");
           const textRect = anchorText?.getBoundingClientRect();
-          const textStyles = anchorText ? window.getComputedStyle(anchorText) : null;
+          const textStyles = anchorText
+            ? window.getComputedStyle(anchorText)
+            : null;
           const labelVisible = Boolean(
             anchorText &&
-              textRect &&
-              textRect.width > 0 &&
-              textStyles &&
-              textStyles.display !== "none" &&
-              textStyles.visibility !== "hidden",
+            textRect &&
+            textRect.width > 0 &&
+            textStyles &&
+            textStyles.display !== "none" &&
+            textStyles.visibility !== "hidden",
           );
           setCompactTarget(!labelVisible);
 
@@ -296,7 +305,7 @@ export default function AuthTransitionOverlay() {
   return (
     <div
       className={cn(
-        "pointer-events-auto fixed inset-0 z-[120] cursor-progress transition-opacity duration-[450ms]",
+        "pointer-events-auto fixed inset-0 z-[120] cursor-progress transition-opacity duration-450",
         phase === "fading" ? "opacity-0" : "opacity-100",
       )}
     >
@@ -335,7 +344,7 @@ export default function AuthTransitionOverlay() {
 
         <div className="absolute inset-0 bg-black/58" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_22%,hsl(var(--secondary)/0.12),transparent_42%),radial-gradient(circle_at_84%_74%,hsl(var(--primary)/0.14),transparent_45%)]" />
-        <div className="absolute inset-0 bg-gradient-to-br from-background/96 via-background/90 to-background/95" />
+        <div className="absolute inset-0 bg-linear-to-br from-background/96 via-background/90 to-background/95" />
         <div className="absolute top-1/4 -left-1/4 h-1/2 w-1/2 rounded-full bg-primary/8 blur-[120px]" />
         <div className="absolute bottom-1/4 -right-1/4 h-1/2 w-1/2 rounded-full bg-secondary/8 blur-[120px]" />
       </div>
@@ -344,7 +353,7 @@ export default function AuthTransitionOverlay() {
         ref={logoRef}
         className={cn(
           "absolute left-1/2 top-1/2 flex items-center gap-2 sm:gap-3 will-change-transform",
-          "transition-[transform,opacity,filter] duration-[1450ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+          "transition-[transform,opacity,filter] duration-1450 ease-[cubic-bezier(0.22,1,0.36,1)]",
           phase === "fading" ? "opacity-0" : "opacity-100",
         )}
         style={{
@@ -354,7 +363,12 @@ export default function AuthTransitionOverlay() {
             : "drop-shadow(0 0 12px hsl(var(--primary) / 0.16))",
         }}
       >
-        <div className={cn("flex items-center gap-2 sm:gap-3", isCenter && "animate-auth-brand-intro")}>
+        <div
+          className={cn(
+            "flex items-center gap-2 sm:gap-3",
+            isCenter && "animate-auth-brand-intro",
+          )}
+        >
           <Film
             className={cn(
               "h-10 w-10 text-primary sm:h-12 sm:w-12",
@@ -363,7 +377,7 @@ export default function AuthTransitionOverlay() {
           />
           <span
             className={cn(
-              "relative text-3xl font-bold leading-none sm:text-4xl transition-[opacity,transform,filter] duration-[900ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+              "relative text-3xl font-bold leading-none sm:text-4xl transition-[opacity,transform,filter] duration-900 ease-[cubic-bezier(0.22,1,0.36,1)]",
               morphToIcon
                 ? "opacity-0 -translate-x-1 scale-95 blur-[1px]"
                 : "opacity-100 translate-x-0 scale-100 blur-0",
@@ -373,8 +387,10 @@ export default function AuthTransitionOverlay() {
             <span
               aria-hidden="true"
               className={cn(
-                "absolute inset-0 bg-[linear-gradient(110deg,transparent_0%,hsl(var(--foreground)/0.95)_45%,transparent_70%)] bg-[length:220%_100%] bg-clip-text text-transparent transition-opacity duration-300",
-                isCenter ? "animate-auth-brand-shimmer opacity-100" : "opacity-0",
+                "absolute inset-0 bg-[linear-gradient(110deg,transparent_0%,hsl(var(--foreground)/0.95)_45%,transparent_70%)] bg-size-[220%_100%] bg-clip-text text-transparent transition-opacity duration-300",
+                isCenter
+                  ? "animate-auth-brand-shimmer opacity-100"
+                  : "opacity-0",
               )}
             >
               MovieReckon
