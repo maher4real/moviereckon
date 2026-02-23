@@ -18,8 +18,8 @@ type ContentTypeFilter = "all" | "movie" | "tv";
 type SortField = "relevance" | "popularity" | "rating" | "release_date";
 type SortOrder = "asc" | "desc";
 
-const INITIAL_VISIBLE_ITEMS = 36;
-const LOAD_MORE_BATCH = 24;
+const INITIAL_VISIBLE_ITEMS = 48;
+const LOAD_MORE_BATCH = 32;
 
 const GENRE_MAP: Record<number, string> = {
   28: "Action",

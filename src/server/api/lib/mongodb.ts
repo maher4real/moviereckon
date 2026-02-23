@@ -25,7 +25,6 @@ interface CachedConnection {
 
 // Use globalThis for connection caching in serverless environment
 declare global {
-  // eslint-disable-next-line no-var
   var mongoConnection: CachedConnection | undefined;
 }
 

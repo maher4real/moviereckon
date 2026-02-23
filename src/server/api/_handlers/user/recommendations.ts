@@ -5,6 +5,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
+import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
 import type { Movie, TVShow } from "@/lib/tmdb";
 import {
   discoverServerMovies,
@@ -84,9 +85,26 @@ interface TMDBListPayload {
 }
 
 const MAX_SEEDS = 6;
-const MAX_CANDIDATES = 500;
-const DIVERSIFICATION_TOP_N = 120;
+const MAX_CANDIDATES = 650;
+const DIVERSIFICATION_TOP_N = 160;
 const TIME_DECAY_THRESHOLD_DAYS = 7;
+const CACHE_TTL_MS = 90 * 1000;
+const CACHE_STALE_TTL_MS = 10 * 60 * 1000;
+const DB_TIMEOUT_MS = 4500;
+const TMDB_TIMEOUT_MS = 6500;
+const BUILD_TIMEOUT_MS = 12_000;
+const MAX_IP_REQUESTS = 70;
+const MAX_USER_REQUESTS = 35;
+
+interface RecommendationCacheEntry {
+  userId: string;
+  payload: RecommendationsPayload;
+  expiresAt: number;
+  staleUntil: number;
+  updatedAt: number;
+}
+
+const recommendationsCache = new Map<string, RecommendationCacheEntry>();
 
 const WEIGHTS = {
   LIKED: 1.5,
@@ -211,6 +229,94 @@ function toPreferences(value: unknown): UserPreferences {
   };
 }
 
+function getLatest<T>(items: T[], resolver: (item: T) => string | undefined): string {
+  if (!items.length) return "";
+  const value = resolver(items[0]);
+  return typeof value === "string" ? value : "";
+}
+
+function toSeedSlice(values: string[]): string {
+  return values.slice(0, 6).join(",");
+}
+
+function buildRecommendationRevision(
+  watchHistory: WatchHistoryItem[],
+  likedItems: LikedItem[],
+  feedbackItems: FeedbackItem[],
+  preferences: UserPreferences,
+): string {
+  const watchSlice = toSeedSlice(
+    watchHistory.map((item) => `${item.content_type}:${item.content_id}:${item.watched_at}`),
+  );
+  const likedSlice = toSeedSlice(
+    likedItems.map((item) => `${item.content_type}:${item.content_id}:${item.liked_at}`),
+  );
+  const feedbackSlice = toSeedSlice(
+    feedbackItems.map(
+      (item) => `${item.content_type}:${item.content_id}:${item.feedback_type}`,
+    ),
+  );
+  const genrePrefs = [...preferences.preferred_genres].sort((a, b) => a - b).join(",");
+
+  return [
+    `w:${watchHistory.length}:${getLatest(watchHistory, (item) => item.watched_at)}:${watchSlice}`,
+    `l:${likedItems.length}:${getLatest(likedItems, (item) => item.liked_at)}:${likedSlice}`,
+    `f:${feedbackItems.length}:${feedbackSlice}`,
+    `g:${genrePrefs}`,
+  ].join("|");
+}
+
+function cleanupCache(now = Date.now()) {
+  recommendationsCache.forEach((entry, key) => {
+    if (entry.staleUntil <= now) {
+      recommendationsCache.delete(key);
+    }
+  });
+}
+
+function readCachedPayload(cacheKey: string): RecommendationsPayload | null {
+  const entry = recommendationsCache.get(cacheKey);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) return null;
+  return entry.payload;
+}
+
+function readLatestUserPayload(
+  userId: string,
+  mode: "fresh" | "stale" = "stale",
+): RecommendationsPayload | null {
+  const now = Date.now();
+  let latest: RecommendationCacheEntry | null = null;
+
+  for (const entry of recommendationsCache.values()) {
+    if (entry.userId !== userId) continue;
+    if (mode === "fresh" && entry.expiresAt <= now) continue;
+    if (mode === "stale" && entry.staleUntil <= now) continue;
+    if (!latest || entry.updatedAt > latest.updatedAt) {
+      latest = entry;
+    }
+  }
+
+  if (latest) return latest.payload;
+  return null;
+}
+
+function writeCachedPayload(
+  cacheKey: string,
+  userId: string,
+  payload: RecommendationsPayload,
+) {
+  const now = Date.now();
+  recommendationsCache.set(cacheKey, {
+    userId,
+    payload,
+    expiresAt: now + CACHE_TTL_MS,
+    staleUntil: now + CACHE_STALE_TTL_MS,
+    updatedAt: now,
+  });
+  cleanupCache(now);
+}
+
 function pushSeed(map: Map<string, SeedSignal>, seed: SeedSignal): void {
   const key = getContentKey(seed.type, seed.id);
   const existing = map.get(key);
@@ -277,13 +383,38 @@ function toDisplayItem(item: UnifiedContentItem): Movie | TVShow {
 
 async function safe<T>(promise: Promise<T>): Promise<T | null> {
   try {
-    return await promise;
+    return await withTimeout(promise, TMDB_TIMEOUT_MS);
   } catch {
     return null;
   }
 }
 
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("timeout"));
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        clearTimeout(timeout);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+  });
+}
+
+export function __clearRecommendationsCacheForTests() {
+  recommendationsCache.clear();
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader("Cache-Control", "private, no-store, max-age=0, must-revalidate");
+  res.setHeader("Vary", "Cookie, Authorization");
+
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -293,124 +424,165 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: "Invalid or expired token" });
   }
 
+  const clientIp = getClientIp(req);
+  const ipRateLimit = consumeRateLimit(
+    `recommendations:ip:${clientIp}`,
+    MAX_IP_REQUESTS,
+    5 * 60 * 1000,
+  );
+  const userRateLimit = consumeRateLimit(
+    `recommendations:user:${user.id}`,
+    MAX_USER_REQUESTS,
+    5 * 60 * 1000,
+  );
+  if (!ipRateLimit.allowed || !userRateLimit.allowed) {
+    const retryAfter = Math.max(
+      ipRateLimit.retryAfterSeconds,
+      userRateLimit.retryAfterSeconds,
+      30,
+    );
+    res.setHeader("Retry-After", String(retryAfter));
+    return res
+      .status(429)
+      .json({ error: "Too many recommendation requests. Please try again shortly." });
+  }
+
   try {
     const { db } = await connectToDatabase();
 
-    const [watchHistoryDocs, likedItemsDocs, feedbackDocs, preferencesDoc] = await Promise.all([
-      db
-        .collection("watch_history")
-        .find({ user_id: user.id })
-        .sort({ watched_at: -1 })
-        .limit(220)
-        .toArray(),
-      db
-        .collection("liked_items")
-        .find({ user_id: user.id })
-        .sort({ liked_at: -1 })
-        .limit(180)
-        .toArray(),
-      db
-        .collection("content_feedback")
-        .find({ user_id: user.id })
-        .sort({ updated_at: -1, created_at: -1 })
-        .limit(180)
-        .toArray(),
-      db.collection("user_preferences").findOne({ user_id: user.id }),
-    ]);
+    const [watchHistoryDocs, likedItemsDocs, feedbackDocs, preferencesDoc] = await withTimeout(
+      Promise.all([
+        db
+          .collection("watch_history")
+          .find({ user_id: user.id })
+          .sort({ watched_at: -1 })
+          .limit(220)
+          .toArray(),
+        db
+          .collection("liked_items")
+          .find({ user_id: user.id })
+          .sort({ liked_at: -1 })
+          .limit(180)
+          .toArray(),
+        db
+          .collection("content_feedback")
+          .find({ user_id: user.id })
+          .sort({ updated_at: -1, created_at: -1 })
+          .limit(180)
+          .toArray(),
+        db.collection("user_preferences").findOne({ user_id: user.id }),
+      ]),
+      DB_TIMEOUT_MS,
+    );
 
     const watchHistory = toWatchHistory(watchHistoryDocs);
     const likedItems = toLikedItems(likedItemsDocs);
     const feedbackItems = toFeedbackItems(feedbackDocs);
     const preferences = toPreferences(preferencesDoc);
+    const revision = buildRecommendationRevision(
+      watchHistory,
+      likedItems,
+      feedbackItems,
+      preferences,
+    );
+    const cacheKey = `${user.id}:${revision}`;
+    cleanupCache();
 
-    const genreScores: Record<number, number> = {};
+    const cachedPayload = readCachedPayload(cacheKey);
+    if (cachedPayload) {
+      return res.status(200).json({ data: cachedPayload });
+    }
 
-    likedItems.forEach((item) => {
-      const watched = watchHistory.find(
-        (entry) =>
-          entry.content_id === item.content_id &&
-          entry.content_type === item.content_type,
-      );
+    const payload = await withTimeout(
+      (async (): Promise<RecommendationsPayload> => {
+        const genreScores: Record<number, number> = {};
 
-      if (!watched?.genres?.length) return;
+        likedItems.forEach((item) => {
+          const watched = watchHistory.find(
+            (entry) =>
+              entry.content_id === item.content_id &&
+              entry.content_type === item.content_type,
+          );
 
-      const weight = WEIGHTS.LIKED * recencyMultiplier(item.liked_at);
-      watched.genres.forEach((genreId) => {
-        genreScores[genreId] = (genreScores[genreId] || 0) + weight;
-      });
-    });
+          if (!watched?.genres?.length) return;
 
-    watchHistory.forEach((item) => {
-      if (!item.genres?.length) return;
-      const recentBoost = recencyMultiplier(item.watched_at);
-      const baseWeight =
-        recentBoost >= 0.95 ? WEIGHTS.WATCHED_RECENT : WEIGHTS.WATCHED_OLD;
-      item.genres.forEach((genreId) => {
-        genreScores[genreId] = (genreScores[genreId] || 0) + baseWeight * recentBoost;
-      });
-    });
+          const weight = WEIGHTS.LIKED * recencyMultiplier(item.liked_at);
+          watched.genres.forEach((genreId) => {
+            genreScores[genreId] = (genreScores[genreId] || 0) + weight;
+          });
+        });
 
-    feedbackItems.forEach((item) => {
-      if (!item.genres?.length || item.feedback_type === "skip") return;
-      const feedbackWeight = getFeedbackWeight(item.feedback_type);
+        watchHistory.forEach((item) => {
+          if (!item.genres?.length) return;
+          const recentBoost = recencyMultiplier(item.watched_at);
+          const baseWeight =
+            recentBoost >= 0.95 ? WEIGHTS.WATCHED_RECENT : WEIGHTS.WATCHED_OLD;
+          item.genres.forEach((genreId) => {
+            genreScores[genreId] = (genreScores[genreId] || 0) + baseWeight * recentBoost;
+          });
+        });
 
-      item.genres.forEach((genreId) => {
-        genreScores[genreId] = (genreScores[genreId] || 0) + feedbackWeight;
-      });
-    });
+        feedbackItems.forEach((item) => {
+          if (!item.genres?.length || item.feedback_type === "skip") return;
+          const feedbackWeight = getFeedbackWeight(item.feedback_type);
 
-    preferences.preferred_genres.forEach((genreId) => {
-      genreScores[genreId] = (genreScores[genreId] || 0) + 0.85;
-    });
+          item.genres.forEach((genreId) => {
+            genreScores[genreId] = (genreScores[genreId] || 0) + feedbackWeight;
+          });
+        });
 
-    const topGenres = Object.entries(genreScores)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 4)
-      .map(([genreId]) => Number(genreId));
+        preferences.preferred_genres.forEach((genreId) => {
+          genreScores[genreId] = (genreScores[genreId] || 0) + 0.85;
+        });
 
-    const seedMap = new Map<string, SeedSignal>();
+        const topGenres = Object.entries(genreScores)
+          .sort(([, a], [, b]) => b - a)
+          .slice(0, 4)
+          .map(([genreId]) => Number(genreId));
 
-    likedItems.forEach((item) => {
-      pushSeed(seedMap, {
-        id: item.content_id,
-        type: item.content_type,
-        title: item.title,
-        weight: WEIGHTS.LIKED * recencyMultiplier(item.liked_at),
-      });
-    });
+        const seedMap = new Map<string, SeedSignal>();
 
-    watchHistory.forEach((item) => {
-      pushSeed(seedMap, {
-        id: item.content_id,
-        type: item.content_type,
-        title: item.title,
-        weight: WEIGHTS.WATCHED_RECENT * recencyMultiplier(item.watched_at),
-      });
-    });
+        likedItems.forEach((item) => {
+          pushSeed(seedMap, {
+            id: item.content_id,
+            type: item.content_type,
+            title: item.title,
+            weight: WEIGHTS.LIKED * recencyMultiplier(item.liked_at),
+          });
+        });
 
-    feedbackItems.forEach((item) => {
-      if (item.feedback_type === "skip") return;
-      pushSeed(seedMap, {
-        id: item.content_id,
-        type: item.content_type,
-        title: item.title,
-        weight: getFeedbackWeight(item.feedback_type),
-      });
-    });
+        watchHistory.forEach((item) => {
+          pushSeed(seedMap, {
+            id: item.content_id,
+            type: item.content_type,
+            title: item.title,
+            weight: WEIGHTS.WATCHED_RECENT * recencyMultiplier(item.watched_at),
+          });
+        });
 
-    const seedSignals = Array.from(seedMap.values())
-      .sort((a, b) => b.weight - a.weight)
-      .slice(0, MAX_SEEDS);
+        feedbackItems.forEach((item) => {
+          if (item.feedback_type === "skip") return;
+          pushSeed(seedMap, {
+            id: item.content_id,
+            type: item.content_type,
+            title: item.title,
+            weight: getFeedbackWeight(item.feedback_type),
+          });
+        });
 
-    const hasPersonalizationData =
-      seedSignals.length > 0 || topGenres.length > 0 || feedbackItems.length > 0;
-    const hasStrongSignals =
-      watchHistory.length >= 4 || likedItems.length >= 3 || feedbackItems.length >= 3;
+        const seedSignals = Array.from(seedMap.values())
+          .sort((a, b) => b.weight - a.weight)
+          .slice(0, MAX_SEEDS);
 
-    const seedWeights: Record<string, number> = {};
-    seedSignals.forEach((seed) => {
-      seedWeights[getContentKey(seed.type, seed.id)] = seed.weight;
-    });
+        const hasPersonalizationData =
+          seedSignals.length > 0 || topGenres.length > 0 || feedbackItems.length > 0;
+        const hasStrongSignals =
+          watchHistory.length >= 4 || likedItems.length >= 3 || feedbackItems.length >= 3;
+
+        const seedWeights: Record<string, number> = {};
+        seedSignals.forEach((seed) => {
+          seedWeights[getContentKey(seed.type, seed.id)] = seed.weight;
+        });
 
     const [trendingMovies, trendingTV] = await Promise.all([
       safe(getServerTrendingMovies("week")),
@@ -631,8 +803,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     );
 
-    const targetCount = hasStrongSignals ? 120 : hasPersonalizationData ? 96 : 84;
-    const cappedRecommendations = rankedRecommendations.slice(0, targetCount);
+        const targetCount = hasStrongSignals ? 180 : hasPersonalizationData ? 150 : 130;
+        const cappedRecommendations = rankedRecommendations.slice(0, targetCount);
 
     const items = cappedRecommendations.map((entry) => toDisplayItem(entry.item));
 
@@ -646,15 +818,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       };
     });
 
-    const payload: RecommendationsPayload = {
-      items,
-      isPersonalized: hasPersonalizationData && hasStrongSignals && items.length > 0,
-      explanationById,
-    };
+        const payload: RecommendationsPayload = {
+          items,
+          isPersonalized: hasPersonalizationData && hasStrongSignals && items.length > 0,
+          explanationById,
+        };
 
+        return payload;
+      })(),
+      BUILD_TIMEOUT_MS,
+    );
+
+    writeCachedPayload(cacheKey, user.id, payload);
     return res.status(200).json({ data: payload });
   } catch (error) {
     console.error("Recommendations handler error:", error);
+    const fallbackPayload = readLatestUserPayload(user.id, "stale");
+    if (fallbackPayload) {
+      res.setHeader("X-Recommendations-Fallback", "stale-cache");
+      return res.status(200).json({ data: fallbackPayload });
+    }
     return res.status(500).json({ error: "Internal server error" });
   }
 }

@@ -1,6 +1,6 @@
 import { memo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Eye, Heart } from "lucide-react";
+import { Eye, Heart, Sparkles } from "lucide-react";
 import { Movie, TVShow, getPosterUrl, getLanguageLabel } from "@/lib/tmdb";
 import { useUserData } from "@/hooks/useUserData";
 import { cn } from "@/lib/utils";
@@ -182,29 +182,42 @@ function ContentCardComponent({
             <PopoverTrigger asChild>
               <button
                 type="button"
-                className="text-[11px] text-primary/90 hover:text-primary underline underline-offset-2"
+                className="inline-flex items-center gap-1 rounded-full border border-primary/35 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
                 onClick={(event) => event.stopPropagation()}
               >
-                Why?
+                <Sparkles className="h-3 w-3" />
+                Why This
               </button>
             </PopoverTrigger>
             <PopoverContent
               align="end"
               sideOffset={8}
-              className="w-64 p-3"
+              className="w-72 overflow-hidden border border-primary/30 p-0"
               onClick={(event) => event.stopPropagation()}
             >
-              <p className="text-xs text-muted-foreground mb-2">
-                {recommendationSeedTitle
-                  ? `Because you liked ${recommendationSeedTitle}`
-                  : "Because this matches your taste"}
-              </p>
-              <div className="space-y-1">
+              <div className="border-b border-border/60 bg-muted/40 px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-primary">
+                  Why This Pick
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {recommendationSeedTitle
+                    ? `Because you liked ${recommendationSeedTitle}`
+                    : "Because this matches your taste profile"}
+                </p>
+              </div>
+              <div className="space-y-2 px-3 py-3">
                 {recommendationReasons.slice(0, 3).map((reason, index) => (
-                  <p key={`${reason.label}-${index}`} className="text-xs leading-snug">
-                    • {reason.label}
-                    {reason.evidence ? `: ${reason.evidence}` : ""}
-                  </p>
+                  <div
+                    key={`${reason.label}-${index}`}
+                    className="rounded-lg border border-border/60 bg-background/80 px-2.5 py-2"
+                  >
+                    <p className="text-xs font-medium text-foreground">{reason.label}</p>
+                    {reason.evidence ? (
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        {reason.evidence}
+                      </p>
+                    ) : null}
+                  </div>
                 ))}
               </div>
             </PopoverContent>
