@@ -49,10 +49,10 @@ export default function Footer() {
       title: "Support",
       icon: LifeBuoy,
       links: [
-        { label: "About", href: "/home" },
-        { label: "Feedback", href: "/profile" },
-        { label: "Contact", href: "/search" },
-        { label: "FAQ", href: "/upcoming" },
+        { label: "About", href: "/about" },
+        { label: "Feedback", href: "/feedback" },
+        { label: "Contact", href: "/contact" },
+        { label: "FAQ", href: "/faq" },
       ],
     },
   ];
@@ -127,13 +127,13 @@ export default function Footer() {
         <div className="mt-7 flex flex-col gap-3 border-t border-border/70 pt-5 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between">
           <p>© {currentYear} MovieReckon. Crafted for people who love stories.</p>
           <div className="flex flex-wrap items-center gap-3">
-            <Link to="/home" className="transition-colors hover:text-foreground">
+            <Link to="/terms" className="transition-colors hover:text-foreground">
               Terms
             </Link>
-            <Link to="/home" className="transition-colors hover:text-foreground">
+            <Link to="/privacy" className="transition-colors hover:text-foreground">
               Privacy
             </Link>
-            <Link to="/search" className="transition-colors hover:text-foreground">
+            <Link to="/contact" className="transition-colors hover:text-foreground">
               Contact
             </Link>
           </div>

@@ -32,6 +32,7 @@ const Reckon = lazy(() => import("./screens/Reckon"));
 const NotFound = lazy(() => import("./screens/NotFound"));
 const Movies = lazy(() => import("./screens/Movies"));
 const Series = lazy(() => import("./screens/Series"));
+const InfoPage = lazy(() => import("./screens/InfoPage"));
 
 type AppProps = {
   initialLocation?: string;
@@ -122,6 +123,12 @@ const App = ({
                       <Route path="/reckon" element={<Reckon />} />
                       <Route path="/movies" element={<Movies />} />
                       <Route path="/series" element={<Series />} />
+                      <Route path="/about" element={<InfoPage page="about" />} />
+                      <Route path="/feedback" element={<InfoPage page="feedback" />} />
+                      <Route path="/contact" element={<InfoPage page="contact" />} />
+                      <Route path="/faq" element={<InfoPage page="faq" />} />
+                      <Route path="/terms" element={<InfoPage page="terms" />} />
+                      <Route path="/privacy" element={<InfoPage page="privacy" />} />
                       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                       <Route path="*" element={<NotFound />} />
                     </Routes>
