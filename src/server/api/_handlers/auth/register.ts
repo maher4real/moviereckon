@@ -4,29 +4,21 @@
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase } from "../../lib/mongodb.js";
-import { hashPassword } from "../../lib/auth.js";
+import {
+  generateTokens,
+  hashPassword,
+  hashRefreshToken,
+  type UserPayload,
+} from "../../lib/auth.js";
+import { setAuthCookies } from "../../lib/cookies.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
 import { verifyCaptchaToken } from "../../lib/captcha.js";
-import { createEmailVerificationToken } from "../../lib/email-verification.js";
-import { sendVerificationEmail } from "../../lib/email.js";
-import { getRequestOrigin } from "../../lib/google-oauth.js";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
 
-function getVerificationBaseUrl(req: VercelRequest): string {
-  const explicitBase = process.env.EMAIL_VERIFICATION_BASE_URL;
-  if (typeof explicitBase === "string" && explicitBase.trim().length > 0) {
-    return explicitBase.trim().replace(/\/$/, "");
-  }
-
-  const origin = getRequestOrigin(req);
-  if (!origin) {
-    throw new Error("Unable to determine request origin for verification email");
-  }
-
-  return origin.replace(/\/$/, "");
-}
+// Temporarily disable email verification until mail delivery is stable.
+const EMAIL_VERIFICATION_DISABLED = true;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -85,11 +77,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Check if user already exists
     const existingUser = await db.collection("users").findOne({ email });
     if (existingUser) {
-      if (existingUser.email_verified === false) {
-        return res.status(400).json({
-          error: "Email already registered but not verified. Please check your inbox.",
-        });
-      }
       return res.status(400).json({ error: "Email already registered" });
     }
 
@@ -108,8 +95,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       password_hash: passwordHash,
       username,
       avatar_url: null,
-      email_verified: false,
-      email_verified_at: null,
+      email_verified: EMAIL_VERIFICATION_DISABLED ? true : false,
+      email_verified_at: EMAIL_VERIFICATION_DISABLED ? now : null,
       created_at: now,
       updated_at: now,
     });
@@ -125,40 +112,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       updated_at: now,
     });
 
-    const { rawToken } = await createEmailVerificationToken(db, {
-      userId,
+    // Email verification flow intentionally disabled for now.
+    // const { rawToken } = await createEmailVerificationToken(db, { userId, email });
+    // const verificationLink = `${getVerificationBaseUrl(req)}/api/auth/verify-email?token=${encodeURIComponent(rawToken)}`;
+    // await sendVerificationEmail({
+    //   toEmail: email,
+    //   username,
+    //   verificationUrl: verificationLink,
+    // });
+
+    const userPayload: UserPayload = {
+      id: userId,
       email,
+      username,
+    };
+    const tokens = generateTokens(userPayload);
+
+    await db.collection("refresh_tokens").insertOne({
+      user_id: userId,
+      token_hash: hashRefreshToken(tokens.refreshToken),
+      created_at: now,
+      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
-    const verificationLink = `${getVerificationBaseUrl(req)}/api/auth/verify-email?token=${encodeURIComponent(rawToken)}`;
 
-    let previewUrl: string | null = null;
-    try {
-      const result = await sendVerificationEmail({
-        toEmail: email,
+    setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
+
+    return res.status(201).json({
+      requires_email_verification: false,
+      message: "Account created successfully.",
+      user: {
+        id: userId,
+        email,
         username,
-        verificationUrl: verificationLink,
-      });
-      previewUrl = result.previewUrl;
-    } catch (sendError) {
-      // Roll back account creation if verification email cannot be sent.
-      await db.collection("email_verification_tokens").deleteMany({ user_id: userId });
-      await db.collection("user_preferences").deleteMany({ user_id: userId });
-      await db.collection("users").deleteOne({ _id: result.insertedId });
-      throw sendError;
-    }
-
-    return res.status(201).json(
-      previewUrl
-        ? {
-            requires_email_verification: true,
-            message: "Account created. Check your email to verify before signing in.",
-            verification_preview_url: previewUrl,
-          }
-        : {
-            requires_email_verification: true,
-            message: "Account created. Check your email to verify before signing in.",
-          },
-    );
+        avatar_url: null,
+        created_at: now,
+        updated_at: now,
+      },
+      session: "cookie",
+    });
   } catch (error) {
     console.error("Registration error:", error);
     return res.status(500).json({ error: "Internal server error" });

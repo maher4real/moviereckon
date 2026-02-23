@@ -55,9 +55,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
-    if (user.email_verified === false) {
-      return res.status(403).json({ error: "Please verify your email before signing in." });
-    }
+    // Email verification check is temporarily disabled.
+    // if (user.email_verified === false) {
+    //   return res.status(403).json({ error: "Please verify your email before signing in." });
+    // }
 
     // Accounts created via OAuth may not have a local password hash.
     if (!user.password_hash || typeof user.password_hash !== "string") {
