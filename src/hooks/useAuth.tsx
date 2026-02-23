@@ -36,7 +36,17 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+type AuthProviderProps = {
+  children: ReactNode;
+  initialUser?: mongoClient.MongoUser | null;
+  authResolved?: boolean;
+};
+
+export function AuthProvider({
+  children,
+  initialUser,
+  authResolved = false,
+}: AuthProviderProps) {
   const mapUserToProfile = (user: mongoClient.MongoUser): Profile => ({
     id: user.id,
     user_id: user.id,
@@ -46,12 +56,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     updated_at: user.updated_at,
   });
 
-  const [user, setUser] = useState<mongoClient.MongoUser | null>(() => mongoClient.getStoredUser());
+  const [user, setUser] = useState<mongoClient.MongoUser | null>(
+    () => initialUser ?? mongoClient.getStoredUser(),
+  );
   const [profile, setProfile] = useState<Profile | null>(() => {
+    if (initialUser) return mapUserToProfile(initialUser);
     const storedUser = mongoClient.getStoredUser();
     return storedUser ? mapUserToProfile(storedUser) : null;
   });
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!authResolved);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authTransitionRunId, setAuthTransitionRunId] = useState(1);
   const { toast } = useToast();
@@ -93,8 +106,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (authResolved) return;
     initAuth();
-  }, [initAuth]);
+  }, [authResolved, initAuth]);
 
   // Sign Up
   const signUp = async (

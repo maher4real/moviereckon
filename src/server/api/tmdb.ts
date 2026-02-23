@@ -26,6 +26,21 @@ function isAllowedEndpoint(endpoint: string): boolean {
   return ALLOWED_ENDPOINT_PATTERNS.some((pattern) => pattern.test(endpoint));
 }
 
+function getCacheProfile(endpoint: string): { sMaxAge: number; staleWhileRevalidate: number } {
+  // Search changes frequently with query terms, so keep CDN cache short.
+  if (/^\/search\//.test(endpoint)) {
+    return { sMaxAge: 60, staleWhileRevalidate: 120 };
+  }
+
+  // Detailed metadata can be cached longer for better hit rates.
+  if (/^\/(movie|tv)\/\d+/.test(endpoint)) {
+    return { sMaxAge: 300, staleWhileRevalidate: 900 };
+  }
+
+  // Trending/discover/list endpoints.
+  return { sMaxAge: 180, staleWhileRevalidate: 600 };
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   applyDefaultSecurityHeaders(res);
   const { originAllowed } = applyApiCors(req, res);
@@ -136,6 +151,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             : undefined) || `TMDB API Error: ${response.status}`,
       });
     }
+
+    const cacheProfile = getCacheProfile(endpoint);
+    res.setHeader(
+      "Cache-Control",
+      `public, s-maxage=${cacheProfile.sMaxAge}, stale-while-revalidate=${cacheProfile.staleWhileRevalidate}`,
+    );
 
     return res.status(200).json(payload);
   } catch (error) {
