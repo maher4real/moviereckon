@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Film } from "lucide-react";
 import MediaImage from "@/components/MediaImage";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   getBollywoodMovies,
   getPosterUrl,
@@ -28,6 +29,7 @@ const POSTERS_PER_ROW = 12;
 
 export default function AuthTransitionOverlay() {
   const { user, isLoading, isAuthenticating, authTransitionRunId } = useAuth();
+  const isMobile = useIsMobile();
   const logoRef = useRef<HTMLDivElement | null>(null);
   const runIdRef = useRef(0);
   const timerRef = useRef<number | null>(null);
@@ -231,6 +233,10 @@ export default function AuthTransitionOverlay() {
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null;
       if (user) {
+        if (isMobile) {
+          setPhase("fading");
+          return;
+        }
         beginMoveToNavbar();
         return;
       }
@@ -243,7 +249,7 @@ export default function AuthTransitionOverlay() {
         timerRef.current = null;
       }
     };
-  }, [phase, isLoading, isAuthenticating, user, beginMoveToNavbar]);
+  }, [phase, isLoading, isAuthenticating, user, isMobile, beginMoveToNavbar]);
 
   useEffect(() => {
     if (phase !== "moving") return;
