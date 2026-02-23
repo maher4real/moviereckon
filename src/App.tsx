@@ -13,6 +13,7 @@ import {
 } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, StaticRouter } from "react-router-dom";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+import { Analytics } from "@vercel/analytics/react";
 import { AuthProvider } from "@/hooks/useAuth";
 import { UserDataProvider } from "@/hooks/useUserData";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -102,6 +103,7 @@ const App = ({
               <TooltipProvider>
                 <Toaster />
                 <Sonner />
+                <Analytics />
                 <AppRouter initialLocation={initialLocation}>
                   <StartupSoundManager />
                   <AuthTransitionOverlay />
