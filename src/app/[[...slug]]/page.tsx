@@ -1,7 +1,6 @@
 import App from "@/App";
 import { dehydrate, QueryClient } from "@tanstack/react-query";
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 import type { MongoUser } from "@/lib/mongodbClient";
 import type { DiscoverFilters, Movie, TVShow } from "@/lib/tmdb";
 import {
@@ -509,6 +508,13 @@ async function prefetchRouteData(
   hasAuthenticatedUser: boolean,
 ) {
   if (pathname === "/" || pathname === "/auth") {
+    if (hasAuthenticatedUser) {
+      await Promise.allSettled([
+        prefetchHomeQueries(queryClient),
+        prefetchAuthVisualQueries(queryClient),
+      ]);
+      return;
+    }
     await prefetchAuthVisualQueries(queryClient);
     return;
   }
@@ -555,10 +561,6 @@ export default async function SpaPage({ params, searchParams }: SpaPageProps) {
   const pathname = normalizePathname(resolvedParams.slug);
   const queryString = normalizeSearch(resolvedSearchParams);
   const initialUser = await resolveInitialUser();
-
-  if (initialUser && (pathname === "/" || pathname === "/auth")) {
-    redirect("/home");
-  }
 
   const queryClient = new QueryClient({
     defaultOptions: {
