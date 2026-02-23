@@ -1,8 +1,5 @@
 // TMDB API Configuration and Service Layer
-// All API calls go through secure edge function
-
-// Legacy fallback (disabled to avoid client-side provider key exposure):
-// import { supabase } from "@/lib/backendClient";
+// All API calls go through the server-side API proxy.
 import { getPublicMongoApiUrl } from "@/lib/runtimeEnv";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
@@ -249,7 +246,7 @@ const getApiBase = () => {
 
 const API_BASE = getApiBase();
 
-// Helper function for API calls via edge function
+// Helper function for API calls via the server API proxy.
 async function fetchTMDB<T>(
   endpoint: string,
   params: Record<string, string | number | undefined> = {},
@@ -269,20 +266,6 @@ async function fetchTMDB<T>(
         : `TMDB API Error: ${response.status}`;
     throw new Error(message);
   }
-
-  // Legacy fallback (disabled to avoid client-side provider key exposure):
-  // const { data, error } = await supabase.functions.invoke("tmdb-proxy", {
-  //   body: { endpoint, params },
-  // });
-  //
-  // if (error) {
-  //   console.error("TMDB API Error:", error);
-  //   throw new Error(`TMDB API Error: ${error.message}`);
-  // }
-  //
-  // if (data.error) {
-  //   throw new Error(data.error);
-  // }
 
   return data as T;
 }

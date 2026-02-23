@@ -1,13 +1,6 @@
 import { createRoot } from "react-dom/client";
 import "./index.css";
 
-// Legacy debug logging (disabled to avoid exposing runtime config details):
-// console.log("ENV Check:", {
-//   hasUrl: !!import.meta.env.VITE_SUPABASE_URL,
-//   hasKey: !!import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-//   mode: import.meta.env.MODE,
-// });
-
 // Global error handler for unhandled promise rejections
 window.addEventListener("unhandledrejection", (event) => {
   console.error("Unhandled rejection:", event.reason);
