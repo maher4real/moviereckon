@@ -18,6 +18,7 @@ import { UserDataProvider } from "@/hooks/useUserData";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import StartupSoundManager from "@/components/StartupSoundManager";
 import AuthTransitionOverlay from "@/components/AuthTransitionOverlay";
+import { CenteredAppSkeleton } from "@/components/AppSkeletons";
 import type { MongoUser } from "@/lib/mongodbClient";
 
 const Auth = lazy(() => import("./screens/Auth"));
@@ -103,7 +104,7 @@ const App = ({
                 <AppRouter initialLocation={initialLocation}>
                   <StartupSoundManager />
                   <AuthTransitionOverlay />
-                  <Suspense fallback={<div className="min-h-screen bg-background" />}>
+                  <Suspense fallback={<CenteredAppSkeleton />}>
                     <Routes>
                       <Route path="/" element={<Auth />} />
                       <Route path="/auth" element={<Auth />} />

@@ -326,7 +326,8 @@ export default function Auth() {
   };
 
   if (user) {
-    return null;
+    // Avoid blank first paint while the redirect effect navigates to /home.
+    return <AuthPageSkeleton />;
   }
 
   if (isLoading) {
