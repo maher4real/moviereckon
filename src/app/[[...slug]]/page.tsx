@@ -25,6 +25,7 @@ import {
   getServerTVSeasonDetails,
   getServerTVShowCredits,
   getServerTVShowDetails,
+  getServerTVShowKeywords,
   getServerTVShowVideos,
   getServerTVWatchProviders,
   getServerTamilMovies,
@@ -287,6 +288,10 @@ async function prefetchTVDetailQueries(queryClient: QueryClient, tvId: number) {
     queryClient.prefetchQuery({
       queryKey: ["tv-season", tvId, 1],
       queryFn: () => getServerTVSeasonDetails(tvId, 1),
+    }),
+    queryClient.prefetchQuery({
+      queryKey: ["tv-keywords", tvId],
+      queryFn: () => getServerTVShowKeywords(tvId),
     }),
   ]);
 }

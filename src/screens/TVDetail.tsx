@@ -7,6 +7,7 @@ import {
   getTVShowDetails,
   getTVShowCredits,
   getTVShowVideos,
+  getTVShowKeywords,
   getSimilarTVShows,
   getTVSeasonDetails,
   getTVWatchProviders,
@@ -15,7 +16,9 @@ import {
   getStillUrl,
   getYouTubeTrailerUrl,
   getLanguageLabel,
-  getLanguageBadgeClass,
+  Cast,
+  CrewMember,
+  MovieKeyword,
   TVShow,
   Episode,
 } from "@/lib/tmdb";
@@ -29,7 +32,6 @@ import MediaImage from "@/components/MediaImage";
 import FeedbackButtons from "@/components/FeedbackButtons";
 import CommentsSection from "@/components/CommentsSection";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -48,6 +50,10 @@ import {
   Globe,
   Tv,
   Clock,
+  Users,
+  TrendingUp,
+  Tag,
+  BadgeCheck,
   ChevronDown,
   ChevronUp,
   X,
@@ -144,6 +150,13 @@ export default function TVDetail() {
     enabled: !!tvId,
   });
 
+  const { data: keywords = [] } = useQuery<MovieKeyword[]>({
+    queryKey: ["tv-keywords", tvId],
+    queryFn: () => getTVShowKeywords(tvId),
+    enabled: !!tvId,
+    staleTime: 1000 * 60 * 30,
+  });
+
   // Update selected season when TV show loads
   useEffect(() => {
     if (tvShow?.seasons) {
@@ -154,7 +167,72 @@ export default function TVDetail() {
     }
   }, [tvShow]);
 
-  const cast = creditsData?.cast.slice(0, 12) || [];
+  const cast = useMemo(
+    () => [...(creditsData?.cast || [])].sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999)),
+    [creditsData],
+  );
+  const crew = useMemo(
+    () =>
+      [...(creditsData?.crew || [])].sort(
+        (a, b) =>
+          a.department.localeCompare(b.department) ||
+          a.job.localeCompare(b.job) ||
+          a.name.localeCompare(b.name),
+      ),
+    [creditsData],
+  );
+  const crewAsCast = useMemo<Cast[]>(
+    () =>
+      crew.map((member, index) => {
+        const role =
+          member.job && member.department && member.department !== member.job
+            ? `${member.job} • ${member.department}`
+            : member.job || member.department || "Crew";
+
+        return {
+          id: member.id,
+          name: member.name,
+          character: role,
+          profile_path: member.profile_path,
+          order: index,
+        };
+      }),
+    [crew],
+  );
+
+  const pickUniqueNames = (members: CrewMember[]) =>
+    Array.from(new Set(members.map((member) => member.name)));
+
+  const creators = useMemo(() => {
+    const createdBy = (tvShow?.created_by || []).map((member) => member.name).filter(Boolean);
+    if (createdBy.length > 0) return Array.from(new Set(createdBy)).slice(0, 3);
+    return pickUniqueNames(crew.filter((member) => member.job === "Creator")).slice(0, 3);
+  }, [crew, tvShow]);
+  const writers = useMemo(
+    () =>
+      pickUniqueNames(
+        crew.filter((member) =>
+          [
+            "Writer",
+            "Screenplay",
+            "Story",
+            "Novel",
+            "Teleplay",
+            "Script Editor",
+          ].includes(member.job),
+        ),
+      ).slice(0, 4),
+    [crew],
+  );
+  const producers = useMemo(
+    () =>
+      pickUniqueNames(
+        crew.filter((member) =>
+          ["Producer", "Executive Producer", "Co-Executive Producer"].includes(member.job),
+        ),
+      ).slice(0, 4),
+    [crew],
+  );
   const trailerUrl = videosData ? getYouTubeTrailerUrl(videosData.results) : null;
   const preferredTrailerKey = trailerUrl?.split("/embed/")[1]?.split("?")[0] || null;
   const backgroundTrailerKeys = useMemo(() => {
@@ -262,6 +340,17 @@ export default function TVDetail() {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  };
+
+  const formatFirstAirDate = (date: string): string => {
+    if (!date) return "N/A";
+    const parsed = new Date(date);
+    if (Number.isNaN(parsed.getTime())) return date;
+    return parsed.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
   };
   const backgroundTrailerEmbedUrl = activeBgVideoKey
     ? `https://www.youtube.com/embed/${activeBgVideoKey}?autoplay=1&mute=1&controls=0&loop=1&playlist=${activeBgVideoKey}&modestbranding=1&rel=0&playsinline=1&iv_load_policy=3&disablekb=1&fs=0&enablejsapi=1${youtubeOrigin ? `&origin=${youtubeOrigin}` : ""}`
@@ -436,6 +525,50 @@ export default function TVDetail() {
   const watched = isWatched(tvShow.id, "tv");
   const liked = isLiked(tvShow.id, "tv");
   const year = tvShow.first_air_date?.split("-")[0] || "";
+  const matchScore = tvShow.vote_average > 0 ? Math.round(tvShow.vote_average * 10) : null;
+  const languageLabel = getLanguageLabel(tvShow.original_language);
+  const firstAired = formatFirstAirDate(tvShow.first_air_date);
+  const averageRuntime = tvShow.episode_run_time?.[0] ?? null;
+  const runtimeLabel = averageRuntime ? formatRuntime(averageRuntime) : "N/A";
+  const detailRows = [
+    { label: "Status", value: tvShow.status || "N/A", icon: BadgeCheck },
+    { label: "First Aired", value: firstAired, icon: Calendar },
+    { label: "Type", value: tvShow.type || "N/A", icon: Tv },
+    {
+      label: "Total Seasons",
+      value: tvShow.number_of_seasons > 0 ? String(tvShow.number_of_seasons) : "N/A",
+      icon: Tv,
+    },
+    {
+      label: "Total Episodes",
+      value: tvShow.number_of_episodes > 0 ? String(tvShow.number_of_episodes) : "N/A",
+      icon: Tv,
+    },
+    { label: "Avg Runtime", value: runtimeLabel, icon: Clock },
+    { label: "Original Language", value: languageLabel, icon: Globe },
+  ];
+  const statsRows = [
+    {
+      label: "TMDB Rating",
+      value: tvShow.vote_average > 0 ? `${tvShow.vote_average.toFixed(1)} / 10` : "N/A",
+      icon: Star,
+    },
+    {
+      label: "Votes",
+      value: tvShow.vote_count > 0 ? tvShow.vote_count.toLocaleString("en-US") : "N/A",
+      icon: Users,
+    },
+    {
+      label: "Popularity",
+      value: tvShow.popularity > 0 ? tvShow.popularity.toFixed(0) : "N/A",
+      icon: TrendingUp,
+    },
+    {
+      label: "Match Score",
+      value: matchScore !== null ? `${matchScore}% Match` : "N/A",
+      icon: BadgeCheck,
+    },
+  ];
   const heroVisualSrc = getBackdropUrl(tvShow.backdrop_path, "original");
 
   return (
@@ -552,36 +685,86 @@ export default function TVDetail() {
             </div>
 
             {/* Meta Info */}
-            <div className="flex flex-wrap items-center gap-3 mb-6">
-              <Badge className={getLanguageBadgeClass(tvShow.original_language)}>
-                <Globe className="w-3 h-3 mr-1" />
-                {getLanguageLabel(tvShow.original_language)}
-              </Badge>
-              {year && (
-                <Badge variant="outline">
-                  <Calendar className="w-3 h-3 mr-1" />
-                  {year}
-                </Badge>
-              )}
-              <Badge variant="outline">
-                <Tv className="w-3 h-3 mr-1" />
-                {tvShow.number_of_seasons} Season{tvShow.number_of_seasons !== 1 ? "s" : ""}
-              </Badge>
-              {tvShow.vote_average > 0 && (
-                <Badge variant="secondary" className="bg-primary/20 text-primary">
-                  <Star className="w-3 h-3 mr-1 fill-current" />
-                  {tvShow.vote_average.toFixed(1)} / 10
-                </Badge>
-              )}
-            </div>
+            <div className="mb-6">
+              <div className="flex flex-wrap gap-2.5">
+                {matchScore !== null && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/35 bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-300">
+                    <Star className="h-3.5 w-3.5 fill-current" />
+                    {matchScore}% Match
+                  </span>
+                )}
 
-            {/* Genres */}
-            <div className="flex flex-wrap gap-2 mb-6">
-              {tvShow.genres.map((genre) => (
-                <Badge key={genre.id} variant="secondary">
-                  {genre.name}
-                </Badge>
-              ))}
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-300">
+                  <BadgeCheck className="h-3.5 w-3.5" />
+                  {tvShow.status || "Status Unknown"}
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-card/70 px-3 py-1.5 text-xs font-medium text-foreground/90">
+                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                  {year || "TBA"}
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-card/70 px-3 py-1.5 text-xs font-medium text-foreground/90">
+                  <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                  {runtimeLabel}
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-card/70 px-3 py-1.5 text-xs font-medium text-foreground/90">
+                  <Star className="h-3.5 w-3.5 text-primary fill-current" />
+                  {tvShow.vote_average > 0
+                    ? `${tvShow.vote_average.toFixed(1)} IMDb`
+                    : "Not Rated"}
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-card/70 px-3 py-1.5 text-xs font-medium text-foreground/90">
+                  <Tv className="h-3.5 w-3.5 text-muted-foreground" />
+                  {tvShow.number_of_seasons > 0
+                    ? `${tvShow.number_of_seasons} Season${tvShow.number_of_seasons !== 1 ? "s" : ""}`
+                    : "Season N/A"}
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-card/70 px-3 py-1.5 text-xs font-medium text-foreground/90">
+                  <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+                  {languageLabel}
+                </span>
+              </div>
+
+              <div className="mt-3 rounded-lg border border-border/60 bg-card/45 px-3 py-2.5">
+                <dl className="space-y-2 text-sm">
+                  <div className="grid grid-cols-[98px_1fr] items-start gap-2">
+                    <dt className="text-muted-foreground">Created By</dt>
+                    <dd className="text-foreground/90 leading-relaxed">
+                      {creators.length > 0 ? creators.join(", ") : "N/A"}
+                    </dd>
+                  </div>
+                  <div className="grid grid-cols-[98px_1fr] items-start gap-2">
+                    <dt className="text-muted-foreground">Writer</dt>
+                    <dd className="text-foreground/90 leading-relaxed">
+                      {writers.length > 0 ? writers.join(", ") : "N/A"}
+                    </dd>
+                  </div>
+                  <div className="grid grid-cols-[98px_1fr] items-start gap-2">
+                    <dt className="text-muted-foreground">Producer</dt>
+                    <dd className="text-foreground/90 leading-relaxed">
+                      {producers.length > 0 ? producers.join(", ") : "N/A"}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+
+              {tvShow.genres.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {tvShow.genres.map((genre) => (
+                    <span
+                      key={genre.id}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border/65 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground"
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary/80" />
+                      {genre.name}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Action Buttons - All using primary red color */}
@@ -626,17 +809,84 @@ export default function TVDetail() {
               </Button>
             </div>
 
-            {/* Overview */}
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold mb-3">Overview</h2>
-              <p className="text-muted-foreground leading-relaxed">{tvShow.overview}</p>
+            <div className="mb-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div>
+                {/* Overview */}
+                <h2 className="text-xl font-semibold mb-3">Overview</h2>
+                <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">
+                  {tvShow.overview || "No overview available."}
+                </p>
+
+                {/* Stats */}
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold mb-3">Stats</h3>
+                  <div className="grid gap-2.5 sm:grid-cols-2">
+                    {statsRows.map((row) => (
+                      <div
+                        key={row.label}
+                        className="rounded-lg border border-border/60 bg-card/45 px-3 py-2.5"
+                      >
+                        <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <row.icon className="h-3.5 w-3.5" />
+                          {row.label}
+                        </p>
+                        <p className="mt-1 text-sm font-medium text-foreground break-words">
+                          {row.value}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Keywords */}
+                {keywords.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                      <Tag className="w-4 h-4" />
+                      Keywords
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {keywords.map((keyword) => (
+                        <span
+                          key={keyword.id}
+                          className="rounded-full border border-border/70 bg-card/70 px-3 py-1 text-xs text-foreground/90"
+                        >
+                          {keyword.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Right Side Panel */}
+              <aside className="h-fit rounded-xl border border-border/70 bg-card/55 p-4 backdrop-blur-sm">
+                <h3 className="text-lg font-semibold mb-4">Quick Facts</h3>
+                <div className="space-y-3">
+                  {detailRows.map((row) => (
+                    <div key={row.label} className="grid grid-cols-[140px_1fr] items-start gap-3">
+                      <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <row.icon className="h-4 w-4" />
+                        {row.label}
+                      </p>
+                      <p className="text-sm font-medium text-left text-foreground break-words">
+                        {row.value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </aside>
             </div>
 
             {/* Where to Watch */}
             <WhereToWatch providers={providers} link={watchLink} />
 
             {/* Cast */}
-            <CastList cast={cast} />
+            <CastList cast={cast} title="Cast" />
+
+            {/* Crew */}
+            <CastList cast={crewAsCast} title="Crew" />
+
             <FeedbackButtons
               contentId={tvShow.id}
               contentType="tv"

@@ -478,7 +478,7 @@ export async function getTVShowDetails(tvId: number): Promise<TVShowDetails> {
   return fetchTMDB<TVShowDetails>(`/tv/${tvId}`);
 }
 
-export async function getTVShowCredits(tvId: number): Promise<{ cast: Cast[] }> {
+export async function getTVShowCredits(tvId: number): Promise<TMDBCreditsResponse> {
   return fetchTMDB<TMDBCreditsResponse>(`/tv/${tvId}/credits`);
 }
 
