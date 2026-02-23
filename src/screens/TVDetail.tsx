@@ -50,8 +50,6 @@ import {
   Globe,
   Tv,
   Clock,
-  Users,
-  TrendingUp,
   Tag,
   BadgeCheck,
   ChevronDown,
@@ -547,28 +545,6 @@ export default function TVDetail() {
     { label: "Avg Runtime", value: runtimeLabel, icon: Clock },
     { label: "Original Language", value: languageLabel, icon: Globe },
   ];
-  const statsRows = [
-    {
-      label: "TMDB Rating",
-      value: tvShow.vote_average > 0 ? `${tvShow.vote_average.toFixed(1)} / 10` : "N/A",
-      icon: Star,
-    },
-    {
-      label: "Votes",
-      value: tvShow.vote_count > 0 ? tvShow.vote_count.toLocaleString("en-US") : "N/A",
-      icon: Users,
-    },
-    {
-      label: "Popularity",
-      value: tvShow.popularity > 0 ? tvShow.popularity.toFixed(0) : "N/A",
-      icon: TrendingUp,
-    },
-    {
-      label: "Match Score",
-      value: matchScore !== null ? `${matchScore}% Match` : "N/A",
-      icon: BadgeCheck,
-    },
-  ];
   const heroVisualSrc = getBackdropUrl(tvShow.backdrop_path, "original");
 
   return (
@@ -817,27 +793,6 @@ export default function TVDetail() {
                   {tvShow.overview || "No overview available."}
                 </p>
 
-                {/* Stats */}
-                <div className="mt-6">
-                  <h3 className="text-lg font-semibold mb-3">Stats</h3>
-                  <div className="grid gap-2.5 sm:grid-cols-2">
-                    {statsRows.map((row) => (
-                      <div
-                        key={row.label}
-                        className="rounded-lg border border-border/60 bg-card/45 px-3 py-2.5"
-                      >
-                        <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <row.icon className="h-3.5 w-3.5" />
-                          {row.label}
-                        </p>
-                        <p className="mt-1 text-sm font-medium text-foreground break-words">
-                          {row.value}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
                 {/* Keywords */}
                 {keywords.length > 0 && (
                   <div className="mt-6">
@@ -887,6 +842,130 @@ export default function TVDetail() {
             {/* Crew */}
             <CastList cast={crewAsCast} title="Crew" />
 
+            {/* Episodes Section */}
+            {seasons.length > 0 && (
+              <div className="mt-10 mb-10">
+                <h2 className="text-2xl font-bold mb-6">📺 Episodes</h2>
+
+                {/* Season Tabs */}
+                <Tabs
+                  value={String(selectedSeason)}
+                  onValueChange={(value) => setSelectedSeason(Number(value))}
+                >
+                  <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 mb-6">
+                    <TabsList className="bg-muted inline-flex w-auto">
+                      {seasons.map((season) => (
+                        <TabsTrigger key={season.season_number} value={String(season.season_number)}>
+                          Season {season.season_number}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+                  </div>
+
+                  {seasons.map((season) => (
+                    <TabsContent key={season.season_number} value={String(season.season_number)}>
+                      {seasonLoading && selectedSeason === season.season_number ? (
+                        <div className="space-y-4">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <div key={i} className="bg-card rounded-lg p-4 animate-pulse">
+                              <div className="flex gap-4">
+                                <div className="w-32 h-20 bg-muted rounded" />
+                                <div className="flex-1 space-y-2">
+                                  <div className="h-4 bg-muted rounded w-1/2" />
+                                  <div className="h-3 bg-muted rounded w-full" />
+                                  <div className="h-3 bg-muted rounded w-3/4" />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {seasonData?.episodes?.map((episode: Episode) => (
+                            <div
+                              key={episode.id}
+                              className="bg-card rounded-lg overflow-hidden border border-border hover:border-primary/50 transition-colors"
+                            >
+                              <div
+                                className="flex gap-4 p-4 cursor-pointer"
+                                onClick={() =>
+                                  setExpandedEpisode(
+                                    expandedEpisode === episode.id ? null : episode.id
+                                  )
+                                }
+                              >
+                                {/* Episode Thumbnail */}
+                                <div className="relative flex-shrink-0">
+                                  <MediaImage
+                                    src={getStillUrl(episode.still_path)}
+                                    alt={episode.name}
+                                    className="w-32 sm:w-40 h-20 sm:h-24 object-cover rounded"
+                                    loading="lazy"
+                                    fallbackSrc="/fallbacks/still.svg"
+                                  />
+                                  {episode.runtime && (
+                                    <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-background/80 rounded text-xs flex items-center gap-1">
+                                      <Clock className="w-3 h-3" />
+                                      {formatRuntime(episode.runtime)}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Episode Info */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                      <h3 className="font-medium text-sm sm:text-base">
+                                        E{episode.episode_number}. {episode.name}
+                                      </h3>
+                                      {episode.air_date && (
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                          {new Date(episode.air_date).toLocaleDateString("en-US", {
+                                            year: "numeric",
+                                            month: "short",
+                                            day: "numeric",
+                                          })}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      {episode.vote_average > 0 && (
+                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                          <Star className="w-3 h-3 fill-accent text-accent" />
+                                          {episode.vote_average.toFixed(1)}
+                                        </div>
+                                      )}
+                                      {expandedEpisode === episode.id ? (
+                                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                                      ) : (
+                                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                                      )}
+                                    </div>
+                                  </div>
+                                  <p className="text-xs sm:text-sm text-muted-foreground mt-2 line-clamp-2">
+                                    {episode.overview || "No description available."}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Expanded Overview */}
+                              {expandedEpisode === episode.id && episode.overview && (
+                                <div className="px-4 pb-4 pt-0">
+                                  <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded">
+                                    {episode.overview}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              </div>
+            )}
+
             <FeedbackButtons
               contentId={tvShow.id}
               contentType="tv"
@@ -898,130 +977,6 @@ export default function TVDetail() {
             <CommentsSection contentId={tvShow.id} contentType="tv" />
           </div>
         </div>
-
-        {/* Episodes Section */}
-        {seasons.length > 0 && (
-          <div className="mt-12">
-            <h2 className="text-2xl font-bold mb-6">📺 Episodes</h2>
-            
-            {/* Season Tabs */}
-            <Tabs
-              value={String(selectedSeason)}
-              onValueChange={(value) => setSelectedSeason(Number(value))}
-            >
-              <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 mb-6">
-                <TabsList className="bg-muted inline-flex w-auto">
-                  {seasons.map((season) => (
-                    <TabsTrigger key={season.season_number} value={String(season.season_number)}>
-                      Season {season.season_number}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </div>
-
-              {seasons.map((season) => (
-                <TabsContent key={season.season_number} value={String(season.season_number)}>
-                  {seasonLoading && selectedSeason === season.season_number ? (
-                    <div className="space-y-4">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <div key={i} className="bg-card rounded-lg p-4 animate-pulse">
-                          <div className="flex gap-4">
-                            <div className="w-32 h-20 bg-muted rounded" />
-                            <div className="flex-1 space-y-2">
-                              <div className="h-4 bg-muted rounded w-1/2" />
-                              <div className="h-3 bg-muted rounded w-full" />
-                              <div className="h-3 bg-muted rounded w-3/4" />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {seasonData?.episodes?.map((episode: Episode) => (
-                        <div
-                          key={episode.id}
-                          className="bg-card rounded-lg overflow-hidden border border-border hover:border-primary/50 transition-colors"
-                        >
-                          <div
-                            className="flex gap-4 p-4 cursor-pointer"
-                            onClick={() =>
-                              setExpandedEpisode(
-                                expandedEpisode === episode.id ? null : episode.id
-                              )
-                            }
-                          >
-                            {/* Episode Thumbnail */}
-                            <div className="relative flex-shrink-0">
-                              <MediaImage
-                                src={getStillUrl(episode.still_path)}
-                                alt={episode.name}
-                                className="w-32 sm:w-40 h-20 sm:h-24 object-cover rounded"
-                                loading="lazy"
-                                fallbackSrc="/fallbacks/still.svg"
-                              />
-                              {episode.runtime && (
-                                <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-background/80 rounded text-xs flex items-center gap-1">
-                                  <Clock className="w-3 h-3" />
-                                  {formatRuntime(episode.runtime)}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Episode Info */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2">
-                                <div>
-                                  <h3 className="font-medium text-sm sm:text-base">
-                                    E{episode.episode_number}. {episode.name}
-                                  </h3>
-                                  {episode.air_date && (
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                      {new Date(episode.air_date).toLocaleDateString("en-US", {
-                                        year: "numeric",
-                                        month: "short",
-                                        day: "numeric",
-                                      })}
-                                    </p>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  {episode.vote_average > 0 && (
-                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                      <Star className="w-3 h-3 fill-accent text-accent" />
-                                      {episode.vote_average.toFixed(1)}
-                                    </div>
-                                  )}
-                                  {expandedEpisode === episode.id ? (
-                                    <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                                  ) : (
-                                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                                  )}
-                                </div>
-                              </div>
-                              <p className="text-xs sm:text-sm text-muted-foreground mt-2 line-clamp-2">
-                                {episode.overview || "No description available."}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Expanded Overview */}
-                          {expandedEpisode === episode.id && episode.overview && (
-                            <div className="px-4 pb-4 pt-0">
-                              <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded">
-                                {episode.overview}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-              ))}
-            </Tabs>
-          </div>
-        )}
 
         {/* Similar TV Shows */}
         {similarData && similarData.results.length > 0 && (
