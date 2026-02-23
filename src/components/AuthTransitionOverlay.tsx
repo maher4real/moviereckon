@@ -305,7 +305,7 @@ export default function AuthTransitionOverlay() {
   return (
     <div
       className={cn(
-        "pointer-events-auto fixed inset-0 z-[120] cursor-progress transition-opacity duration-450",
+        "pointer-events-auto fixed inset-0 z-120 cursor-progress transition-opacity duration-450",
         phase === "fading" ? "opacity-0" : "opacity-100",
       )}
     >
