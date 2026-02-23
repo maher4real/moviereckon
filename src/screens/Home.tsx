@@ -53,6 +53,7 @@ export default function Home() {
   } = useRecommendations();
   const navigate = useNavigate();
   const [heroIndex, setHeroIndex] = useState(0);
+  const [loadSecondaryShelves, setLoadSecondaryShelves] = useState(false);
   const hasAnnouncedHeroReadyRef = useRef(false);
 
   // Redirect to auth if no user
@@ -61,6 +62,13 @@ export default function Home() {
       navigate("/");
     }
   }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    if (!user) return;
+    setLoadSecondaryShelves(false);
+    const timer = window.setTimeout(() => setLoadSecondaryShelves(true), 1100);
+    return () => window.clearTimeout(timer);
+  }, [user]);
 
   // Fetch all data with optimized query config
   const queryConfig = useMemo(
@@ -93,18 +101,21 @@ export default function Home() {
     queryKey: ["gujarati-movies"],
     queryFn: () => getGujaratiMovies(),
     ...queryConfig,
+    enabled: loadSecondaryShelves,
   });
 
   const { data: tamilData, isLoading: tamilLoading } = useQuery({
     queryKey: ["tamil-movies"],
     queryFn: () => getTamilMovies(),
     ...queryConfig,
+    enabled: loadSecondaryShelves,
   });
 
   const { data: teluguData, isLoading: teluguLoading } = useQuery({
     queryKey: ["telugu-movies"],
     queryFn: () => getTeluguMovies(),
     ...queryConfig,
+    enabled: loadSecondaryShelves,
   });
 
   const { data: tvShowsData, isLoading: tvLoading } = useQuery({
@@ -117,12 +128,14 @@ export default function Home() {
     queryKey: ["top-rated-movies"],
     queryFn: () => getTopRatedMovies(),
     ...queryConfig,
+    enabled: loadSecondaryShelves,
   });
 
   const { data: nowPlayingData, isLoading: nowPlayingLoading } = useQuery({
     queryKey: ["now-playing-movies"],
     queryFn: () => getNowPlayingMovies(),
     ...queryConfig,
+    enabled: loadSecondaryShelves,
   });
 
   const { data: upcomingMovies, isLoading: upcomingLoading } = useQuery({
@@ -148,6 +161,7 @@ export default function Home() {
       );
     },
     ...queryConfig,
+    enabled: loadSecondaryShelves,
   });
 
   const { data: upcomingTVShows, isLoading: upcomingTVLoading } = useQuery({
@@ -179,6 +193,7 @@ export default function Home() {
       );
     },
     ...queryConfig,
+    enabled: loadSecondaryShelves,
   });
 
   // Filter Now Playing to only show movies released today or earlier

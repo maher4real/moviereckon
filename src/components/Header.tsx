@@ -13,12 +13,22 @@ export default function Header() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    let rafId: number | null = null;
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
+      if (rafId !== null) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        setIsScrolled(window.scrollY > 50);
+      });
     };
 
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
+    };
   }, []);
 
   const navLinks = [

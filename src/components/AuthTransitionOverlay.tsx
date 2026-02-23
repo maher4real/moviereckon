@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
 import { Film } from "lucide-react";
 import MediaImage from "@/components/MediaImage";
 import { useAuth } from "@/hooks/useAuth";
@@ -26,10 +27,13 @@ const INITIAL_TRANSFORM = {
 };
 const ROW_COUNT = 4;
 const POSTERS_PER_ROW = 12;
+const isAuthRoute = (pathname: string) =>
+  pathname === "/" || pathname.startsWith("/auth");
 
 export default function AuthTransitionOverlay() {
   const { user, isLoading, isAuthenticating, authTransitionRunId } = useAuth();
   const isMobile = useIsMobile();
+  const location = useLocation();
   const logoRef = useRef<HTMLDivElement | null>(null);
   const runIdRef = useRef(0);
   const timerRef = useRef<number | null>(null);
@@ -39,22 +43,27 @@ export default function AuthTransitionOverlay() {
   const [phase, setPhase] = useState<OverlayPhase>("hidden");
   const [transform, setTransform] = useState(INITIAL_TRANSFORM);
   const [compactTarget, setCompactTarget] = useState(false);
+  const shouldFetchOverlayData =
+    isAuthRoute(location.pathname) || phase !== "hidden" || isAuthenticating;
 
   const { data: trendingMovies } = useQuery({
-    queryKey: ["auth-overlay-bg-trending-movies"],
+    queryKey: ["auth-bg-trending-movies"],
     queryFn: () => getTrendingMovies("week"),
+    enabled: shouldFetchOverlayData,
     staleTime: 1000 * 60 * 10,
   });
 
   const { data: trendingTV } = useQuery({
-    queryKey: ["auth-overlay-bg-trending-tv"],
+    queryKey: ["auth-bg-trending-tv"],
     queryFn: () => getTrendingTVShows("week"),
+    enabled: shouldFetchOverlayData,
     staleTime: 1000 * 60 * 10,
   });
 
   const { data: bollywoodData } = useQuery({
-    queryKey: ["auth-overlay-bg-bollywood"],
+    queryKey: ["auth-bg-bollywood"],
     queryFn: () => getBollywoodMovies(1),
+    enabled: shouldFetchOverlayData,
     staleTime: 1000 * 60 * 10,
   });
 

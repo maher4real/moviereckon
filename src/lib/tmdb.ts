@@ -246,16 +246,37 @@ const getApiBase = () => {
 
 const API_BASE = getApiBase();
 
+type TMDBParams = Record<string, string | number | boolean | undefined>;
+
 // Helper function for API calls via the server API proxy.
 async function fetchTMDB<T>(
   endpoint: string,
-  params: Record<string, string | number | undefined> = {},
+  params: TMDBParams = {},
 ): Promise<T> {
-  const response = await fetch(`${API_BASE}/api/tmdb`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ endpoint, params }),
+  const normalizedParams = Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== ""),
+  ) as Record<string, string | number | boolean>;
+
+  const searchParams = new URLSearchParams();
+  searchParams.set("endpoint", endpoint);
+  Object.entries(normalizedParams).forEach(([key, value]) => {
+    searchParams.set(key, String(value));
   });
+
+  const getUrl = `${API_BASE}/api/tmdb?${searchParams.toString()}`;
+  let response = await fetch(getUrl, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+
+  // Fallback keeps compatibility for oversized URLs or older deployments.
+  if (response.status === 405 || response.status === 414) {
+    response = await fetch(`${API_BASE}/api/tmdb`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint, params: normalizedParams }),
+    });
+  }
 
   const data = await response.json().catch(() => ({}));
 

@@ -7,7 +7,6 @@ import {
   discoverServerMovies,
   discoverServerTVShows,
   getServerBollywoodMovies,
-  getServerGujaratiMovies,
   getServerHollywoodMovies,
   getServerMovieCredits,
   getServerMovieDetails,
@@ -16,7 +15,6 @@ import {
   getServerMovieReleaseDates,
   getServerMovieVideos,
   getServerMovieWatchProviders,
-  getServerNowPlayingMovies,
   getServerPopularTVShows,
   getServerSimilarMovies,
   getServerSimilarTVShows,
@@ -27,13 +25,8 @@ import {
   getServerTVShowKeywords,
   getServerTVShowVideos,
   getServerTVWatchProviders,
-  getServerTamilMovies,
-  getServerTeluguMovies,
-  getServerTopRatedMovies,
   getServerTrendingMovies,
   getServerTrendingTVShows,
-  getServerUpcomingMovies,
-  getServerUpcomingTVShows,
 } from "@/lib/server/tmdbServer";
 import { getUserById, getUserFromRequest } from "@/server/api/lib/auth";
 
@@ -57,8 +50,6 @@ interface UpcomingPage {
   total_results: number;
 }
 
-const HOME_UPCOMING_PAGES = [1, 2, 3] as const;
-const HOME_UPCOMING_TV_PAGES = [1, 2] as const;
 const BOLLYWOOD_LANGUAGE_LIST = ["hi", "gu", "ta", "te", "kn"] as const;
 
 function normalizePathname(slug: string | string[] | undefined): string {
@@ -130,76 +121,8 @@ async function prefetchHomeQueries(queryClient: QueryClient) {
       queryFn: () => getServerHollywoodMovies(),
     }),
     queryClient.prefetchQuery({
-      queryKey: ["gujarati-movies"],
-      queryFn: () => getServerGujaratiMovies(),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ["tamil-movies"],
-      queryFn: () => getServerTamilMovies(),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ["telugu-movies"],
-      queryFn: () => getServerTeluguMovies(),
-    }),
-    queryClient.prefetchQuery({
       queryKey: ["popular-tv"],
       queryFn: () => getServerPopularTVShows(),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ["top-rated-movies"],
-      queryFn: () => getServerTopRatedMovies(),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ["now-playing-movies"],
-      queryFn: () => getServerNowPlayingMovies(),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ["upcoming-movies-home"],
-      queryFn: async () => {
-        const responses = await Promise.all(
-          HOME_UPCOMING_PAGES.map((page) => getServerUpcomingMovies(page).catch(() => null)),
-        );
-
-        const deduped = new Map<number, Movie>();
-        responses.forEach((response) => {
-          response?.results?.forEach((movie) => {
-            if (!deduped.has(movie.id)) deduped.set(movie.id, movie);
-          });
-        });
-
-        return Array.from(deduped.values()).sort((a, b) =>
-          (a.release_date || "9999-12-31").localeCompare(
-            b.release_date || "9999-12-31",
-          ),
-        );
-      },
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ["upcoming-tv-home"],
-      queryFn: async () => {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowStr = formatLocalDate(tomorrow);
-
-        const responses = await Promise.all(
-          HOME_UPCOMING_TV_PAGES.map((page) =>
-            getServerUpcomingTVShows(page, tomorrowStr).catch(() => null),
-          ),
-        );
-
-        const deduped = new Map<number, TVShow>();
-        responses.forEach((response) => {
-          response?.results?.forEach((show) => {
-            if (!deduped.has(show.id)) deduped.set(show.id, show);
-          });
-        });
-
-        return Array.from(deduped.values()).sort((a, b) =>
-          (a.first_air_date || "9999-12-31").localeCompare(
-            b.first_air_date || "9999-12-31",
-          ),
-        );
-      },
     }),
   ]);
 }
@@ -489,15 +412,12 @@ async function prefetchAuthVisualQueries(queryClient: QueryClient) {
 
   if (trendingMovies.status === "fulfilled") {
     queryClient.setQueryData(["auth-bg-trending-movies"], trendingMovies.value);
-    queryClient.setQueryData(["auth-overlay-bg-trending-movies"], trendingMovies.value);
   }
   if (trendingTV.status === "fulfilled") {
     queryClient.setQueryData(["auth-bg-trending-tv"], trendingTV.value);
-    queryClient.setQueryData(["auth-overlay-bg-trending-tv"], trendingTV.value);
   }
   if (bollywoodData.status === "fulfilled") {
     queryClient.setQueryData(["auth-bg-bollywood"], bollywoodData.value);
-    queryClient.setQueryData(["auth-overlay-bg-bollywood"], bollywoodData.value);
   }
 }
 
@@ -509,10 +429,7 @@ async function prefetchRouteData(
 ) {
   if (pathname === "/" || pathname === "/auth") {
     if (hasAuthenticatedUser) {
-      await Promise.allSettled([
-        prefetchHomeQueries(queryClient),
-        prefetchAuthVisualQueries(queryClient),
-      ]);
+      await prefetchHomeQueries(queryClient);
       return;
     }
     await prefetchAuthVisualQueries(queryClient);

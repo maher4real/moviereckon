@@ -41,7 +41,7 @@ export default function HeroBanner({
     <div className="relative h-[70vh] md:h-[85vh] overflow-hidden">
       {/* Background Image */}
       <MediaImage
-        src={getBackdropUrl(movie.backdrop_path, "original")}
+        src={getBackdropUrl(movie.backdrop_path, "large")}
         alt={`${movie.title} backdrop`}
         className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700"
         fallbackSrc="/fallbacks/backdrop.svg"

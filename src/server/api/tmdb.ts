@@ -1,5 +1,5 @@
 /**
- * POST /api/tmdb
+ * GET|POST /api/tmdb
  * Server-side TMDB proxy to avoid client-side provider key exposure.
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
@@ -56,17 +56,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(403).json({ error: "Origin not allowed" });
   }
 
-  if (req.method !== "POST") {
+  if (req.method !== "POST" && req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Only accept browser-like requests for this public proxy.
-  if (typeof req.headers.origin !== "string" || req.headers.origin.length === 0) {
+  // Keep stricter CSRF-style checks for stateful POSTs.
+  if (
+    req.method === "POST" &&
+    (typeof req.headers.origin !== "string" || req.headers.origin.length === 0)
+  ) {
     return res.status(403).json({ error: "Origin header is required" });
   }
 
   const contentType = req.headers["content-type"];
-  if (typeof contentType === "string" && !contentType.includes("application/json")) {
+  if (
+    req.method === "POST" &&
+    typeof contentType === "string" &&
+    !contentType.includes("application/json")
+  ) {
     return res.status(415).json({ error: "Content-Type must be application/json" });
   }
 
@@ -76,9 +83,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const endpoint =
-      typeof req.body?.endpoint === "string" ? req.body.endpoint.trim() : "";
-    const params = req.body?.params;
+    let endpoint = "";
+    let params: Record<string, unknown> | undefined;
+
+    if (req.method === "GET") {
+      const rawEndpoint = req.query?.endpoint;
+      endpoint =
+        typeof rawEndpoint === "string"
+          ? rawEndpoint.trim()
+          : Array.isArray(rawEndpoint)
+            ? String(rawEndpoint[0] || "").trim()
+            : "";
+
+      const queryParams: Record<string, string> = {};
+      Object.entries(req.query || {}).forEach(([key, value]) => {
+        if (key === "endpoint") return;
+        const normalizedValue = Array.isArray(value) ? value[0] : value;
+        if (normalizedValue === undefined || normalizedValue === null || normalizedValue === "") {
+          return;
+        }
+        queryParams[key] = String(normalizedValue);
+      });
+
+      params = queryParams;
+    } else {
+      endpoint = typeof req.body?.endpoint === "string" ? req.body.endpoint.trim() : "";
+      params = req.body?.params;
+    }
 
     const clientIp = getClientIp(req);
     const ipRateLimit = consumeRateLimit(`tmdb:ip:${clientIp}`, 180, 15 * 60 * 1000);
@@ -101,10 +132,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: "Endpoint not allowed" });
     }
 
-    if (
-      params !== undefined &&
-      (typeof params !== "object" || params === null || Array.isArray(params))
-    ) {
+    if (params !== undefined && (typeof params !== "object" || params === null || Array.isArray(params))) {
       return res.status(400).json({ error: "params must be an object" });
     }
 

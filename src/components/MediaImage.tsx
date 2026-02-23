@@ -48,6 +48,7 @@ export default function MediaImage({
     <img
       {...imgProps}
       src={resolvedSrc}
+      decoding={imgProps.decoding ?? "async"}
       onLoad={handleLoad}
       onError={handleError}
       className={cn(

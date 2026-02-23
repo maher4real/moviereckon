@@ -60,6 +60,7 @@ import { cn } from "@/lib/utils";
 
 const MemoizedCarousel = memo(ContentCarousel);
 const PREVIEW_AUTOPLAY_TIMEOUT_MS = 12000;
+const BACKGROUND_VIDEO_BOOT_DELAY_MS = 900;
 
 export default function TVDetail() {
   const { id } = useParams<{ id: string }>();
@@ -74,6 +75,7 @@ export default function TVDetail() {
   const [isTrailerModalOpen, setIsTrailerModalOpen] = useState(false);
   const [trailerSessionId, setTrailerSessionId] = useState(0);
   const [isBackgroundVideoVisible, setIsBackgroundVideoVisible] = useState(true);
+  const [shouldLoadBackgroundVideo, setShouldLoadBackgroundVideo] = useState(false);
   const [isBackgroundVideoPlaying, setIsBackgroundVideoPlaying] = useState(false);
   const [bgFrameSize, setBgFrameSize] = useState({ width: 1920, height: 1080 });
   const heroMediaRef = useRef<HTMLDivElement>(null);
@@ -375,10 +377,19 @@ export default function TVDetail() {
   useEffect(() => {
     setIsBackgroundVideoVisible(Boolean(activeBgVideoKey));
     setIsBackgroundVideoPlaying(false);
+    setShouldLoadBackgroundVideo(false);
+    if (!activeBgVideoKey) return;
+    const timer = window.setTimeout(
+      () => setShouldLoadBackgroundVideo(true),
+      BACKGROUND_VIDEO_BOOT_DELAY_MS,
+    );
+    return () => window.clearTimeout(timer);
   }, [activeBgVideoKey]);
 
   useEffect(() => {
-    if (!backgroundTrailerEmbedUrl || !isBackgroundVideoVisible) return;
+    if (!backgroundTrailerEmbedUrl || !isBackgroundVideoVisible || !shouldLoadBackgroundVideo) {
+      return;
+    }
     const timer = window.setTimeout(() => {
       controlBackgroundPreview("addEventListener", ["onStateChange"]);
       controlBackgroundPreview("addEventListener", ["onError"]);
@@ -386,10 +397,20 @@ export default function TVDetail() {
       controlBackgroundPreview("playVideo");
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [backgroundTrailerEmbedUrl, controlBackgroundPreview, isBackgroundVideoVisible]);
+  }, [
+    backgroundTrailerEmbedUrl,
+    controlBackgroundPreview,
+    isBackgroundVideoVisible,
+    shouldLoadBackgroundVideo,
+  ]);
 
   useEffect(() => {
-    if (!backgroundTrailerEmbedUrl || !isBackgroundVideoVisible || isBackgroundVideoPlaying) {
+    if (
+      !backgroundTrailerEmbedUrl ||
+      !isBackgroundVideoVisible ||
+      !shouldLoadBackgroundVideo ||
+      isBackgroundVideoPlaying
+    ) {
       return;
     }
 
@@ -398,7 +419,12 @@ export default function TVDetail() {
     }, PREVIEW_AUTOPLAY_TIMEOUT_MS);
 
     return () => window.clearTimeout(fallbackTimeout);
-  }, [backgroundTrailerEmbedUrl, isBackgroundVideoVisible, isBackgroundVideoPlaying]);
+  }, [
+    backgroundTrailerEmbedUrl,
+    isBackgroundVideoVisible,
+    isBackgroundVideoPlaying,
+    shouldLoadBackgroundVideo,
+  ]);
 
   useEffect(() => {
     if (!activeBgVideoKey) return;
@@ -460,7 +486,9 @@ export default function TVDetail() {
   }, [activeBgVideoKey, controlBackgroundPreview]);
 
   useEffect(() => {
-    if (!backgroundTrailerEmbedUrl || !isBackgroundVideoVisible) return;
+    if (!backgroundTrailerEmbedUrl || !isBackgroundVideoVisible || !shouldLoadBackgroundVideo) {
+      return;
+    }
 
     if (isTrailerModalOpen) {
       controlBackgroundPreview("pauseVideo");
@@ -477,6 +505,7 @@ export default function TVDetail() {
     backgroundTrailerEmbedUrl,
     controlBackgroundPreview,
     isBackgroundVideoVisible,
+    shouldLoadBackgroundVideo,
     isTrailerModalOpen,
   ]);
 
@@ -545,7 +574,7 @@ export default function TVDetail() {
     { label: "Avg Runtime", value: runtimeLabel, icon: Clock },
     { label: "Original Language", value: languageLabel, icon: Globe },
   ];
-  const heroVisualSrc = getBackdropUrl(tvShow.backdrop_path, "original");
+  const heroVisualSrc = getBackdropUrl(tvShow.backdrop_path, "large");
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0 overflow-x-hidden">
@@ -563,7 +592,7 @@ export default function TVDetail() {
           fallbackSrc="/fallbacks/backdrop.svg"
           fadeIn
         />
-        {backgroundTrailerEmbedUrl && isBackgroundVideoVisible && (
+        {backgroundTrailerEmbedUrl && isBackgroundVideoVisible && shouldLoadBackgroundVideo && (
           <div className="absolute inset-0">
             <iframe
               key={activeBgVideoKey}
@@ -577,7 +606,7 @@ export default function TVDetail() {
                 willChange: "transform",
               }}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              loading="eager"
+              loading="lazy"
               referrerPolicy="strict-origin-when-cross-origin"
               onLoad={() => {
                 controlBackgroundPreview("addEventListener", ["onStateChange"]);

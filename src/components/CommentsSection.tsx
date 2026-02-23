@@ -131,8 +131,9 @@ export default function CommentsSection({
     queryKey,
     queryFn: () => mongoClient.fetchComments(contentId, contentType),
     enabled: !!contentId,
-    refetchInterval: 20_000,
-    staleTime: 10_000,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 
   const { data: publicReviews = [], isLoading: reviewsLoading } = useQuery({

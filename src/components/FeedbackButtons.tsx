@@ -76,8 +76,9 @@ export default function FeedbackButtons({
     queryKey,
     queryFn: () => mongoClient.fetchContentFeedbackSummary(contentId, contentType),
     enabled: !!contentId,
-    refetchInterval: 20_000,
-    staleTime: 10_000,
+    staleTime: 60_000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 
   const feedbackMutation = useMutation({
