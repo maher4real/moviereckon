@@ -9,6 +9,21 @@ import { getUserFromRequest } from "../../lib/auth.js";
 const DEFAULT_PAGE_SIZE = 80;
 const MAX_PAGE_SIZE = 120;
 
+type ContentType = "movie" | "tv";
+
+interface ContentCommentDoc {
+  _id?: ObjectId;
+  user_id: string;
+  username: string;
+  avatar_url: string | null;
+  content_id: number;
+  content_type: ContentType;
+  text: string;
+  rating: number;
+  created_at: string;
+  updated_at: string;
+}
+
 function getQueryParam(req: VercelRequest, key: string): string | undefined {
   const value = req.query?.[key];
   if (Array.isArray(value)) return value[0];
@@ -43,14 +58,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const { db } = await connectToDatabase();
+  const commentsCollection = db.collection<ContentCommentDoc>("content_comments");
 
   try {
     if (req.method === "GET") {
       const contentIdRaw = getQueryParam(req, "content_id");
       const contentType = getQueryParam(req, "content_type");
       const contentId = Number(contentIdRaw);
-      const limit = parseLimit(getQueryParam(req, "limit"));
+      const limitRaw = getQueryParam(req, "limit");
+      const limit = parseLimit(limitRaw);
       const cursor = decodeCursor(getQueryParam(req, "cursor"));
+      const usePagination = Boolean(limitRaw || cursor);
 
       if (!contentId || !contentType || !["movie", "tv"].includes(contentType)) {
         return res.status(400).json({ error: "content_id and valid content_type are required" });
@@ -66,8 +84,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ];
       }
 
-      const comments = await db
-        .collection("content_comments")
+      let query = commentsCollection
         .find(filter, {
           projection: {
             user_id: 1,
@@ -81,14 +98,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             updated_at: 1,
           },
         })
-        .sort({ created_at: -1, _id: -1 })
-        .limit(limit + 1)
-        .toArray();
-      const hasMore = comments.length > limit;
-      const pageItems = hasMore ? comments.slice(0, limit) : comments;
+        .sort({ created_at: -1, _id: -1 });
+      if (usePagination) {
+        query = query.limit(limit + 1);
+      }
+
+      const comments = await query.toArray();
+      const hasMore = usePagination ? comments.length > limit : false;
+      const pageItems = usePagination && hasMore ? comments.slice(0, limit) : comments;
       const lastItem = pageItems[pageItems.length - 1];
 
-      return res.status(200).json({
+      const payload: Record<string, unknown> = {
         data: pageItems.map((comment) => ({
           id: comment._id.toString(),
           user_id: comment.user_id,
@@ -104,12 +124,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           created_at: comment.created_at,
           updated_at: comment.updated_at,
         })),
-        page: {
+      };
+
+      if (usePagination) {
+        payload.page = {
           limit,
           has_more: hasMore,
           next_cursor: hasMore && lastItem ? encodeCursor(lastItem) : null,
-        },
-      });
+        };
+      }
+
+      return res.status(200).json(payload);
     }
 
     if (req.method === "POST") {
@@ -197,7 +222,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const commentObjectId = new ObjectId(String(comment_id));
       const now = new Date().toISOString();
 
-      const updateResult = await db.collection("content_comments").findOneAndUpdate(
+      const updateResult = await commentsCollection.findOneAndUpdate(
         { _id: commentObjectId, user_id: user.id },
         {
           $set: {
@@ -241,7 +266,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: "valid comment_id is required" });
       }
 
-      const deleteResult = await db.collection("content_comments").deleteOne({
+      const deleteResult = await commentsCollection.deleteOne({
         _id: new ObjectId(String(comment_id)),
         user_id: user.id,
       });

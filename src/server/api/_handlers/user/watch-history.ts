@@ -11,6 +11,18 @@ type Database = Awaited<ReturnType<typeof connectToDatabase>>["db"];
 const DEFAULT_PAGE_SIZE = 200;
 const MAX_PAGE_SIZE = 400;
 
+interface WatchHistoryDoc {
+  _id?: ObjectId;
+  user_id: string;
+  content_id: number;
+  content_type: ContentType;
+  title: string;
+  poster_path: string | null;
+  genres: number[];
+  language: string;
+  watched_at: string;
+}
+
 function normalizeContentType(value: unknown): ContentType | null {
   if (value === "movie" || value === "tv") return value;
   return null;
@@ -92,12 +104,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const { db } = await connectToDatabase();
+  const watchHistoryCollection = db.collection<WatchHistoryDoc>("watch_history");
 
   try {
     // GET - Fetch watch history
     if (req.method === "GET") {
-      const limit = parseLimit(getQueryParam(req, "limit"));
+      const limitRaw = getQueryParam(req, "limit");
+      const limit = parseLimit(limitRaw);
       const cursor = decodeCursor(getQueryParam(req, "cursor"));
+      const usePagination = Boolean(limitRaw || cursor);
       const filter: Record<string, unknown> = { user_id: user.id };
 
       if (cursor) {
@@ -107,8 +122,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ];
       }
 
-      const history = await db
-        .collection("watch_history")
+      let query = watchHistoryCollection
         .find(filter, {
           projection: {
             user_id: 1,
@@ -121,14 +135,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             watched_at: 1,
           },
         })
-        .sort({ watched_at: -1, _id: -1 })
-        .limit(limit + 1)
-        .toArray();
-      const hasMore = history.length > limit;
-      const pageItems = hasMore ? history.slice(0, limit) : history;
+        .sort({ watched_at: -1, _id: -1 });
+      if (usePagination) {
+        query = query.limit(limit + 1);
+      }
+
+      const history = await query.toArray();
+      const hasMore = usePagination ? history.length > limit : false;
+      const pageItems = usePagination && hasMore ? history.slice(0, limit) : history;
       const lastItem = pageItems[pageItems.length - 1];
 
-      return res.status(200).json({
+      const payload: Record<string, unknown> = {
         data: pageItems.map((item) => ({
           id: item._id.toString(),
           user_id: item.user_id,
@@ -140,12 +157,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           language: item.language || "en",
           watched_at: item.watched_at,
         })),
-        page: {
+      };
+
+      if (usePagination) {
+        payload.page = {
           limit,
           has_more: hasMore,
           next_cursor: hasMore && lastItem ? encodeCursor(lastItem) : null,
-        },
-      });
+        };
+      }
+
+      return res.status(200).json(payload);
     }
 
     // POST - Add to watch history (upsert)
@@ -166,7 +188,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const now = new Date().toISOString();
 
       // Upsert - update if exists, insert if not
-      const result = await db.collection("watch_history").findOneAndUpdate(
+      const result = await watchHistoryCollection.findOneAndUpdate(
         {
           user_id: user.id,
           content_id: contentId,
@@ -221,7 +243,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: "content_id and content_type are required" });
       }
 
-      await db.collection("watch_history").deleteOne({
+      await watchHistoryCollection.deleteOne({
         user_id: user.id,
         content_id: contentId,
         content_type: contentType,

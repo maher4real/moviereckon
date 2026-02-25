@@ -8,10 +8,35 @@ import { getUserFromRequest } from "../../lib/auth.js";
 
 const FEEDBACK_TYPES = ["give_it_a_go", "one_time_watch", "must_watch", "skip"] as const;
 type FeedbackType = (typeof FEEDBACK_TYPES)[number];
+type ContentType = "movie" | "tv";
 const DEFAULT_PAGE_SIZE = 200;
 const MAX_PAGE_SIZE = 400;
 
-function normalizeContentType(value: unknown): "movie" | "tv" | null {
+interface ContentFeedbackDoc {
+  _id?: ObjectId;
+  user_id: string;
+  content_id: number;
+  content_type: ContentType;
+  feedback_type: FeedbackType;
+  title: string;
+  poster_path: string | null;
+  genres: number[];
+  language: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ContentFeedbackSummaryDoc {
+  _id?: ObjectId;
+  content_id: number;
+  content_type: ContentType;
+  counts: Partial<Record<FeedbackType, number>>;
+  total_votes: number;
+  created_at: string;
+  updated_at: string;
+}
+
+function normalizeContentType(value: unknown): ContentType | null {
   if (value === "movie" || value === "tv") return value;
   return null;
 }
@@ -123,7 +148,7 @@ function createCountsFromAggregate(feedbackDocs: Array<{ _id: string; count: num
 async function adjustFeedbackSummary(
   db: Awaited<ReturnType<typeof connectToDatabase>>["db"],
   contentId: number,
-  contentType: "movie" | "tv",
+  contentType: ContentType,
   deltas: Partial<Record<FeedbackType, number>>,
 ) {
   const inc: Record<string, number> = {};
@@ -140,7 +165,7 @@ async function adjustFeedbackSummary(
   inc.total_votes = totalDelta;
 
   const now = new Date().toISOString();
-  await db.collection("content_feedback_summary").updateOne(
+  await db.collection<ContentFeedbackSummaryDoc>("content_feedback_summary").updateOne(
     { content_id: contentId, content_type: contentType },
     {
       $inc: inc,
@@ -162,6 +187,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const { db } = await connectToDatabase();
+  const feedbackCollection = db.collection<ContentFeedbackDoc>("content_feedback");
+  const feedbackSummaryCollection = db.collection<ContentFeedbackSummaryDoc>(
+    "content_feedback_summary",
+  );
 
   try {
     if (req.method === "GET") {
@@ -174,9 +203,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ error: "content_id and valid content_type are required" });
         }
 
-        const feedbackCollection = db.collection("content_feedback");
         const [summaryDoc, userFeedbackDoc] = await Promise.all([
-          db.collection("content_feedback_summary").findOne(
+          feedbackSummaryCollection.findOne(
             { content_id: contentId, content_type: contentType },
             { projection: { counts: 1 } },
           ),
@@ -185,7 +213,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             { projection: { feedback_type: 1 } },
           ),
         ]);
-        let counts = normalizeSummaryCounts(summaryDoc as { counts?: Partial<Record<FeedbackType, number>> } | null);
+        let counts = normalizeSummaryCounts(summaryDoc);
 
         // Legacy compatibility: build summary once when a pre-index deployment has existing votes.
         if (!summaryDoc) {
@@ -198,7 +226,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           counts = createCountsFromAggregate(aggregateRows);
           const totalVotes = Object.values(counts).reduce((sum, value) => sum + value, 0);
           const now = new Date().toISOString();
-          await db.collection("content_feedback_summary").updateOne(
+          await feedbackSummaryCollection.updateOne(
             { content_id: contentId, content_type: contentType },
             {
               $set: {
@@ -225,8 +253,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // No query params: return current user's feedback history
-      const limit = parseLimit(getQueryParam(req, "limit"));
+      const limitRaw = getQueryParam(req, "limit");
+      const limit = parseLimit(limitRaw);
       const cursor = decodeCursor(getQueryParam(req, "cursor"));
+      const usePagination = Boolean(limitRaw || cursor);
       const filter: Record<string, unknown> = { user_id: user.id };
       if (cursor) {
         filter.$or = [
@@ -235,8 +265,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ];
       }
 
-      const ownFeedback = await db
-        .collection("content_feedback")
+      let query = feedbackCollection
         .find(filter, {
           projection: {
             user_id: 1,
@@ -251,14 +280,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             updated_at: 1,
           },
         })
-        .sort({ updated_at: -1, _id: -1 })
-        .limit(limit + 1)
-        .toArray();
-      const hasMore = ownFeedback.length > limit;
-      const pageItems = hasMore ? ownFeedback.slice(0, limit) : ownFeedback;
+        .sort({ updated_at: -1, _id: -1 });
+      if (usePagination) {
+        query = query.limit(limit + 1);
+      }
+
+      const ownFeedback = await query.toArray();
+      const hasMore = usePagination ? ownFeedback.length > limit : false;
+      const pageItems = usePagination && hasMore ? ownFeedback.slice(0, limit) : ownFeedback;
       const lastItem = pageItems[pageItems.length - 1];
 
-      return res.status(200).json({
+      const payload: Record<string, unknown> = {
         data: pageItems.map((doc) => ({
           id: doc._id.toString(),
           user_id: doc.user_id,
@@ -272,12 +304,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           created_at: doc.created_at,
           updated_at: doc.updated_at,
         })),
-        page: {
+      };
+
+      if (usePagination) {
+        payload.page = {
           limit,
           has_more: hasMore,
           next_cursor: hasMore && lastItem ? encodeCursor(lastItem) : null,
-        },
-      });
+        };
+      }
+
+      return res.status(200).json(payload);
     }
 
     if (req.method === "POST") {
@@ -293,7 +330,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!feedbackType) {
         return res.status(400).json({ error: "Invalid feedback_type" });
       }
-      const normalizedTitle = normalizeOptionalString(body.title, 220);
+      const normalizedTitle = normalizeOptionalString(body.title, 220) || "";
       const normalizedPosterPath = normalizeOptionalString(body.poster_path, 300, null);
       const normalizedGenres = normalizeGenres(body.genres);
       const normalizedLanguage = normalizeLanguage(body.language);
@@ -302,7 +339,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         content_id: contentId,
         content_type: contentType,
       };
-      const feedbackCollection = db.collection("content_feedback");
       const now = new Date().toISOString();
 
       const previousDoc = await feedbackCollection.findOneAndUpdate(

@@ -10,6 +10,16 @@ type ContentType = "movie" | "tv";
 const DEFAULT_PAGE_SIZE = 200;
 const MAX_PAGE_SIZE = 400;
 
+interface LikedItemDoc {
+  _id?: ObjectId;
+  user_id: string;
+  content_id: number;
+  content_type: ContentType;
+  title: string;
+  poster_path: string | null;
+  liked_at: string;
+}
+
 function normalizeContentType(value: unknown): ContentType | null {
   if (value === "movie" || value === "tv") return value;
   return null;
@@ -77,12 +87,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const { db } = await connectToDatabase();
+  const likedItemsCollection = db.collection<LikedItemDoc>("liked_items");
 
   try {
     // GET - Fetch liked items
     if (req.method === "GET") {
-      const limit = parseLimit(getQueryParam(req, "limit"));
+      const limitRaw = getQueryParam(req, "limit");
+      const limit = parseLimit(limitRaw);
       const cursor = decodeCursor(getQueryParam(req, "cursor"));
+      const usePagination = Boolean(limitRaw || cursor);
       const filter: Record<string, unknown> = { user_id: user.id };
       if (cursor) {
         filter.$or = [
@@ -91,8 +104,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ];
       }
 
-      const liked = await db
-        .collection("liked_items")
+      let query = likedItemsCollection
         .find(filter, {
           projection: {
             user_id: 1,
@@ -103,14 +115,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             liked_at: 1,
           },
         })
-        .sort({ liked_at: -1, _id: -1 })
-        .limit(limit + 1)
-        .toArray();
-      const hasMore = liked.length > limit;
-      const pageItems = hasMore ? liked.slice(0, limit) : liked;
+        .sort({ liked_at: -1, _id: -1 });
+      if (usePagination) {
+        query = query.limit(limit + 1);
+      }
+
+      const liked = await query.toArray();
+      const hasMore = usePagination ? liked.length > limit : false;
+      const pageItems = usePagination && hasMore ? liked.slice(0, limit) : liked;
       const lastItem = pageItems[pageItems.length - 1];
 
-      return res.status(200).json({
+      const payload: Record<string, unknown> = {
         data: pageItems.map((item) => ({
           id: item._id.toString(),
           user_id: item.user_id,
@@ -120,12 +135,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           poster_path: item.poster_path,
           liked_at: item.liked_at,
         })),
-        page: {
+      };
+
+      if (usePagination) {
+        payload.page = {
           limit,
           has_more: hasMore,
           next_cursor: hasMore && lastItem ? encodeCursor(lastItem) : null,
-        },
-      });
+        };
+      }
+
+      return res.status(200).json(payload);
     }
 
     // POST - Toggle like (add if not exists, remove if exists)
@@ -145,7 +165,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         content_id: contentId,
         content_type: contentType,
       };
-      const collection = db.collection("liked_items");
+      const collection = likedItemsCollection;
 
       // Toggle off first. With a unique index in place, this avoids a read-before-write race.
       const removed = await collection.deleteOne(filter);
@@ -228,7 +248,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: "content_id and content_type are required" });
       }
 
-      await db.collection("liked_items").deleteOne({
+      await likedItemsCollection.deleteOne({
         user_id: user.id,
         content_id: contentId,
         content_type: contentType,
