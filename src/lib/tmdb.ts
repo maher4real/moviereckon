@@ -273,7 +273,10 @@ async function fetchTMDB<T>(
   if (response.status === 405 || response.status === 414) {
     response = await fetch(`${API_BASE}/api/tmdb`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
       body: JSON.stringify({ endpoint, params: normalizedParams }),
     });
   }

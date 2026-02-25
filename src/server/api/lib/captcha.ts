@@ -7,6 +7,7 @@ type TurnstileVerifyResponse = {
   success?: boolean;
   "error-codes"?: string[];
   action?: string;
+  hostname?: string;
 };
 
 export type CaptchaVerificationResult = {
@@ -26,6 +27,32 @@ async function parseJsonSafe(response: Response): Promise<TurnstileVerifyRespons
   } catch {
     return {};
   }
+}
+
+function normalizeHostname(hostname: string): string {
+  return hostname.trim().toLowerCase().replace(/\.$/, "");
+}
+
+function getAllowedCaptchaHostnames(req: VercelRequest): Set<string> {
+  const values = new Set<string>();
+  const configured = process.env.TURNSTILE_ALLOWED_HOSTNAMES;
+  if (configured) {
+    configured
+      .split(",")
+      .map((entry) => normalizeHostname(entry))
+      .filter((entry) => entry.length > 0)
+      .forEach((entry) => values.add(entry));
+  }
+
+  if (typeof req.headers.host === "string" && req.headers.host.trim().length > 0) {
+    values.add(normalizeHostname(req.headers.host.split(":")[0] || ""));
+  }
+
+  if (process.env.VERCEL_URL) {
+    values.add(normalizeHostname(process.env.VERCEL_URL.split(":")[0] || ""));
+  }
+
+  return values;
 }
 
 export async function verifyCaptchaToken(
@@ -62,6 +89,16 @@ export async function verifyCaptchaToken(
 
     if (data.action && data.action !== expectedAction) {
       return { ok: false, error: "CAPTCHA action mismatch. Please retry." };
+    }
+
+    const skipHostnameCheck = process.env.TURNSTILE_SKIP_HOSTNAME_CHECK === "true";
+    if (!skipHostnameCheck) {
+      const allowedHostnames = getAllowedCaptchaHostnames(req);
+      const responseHostname = typeof data.hostname === "string" ? normalizeHostname(data.hostname) : "";
+
+      if (allowedHostnames.size > 0 && (!responseHostname || !allowedHostnames.has(responseHostname))) {
+        return { ok: false, error: "CAPTCHA hostname validation failed. Please retry." };
+      }
     }
 
     return { ok: true, error: null };

@@ -122,6 +122,12 @@ async function ensureMongoIndexes(db: Db): Promise<void> {
     await createIndexSafe(db, "refresh_tokens", { user_id: 1, expires_at: -1 }, {
       name: "refresh_tokens_user_exp_desc",
     });
+    await createIndexSafe(db, "refresh_tokens", { user_id: 1, created_at: -1, _id: -1 }, {
+      name: "refresh_tokens_user_created_desc",
+    });
+    await createIndexSafe(db, "refresh_tokens", { user_id: 1, session_id: 1 }, {
+      name: "refresh_tokens_user_session",
+    });
     await createIndexSafe(db, "refresh_tokens", { expires_at: 1 }, {
       expireAfterSeconds: 0,
       name: "refresh_tokens_ttl_expires_at",

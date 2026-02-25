@@ -6,8 +6,11 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import {
   comparePassword,
+  generateRefreshSessionId,
   generateTokens,
+  getSessionFingerprintFromRequest,
   hashRefreshToken,
+  pruneRefreshTokensForUser,
   UserPayload,
 } from "../../lib/auth.js";
 import { setAuthCookies } from "../../lib/cookies.js";
@@ -89,18 +92,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       email: user.email,
       username: user.username,
     };
-    const tokens = generateTokens(userPayload);
+    const sessionId = generateRefreshSessionId();
+    const tokens = generateTokens(userPayload, { refreshSessionId: sessionId });
+    const sessionFingerprint = getSessionFingerprintFromRequest(req);
 
     // Store refresh token hash (not raw token)
     const now = new Date().toISOString();
     await db.collection("refresh_tokens").insertOne({
       user_id: user._id.toString(),
+      session_id: sessionId,
+      session_fingerprint: sessionFingerprint,
       token_hash: hashRefreshToken(tokens.refreshToken),
       // Legacy fallback (disabled for security):
       // token: tokens.refreshToken,
       created_at: now,
+      last_used_at: now,
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
+    await pruneRefreshTokensForUser(db, user._id.toString());
 
     setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
 

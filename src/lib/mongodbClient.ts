@@ -36,6 +36,17 @@ function getBrowserStorage(): Storage | null {
 // Helper for making authenticated requests with HttpOnly cookie sessions.
 async function fetchWithAuth(endpoint: string, options: RequestInit = {}): Promise<Response> {
   const headers = new Headers(options.headers || {});
+  const method = (options.method || "GET").toUpperCase();
+
+  if (
+    method !== "GET" &&
+    method !== "HEAD" &&
+    method !== "OPTIONS" &&
+    !headers.has("X-Requested-With")
+  ) {
+    headers.set("X-Requested-With", "XMLHttpRequest");
+  }
+
   if (options.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
@@ -227,7 +238,10 @@ export async function register(
   try {
     const response = await fetch(`${MONGODB_API_URL}/api/auth/register`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
       body: JSON.stringify({ email, password, username, captcha_token: captchaToken }),
       credentials: "include",
     });
@@ -278,7 +292,10 @@ export async function login(
   try {
     const response = await fetch(`${MONGODB_API_URL}/api/auth/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
       body: JSON.stringify({ email, password, captcha_token: captchaToken }),
       credentials: "include",
     });
@@ -321,6 +338,9 @@ export async function logout(): Promise<void> {
   try {
     await fetch(`${MONGODB_API_URL}/api/auth/logout`, {
       method: "POST",
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+      },
       credentials: "include",
     });
 
@@ -344,6 +364,9 @@ export async function refreshAccessToken(): Promise<boolean> {
   try {
     const response = await fetch(`${MONGODB_API_URL}/api/auth/refresh`, {
       method: "POST",
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+      },
       credentials: "include",
     });
 

@@ -5,8 +5,10 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import {
+  generateRefreshSessionId,
   verifyRefreshToken,
   generateTokens,
+  getSessionFingerprintFromRequest,
   hashRefreshToken,
   UserPayload,
 } from "../../lib/auth.js";
@@ -53,7 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       token_hash: hashRefreshToken(refreshToken),
       // Legacy fallback (disabled for security):
       // token: refreshToken,
-    }, { projection: { _id: 1, expires_at: 1 } });
+    }, { projection: { _id: 1, expires_at: 1, session_id: 1, session_fingerprint: 1 } });
 
     if (!storedToken) {
       return res.status(401).json({ error: "Refresh token not found or revoked" });
@@ -63,6 +65,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (new Date(storedToken.expires_at) < new Date()) {
       await db.collection("refresh_tokens").deleteOne({ _id: storedToken._id });
       return res.status(401).json({ error: "Refresh token expired" });
+    }
+
+    const currentSessionFingerprint = getSessionFingerprintFromRequest(req);
+    const strictSessionBinding =
+      process.env.SESSION_BINDING_STRICT === "true" ||
+      process.env.NODE_ENV === "production";
+    if (
+      strictSessionBinding &&
+      typeof storedToken.session_fingerprint === "string" &&
+      storedToken.session_fingerprint.length > 0 &&
+      storedToken.session_fingerprint !== currentSessionFingerprint
+    ) {
+      await db.collection("refresh_tokens").deleteOne({ _id: storedToken._id });
+      return res.status(401).json({ error: "Refresh token session mismatch" });
     }
 
     // Get user
@@ -88,15 +104,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       email: user.email,
       username: user.username,
     };
-    const tokens = generateTokens(userPayload);
+    const refreshSessionId =
+      (typeof storedToken.session_id === "string" && storedToken.session_id.length > 0
+        ? storedToken.session_id
+        : payload.sid) || generateRefreshSessionId();
+    const tokens = generateTokens(userPayload, { refreshSessionId });
 
     const now = new Date().toISOString();
     await db.collection("refresh_tokens").updateOne(
       { _id: storedToken._id },
       {
         $set: {
+          session_id: refreshSessionId,
+          session_fingerprint: currentSessionFingerprint,
           token_hash: hashRefreshToken(tokens.refreshToken),
           created_at: now,
+          last_used_at: now,
           expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         },
       },

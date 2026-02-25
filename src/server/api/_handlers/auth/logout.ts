@@ -17,26 +17,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    const user = await getUserFromRequest(req);
     const bodyRefreshToken = typeof req.body?.refreshToken === "string" ? req.body.refreshToken : "";
     const cookieRefreshToken = getCookieValue(req.headers.cookie, REFRESH_TOKEN_COOKIE_NAME) || "";
+    const allDevices = req.body?.all_devices === true;
     const refreshToken = bodyRefreshToken || cookieRefreshToken;
 
     if (refreshToken) {
       const { db } = await connectToDatabase();
 
       // Delete the specific refresh token hash
-      await db.collection("refresh_tokens").deleteOne({ token_hash: hashRefreshToken(refreshToken) });
+      await db.collection("refresh_tokens").deleteOne(
+        user
+          ? { user_id: user.id, token_hash: hashRefreshToken(refreshToken) }
+          : { token_hash: hashRefreshToken(refreshToken) },
+      );
 
       // Legacy fallback (disabled for security):
       // await db.collection("refresh_tokens").deleteOne({ token: refreshToken });
+
+      if (allDevices && user) {
+        await db.collection("refresh_tokens").deleteMany({ user_id: user.id });
+      }
+    }
+
+    if (allDevices && user && !refreshToken) {
+      const { db } = await connectToDatabase();
+      await db.collection("refresh_tokens").deleteMany({ user_id: user.id });
     }
 
     clearAuthCookies(res);
 
-    // Optionally also clear all tokens for this user if they want to log out everywhere
-    const user = await getUserFromRequest(req);
-    if (user) {
-      // Could optionally delete all refresh tokens for this user here
+    if (allDevices && !user) {
+      return res.status(401).json({ error: "Authentication required for all-device logout" });
     }
 
     return res.status(200).json({ message: "Logged out successfully" });

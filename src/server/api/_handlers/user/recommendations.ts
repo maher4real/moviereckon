@@ -90,6 +90,14 @@ const DIVERSIFICATION_TOP_N = 160;
 const TIME_DECAY_THRESHOLD_DAYS = 7;
 const CACHE_TTL_MS = 90 * 1000;
 const CACHE_STALE_TTL_MS = 10 * 60 * 1000;
+const MAX_CACHE_ENTRIES = Math.max(
+  300,
+  Number(process.env.RECOMMENDATIONS_CACHE_MAX_ENTRIES || 2_500),
+);
+const MAX_CACHE_VARIANTS_PER_USER = Math.max(
+  1,
+  Number(process.env.RECOMMENDATIONS_CACHE_MAX_VARIANTS_PER_USER || 6),
+);
 const DB_TIMEOUT_MS = 4500;
 const TMDB_TIMEOUT_MS = 6500;
 const BUILD_TIMEOUT_MS = 12_000;
@@ -272,6 +280,23 @@ function cleanupCache(now = Date.now()) {
       recommendationsCache.delete(key);
     }
   });
+
+  evictOldestEntries(MAX_CACHE_ENTRIES);
+}
+
+function evictOldestEntries(maxEntries: number) {
+  if (recommendationsCache.size <= maxEntries) return;
+
+  const overflow = recommendationsCache.size - maxEntries;
+  const sorted = Array.from(recommendationsCache.entries()).sort(
+    (a, b) => a[1].updatedAt - b[1].updatedAt,
+  );
+
+  for (let index = 0; index < overflow; index += 1) {
+    const entry = sorted[index];
+    if (!entry) break;
+    recommendationsCache.delete(entry[0]);
+  }
 }
 
 function readCachedPayload(cacheKey: string): RecommendationsPayload | null {
@@ -314,6 +339,17 @@ function writeCachedPayload(
     staleUntil: now + CACHE_STALE_TTL_MS,
     updatedAt: now,
   });
+
+  const userEntries = Array.from(recommendationsCache.entries())
+    .filter(([key, entry]) => key !== cacheKey && entry.userId === userId)
+    .sort((a, b) => b[1].updatedAt - a[1].updatedAt);
+
+  if (userEntries.length > MAX_CACHE_VARIANTS_PER_USER - 1) {
+    userEntries
+      .slice(MAX_CACHE_VARIANTS_PER_USER - 1)
+      .forEach(([staleKey]) => recommendationsCache.delete(staleKey));
+  }
+
   cleanupCache(now);
 }
 

@@ -5,9 +5,12 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import {
+  generateRefreshSessionId,
   generateTokens,
+  getSessionFingerprintFromRequest,
   hashPassword,
   hashRefreshToken,
+  pruneRefreshTokensForUser,
   type UserPayload,
 } from "../../lib/auth.js";
 import { setAuthCookies } from "../../lib/cookies.js";
@@ -18,7 +21,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
 
 // Temporarily disable email verification until mail delivery is stable.
-const EMAIL_VERIFICATION_DISABLED = true;
+const EMAIL_VERIFICATION_DISABLED = process.env.EMAIL_VERIFICATION_DISABLED !== "false";
 
 function parseDuplicateField(error: unknown): "email" | "username" | null {
   if (!error || typeof error !== "object") return null;
@@ -147,14 +150,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       email,
       username,
     };
-    const tokens = generateTokens(userPayload);
+    const sessionId = generateRefreshSessionId();
+    const tokens = generateTokens(userPayload, { refreshSessionId: sessionId });
+    const sessionFingerprint = getSessionFingerprintFromRequest(req);
 
     await db.collection("refresh_tokens").insertOne({
       user_id: userId,
+      session_id: sessionId,
+      session_fingerprint: sessionFingerprint,
       token_hash: hashRefreshToken(tokens.refreshToken),
       created_at: now,
+      last_used_at: now,
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
+    await pruneRefreshTokensForUser(db, userId);
 
     setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
 

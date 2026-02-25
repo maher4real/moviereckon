@@ -13,7 +13,14 @@ import clearHistoryHandler from "./_handlers/user/clear-history.js";
 import commentsHandler from "./_handlers/user/comments.js";
 import feedbackHandler from "./_handlers/user/feedback.js";
 import recommendationsHandler from "./_handlers/user/recommendations.js";
-import { applyApiCors, applyDefaultSecurityHeaders } from "./lib/cors.js";
+import {
+  applyApiCors,
+  applyDefaultSecurityHeaders,
+  hasAjaxHeader,
+  isStateChangingMethod,
+  isTrustedRequestOrigin,
+} from "./lib/cors.js";
+import { consumeRateLimit, getClientIp } from "./lib/rate-limit.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   applyDefaultSecurityHeaders(res);
@@ -28,6 +35,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (!originAllowed) {
     return res.status(403).json({ error: "Origin not allowed" });
+  }
+
+  const method = (req.method || "GET").toUpperCase();
+  const routeRateLimit = consumeRateLimit(
+    `user:router:${getClientIp(req)}:${method}`,
+    isStateChangingMethod(method) ? 220 : 520,
+    5 * 60 * 1000,
+  );
+  if (!routeRateLimit.allowed) {
+    const retryAfter = Math.max(routeRateLimit.retryAfterSeconds, 30);
+    res.setHeader("Retry-After", String(retryAfter));
+    return res.status(429).json({ error: "Too many user requests. Please try again shortly." });
+  }
+
+  if (isStateChangingMethod(method)) {
+    if (
+      !isTrustedRequestOrigin(req, {
+        allowRefererFallback: true,
+        allowMissingOriginForSafeMethods: false,
+      })
+    ) {
+      return res.status(403).json({ error: "Invalid request origin" });
+    }
+
+    if (!hasAjaxHeader(req)) {
+      return res.status(403).json({ error: "Missing required request header" });
+    }
   }
 
   // Legacy CORS fallback (disabled for security):

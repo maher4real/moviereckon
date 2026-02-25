@@ -3,9 +3,10 @@
  */
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { createHash } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { connectToDatabase, ObjectId } from "./mongodb.js";
 import { ACCESS_TOKEN_COOKIE_NAME, getCookieValue } from "./cookies.js";
+import type { Db } from "mongodb";
 
 const JWT_SECRET = (() => {
   const value = process.env.JWT_SECRET;
@@ -38,18 +39,31 @@ export interface TokenPair {
   refreshToken: string;
 }
 
-export function generateTokens(user: UserPayload): TokenPair {
+export function generateRefreshSessionId(): string {
+  return randomBytes(16).toString("hex");
+}
+
+export function generateTokens(
+  user: UserPayload,
+  options: { refreshSessionId?: string } = {},
+): TokenPair {
+  const refreshSessionId = options.refreshSessionId || generateRefreshSessionId();
+
   const accessToken = jwt.sign(user, JWT_SECRET, {
     expiresIn: JWT_EXPIRES_IN,
     issuer: JWT_ISSUER,
     audience: JWT_AUDIENCE,
   });
 
-  const refreshToken = jwt.sign({ id: user.id, type: "refresh" }, JWT_SECRET, {
-    expiresIn: REFRESH_TOKEN_EXPIRES_IN,
-    issuer: JWT_ISSUER,
-    audience: JWT_AUDIENCE,
-  });
+  const refreshToken = jwt.sign(
+    { id: user.id, type: "refresh", sid: refreshSessionId },
+    JWT_SECRET,
+    {
+      expiresIn: REFRESH_TOKEN_EXPIRES_IN,
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+    },
+  );
 
   return { accessToken, refreshToken };
 }
@@ -66,14 +80,15 @@ export function verifyAccessToken(token: string): UserPayload | null {
   }
 }
 
-export function verifyRefreshToken(token: string): { id: string } | null {
+export function verifyRefreshToken(token: string): { id: string; sid: string | null } | null {
   try {
     const decoded = jwt.verify(token, JWT_SECRET, {
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,
-    }) as { id: string; type: string };
+    }) as { id: string; type: string; sid?: unknown };
     if (decoded.type !== "refresh") return null;
-    return { id: decoded.id };
+    const sid = typeof decoded.sid === "string" && decoded.sid.length > 0 ? decoded.sid : null;
+    return { id: decoded.id, sid };
   } catch {
     return null;
   }
@@ -120,6 +135,42 @@ function getHeaderValue(headers: RequestLike["headers"], headerName: string): st
   if (Array.isArray(direct) && direct.length > 0) return direct[0] ?? null;
 
   return null;
+}
+
+export function getSessionFingerprintFromRequest(request: RequestLike): string {
+  const userAgent = (getHeaderValue(request.headers, "user-agent") || "").trim().slice(0, 400);
+  const acceptLanguage = (getHeaderValue(request.headers, "accept-language") || "")
+    .trim()
+    .slice(0, 120);
+
+  return createHash("sha256")
+    .update(`${REFRESH_TOKEN_PEPPER}:ua:${userAgent}|lang:${acceptLanguage}`)
+    .digest("hex");
+}
+
+export async function pruneRefreshTokensForUser(
+  db: Db,
+  userId: string,
+  maxTokens: number = Number(process.env.REFRESH_TOKEN_MAX_SESSIONS || 8),
+): Promise<void> {
+  const maxAllowed = Math.max(1, Number.isFinite(maxTokens) ? Math.floor(maxTokens) : 8);
+  const staleDocs = await db
+    .collection("refresh_tokens")
+    .find(
+      { user_id: userId },
+      {
+        projection: { _id: 1 },
+        sort: { created_at: -1, _id: -1 },
+        skip: maxAllowed,
+      },
+    )
+    .toArray();
+
+  if (staleDocs.length === 0) return;
+
+  await db.collection("refresh_tokens").deleteMany({
+    _id: { $in: staleDocs.map((doc) => doc._id) },
+  });
 }
 
 export async function getUserFromRequest(request: RequestLike): Promise<UserPayload | null> {

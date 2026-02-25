@@ -24,6 +24,8 @@ interface ContentCommentDoc {
   updated_at: string;
 }
 
+type CursorItem = Pick<ContentCommentDoc, "created_at"> & { _id: ObjectId };
+
 function getQueryParam(req: VercelRequest, key: string): string | undefined {
   const value = req.query?.[key];
   if (Array.isArray(value)) return value[0];
@@ -47,7 +49,7 @@ function decodeCursor(raw: string | undefined): { createdAt: string; id: ObjectI
   return { createdAt, id: new ObjectId(idRaw) };
 }
 
-function encodeCursor(item: { created_at: string; _id: ObjectId }): string {
+function encodeCursor(item: CursorItem): string {
   return `${item.created_at}|${item._id.toString()}`;
 }
 
@@ -106,7 +108,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const comments = await query.toArray();
       const hasMore = usePagination ? comments.length > limit : false;
       const pageItems = usePagination && hasMore ? comments.slice(0, limit) : comments;
-      const lastItem = pageItems[pageItems.length - 1];
+      const lastItem = pageItems[pageItems.length - 1] as CursorItem | undefined;
 
       const payload: Record<string, unknown> = {
         data: pageItems.map((comment) => ({

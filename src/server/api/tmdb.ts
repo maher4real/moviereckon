@@ -3,7 +3,12 @@
  * Server-side TMDB proxy to avoid client-side provider key exposure.
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { applyApiCors, applyDefaultSecurityHeaders } from "./lib/cors.js";
+import {
+  applyApiCors,
+  applyDefaultSecurityHeaders,
+  hasAjaxHeader,
+  isTrustedRequestOrigin,
+} from "./lib/cors.js";
 import { consumeRateLimit, getClientIp } from "./lib/rate-limit.js";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
@@ -60,12 +65,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Keep stricter CSRF-style checks for stateful POSTs.
   if (
-    req.method === "POST" &&
-    (typeof req.headers.origin !== "string" || req.headers.origin.length === 0)
+    !isTrustedRequestOrigin(req, {
+      allowRefererFallback: true,
+      allowMissingOriginForSafeMethods: false,
+    })
   ) {
-    return res.status(403).json({ error: "Origin header is required" });
+    return res.status(403).json({ error: "Invalid request origin" });
+  }
+
+  if (req.method === "POST" && !hasAjaxHeader(req)) {
+    return res.status(403).json({ error: "Missing required request header" });
   }
 
   const contentType = req.headers["content-type"];

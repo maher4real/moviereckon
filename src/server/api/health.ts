@@ -40,7 +40,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json({
       status: "healthy",
-      database: "connected",
       latency_ms: latency,
       timestamp: new Date().toISOString(),
     });
@@ -48,7 +47,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error("Health check failed:", error);
     return res.status(500).json({
       status: "unhealthy",
-      database: "disconnected",
       // Return generic error to avoid leaking infrastructure details.
       error: "Service unavailable",
       timestamp: new Date().toISOString(),
