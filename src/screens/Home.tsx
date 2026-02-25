@@ -75,7 +75,25 @@ export default function Home() {
     if (!user || loadSecondaryShelves) return;
     if (!isHeroVisualReady) return;
 
-    const timer = window.setTimeout(() => setLoadSecondaryShelves(true), 250);
+    const idleApi = window as Window & {
+      requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+
+    if (typeof idleApi.requestIdleCallback === "function") {
+      const idleHandle = idleApi.requestIdleCallback(
+        () => setLoadSecondaryShelves(true),
+        { timeout: 1200 },
+      );
+
+      return () => {
+        if (typeof idleApi.cancelIdleCallback === "function") {
+          idleApi.cancelIdleCallback(idleHandle);
+        }
+      };
+    }
+
+    const timer = window.setTimeout(() => setLoadSecondaryShelves(true), 350);
     return () => window.clearTimeout(timer);
   }, [user, loadSecondaryShelves, isHeroVisualReady]);
 

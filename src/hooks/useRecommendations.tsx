@@ -58,6 +58,7 @@ export function useRecommendations(): RecommendationResult {
     gcTime: 1000 * 60 * 30,
     placeholderData: (previousData) => previousData,
   });
+  const hasResolvedItems = Boolean(data && Array.isArray(data.items));
 
   if (!user) {
     return {
@@ -70,7 +71,9 @@ export function useRecommendations(): RecommendationResult {
 
   return {
     items: data?.items || [],
-    isLoading: userDataLoading || isLoading || fetchStatus === "fetching",
+    isLoading:
+      userDataLoading ||
+      (!hasResolvedItems && (isLoading || fetchStatus === "fetching")),
     isPersonalized: data?.isPersonalized === true,
     explanationById: data?.explanationById || {},
   };

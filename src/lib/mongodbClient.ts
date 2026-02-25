@@ -466,17 +466,17 @@ export async function fetchLikedItems(): Promise<LikedItem[]> {
   }
 }
 
-export async function toggleLikeItem(item: Omit<LikedItem, "id" | "user_id" | "liked_at">): Promise<{ action: "added" | "removed"; data: LikedItem | null }> {
+export async function toggleLikeItem(item: Omit<LikedItem, "id" | "user_id" | "liked_at">): Promise<{ ok: boolean; action: "added" | "removed"; data: LikedItem | null }> {
   try {
     const response = await fetchWithAuth("/api/user/liked-items", {
       method: "POST",
       body: JSON.stringify(item),
     });
-    if (!response.ok) return { action: "removed", data: null };
+    if (!response.ok) return { ok: false, action: "removed", data: null };
     const data = await response.json();
-    return { action: data.action, data: data.data };
+    return { ok: true, action: data.action, data: data.data };
   } catch {
-    return { action: "removed", data: null };
+    return { ok: false, action: "removed", data: null };
   }
 }
 

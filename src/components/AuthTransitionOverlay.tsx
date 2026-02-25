@@ -47,22 +47,22 @@ export default function AuthTransitionOverlay() {
     isAuthRoute(location.pathname) || phase !== "hidden" || isAuthenticating;
 
   const { data: trendingMovies } = useQuery({
-    queryKey: ["auth-bg-trending-movies"],
+    queryKey: ["trending-movies"],
     queryFn: () => getTrendingMovies("week"),
     enabled: shouldFetchOverlayData,
     staleTime: 1000 * 60 * 10,
   });
 
   const { data: trendingTV } = useQuery({
-    queryKey: ["auth-bg-trending-tv"],
+    queryKey: ["trending-tv-week"],
     queryFn: () => getTrendingTVShows("week"),
     enabled: shouldFetchOverlayData,
     staleTime: 1000 * 60 * 10,
   });
 
   const { data: bollywoodData } = useQuery({
-    queryKey: ["auth-bg-bollywood"],
-    queryFn: () => getBollywoodMovies(1),
+    queryKey: ["bollywood-movies"],
+    queryFn: () => getBollywoodMovies(),
     enabled: shouldFetchOverlayData,
     staleTime: 1000 * 60 * 10,
   });

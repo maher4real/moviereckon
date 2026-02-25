@@ -2,7 +2,16 @@
  * User Data Hook - MongoDB Backend Only
  * No fallback to other services
  */
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+  ReactNode,
+} from "react";
 import { useAuth } from "./useAuth";
 import * as mongoClient from "@/lib/mongodbClient";
 import { useToast } from "@/hooks/use-toast";
@@ -81,6 +90,10 @@ interface UserDataContextType {
 
 const UserDataContext = createContext<UserDataContextType | undefined>(undefined);
 
+function getContentKey(contentId: number, contentType: "movie" | "tv"): string {
+  return `${contentType}:${contentId}`;
+}
+
 export function UserDataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -89,6 +102,17 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
   const [feedbackItems, setFeedbackItems] = useState<FeedbackItem[]>([]);
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const pendingWatchMutations = useRef(new Set<string>());
+  const pendingLikeMutations = useRef(new Set<string>());
+  const fetchTokenRef = useRef(0);
+  const watchedLookup = useMemo(
+    () => new Set(watchHistory.map((entry) => getContentKey(entry.content_id, entry.content_type))),
+    [watchHistory],
+  );
+  const likedLookup = useMemo(
+    () => new Set(likedItems.map((entry) => getContentKey(entry.content_id, entry.content_type))),
+    [likedItems],
+  );
 
   // Get user ID
   const getUserId = useCallback(() => {
@@ -99,6 +123,8 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
   // Fetch User Data from MongoDB
   const fetchUserData = useCallback(async () => {
     const userId = getUserId();
+    const fetchToken = fetchTokenRef.current + 1;
+    fetchTokenRef.current = fetchToken;
     
     if (!userId) {
       setWatchHistory([]);
@@ -110,21 +136,40 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const [history, liked, feedback, prefs] = await Promise.all([
+      const [history, liked] = await Promise.all([
         mongoClient.fetchWatchHistory(),
         mongoClient.fetchLikedItems(),
-        mongoClient.fetchUserFeedback(),
-        mongoClient.fetchUserPreferences(),
       ]);
 
+      if (fetchTokenRef.current !== fetchToken) return;
       setWatchHistory(history as WatchedItem[]);
       setLikedItems(liked as LikedItem[]);
-      setFeedbackItems(feedback as FeedbackItem[]);
-      setPreferences(prefs as UserPreferences | null);
+      setIsLoading(false);
+
+      void (async () => {
+        try {
+          const [feedback, prefs] = await Promise.all([
+            mongoClient.fetchUserFeedback(),
+            mongoClient.fetchUserPreferences(),
+          ]);
+          if (fetchTokenRef.current !== fetchToken) return;
+          setFeedbackItems(feedback as FeedbackItem[]);
+          setPreferences(prefs as UserPreferences | null);
+        } catch (error) {
+          console.error("Error fetching secondary user data:", error);
+        }
+      })();
     } catch (error) {
       console.error("Error fetching user data:", error);
+      if (fetchTokenRef.current !== fetchToken) return;
+      setWatchHistory([]);
+      setLikedItems([]);
+      setFeedbackItems([]);
+      setPreferences(null);
     } finally {
-      setIsLoading(false);
+      if (fetchTokenRef.current === fetchToken) {
+        setIsLoading(false);
+      }
     }
   }, [getUserId]);
 
@@ -137,24 +182,81 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     async (item: Omit<WatchedItem, "id" | "user_id" | "watched_at">) => {
       const userId = getUserId();
       if (!userId) return;
+      const mutationKey = getContentKey(item.content_id, item.content_type);
+      if (pendingWatchMutations.current.has(mutationKey)) return;
+
+      pendingWatchMutations.current.add(mutationKey);
+      const optimisticTimestamp = new Date().toISOString();
+      let previousMatch: WatchedItem | null = null;
+
+      setWatchHistory((prev) => {
+        previousMatch =
+          prev.find(
+            (entry) =>
+              entry.content_id === item.content_id &&
+              entry.content_type === item.content_type,
+          ) || null;
+
+        const filtered = prev.filter(
+          (entry) =>
+            !(
+              entry.content_id === item.content_id &&
+              entry.content_type === item.content_type
+            ),
+        );
+
+        return [
+          {
+            id: `optimistic-watch:${mutationKey}`,
+            user_id: userId,
+            content_id: item.content_id,
+            content_type: item.content_type,
+            title: item.title,
+            poster_path: item.poster_path,
+            genres: item.genres || [],
+            language: item.language || "en",
+            watched_at: optimisticTimestamp,
+          },
+          ...filtered,
+        ];
+      });
 
       try {
         const result = await mongoClient.addToWatchHistory(item);
-        if (result) {
-          setWatchHistory((prev) => {
-            const filtered = prev.filter(
-              (w) => !(w.content_id === item.content_id && w.content_type === item.content_type)
-            );
-            return [result as WatchedItem, ...filtered];
-          });
+        if (!result) {
+          throw new Error("watch_history_update_failed");
         }
+
+        setWatchHistory((prev) => {
+          const filtered = prev.filter(
+            (entry) =>
+              !(
+                entry.content_id === item.content_id &&
+                entry.content_type === item.content_type
+              ),
+          );
+          return [result as WatchedItem, ...filtered];
+        });
+        return;
       } catch (error) {
         console.error("Error adding to watch history:", error);
+        setWatchHistory((prev) => {
+          const filtered = prev.filter(
+            (entry) =>
+              !(
+                entry.content_id === item.content_id &&
+                entry.content_type === item.content_type
+              ),
+          );
+          return previousMatch ? [previousMatch, ...filtered] : filtered;
+        });
         toast({
           variant: "destructive",
           title: "Error",
           description: "Failed to update watch history",
         });
+      } finally {
+        pendingWatchMutations.current.delete(mutationKey);
       }
     },
     [getUserId, toast]
@@ -181,11 +283,9 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
   // Is Watched
   const isWatched = useCallback(
     (contentId: number, contentType: "movie" | "tv") => {
-      return watchHistory.some(
-        (w) => w.content_id === contentId && w.content_type === contentType
-      );
+      return watchedLookup.has(getContentKey(contentId, contentType));
     },
-    [watchHistory]
+    [watchedLookup]
   );
 
   // Toggle Like
@@ -193,24 +293,109 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     async (item: Omit<LikedItem, "id" | "user_id" | "liked_at">) => {
       const userId = getUserId();
       if (!userId) return;
+      const mutationKey = getContentKey(item.content_id, item.content_type);
+      if (pendingLikeMutations.current.has(mutationKey)) return;
+
+      pendingLikeMutations.current.add(mutationKey);
+      const optimisticTimestamp = new Date().toISOString();
+      let previousMatch: LikedItem | null = null;
+
+      setLikedItems((prev) => {
+        previousMatch =
+          prev.find(
+            (entry) =>
+              entry.content_id === item.content_id &&
+              entry.content_type === item.content_type,
+          ) || null;
+
+        if (previousMatch) {
+          return prev.filter(
+            (entry) =>
+              !(
+                entry.content_id === item.content_id &&
+                entry.content_type === item.content_type
+              ),
+          );
+        }
+
+        return [
+          {
+            id: `optimistic-like:${mutationKey}`,
+            user_id: userId,
+            content_id: item.content_id,
+            content_type: item.content_type,
+            title: item.title,
+            poster_path: item.poster_path,
+            liked_at: optimisticTimestamp,
+          },
+          ...prev,
+        ];
+      });
 
       try {
         const result = await mongoClient.toggleLikeItem(item);
-        
-        if (result.action === "added" && result.data) {
-          setLikedItems((prev) => [result.data as LikedItem, ...prev]);
-        } else {
-          setLikedItems((prev) =>
-            prev.filter((l) => !(l.content_id === item.content_id && l.content_type === item.content_type))
-          );
+        if (!result.ok) {
+          throw new Error("toggle_like_failed");
         }
+
+        if (result.action === "added" && result.data) {
+          setLikedItems((prev) =>
+            [
+              result.data as LikedItem,
+              ...prev.filter(
+                (entry) =>
+                  !(
+                    entry.content_id === item.content_id &&
+                    entry.content_type === item.content_type
+                  ),
+              ),
+            ],
+          );
+          return;
+        }
+
+        if (result.action === "removed") {
+          setLikedItems((prev) =>
+            prev.filter(
+              (entry) =>
+                !(
+                  entry.content_id === item.content_id &&
+                  entry.content_type === item.content_type
+                ),
+            ),
+          );
+          return;
+        }
+
+        setLikedItems((prev) => {
+          const filtered = prev.filter(
+            (entry) =>
+              !(
+                entry.content_id === item.content_id &&
+                entry.content_type === item.content_type
+              ),
+          );
+          return previousMatch ? [previousMatch, ...filtered] : filtered;
+        });
       } catch (error) {
         console.error("Error toggling like:", error);
+        setLikedItems((prev) => {
+          const filtered = prev.filter(
+            (entry) =>
+              !(
+                entry.content_id === item.content_id &&
+                entry.content_type === item.content_type
+              ),
+          );
+          return previousMatch ? [previousMatch, ...filtered] : filtered;
+        });
         toast({
           variant: "destructive",
           title: "Error",
           description: "Failed to update like status",
         });
+      } finally {
+        pendingLikeMutations.current.delete(mutationKey);
       }
     },
     [getUserId, toast]
@@ -219,11 +404,9 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
   // Is Liked
   const isLiked = useCallback(
     (contentId: number, contentType: "movie" | "tv") => {
-      return likedItems.some(
-        (l) => l.content_id === contentId && l.content_type === contentType
-      );
+      return likedLookup.has(getContentKey(contentId, contentType));
     },
-    [likedItems]
+    [likedLookup]
   );
 
   const setFeedback = useCallback(

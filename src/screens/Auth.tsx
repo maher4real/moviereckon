@@ -71,20 +71,20 @@ export default function Auth() {
   const [username, setUsername] = useState("");
 
   const { data: trendingMovies } = useQuery({
-    queryKey: ["auth-bg-trending-movies"],
+    queryKey: ["trending-movies"],
     queryFn: () => getTrendingMovies("week"),
     staleTime: 1000 * 60 * 10,
   });
 
   const { data: trendingTV } = useQuery({
-    queryKey: ["auth-bg-trending-tv"],
+    queryKey: ["trending-tv-week"],
     queryFn: () => getTrendingTVShows("week"),
     staleTime: 1000 * 60 * 10,
   });
 
   const { data: bollywoodData } = useQuery({
-    queryKey: ["auth-bg-bollywood"],
-    queryFn: () => getBollywoodMovies(1),
+    queryKey: ["bollywood-movies"],
+    queryFn: () => getBollywoodMovies(),
     staleTime: 1000 * 60 * 10,
   });
 

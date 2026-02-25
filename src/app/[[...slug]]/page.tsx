@@ -411,13 +411,13 @@ async function prefetchAuthVisualQueries(queryClient: QueryClient) {
   ]);
 
   if (trendingMovies.status === "fulfilled") {
-    queryClient.setQueryData(["auth-bg-trending-movies"], trendingMovies.value);
+    queryClient.setQueryData(["trending-movies"], trendingMovies.value);
   }
   if (trendingTV.status === "fulfilled") {
-    queryClient.setQueryData(["auth-bg-trending-tv"], trendingTV.value);
+    queryClient.setQueryData(["trending-tv-week"], trendingTV.value);
   }
   if (bollywoodData.status === "fulfilled") {
-    queryClient.setQueryData(["auth-bg-bollywood"], bollywoodData.value);
+    queryClient.setQueryData(["bollywood-movies"], bollywoodData.value);
   }
 }
 
