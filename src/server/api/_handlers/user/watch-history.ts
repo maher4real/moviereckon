@@ -3,11 +3,13 @@
  * Manage user watch history
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { connectToDatabase } from "../../lib/mongodb.js";
+import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
 
 type ContentType = "movie" | "tv";
 type Database = Awaited<ReturnType<typeof connectToDatabase>>["db"];
+const DEFAULT_PAGE_SIZE = 200;
+const MAX_PAGE_SIZE = 400;
 
 function normalizeContentType(value: unknown): ContentType | null {
   if (value === "movie" || value === "tv") return value;
@@ -54,6 +56,34 @@ function normalizeLanguage(value: unknown): string | null {
   return normalized;
 }
 
+function getQueryParam(req: VercelRequest, key: string): string | undefined {
+  const value = req.query?.[key];
+  if (Array.isArray(value)) return value[0];
+  return typeof value === "string" ? value : undefined;
+}
+
+function parseLimit(raw: string | undefined): number {
+  const numeric = Number(raw);
+  if (!Number.isInteger(numeric) || numeric <= 0) return DEFAULT_PAGE_SIZE;
+  return Math.min(numeric, MAX_PAGE_SIZE);
+}
+
+function decodeCursor(raw: string | undefined): { watchedAt: string; id: ObjectId } | null {
+  if (!raw) return null;
+  const separator = raw.lastIndexOf("|");
+  if (separator <= 0 || separator >= raw.length - 1) return null;
+
+  const watchedAt = raw.slice(0, separator);
+  const idRaw = raw.slice(separator + 1);
+  if (!watchedAt || !ObjectId.isValid(idRaw)) return null;
+
+  return { watchedAt, id: new ObjectId(idRaw) };
+}
+
+function encodeCursor(item: { watched_at: string; _id: ObjectId }): string {
+  return `${item.watched_at}|${item._id.toString()}`;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Authenticate user
   const user = await getUserFromRequest(req);
@@ -66,14 +96,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // GET - Fetch watch history
     if (req.method === "GET") {
+      const limit = parseLimit(getQueryParam(req, "limit"));
+      const cursor = decodeCursor(getQueryParam(req, "cursor"));
+      const filter: Record<string, unknown> = { user_id: user.id };
+
+      if (cursor) {
+        filter.$or = [
+          { watched_at: { $lt: cursor.watchedAt } },
+          { watched_at: cursor.watchedAt, _id: { $lt: cursor.id } },
+        ];
+      }
+
       const history = await db
         .collection("watch_history")
-        .find({ user_id: user.id })
-        .sort({ watched_at: -1 })
+        .find(filter, {
+          projection: {
+            user_id: 1,
+            content_id: 1,
+            content_type: 1,
+            title: 1,
+            poster_path: 1,
+            genres: 1,
+            language: 1,
+            watched_at: 1,
+          },
+        })
+        .sort({ watched_at: -1, _id: -1 })
+        .limit(limit + 1)
         .toArray();
+      const hasMore = history.length > limit;
+      const pageItems = hasMore ? history.slice(0, limit) : history;
+      const lastItem = pageItems[pageItems.length - 1];
 
       return res.status(200).json({
-        data: history.map((item) => ({
+        data: pageItems.map((item) => ({
           id: item._id.toString(),
           user_id: item.user_id,
           content_id: item.content_id,
@@ -84,6 +140,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           language: item.language || "en",
           watched_at: item.watched_at,
         })),
+        page: {
+          limit,
+          has_more: hasMore,
+          next_cursor: hasMore && lastItem ? encodeCursor(lastItem) : null,
+        },
       });
     }
 
@@ -183,35 +244,40 @@ async function updateUserPreferences(
   language?: string,
   genres?: number[]
 ) {
-  const prefs = await db.collection("user_preferences").findOne({ user_id: userId });
+  const now = new Date().toISOString();
+  const incomingLanguages = language ? [language] : [];
+  const incomingGenres = (genres || []).slice(0, 20);
 
-  if (!prefs) {
-    // Create preferences if they don't exist
-    await db.collection("user_preferences").insertOne({
-      user_id: userId,
-      preferred_languages: language ? [language] : [],
-      preferred_genres: genres || [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
-    return;
-  }
-
-  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-
-  if (language && !prefs.preferred_languages?.includes(language)) {
-    updates.preferred_languages = [language, ...(prefs.preferred_languages || [])].slice(0, 5);
-  }
-
-  if (genres?.length) {
-    const newGenres = [...new Set([...(genres || []), ...(prefs.preferred_genres || [])])].slice(0, 10);
-    updates.preferred_genres = newGenres;
-  }
-
-  if (Object.keys(updates).length > 1) {
-    await db.collection("user_preferences").updateOne(
-      { user_id: userId },
-      { $set: updates }
-    );
-  }
+  await db.collection("user_preferences").updateOne(
+    { user_id: userId },
+    [
+      {
+        $set: {
+          user_id: userId,
+          preferred_languages: {
+            $slice: [
+              {
+                $setUnion: [
+                  incomingLanguages,
+                  { $ifNull: ["$preferred_languages", []] },
+                ],
+              },
+              5,
+            ],
+          },
+          preferred_genres: {
+            $slice: [
+              {
+                $setUnion: [incomingGenres, { $ifNull: ["$preferred_genres", []] }],
+              },
+              10,
+            ],
+          },
+          created_at: { $ifNull: ["$created_at", now] },
+          updated_at: now,
+        },
+      },
+    ],
+    { upsert: true }
+  );
 }

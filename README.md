@@ -128,6 +128,7 @@ Live app: `https://moviereckon.vercel.app/`
 ### Backend and Data Layer
 
 - MongoDB-backed API for auth + user data + recommendations
+- Automatic MongoDB index bootstrap for high-volume collections (users, tokens, history, likes, feedback, comments)
 - API routers:
   - `/api/auth/*`
   - `/api/user/*`
@@ -193,6 +194,7 @@ Required for full app behavior:
 
 - `MONGODB_URI`
 - `MONGODB_DB_NAME`
+- `MONGODB_SKIP_INDEX_BOOTSTRAP` (optional; defaults to enabled)
 - `JWT_SECRET` (min 32 chars)
 - `TMDB_API_KEY`
 - `TURNSTILE_SECRET_KEY`

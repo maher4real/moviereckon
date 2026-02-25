@@ -50,7 +50,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { db } = await connectToDatabase();
 
     // Find user
-    const user = await db.collection("users").findOne({ email });
+    const user = await db.collection("users").findOne(
+      { email },
+      {
+        projection: {
+          email: 1,
+          username: 1,
+          password_hash: 1,
+          avatar_url: 1,
+          created_at: 1,
+          updated_at: 1,
+        },
+      },
+    );
     if (!user) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
@@ -87,7 +99,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Legacy fallback (disabled for security):
       // token: tokens.refreshToken,
       created_at: now,
-      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
 
     setAuthCookies(res, tokens.accessToken, tokens.refreshToken);

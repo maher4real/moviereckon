@@ -53,7 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       token_hash: hashRefreshToken(refreshToken),
       // Legacy fallback (disabled for security):
       // token: refreshToken,
-    });
+    }, { projection: { _id: 1, expires_at: 1 } });
 
     if (!storedToken) {
       return res.status(401).json({ error: "Refresh token not found or revoked" });
@@ -66,7 +66,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Get user
-    const user = await db.collection("users").findOne({ _id: new ObjectId(payload.id) });
+    const user = await db.collection("users").findOne(
+      { _id: new ObjectId(payload.id) },
+      {
+        projection: {
+          email: 1,
+          username: 1,
+          avatar_url: 1,
+          created_at: 1,
+          updated_at: 1,
+        },
+      },
+    );
     if (!user) {
       return res.status(401).json({ error: "User not found" });
     }
@@ -79,18 +90,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
     const tokens = generateTokens(userPayload);
 
-    // Delete old refresh token and store new one
-    await db.collection("refresh_tokens").deleteOne({ _id: storedToken._id });
-
     const now = new Date().toISOString();
-    await db.collection("refresh_tokens").insertOne({
-      user_id: user._id.toString(),
-      token_hash: hashRefreshToken(tokens.refreshToken),
-      // Legacy fallback (disabled for security):
-      // token: tokens.refreshToken,
-      created_at: now,
-      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    });
+    await db.collection("refresh_tokens").updateOne(
+      { _id: storedToken._id },
+      {
+        $set: {
+          token_hash: hashRefreshToken(tokens.refreshToken),
+          created_at: now,
+          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
+      },
+    );
 
     setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
 

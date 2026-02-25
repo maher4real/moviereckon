@@ -19,6 +19,19 @@ const PROFILE_PROJECTION = {
   updated_at: 1,
 } as const;
 
+function isDuplicateUsernameError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const duplicate = error as {
+    code?: number;
+    keyPattern?: Record<string, number>;
+    message?: string;
+  };
+  if (duplicate.code !== 11000) return false;
+  if (duplicate.keyPattern?.username) return true;
+  const message = String(duplicate.message || "").toLowerCase();
+  return message.includes("users_username_unique") || message.includes("username");
+}
+
 function normalizeUsername(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const username = value.trim();
@@ -114,21 +127,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (usernameProvided) updates.username = username;
       if (avatarProvided) updates.avatar_url = avatarUrl;
 
-      // Check if username is taken (if changing)
-      if (usernameProvided && username) {
-        const existing = await db.collection("users").findOne({
-          username,
-          _id: { $ne: new ObjectId(userPayload.id) },
-        }, { projection: { _id: 1 } });
-        if (existing) {
+      try {
+        await db.collection("users").updateOne(
+          { _id: new ObjectId(userPayload.id) },
+          { $set: updates }
+        );
+      } catch (error) {
+        if (isDuplicateUsernameError(error)) {
           return res.status(400).json({ error: "Username already taken" });
         }
+        throw error;
       }
-
-      await db.collection("users").updateOne(
-        { _id: new ObjectId(userPayload.id) },
-        { $set: updates }
-      );
 
       const user = await db.collection("users").findOne(
         { _id: new ObjectId(userPayload.id) },

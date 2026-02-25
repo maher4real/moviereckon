@@ -454,23 +454,61 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       Promise.all([
         db
           .collection("watch_history")
-          .find({ user_id: user.id })
-          .sort({ watched_at: -1 })
+          .find(
+            { user_id: user.id },
+            {
+              projection: {
+                content_id: 1,
+                content_type: 1,
+                title: 1,
+                genres: 1,
+                language: 1,
+                watched_at: 1,
+              },
+            },
+          )
+          .sort({ watched_at: -1, _id: -1 })
           .limit(220)
           .toArray(),
         db
           .collection("liked_items")
-          .find({ user_id: user.id })
-          .sort({ liked_at: -1 })
+          .find(
+            { user_id: user.id },
+            {
+              projection: {
+                content_id: 1,
+                content_type: 1,
+                title: 1,
+                liked_at: 1,
+              },
+            },
+          )
+          .sort({ liked_at: -1, _id: -1 })
           .limit(180)
           .toArray(),
         db
           .collection("content_feedback")
-          .find({ user_id: user.id })
-          .sort({ updated_at: -1, created_at: -1 })
+          .find(
+            { user_id: user.id },
+            {
+              projection: {
+                content_id: 1,
+                content_type: 1,
+                feedback_type: 1,
+                title: 1,
+                genres: 1,
+                updated_at: 1,
+                created_at: 1,
+              },
+            },
+          )
+          .sort({ updated_at: -1, created_at: -1, _id: -1 })
           .limit(180)
           .toArray(),
-        db.collection("user_preferences").findOne({ user_id: user.id }),
+        db.collection("user_preferences").findOne(
+          { user_id: user.id },
+          { projection: { preferred_genres: 1 } },
+        ),
       ]),
       DB_TIMEOUT_MS,
     );

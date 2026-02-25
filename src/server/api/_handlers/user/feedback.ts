@@ -3,11 +3,58 @@
  * Manage community feedback signals
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { connectToDatabase } from "../../lib/mongodb.js";
+import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
 
 const FEEDBACK_TYPES = ["give_it_a_go", "one_time_watch", "must_watch", "skip"] as const;
 type FeedbackType = (typeof FEEDBACK_TYPES)[number];
+const DEFAULT_PAGE_SIZE = 200;
+const MAX_PAGE_SIZE = 400;
+
+function normalizeContentType(value: unknown): "movie" | "tv" | null {
+  if (value === "movie" || value === "tv") return value;
+  return null;
+}
+
+function normalizeContentId(value: unknown): number | null {
+  const numeric = Number(value);
+  if (!Number.isInteger(numeric) || numeric <= 0) return null;
+  return numeric;
+}
+
+function normalizeFeedbackType(value: unknown): FeedbackType | null {
+  if (FEEDBACK_TYPES.includes(value as FeedbackType)) return value as FeedbackType;
+  return null;
+}
+
+function normalizeOptionalString(
+  value: unknown,
+  maxLength: number,
+  fallback: string | null = "",
+): string | null {
+  if (typeof value !== "string") return fallback;
+  const normalized = value.trim();
+  if (!normalized || normalized.length > maxLength) return fallback;
+  return normalized;
+}
+
+function normalizeGenres(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  const unique = new Set<number>();
+  for (const entry of value) {
+    const parsed = Number(entry);
+    if (Number.isInteger(parsed) && parsed > 0) unique.add(parsed);
+    if (unique.size >= 20) break;
+  }
+  return [...unique];
+}
+
+function normalizeLanguage(value: unknown): string {
+  if (typeof value !== "string") return "en";
+  const normalized = value.trim().toLowerCase();
+  if (!/^[a-z]{2,10}(?:-[a-z]{2,10})?$/.test(normalized)) return "en";
+  return normalized;
+}
 
 function getQueryParam(req: VercelRequest, key: string): string | undefined {
   const value = req.query?.[key];
@@ -15,21 +62,97 @@ function getQueryParam(req: VercelRequest, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-function createCounts(feedbackDocs: any[]) {
-  const counts: Record<FeedbackType, number> = {
+function parseLimit(raw: string | undefined): number {
+  const numeric = Number(raw);
+  if (!Number.isInteger(numeric) || numeric <= 0) return DEFAULT_PAGE_SIZE;
+  return Math.min(numeric, MAX_PAGE_SIZE);
+}
+
+function decodeCursor(raw: string | undefined): { updatedAt: string; id: ObjectId } | null {
+  if (!raw) return null;
+  const separator = raw.lastIndexOf("|");
+  if (separator <= 0 || separator >= raw.length - 1) return null;
+
+  const updatedAt = raw.slice(0, separator);
+  const idRaw = raw.slice(separator + 1);
+  if (!updatedAt || !ObjectId.isValid(idRaw)) return null;
+
+  return { updatedAt, id: new ObjectId(idRaw) };
+}
+
+function encodeCursor(item: { updated_at: string; _id: ObjectId }): string {
+  return `${item.updated_at}|${item._id.toString()}`;
+}
+
+function emptyCounts(): Record<FeedbackType, number> {
+  return {
     give_it_a_go: 0,
     one_time_watch: 0,
     must_watch: 0,
     skip: 0,
   };
+}
 
+function normalizeCount(value: unknown): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(0, Math.floor(numeric));
+}
+
+function normalizeSummaryCounts(
+  summaryDoc: { counts?: Partial<Record<FeedbackType, number>> } | null,
+): Record<FeedbackType, number> {
+  const counts = emptyCounts();
+  if (!summaryDoc?.counts) return counts;
+  for (const feedbackType of FEEDBACK_TYPES) {
+    counts[feedbackType] = normalizeCount(summaryDoc.counts[feedbackType]);
+  }
+  return counts;
+}
+
+function createCountsFromAggregate(feedbackDocs: Array<{ _id: string; count: number }>) {
+  const counts = emptyCounts();
   feedbackDocs.forEach((doc) => {
-    if (FEEDBACK_TYPES.includes(doc.feedback_type as FeedbackType)) {
-      counts[doc.feedback_type as FeedbackType] += 1;
+    if (FEEDBACK_TYPES.includes(doc._id as FeedbackType)) {
+      counts[doc._id as FeedbackType] = normalizeCount(doc.count);
     }
   });
-
   return counts;
+}
+
+async function adjustFeedbackSummary(
+  db: Awaited<ReturnType<typeof connectToDatabase>>["db"],
+  contentId: number,
+  contentType: "movie" | "tv",
+  deltas: Partial<Record<FeedbackType, number>>,
+) {
+  const inc: Record<string, number> = {};
+  let totalDelta = 0;
+
+  for (const feedbackType of FEEDBACK_TYPES) {
+    const delta = Number(deltas[feedbackType] || 0);
+    if (!Number.isFinite(delta) || delta === 0) continue;
+    inc[`counts.${feedbackType}`] = delta;
+    totalDelta += delta;
+  }
+
+  if (Object.keys(inc).length === 0) return;
+  inc.total_votes = totalDelta;
+
+  const now = new Date().toISOString();
+  await db.collection("content_feedback_summary").updateOne(
+    { content_id: contentId, content_type: contentType },
+    {
+      $inc: inc,
+      $set: { updated_at: now },
+      $setOnInsert: {
+        content_id: contentId,
+        content_type: contentType,
+        created_at: now,
+      },
+    },
+    { upsert: true },
+  );
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -43,38 +166,100 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (req.method === "GET") {
       const contentIdRaw = getQueryParam(req, "content_id");
-      const contentType = getQueryParam(req, "content_type");
+      const contentType = normalizeContentType(getQueryParam(req, "content_type"));
 
       if (contentIdRaw && contentType) {
-        const contentId = Number(contentIdRaw);
-        if (!contentId || !["movie", "tv"].includes(contentType)) {
+        const contentId = normalizeContentId(contentIdRaw);
+        if (!contentId) {
           return res.status(400).json({ error: "content_id and valid content_type are required" });
         }
 
-        const feedbackDocs = await db
-          .collection("content_feedback")
-          .find({ content_id: contentId, content_type: contentType })
-          .toArray();
+        const feedbackCollection = db.collection("content_feedback");
+        const [summaryDoc, userFeedbackDoc] = await Promise.all([
+          db.collection("content_feedback_summary").findOne(
+            { content_id: contentId, content_type: contentType },
+            { projection: { counts: 1 } },
+          ),
+          feedbackCollection.findOne(
+            { user_id: user.id, content_id: contentId, content_type: contentType },
+            { projection: { feedback_type: 1 } },
+          ),
+        ]);
+        let counts = normalizeSummaryCounts(summaryDoc as { counts?: Partial<Record<FeedbackType, number>> } | null);
 
-        const userFeedback = feedbackDocs.find((doc) => doc.user_id === user.id);
+        // Legacy compatibility: build summary once when a pre-index deployment has existing votes.
+        if (!summaryDoc) {
+          const aggregateRows = await feedbackCollection
+            .aggregate<{ _id: string; count: number }>([
+              { $match: { content_id: contentId, content_type: contentType } },
+              { $group: { _id: "$feedback_type", count: { $sum: 1 } } },
+            ])
+            .toArray();
+          counts = createCountsFromAggregate(aggregateRows);
+          const totalVotes = Object.values(counts).reduce((sum, value) => sum + value, 0);
+          const now = new Date().toISOString();
+          await db.collection("content_feedback_summary").updateOne(
+            { content_id: contentId, content_type: contentType },
+            {
+              $set: {
+                counts,
+                total_votes: totalVotes,
+                updated_at: now,
+              },
+              $setOnInsert: {
+                content_id: contentId,
+                content_type: contentType,
+                created_at: now,
+              },
+            },
+            { upsert: true },
+          );
+        }
 
         return res.status(200).json({
           data: {
-            counts: createCounts(feedbackDocs),
-            user_feedback: userFeedback?.feedback_type || null,
+            counts,
+            user_feedback: userFeedbackDoc?.feedback_type || null,
           },
         });
       }
 
       // No query params: return current user's feedback history
+      const limit = parseLimit(getQueryParam(req, "limit"));
+      const cursor = decodeCursor(getQueryParam(req, "cursor"));
+      const filter: Record<string, unknown> = { user_id: user.id };
+      if (cursor) {
+        filter.$or = [
+          { updated_at: { $lt: cursor.updatedAt } },
+          { updated_at: cursor.updatedAt, _id: { $lt: cursor.id } },
+        ];
+      }
+
       const ownFeedback = await db
         .collection("content_feedback")
-        .find({ user_id: user.id })
-        .sort({ updated_at: -1 })
+        .find(filter, {
+          projection: {
+            user_id: 1,
+            content_id: 1,
+            content_type: 1,
+            feedback_type: 1,
+            title: 1,
+            poster_path: 1,
+            genres: 1,
+            language: 1,
+            created_at: 1,
+            updated_at: 1,
+          },
+        })
+        .sort({ updated_at: -1, _id: -1 })
+        .limit(limit + 1)
         .toArray();
+      const hasMore = ownFeedback.length > limit;
+      const pageItems = hasMore ? ownFeedback.slice(0, limit) : ownFeedback;
+      const lastItem = pageItems[pageItems.length - 1];
 
       return res.status(200).json({
-        data: ownFeedback.map((doc) => ({
+        data: pageItems.map((doc) => ({
           id: doc._id.toString(),
           user_id: doc.user_id,
           content_id: doc.content_id,
@@ -87,91 +272,115 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           created_at: doc.created_at,
           updated_at: doc.updated_at,
         })),
+        page: {
+          limit,
+          has_more: hasMore,
+          next_cursor: hasMore && lastItem ? encodeCursor(lastItem) : null,
+        },
       });
     }
 
     if (req.method === "POST") {
-      const {
-        content_id,
-        content_type,
-        feedback_type,
-        title,
-        poster_path,
-        genres,
-        language,
-      } = req.body || {};
+      const body = req.body || {};
+      const contentId = normalizeContentId(body.content_id);
+      const contentType = normalizeContentType(body.content_type);
+      const feedbackType = normalizeFeedbackType(body.feedback_type);
 
-      const contentId = Number(content_id);
-      const normalizedType = typeof feedback_type === "string" ? feedback_type : "";
-
-      if (!contentId || !content_type || !["movie", "tv"].includes(content_type)) {
+      if (!contentId || !contentType) {
         return res.status(400).json({ error: "content_id and valid content_type are required" });
       }
 
-      if (!FEEDBACK_TYPES.includes(normalizedType as FeedbackType)) {
+      if (!feedbackType) {
         return res.status(400).json({ error: "Invalid feedback_type" });
       }
-
-      const existing = await db.collection("content_feedback").findOne({
+      const normalizedTitle = normalizeOptionalString(body.title, 220);
+      const normalizedPosterPath = normalizeOptionalString(body.poster_path, 300, null);
+      const normalizedGenres = normalizeGenres(body.genres);
+      const normalizedLanguage = normalizeLanguage(body.language);
+      const key = {
         user_id: user.id,
         content_id: contentId,
-        content_type,
-      });
-
-      if (existing && existing.feedback_type === normalizedType) {
-        await db.collection("content_feedback").deleteOne({ _id: existing._id });
-        return res.status(200).json({ action: "removed", data: null });
-      }
-
+        content_type: contentType,
+      };
+      const feedbackCollection = db.collection("content_feedback");
       const now = new Date().toISOString();
-      await db.collection("content_feedback").updateOne(
-        {
-          user_id: user.id,
-          content_id: contentId,
-          content_type,
-        },
+
+      const previousDoc = await feedbackCollection.findOneAndUpdate(
+        key,
         {
           $set: {
-            feedback_type: normalizedType,
-            title: typeof title === "string" ? title : "",
-            poster_path: typeof poster_path === "string" ? poster_path : null,
-            genres: Array.isArray(genres) ? genres : [],
-            language: typeof language === "string" ? language : "en",
+            feedback_type: feedbackType,
+            title: normalizedTitle,
+            poster_path: normalizedPosterPath,
+            genres: normalizedGenres,
+            language: normalizedLanguage,
             updated_at: now,
           },
           $setOnInsert: {
-            user_id: user.id,
-            content_id: contentId,
-            content_type,
+            ...key,
             created_at: now,
           },
         },
-        { upsert: true }
+        {
+          upsert: true,
+          returnDocument: "before",
+          projection: { feedback_type: 1 },
+        }
       );
+      const previousType = normalizeFeedbackType(previousDoc?.feedback_type);
+      let action: "added" | "updated" | "removed" = "added";
 
-      const updated = await db.collection("content_feedback").findOne({
-        user_id: user.id,
-        content_id: contentId,
-        content_type,
+      if (previousType === feedbackType) {
+        const removed = await feedbackCollection.deleteOne({ ...key, feedback_type: feedbackType });
+        if (removed.deletedCount === 1) {
+          await adjustFeedbackSummary(db, contentId, contentType, { [feedbackType]: -1 });
+          return res.status(200).json({ action: "removed", data: null });
+        }
+      } else if (previousType && previousType !== feedbackType) {
+        action = "updated";
+        await adjustFeedbackSummary(db, contentId, contentType, {
+          [previousType]: -1,
+          [feedbackType]: 1,
+        });
+      } else {
+        action = "added";
+        await adjustFeedbackSummary(db, contentId, contentType, { [feedbackType]: 1 });
+      }
+
+      const updated = await feedbackCollection.findOne(key, {
+        projection: {
+          user_id: 1,
+          content_id: 1,
+          content_type: 1,
+          feedback_type: 1,
+          title: 1,
+          poster_path: 1,
+          genres: 1,
+          language: 1,
+          created_at: 1,
+          updated_at: 1,
+        },
       });
 
+      if (!updated) {
+        return res.status(200).json({ action: "removed", data: null });
+      }
+
       return res.status(200).json({
-        action: existing ? "updated" : "added",
-        data: updated
-          ? {
-              id: updated._id.toString(),
-              user_id: updated.user_id,
-              content_id: updated.content_id,
-              content_type: updated.content_type,
-              feedback_type: updated.feedback_type,
-              title: updated.title || "",
-              poster_path: updated.poster_path || null,
-              genres: updated.genres || [],
-              language: updated.language || "en",
-              created_at: updated.created_at,
-              updated_at: updated.updated_at,
-            }
-          : null,
+        action,
+        data: {
+          id: updated._id.toString(),
+          user_id: updated.user_id,
+          content_id: updated.content_id,
+          content_type: updated.content_type,
+          feedback_type: updated.feedback_type,
+          title: updated.title || "",
+          poster_path: updated.poster_path || null,
+          genres: updated.genres || [],
+          language: updated.language || "en",
+          created_at: updated.created_at,
+          updated_at: updated.updated_at,
+        },
       });
     }
 

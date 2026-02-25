@@ -20,6 +20,23 @@ const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
 // Temporarily disable email verification until mail delivery is stable.
 const EMAIL_VERIFICATION_DISABLED = true;
 
+function parseDuplicateField(error: unknown): "email" | "username" | null {
+  if (!error || typeof error !== "object") return null;
+  const duplicate = error as {
+    code?: number;
+    keyPattern?: Record<string, number>;
+    message?: string;
+  };
+  if (duplicate.code !== 11000) return null;
+  if (duplicate.keyPattern?.email) return "email";
+  if (duplicate.keyPattern?.username) return "username";
+
+  const message = String(duplicate.message || "").toLowerCase();
+  if (message.includes("users_email_unique") || message.includes(" email")) return "email";
+  if (message.includes("users_username_unique") || message.includes(" username")) return "username";
+  return null;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -74,32 +91,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { db } = await connectToDatabase();
 
-    // Check if user already exists
-    const existingUser = await db.collection("users").findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ error: "Email already registered" });
-    }
-
-    // Check if username is taken
-    const existingUsername = await db.collection("users").findOne({ username });
-    if (existingUsername) {
-      return res.status(400).json({ error: "Username already taken" });
-    }
-
     // Hash password and create user
     const passwordHash = await hashPassword(password);
     const now = new Date().toISOString();
+    const result = await (async () => {
+      try {
+        return await db.collection("users").insertOne({
+          email,
+          password_hash: passwordHash,
+          username,
+          avatar_url: null,
+          email_verified: EMAIL_VERIFICATION_DISABLED ? true : false,
+          email_verified_at: EMAIL_VERIFICATION_DISABLED ? now : null,
+          created_at: now,
+          updated_at: now,
+        });
+      } catch (error) {
+        const duplicateField = parseDuplicateField(error);
+        if (duplicateField === "email") {
+          res.status(400).json({ error: "Email already registered" });
+          return null;
+        }
+        if (duplicateField === "username") {
+          res.status(400).json({ error: "Username already taken" });
+          return null;
+        }
+        throw error;
+      }
+    })();
 
-    const result = await db.collection("users").insertOne({
-      email,
-      password_hash: passwordHash,
-      username,
-      avatar_url: null,
-      email_verified: EMAIL_VERIFICATION_DISABLED ? true : false,
-      email_verified_at: EMAIL_VERIFICATION_DISABLED ? now : null,
-      created_at: now,
-      updated_at: now,
-    });
+    if (!result) return;
 
     const userId = result.insertedId.toString();
 
@@ -132,7 +153,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       user_id: userId,
       token_hash: hashRefreshToken(tokens.refreshToken),
       created_at: now,
-      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
 
     setAuthCookies(res, tokens.accessToken, tokens.refreshToken);

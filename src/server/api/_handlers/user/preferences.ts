@@ -93,13 +93,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: "At least one preference field is required" });
       }
 
-      const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      const now = new Date().toISOString();
+      const updates: Record<string, unknown> = { updated_at: now };
       if (preferredLanguages !== null) updates.preferred_languages = preferredLanguages;
       if (preferredGenres !== null) updates.preferred_genres = preferredGenres;
 
       await db.collection("user_preferences").updateOne(
         { user_id: user.id },
-        { $set: updates },
+        {
+          $set: updates,
+          $setOnInsert: {
+            user_id: user.id,
+            preferred_languages: [],
+            preferred_genres: [],
+            created_at: now,
+          },
+        },
         { upsert: true }
       );
 

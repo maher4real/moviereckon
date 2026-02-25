@@ -6,10 +6,34 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
 
+const DEFAULT_PAGE_SIZE = 80;
+const MAX_PAGE_SIZE = 120;
+
 function getQueryParam(req: VercelRequest, key: string): string | undefined {
   const value = req.query?.[key];
   if (Array.isArray(value)) return value[0];
   return typeof value === "string" ? value : undefined;
+}
+
+function parseLimit(raw: string | undefined): number {
+  const numeric = Number(raw);
+  if (!Number.isInteger(numeric) || numeric <= 0) return DEFAULT_PAGE_SIZE;
+  return Math.min(numeric, MAX_PAGE_SIZE);
+}
+
+function decodeCursor(raw: string | undefined): { createdAt: string; id: ObjectId } | null {
+  if (!raw) return null;
+  const separator = raw.lastIndexOf("|");
+  if (separator <= 0 || separator >= raw.length - 1) return null;
+
+  const createdAt = raw.slice(0, separator);
+  const idRaw = raw.slice(separator + 1);
+  if (!createdAt || !ObjectId.isValid(idRaw)) return null;
+  return { createdAt, id: new ObjectId(idRaw) };
+}
+
+function encodeCursor(item: { created_at: string; _id: ObjectId }): string {
+  return `${item.created_at}|${item._id.toString()}`;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -25,19 +49,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const contentIdRaw = getQueryParam(req, "content_id");
       const contentType = getQueryParam(req, "content_type");
       const contentId = Number(contentIdRaw);
+      const limit = parseLimit(getQueryParam(req, "limit"));
+      const cursor = decodeCursor(getQueryParam(req, "cursor"));
 
       if (!contentId || !contentType || !["movie", "tv"].includes(contentType)) {
         return res.status(400).json({ error: "content_id and valid content_type are required" });
       }
+      const filter: Record<string, unknown> = {
+        content_id: contentId,
+        content_type: contentType,
+      };
+      if (cursor) {
+        filter.$or = [
+          { created_at: { $lt: cursor.createdAt } },
+          { created_at: cursor.createdAt, _id: { $lt: cursor.id } },
+        ];
+      }
 
       const comments = await db
         .collection("content_comments")
-        .find({ content_id: contentId, content_type: contentType })
-        .sort({ created_at: -1 })
+        .find(filter, {
+          projection: {
+            user_id: 1,
+            username: 1,
+            avatar_url: 1,
+            content_id: 1,
+            content_type: 1,
+            text: 1,
+            rating: 1,
+            created_at: 1,
+            updated_at: 1,
+          },
+        })
+        .sort({ created_at: -1, _id: -1 })
+        .limit(limit + 1)
         .toArray();
+      const hasMore = comments.length > limit;
+      const pageItems = hasMore ? comments.slice(0, limit) : comments;
+      const lastItem = pageItems[pageItems.length - 1];
 
       return res.status(200).json({
-        data: comments.map((comment) => ({
+        data: pageItems.map((comment) => ({
           id: comment._id.toString(),
           user_id: comment.user_id,
           username: comment.username,
@@ -52,6 +104,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           created_at: comment.created_at,
           updated_at: comment.updated_at,
         })),
+        page: {
+          limit,
+          has_more: hasMore,
+          next_cursor: hasMore && lastItem ? encodeCursor(lastItem) : null,
+        },
       });
     }
 

@@ -31,7 +31,8 @@ export async function createEmailVerificationToken(
 ): Promise<{ rawToken: string; expiresAt: string }> {
   const now = new Date();
   const nowIso = now.toISOString();
-  const expiresAtIso = new Date(now.getTime() + EMAIL_VERIFICATION_TOKEN_TTL_MS).toISOString();
+  const expiresAt = new Date(now.getTime() + EMAIL_VERIFICATION_TOKEN_TTL_MS);
+  const expiresAtIso = expiresAt.toISOString();
   const rawToken = randomBytes(32).toString("hex");
   const tokenHash = hashEmailVerificationToken(rawToken);
 
@@ -45,7 +46,7 @@ export async function createEmailVerificationToken(
     email: params.email,
     token_hash: tokenHash,
     created_at: nowIso,
-    expires_at: expiresAtIso,
+    expires_at: expiresAt,
     used_at: null,
   });
 
@@ -80,7 +81,7 @@ export async function consumeEmailVerificationToken(
 
   const markUsedResult = await db.collection("email_verification_tokens").updateOne(
     { _id: tokenRecord._id, used_at: null },
-    { $set: { used_at: new Date().toISOString() } },
+    { $set: { used_at: new Date() } },
   );
 
   if (markUsedResult.modifiedCount !== 1) {

@@ -219,7 +219,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       user_id: user._id.toString(),
       token_hash: hashRefreshToken(tokens.refreshToken),
       created_at: now,
-      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
 
     clearGoogleOAuthStateCookie(res);

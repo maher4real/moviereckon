@@ -23,15 +23,129 @@ interface CachedConnection {
   db: Db;
 }
 
+type GenericDocument = Record<string, unknown>;
+
 // Use globalThis for connection caching in serverless environment
 declare global {
   var mongoConnection: CachedConnection | undefined;
+  var mongoIndexBootstrapPromise: Promise<void> | undefined;
 }
 
 let cached = globalThis.mongoConnection;
+const INDEX_BOOTSTRAP_DISABLED = process.env.MONGODB_SKIP_INDEX_BOOTSTRAP === "true";
+
+function logIndexBootstrapWarning(name: string, error: unknown) {
+  const details = error instanceof Error ? error.message : String(error);
+  console.warn(`Mongo index bootstrap warning (${name}): ${details}`);
+}
+
+async function createIndexSafe(
+  db: Db,
+  collectionName: string,
+  keys: Record<string, 1 | -1>,
+  options: Record<string, unknown>,
+) {
+  try {
+    await db
+      .collection<GenericDocument>(collectionName)
+      .createIndex(keys, options);
+  } catch (error) {
+    logIndexBootstrapWarning(
+      `${collectionName}:${JSON.stringify(keys)}`,
+      error,
+    );
+  }
+}
+
+async function ensureMongoIndexes(db: Db): Promise<void> {
+  if (INDEX_BOOTSTRAP_DISABLED) return;
+  if (globalThis.mongoIndexBootstrapPromise) {
+    return globalThis.mongoIndexBootstrapPromise;
+  }
+
+  globalThis.mongoIndexBootstrapPromise = (async () => {
+    await createIndexSafe(db, "users", { email: 1 }, { unique: true, name: "users_email_unique" });
+    await createIndexSafe(db, "users", { username: 1 }, { unique: true, name: "users_username_unique" });
+    await createIndexSafe(db, "users", { google_sub: 1 }, {
+      unique: true,
+      sparse: true,
+      name: "users_google_sub_unique_sparse",
+    });
+
+    await createIndexSafe(db, "user_preferences", { user_id: 1 }, {
+      unique: true,
+      name: "user_preferences_user_id_unique",
+    });
+
+    await createIndexSafe(db, "watch_history", { user_id: 1, content_id: 1, content_type: 1 }, {
+      unique: true,
+      name: "watch_history_user_content_unique",
+    });
+    await createIndexSafe(db, "watch_history", { user_id: 1, watched_at: -1, _id: -1 }, {
+      name: "watch_history_user_time_desc",
+    });
+
+    await createIndexSafe(db, "liked_items", { user_id: 1, content_id: 1, content_type: 1 }, {
+      unique: true,
+      name: "liked_items_user_content_unique",
+    });
+    await createIndexSafe(db, "liked_items", { user_id: 1, liked_at: -1, _id: -1 }, {
+      name: "liked_items_user_time_desc",
+    });
+
+    await createIndexSafe(db, "content_feedback", { user_id: 1, content_id: 1, content_type: 1 }, {
+      unique: true,
+      name: "content_feedback_user_content_unique",
+    });
+    await createIndexSafe(db, "content_feedback", { user_id: 1, updated_at: -1, _id: -1 }, {
+      name: "content_feedback_user_time_desc",
+    });
+    await createIndexSafe(db, "content_feedback", { content_id: 1, content_type: 1, feedback_type: 1 }, {
+      name: "content_feedback_content_feedback_type",
+    });
+    await createIndexSafe(db, "content_feedback_summary", { content_id: 1, content_type: 1 }, {
+      unique: true,
+      name: "content_feedback_summary_content_unique",
+    });
+
+    await createIndexSafe(db, "content_comments", { content_id: 1, content_type: 1, created_at: -1, _id: -1 }, {
+      name: "content_comments_content_time_desc",
+    });
+    await createIndexSafe(db, "content_comments", { user_id: 1, created_at: -1, _id: -1 }, {
+      name: "content_comments_user_time_desc",
+    });
+
+    await createIndexSafe(db, "refresh_tokens", { token_hash: 1 }, {
+      unique: true,
+      name: "refresh_tokens_hash_unique",
+    });
+    await createIndexSafe(db, "refresh_tokens", { user_id: 1, expires_at: -1 }, {
+      name: "refresh_tokens_user_exp_desc",
+    });
+    await createIndexSafe(db, "refresh_tokens", { expires_at: 1 }, {
+      expireAfterSeconds: 0,
+      name: "refresh_tokens_ttl_expires_at",
+    });
+
+    await createIndexSafe(db, "email_verification_tokens", { token_hash: 1 }, {
+      unique: true,
+      name: "email_verification_tokens_hash_unique",
+    });
+    await createIndexSafe(db, "email_verification_tokens", { user_id: 1, used_at: 1 }, {
+      name: "email_verification_tokens_user_used",
+    });
+    await createIndexSafe(db, "email_verification_tokens", { expires_at: 1 }, {
+      expireAfterSeconds: 0,
+      name: "email_verification_tokens_ttl_expires_at",
+    });
+  })();
+
+  return globalThis.mongoIndexBootstrapPromise;
+}
 
 export async function connectToDatabase(): Promise<CachedConnection> {
   if (cached) {
+    await ensureMongoIndexes(cached.db);
     return cached;
   }
 
@@ -61,6 +175,7 @@ export async function connectToDatabase(): Promise<CachedConnection> {
   });
   await client.connect();
   const db = client.db(MONGODB_DB_NAME);
+  await ensureMongoIndexes(db);
 
   cached = { client, db };
   globalThis.mongoConnection = cached;
