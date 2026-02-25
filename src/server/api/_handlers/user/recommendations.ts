@@ -3,9 +3,12 @@
  * Build personalized recommendations server-side to avoid client fan-out requests.
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { createHash } from "crypto";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
+import { emitSecurityEvent } from "../../lib/abuse-telemetry.js";
+import { getRedisKey, isRedisConfigured, runRedisCommand } from "../../lib/redis-rest.js";
 import type { Movie, TVShow } from "@/lib/tmdb";
 import {
   discoverServerMovies,
@@ -94,10 +97,6 @@ const MAX_CACHE_ENTRIES = Math.max(
   300,
   Number(process.env.RECOMMENDATIONS_CACHE_MAX_ENTRIES || 2_500),
 );
-const MAX_CACHE_VARIANTS_PER_USER = Math.max(
-  1,
-  Number(process.env.RECOMMENDATIONS_CACHE_MAX_VARIANTS_PER_USER || 6),
-);
 const DB_TIMEOUT_MS = 4500;
 const TMDB_TIMEOUT_MS = 6500;
 const BUILD_TIMEOUT_MS = 12_000;
@@ -106,6 +105,7 @@ const MAX_USER_REQUESTS = 35;
 
 interface RecommendationCacheEntry {
   userId: string;
+  revision: string;
   payload: RecommendationsPayload;
   expiresAt: number;
   staleUntil: number;
@@ -113,6 +113,7 @@ interface RecommendationCacheEntry {
 }
 
 const recommendationsCache = new Map<string, RecommendationCacheEntry>();
+const RECOMMENDATIONS_CACHE_VERSION = "v2";
 
 const WEIGHTS = {
   LIKED: 1.5,
@@ -299,58 +300,122 @@ function evictOldestEntries(maxEntries: number) {
   }
 }
 
-function readCachedPayload(cacheKey: string): RecommendationsPayload | null {
-  const entry = recommendationsCache.get(cacheKey);
-  if (!entry) return null;
-  if (entry.expiresAt <= Date.now()) return null;
-  return entry.payload;
+function getRecommendationsRedisKey(userId: string): string {
+  const digest = createHash("sha256").update(userId).digest("hex").slice(0, 24);
+  return getRedisKey(`recommendations:${RECOMMENDATIONS_CACHE_VERSION}:${digest}`);
 }
 
-function readLatestUserPayload(
-  userId: string,
-  mode: "fresh" | "stale" = "stale",
-): RecommendationsPayload | null {
-  const now = Date.now();
-  let latest: RecommendationCacheEntry | null = null;
+function isValidRecommendationsPayload(value: unknown): value is RecommendationsPayload {
+  if (!value || typeof value !== "object") return false;
+  const payload = value as RecommendationsPayload;
+  return Array.isArray(payload.items) && typeof payload.explanationById === "object";
+}
 
-  for (const entry of recommendationsCache.values()) {
-    if (entry.userId !== userId) continue;
-    if (mode === "fresh" && entry.expiresAt <= now) continue;
-    if (mode === "stale" && entry.staleUntil <= now) continue;
-    if (!latest || entry.updatedAt > latest.updatedAt) {
-      latest = entry;
-    }
+function toCacheEntry(value: unknown): RecommendationCacheEntry | null {
+  if (!value || typeof value !== "object") return null;
+  const parsed = value as Partial<RecommendationCacheEntry>;
+  if (
+    typeof parsed.userId !== "string" ||
+    typeof parsed.revision !== "string" ||
+    !isValidRecommendationsPayload(parsed.payload) ||
+    typeof parsed.expiresAt !== "number" ||
+    typeof parsed.staleUntil !== "number" ||
+    typeof parsed.updatedAt !== "number"
+  ) {
+    return null;
   }
 
-  if (latest) return latest.payload;
+  return {
+    userId: parsed.userId,
+    revision: parsed.revision,
+    payload: parsed.payload,
+    expiresAt: parsed.expiresAt,
+    staleUntil: parsed.staleUntil,
+    updatedAt: parsed.updatedAt,
+  };
+}
+
+async function readDistributedCacheEntry(userId: string): Promise<RecommendationCacheEntry | null> {
+  if (!isRedisConfigured()) return null;
+
+  const response = await runRedisCommand<string>(["GET", getRecommendationsRedisKey(userId)]);
+  if (!response.ok || !response.result) return null;
+
+  try {
+    const parsed = JSON.parse(response.result);
+    return toCacheEntry(parsed);
+  } catch {
+    return null;
+  }
+}
+
+async function writeDistributedCacheEntry(entry: RecommendationCacheEntry): Promise<void> {
+  if (!isRedisConfigured()) return;
+
+  await runRedisCommand([
+    "SET",
+    getRecommendationsRedisKey(entry.userId),
+    JSON.stringify(entry),
+    "PX",
+    CACHE_STALE_TTL_MS,
+  ]);
+}
+
+async function readCachedPayload(
+  userId: string,
+  revision: string,
+): Promise<RecommendationsPayload | null> {
+  const now = Date.now();
+  const local = recommendationsCache.get(userId);
+  if (local && local.revision === revision && local.expiresAt > now) {
+    return local.payload;
+  }
+
+  const distributed = await readDistributedCacheEntry(userId);
+  if (!distributed) return null;
+
+  recommendationsCache.set(userId, distributed);
+  if (distributed.revision !== revision) return null;
+  if (distributed.expiresAt <= now) return null;
+  return distributed.payload;
+}
+
+async function readLatestUserPayload(
+  userId: string,
+  mode: "fresh" | "stale" = "stale",
+): Promise<RecommendationsPayload | null> {
+  const now = Date.now();
+  const local = recommendationsCache.get(userId);
+  if (local) {
+    if (mode === "fresh" && local.expiresAt > now) return local.payload;
+    if (mode === "stale" && local.staleUntil > now) return local.payload;
+  }
+
+  const distributed = await readDistributedCacheEntry(userId);
+  if (!distributed) return null;
+  recommendationsCache.set(userId, distributed);
+  if (mode === "fresh" && distributed.expiresAt > now) return distributed.payload;
+  if (mode === "stale" && distributed.staleUntil > now) return distributed.payload;
   return null;
 }
 
-function writeCachedPayload(
-  cacheKey: string,
+async function writeCachedPayload(
   userId: string,
+  revision: string,
   payload: RecommendationsPayload,
 ) {
   const now = Date.now();
-  recommendationsCache.set(cacheKey, {
+  const entry: RecommendationCacheEntry = {
     userId,
+    revision,
     payload,
     expiresAt: now + CACHE_TTL_MS,
     staleUntil: now + CACHE_STALE_TTL_MS,
     updatedAt: now,
-  });
-
-  const userEntries = Array.from(recommendationsCache.entries())
-    .filter(([key, entry]) => key !== cacheKey && entry.userId === userId)
-    .sort((a, b) => b[1].updatedAt - a[1].updatedAt);
-
-  if (userEntries.length > MAX_CACHE_VARIANTS_PER_USER - 1) {
-    userEntries
-      .slice(MAX_CACHE_VARIANTS_PER_USER - 1)
-      .forEach(([staleKey]) => recommendationsCache.delete(staleKey));
-  }
-
+  };
+  recommendationsCache.set(userId, entry);
   cleanupCache(now);
+  await writeDistributedCacheEntry(entry);
 }
 
 function pushSeed(map: Map<string, SeedSignal>, seed: SeedSignal): void {
@@ -461,17 +526,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const clientIp = getClientIp(req);
-  const ipRateLimit = consumeRateLimit(
+  const ipRateLimit = await consumeRateLimit(
     `recommendations:ip:${clientIp}`,
     MAX_IP_REQUESTS,
     5 * 60 * 1000,
   );
-  const userRateLimit = consumeRateLimit(
+  const userRateLimit = await consumeRateLimit(
     `recommendations:user:${user.id}`,
     MAX_USER_REQUESTS,
     5 * 60 * 1000,
   );
   if (!ipRateLimit.allowed || !userRateLimit.allowed) {
+    emitSecurityEvent({
+      type: "rate_limit_blocked",
+      outcome: "blocked",
+      route: "user_recommendations",
+      reason: "recommendation_limit",
+      req,
+      userId: user.id,
+      metadata: {
+        ip_source: ipRateLimit.source,
+        user_source: userRateLimit.source,
+      },
+    });
     const retryAfter = Math.max(
       ipRateLimit.retryAfterSeconds,
       userRateLimit.retryAfterSeconds,
@@ -559,10 +636,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       feedbackItems,
       preferences,
     );
-    const cacheKey = `${user.id}:${revision}`;
     cleanupCache();
 
-    const cachedPayload = readCachedPayload(cacheKey);
+    const cachedPayload = await readCachedPayload(user.id, revision);
     if (cachedPayload) {
       return res.status(200).json({ data: cachedPayload });
     }
@@ -903,11 +979,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       BUILD_TIMEOUT_MS,
     );
 
-    writeCachedPayload(cacheKey, user.id, payload);
+    await writeCachedPayload(user.id, revision, payload);
     return res.status(200).json({ data: payload });
   } catch (error) {
     console.error("Recommendations handler error:", error);
-    const fallbackPayload = readLatestUserPayload(user.id, "stale");
+    emitSecurityEvent({
+      type: "recommendations_error",
+      outcome: "error",
+      route: "user_recommendations",
+      reason: "build_or_dependency_error",
+      req,
+      userId: user.id,
+    });
+    const fallbackPayload = await readLatestUserPayload(user.id, "stale");
     if (fallbackPayload) {
       res.setHeader("X-Recommendations-Fallback", "stale-cache");
       return res.status(200).json({ data: fallbackPayload });

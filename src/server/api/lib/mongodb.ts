@@ -66,6 +66,7 @@ async function ensureMongoIndexes(db: Db): Promise<void> {
   globalThis.mongoIndexBootstrapPromise = (async () => {
     await createIndexSafe(db, "users", { email: 1 }, { unique: true, name: "users_email_unique" });
     await createIndexSafe(db, "users", { username: 1 }, { unique: true, name: "users_username_unique" });
+    await createIndexSafe(db, "users", { role: 1 }, { name: "users_role" });
     await createIndexSafe(db, "users", { google_sub: 1 }, {
       unique: true,
       sparse: true,
@@ -143,6 +144,21 @@ async function ensureMongoIndexes(db: Db): Promise<void> {
     await createIndexSafe(db, "email_verification_tokens", { expires_at: 1 }, {
       expireAfterSeconds: 0,
       name: "email_verification_tokens_ttl_expires_at",
+    });
+
+    await createIndexSafe(db, "security_event_aggregates", { bucket_start: 1, event_field: 1 }, {
+      name: "security_event_aggregates_bucket_field",
+    });
+    await createIndexSafe(db, "security_event_aggregates", { updated_at: -1 }, {
+      name: "security_event_aggregates_updated_desc",
+    });
+
+    await createIndexSafe(db, "security_events", { created_at: -1 }, {
+      name: "security_events_created_desc",
+    });
+    await createIndexSafe(db, "security_events", { created_at: 1 }, {
+      expireAfterSeconds: Number(process.env.SECURITY_EVENTS_TTL_SECONDS || 14 * 24 * 60 * 60),
+      name: "security_events_ttl_created_at",
     });
   })();
 

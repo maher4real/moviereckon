@@ -10,6 +10,7 @@ import {
   generateTokens,
   getSessionFingerprintFromRequest,
   hashRefreshToken,
+  normalizeUserRole,
   UserPayload,
 } from "../../lib/auth.js";
 import {
@@ -18,6 +19,7 @@ import {
   setAuthCookies,
 } from "../../lib/cookies.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
+import { emitSecurityEvent } from "../../lib/abuse-telemetry.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -26,9 +28,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const clientIp = getClientIp(req);
-    const ipRateLimit = consumeRateLimit(`auth:refresh:ip:${clientIp}`, 40, 15 * 60 * 1000);
+    const ipRateLimit = await consumeRateLimit(`auth:refresh:ip:${clientIp}`, 40, 15 * 60 * 1000);
 
     if (!ipRateLimit.allowed) {
+      emitSecurityEvent({
+        type: "rate_limit_blocked",
+        outcome: "blocked",
+        route: "auth_refresh",
+        reason: "refresh_attempt_limit",
+        req,
+        metadata: { source: ipRateLimit.source },
+      });
       res.setHeader("Retry-After", String(Math.max(ipRateLimit.retryAfterSeconds, 60)));
       return res.status(429).json({ error: "Too many refresh requests. Please try again later." });
     }
@@ -77,6 +87,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       storedToken.session_fingerprint.length > 0 &&
       storedToken.session_fingerprint !== currentSessionFingerprint
     ) {
+      emitSecurityEvent({
+        type: "refresh_session_mismatch",
+        outcome: "blocked",
+        route: "auth_refresh",
+        reason: "session_fingerprint_mismatch",
+        req,
+        userId: payload.id,
+      });
       await db.collection("refresh_tokens").deleteOne({ _id: storedToken._id });
       return res.status(401).json({ error: "Refresh token session mismatch" });
     }
@@ -88,6 +106,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         projection: {
           email: 1,
           username: 1,
+          role: 1,
           avatar_url: 1,
           created_at: 1,
           updated_at: 1,
@@ -103,6 +122,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       id: user._id.toString(),
       email: user.email,
       username: user.username,
+      role: normalizeUserRole(user.role),
     };
     const refreshSessionId =
       (typeof storedToken.session_id === "string" && storedToken.session_id.length > 0
@@ -132,6 +152,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         id: user._id.toString(),
         email: user.email,
         username: user.username,
+        role: normalizeUserRole(user.role),
         avatar_url: user.avatar_url || null,
         created_at: user.created_at,
         updated_at: user.updated_at,

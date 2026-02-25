@@ -4,7 +4,7 @@
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
-import { getUserFromRequest } from "../../lib/auth.js";
+import { getUserFromRequest, normalizeUserRole } from "../../lib/auth.js";
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
 const DATA_IMAGE_REGEX =
@@ -14,6 +14,7 @@ const MAX_AVATAR_DATA_URL_LENGTH = 700_000;
 const PROFILE_PROJECTION = {
   email: 1,
   username: 1,
+  role: 1,
   avatar_url: 1,
   created_at: 1,
   updated_at: 1,
@@ -91,6 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           user_id: user._id.toString(),
           email: user.email,
           username: user.username,
+          role: normalizeUserRole(user.role),
           avatar_url: user.avatar_url || null,
           created_at: user.created_at,
           updated_at: user.updated_at,
@@ -150,6 +152,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           user_id: user?._id.toString(),
           email: user?.email,
           username: user?.username,
+          role: normalizeUserRole(user?.role),
           avatar_url: user?.avatar_url || null,
           created_at: user?.created_at,
           updated_at: user?.updated_at,

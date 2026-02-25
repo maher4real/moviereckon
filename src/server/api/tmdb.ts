@@ -9,6 +9,7 @@ import {
   hasAjaxHeader,
   isTrustedRequestOrigin,
 } from "./lib/cors.js";
+import { emitSecurityEvent } from "./lib/abuse-telemetry.js";
 import { consumeRateLimit, getClientIp } from "./lib/rate-limit.js";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
@@ -52,12 +53,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === "OPTIONS") {
     if (!originAllowed) {
+      emitSecurityEvent({
+        type: "cors_origin_blocked",
+        outcome: "blocked",
+        route: "tmdb_proxy",
+        reason: "preflight_origin_not_allowed",
+        req,
+      });
       return res.status(403).json({ error: "Origin not allowed" });
     }
     return res.status(204).end();
   }
 
   if (!originAllowed) {
+    emitSecurityEvent({
+      type: "cors_origin_blocked",
+      outcome: "blocked",
+      route: "tmdb_proxy",
+      reason: "origin_not_allowed",
+      req,
+    });
     return res.status(403).json({ error: "Origin not allowed" });
   }
 
@@ -71,10 +86,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       allowMissingOriginForSafeMethods: false,
     })
   ) {
+    emitSecurityEvent({
+      type: "csrf_origin_blocked",
+      outcome: "blocked",
+      route: "tmdb_proxy",
+      reason: "untrusted_origin",
+      req,
+    });
     return res.status(403).json({ error: "Invalid request origin" });
   }
 
   if (req.method === "POST" && !hasAjaxHeader(req)) {
+    emitSecurityEvent({
+      type: "csrf_header_missing",
+      outcome: "blocked",
+      route: "tmdb_proxy",
+      reason: "missing_x_requested_with",
+      req,
+    });
     return res.status(403).json({ error: "Missing required request header" });
   }
 
@@ -122,13 +151,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const clientIp = getClientIp(req);
-    const ipRateLimit = consumeRateLimit(`tmdb:ip:${clientIp}`, 180, 15 * 60 * 1000);
-    const endpointRateLimit = consumeRateLimit(
+    const ipRateLimit = await consumeRateLimit(`tmdb:ip:${clientIp}`, 180, 15 * 60 * 1000);
+    const endpointRateLimit = await consumeRateLimit(
       `tmdb:endpoint:${clientIp}:${endpoint || "unknown"}`,
       50,
       5 * 60 * 1000,
     );
     if (!ipRateLimit.allowed || !endpointRateLimit.allowed) {
+      emitSecurityEvent({
+        type: "rate_limit_blocked",
+        outcome: "blocked",
+        route: "tmdb_proxy",
+        reason: "proxy_limit",
+        req,
+        metadata: {
+          endpoint: endpoint || "unknown",
+          ip_source: ipRateLimit.source,
+          endpoint_source: endpointRateLimit.source,
+        },
+      });
       const retryAfter = Math.max(ipRateLimit.retryAfterSeconds, endpointRateLimit.retryAfterSeconds, 60);
       res.setHeader("Retry-After", String(retryAfter));
       return res.status(429).json({ error: "Too many TMDB requests. Please try again later." });

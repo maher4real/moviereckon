@@ -7,10 +7,12 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { Db } from "mongodb";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import {
+  getDefaultUserRoleForEmail,
   generateRefreshSessionId,
   generateTokens,
   getSessionFingerprintFromRequest,
   hashRefreshToken,
+  normalizeUserRole,
   pruneRefreshTokensForUser,
   type UserPayload,
 } from "../../lib/auth.js";
@@ -82,16 +84,19 @@ async function generateUniqueUsername(db: Db, profile: GoogleProfile): Promise<s
 async function resolveUserFromGoogleProfile(db: Db, profile: GoogleProfile) {
   const users = db.collection("users");
   const now = new Date().toISOString();
+  const defaultRole = getDefaultUserRoleForEmail(profile.email);
 
   let user = await users.findOne({ google_sub: profile.sub });
 
-  if (user && user.email_verified !== true) {
+  if (user && (user.email_verified !== true || !user.role)) {
+    const role = normalizeUserRole(user.role || defaultRole);
     await users.updateOne(
       { _id: user._id },
       {
         $set: {
           email_verified: true,
           email_verified_at: now,
+          role,
           updated_at: now,
         },
       },
@@ -126,6 +131,9 @@ async function resolveUserFromGoogleProfile(db: Db, profile: GoogleProfile) {
       if (!userByEmail.username || typeof userByEmail.username !== "string") {
         updates.username = await generateUniqueUsername(db, profile);
       }
+      if (!userByEmail.role) {
+        updates.role = defaultRole;
+      }
 
       if (Object.keys(updates).length > 0) {
         await users.updateOne(
@@ -144,6 +152,7 @@ async function resolveUserFromGoogleProfile(db: Db, profile: GoogleProfile) {
       email: profile.email,
       password_hash: null,
       username,
+      role: defaultRole,
       avatar_url: profile.picture || null,
       google_sub: profile.sub,
       email_verified: true,
@@ -214,6 +223,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       id: user._id.toString(),
       email: user.email,
       username: user.username,
+      role: normalizeUserRole(user.role),
     };
     const sessionId = generateRefreshSessionId();
     const tokens = generateTokens(userPayload, { refreshSessionId: sessionId });

@@ -20,6 +20,7 @@ import {
   isStateChangingMethod,
   isTrustedRequestOrigin,
 } from "./lib/cors.js";
+import { emitSecurityEvent } from "./lib/abuse-telemetry.js";
 import { consumeRateLimit, getClientIp } from "./lib/rate-limit.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -28,22 +29,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === "OPTIONS") {
     if (!originAllowed) {
+      emitSecurityEvent({
+        type: "cors_origin_blocked",
+        outcome: "blocked",
+        route: "auth_router",
+        reason: "preflight_origin_not_allowed",
+        req,
+      });
       return res.status(403).json({ error: "Origin not allowed" });
     }
     return res.status(204).end();
   }
 
   if (!originAllowed) {
+    emitSecurityEvent({
+      type: "cors_origin_blocked",
+      outcome: "blocked",
+      route: "auth_router",
+      reason: "origin_not_allowed",
+      req,
+    });
     return res.status(403).json({ error: "Origin not allowed" });
   }
 
   const method = (req.method || "GET").toUpperCase();
-  const routeRateLimit = consumeRateLimit(
+  const routeRateLimit = await consumeRateLimit(
     `auth:router:${getClientIp(req)}:${method}`,
     isStateChangingMethod(method) ? 160 : 420,
     5 * 60 * 1000,
   );
   if (!routeRateLimit.allowed) {
+    emitSecurityEvent({
+      type: "rate_limit_blocked",
+      outcome: "blocked",
+      route: "auth_router",
+      reason: "router_limit",
+      req,
+      metadata: { source: routeRateLimit.source },
+    });
     const retryAfter = Math.max(routeRateLimit.retryAfterSeconds, 30);
     res.setHeader("Retry-After", String(retryAfter));
     return res.status(429).json({ error: "Too many auth requests. Please try again shortly." });
@@ -56,10 +79,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         allowMissingOriginForSafeMethods: false,
       })
     ) {
+      emitSecurityEvent({
+        type: "csrf_origin_blocked",
+        outcome: "blocked",
+        route: "auth_router",
+        reason: "untrusted_origin",
+        req,
+      });
       return res.status(403).json({ error: "Invalid request origin" });
     }
 
     if (!hasAjaxHeader(req)) {
+      emitSecurityEvent({
+        type: "csrf_header_missing",
+        outcome: "blocked",
+        route: "auth_router",
+        reason: "missing_x_requested_with",
+        req,
+      });
       return res.status(403).json({ error: "Missing required request header" });
     }
   }

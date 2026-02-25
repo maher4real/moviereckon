@@ -123,6 +123,7 @@ export interface MongoUser {
   id: string;
   email: string;
   username: string;
+  role: "user" | "moderator" | "admin";
   avatar_url: string | null;
   created_at: string;
   updated_at: string;

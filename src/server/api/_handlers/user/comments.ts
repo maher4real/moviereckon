@@ -4,7 +4,7 @@
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
-import { getUserFromRequest } from "../../lib/auth.js";
+import { getUserFromRequest, userHasRoleAtLeast } from "../../lib/auth.js";
 
 const DEFAULT_PAGE_SIZE = 80;
 const MAX_PAGE_SIZE = 120;
@@ -268,10 +268,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: "valid comment_id is required" });
       }
 
-      const deleteResult = await commentsCollection.deleteOne({
+      const canModerateAnyComment = await userHasRoleAtLeast(user, "moderator");
+      const deleteFilter: Record<string, unknown> = {
         _id: new ObjectId(String(comment_id)),
-        user_id: user.id,
-      });
+      };
+      if (!canModerateAnyComment) {
+        deleteFilter.user_id = user.id;
+      }
+
+      const deleteResult = await commentsCollection.deleteOne(deleteFilter);
 
       if (deleteResult.deletedCount === 0) {
         return res.status(404).json({ error: "Comment not found or not owned by user" });

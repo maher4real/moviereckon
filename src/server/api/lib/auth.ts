@@ -28,10 +28,49 @@ const JWT_EXPIRES_IN = "15m";
 const REFRESH_TOKEN_EXPIRES_IN = "30d";
 const REFRESH_TOKEN_PEPPER = process.env.REFRESH_TOKEN_PEPPER || JWT_SECRET;
 
+export type UserRole = "user" | "moderator" | "admin";
+
+const ROLE_RANK: Record<UserRole, number> = {
+  user: 1,
+  moderator: 2,
+  admin: 3,
+};
+
+function getBootstrapAdminEmails(): Set<string> {
+  const raw = process.env.ADMIN_EMAILS;
+  if (!raw) return new Set();
+  return new Set(
+    raw
+      .split(",")
+      .map((entry) => entry.trim().toLowerCase())
+      .filter((entry) => entry.length > 0),
+  );
+}
+
+export function normalizeUserRole(value: unknown): UserRole {
+  if (value === "admin" || value === "moderator" || value === "user") {
+    return value;
+  }
+  return "user";
+}
+
+export function hasRequiredRole(userRole: UserRole, requiredRole: UserRole): boolean {
+  return ROLE_RANK[userRole] >= ROLE_RANK[requiredRole];
+}
+
+export function getDefaultUserRoleForEmail(email: string): UserRole {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (getBootstrapAdminEmails().has(normalizedEmail)) {
+    return "admin";
+  }
+  return "user";
+}
+
 export interface UserPayload {
   id: string;
   email: string;
   username: string;
+  role: UserRole;
 }
 
 export interface TokenPair {
@@ -73,8 +112,15 @@ export function verifyAccessToken(token: string): UserPayload | null {
     const decoded = jwt.verify(token, JWT_SECRET, {
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,
-    }) as UserPayload;
-    return decoded;
+    }) as Partial<UserPayload>;
+    if (!decoded || typeof decoded.id !== "string") return null;
+    if (typeof decoded.email !== "string" || typeof decoded.username !== "string") return null;
+    return {
+      id: decoded.id,
+      email: decoded.email,
+      username: decoded.username,
+      role: normalizeUserRole(decoded.role),
+    };
   } catch {
     return null;
   }
@@ -186,6 +232,28 @@ export async function getUserFromRequest(request: RequestLike): Promise<UserPayl
   return verifyAccessToken(token);
 }
 
+export async function resolveCurrentUserRole(user: UserPayload): Promise<UserRole> {
+  const enforceDbRole = process.env.RBAC_ENFORCE_DB !== "false";
+  if (!enforceDbRole) return normalizeUserRole(user.role);
+  if (!ObjectId.isValid(user.id)) return normalizeUserRole(user.role);
+
+  const { db } = await connectToDatabase();
+  const doc = await db.collection("users").findOne(
+    { _id: new ObjectId(user.id) },
+    { projection: { role: 1 } },
+  );
+  if (!doc) return normalizeUserRole(user.role);
+  return normalizeUserRole(doc.role);
+}
+
+export async function userHasRoleAtLeast(
+  user: UserPayload,
+  requiredRole: UserRole,
+): Promise<boolean> {
+  const effectiveRole = await resolveCurrentUserRole(user);
+  return hasRequiredRole(effectiveRole, requiredRole);
+}
+
 // Get full user from database
 export async function getUserById(userId: string) {
   const { db } = await connectToDatabase();
@@ -196,6 +264,7 @@ export async function getUserById(userId: string) {
     id: user._id.toString(),
     email: user.email,
     username: user.username,
+    role: normalizeUserRole(user.role),
     avatar_url: user.avatar_url || null,
     created_at: user.created_at,
     updated_at: user.updated_at,

@@ -5,6 +5,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import {
+  getDefaultUserRoleForEmail,
   generateRefreshSessionId,
   generateTokens,
   getSessionFingerprintFromRequest,
@@ -16,6 +17,7 @@ import {
 import { setAuthCookies } from "../../lib/cookies.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
 import { verifyCaptchaToken } from "../../lib/captcha.js";
+import { emitSecurityEvent } from "../../lib/abuse-telemetry.js";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
@@ -52,9 +54,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const captchaToken = typeof req.body?.captcha_token === "string" ? req.body.captcha_token : "";
 
     const clientIp = getClientIp(req);
-    const ipRateLimit = consumeRateLimit(`auth:register:ip:${clientIp}`, 8, 30 * 60 * 1000);
+    const ipRateLimit = await consumeRateLimit(`auth:register:ip:${clientIp}`, 8, 30 * 60 * 1000);
 
     if (!ipRateLimit.allowed) {
+      emitSecurityEvent({
+        type: "rate_limit_blocked",
+        outcome: "blocked",
+        route: "auth_register",
+        reason: "registration_attempt_limit",
+        req,
+        metadata: { source: ipRateLimit.source },
+      });
       res.setHeader("Retry-After", String(Math.max(ipRateLimit.retryAfterSeconds, 60)));
       return res.status(429).json({ error: "Too many registration attempts. Please try again later." });
     }
@@ -89,10 +99,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const captchaResult = await verifyCaptchaToken(req, captchaToken, "signup");
     if (!captchaResult.ok) {
+      emitSecurityEvent({
+        type: "captcha_failed",
+        outcome: "blocked",
+        route: "auth_register",
+        reason: "captcha_verification_failed",
+        req,
+      });
       return res.status(400).json({ error: captchaResult.error || "CAPTCHA verification failed" });
     }
 
     const { db } = await connectToDatabase();
+    const role = getDefaultUserRoleForEmail(email);
 
     // Hash password and create user
     const passwordHash = await hashPassword(password);
@@ -103,6 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           email,
           password_hash: passwordHash,
           username,
+          role,
           avatar_url: null,
           email_verified: EMAIL_VERIFICATION_DISABLED ? true : false,
           email_verified_at: EMAIL_VERIFICATION_DISABLED ? now : null,
@@ -149,6 +168,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       id: userId,
       email,
       username,
+      role,
     };
     const sessionId = generateRefreshSessionId();
     const tokens = generateTokens(userPayload, { refreshSessionId: sessionId });
@@ -174,6 +194,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         id: userId,
         email,
         username,
+        role,
         avatar_url: null,
         created_at: now,
         updated_at: now,

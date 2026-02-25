@@ -10,12 +10,14 @@ import {
   generateTokens,
   getSessionFingerprintFromRequest,
   hashRefreshToken,
+  normalizeUserRole,
   pruneRefreshTokensForUser,
   UserPayload,
 } from "../../lib/auth.js";
 import { setAuthCookies } from "../../lib/cookies.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
 import { verifyCaptchaToken } from "../../lib/captcha.js";
+import { emitSecurityEvent } from "../../lib/abuse-telemetry.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -28,14 +30,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const captchaToken = typeof req.body?.captcha_token === "string" ? req.body.captcha_token : "";
 
     const clientIp = getClientIp(req);
-    const ipRateLimit = consumeRateLimit(`auth:login:ip:${clientIp}`, 25, 15 * 60 * 1000);
-    const emailRateLimit = consumeRateLimit(
+    const ipRateLimit = await consumeRateLimit(`auth:login:ip:${clientIp}`, 25, 15 * 60 * 1000);
+    const emailRateLimit = await consumeRateLimit(
       `auth:login:email:${email || "missing"}`,
       12,
       15 * 60 * 1000,
     );
 
     if (!ipRateLimit.allowed || !emailRateLimit.allowed) {
+      emitSecurityEvent({
+        type: "rate_limit_blocked",
+        outcome: "blocked",
+        route: "auth_login",
+        reason: "login_attempt_limit",
+        req,
+        metadata: {
+          ip_source: ipRateLimit.source,
+          email_source: emailRateLimit.source,
+        },
+      });
       const retryAfter = Math.max(ipRateLimit.retryAfterSeconds, emailRateLimit.retryAfterSeconds, 60);
       res.setHeader("Retry-After", String(retryAfter));
       return res.status(429).json({ error: "Too many login attempts. Please try again later." });
@@ -47,6 +60,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const captchaResult = await verifyCaptchaToken(req, captchaToken, "login");
     if (!captchaResult.ok) {
+      emitSecurityEvent({
+        type: "captcha_failed",
+        outcome: "blocked",
+        route: "auth_login",
+        reason: "captcha_verification_failed",
+        req,
+      });
       return res.status(400).json({ error: captchaResult.error || "CAPTCHA verification failed" });
     }
 
@@ -59,6 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         projection: {
           email: 1,
           username: 1,
+          role: 1,
           password_hash: 1,
           avatar_url: 1,
           created_at: 1,
@@ -91,6 +112,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       id: user._id.toString(),
       email: user.email,
       username: user.username,
+      role: normalizeUserRole(user.role),
     };
     const sessionId = generateRefreshSessionId();
     const tokens = generateTokens(userPayload, { refreshSessionId: sessionId });
@@ -118,6 +140,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         id: user._id.toString(),
         email: user.email,
         username: user.username,
+        role: normalizeUserRole(user.role),
         avatar_url: user.avatar_url || null,
         created_at: user.created_at,
         updated_at: user.updated_at,
