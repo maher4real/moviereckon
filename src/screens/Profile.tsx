@@ -22,7 +22,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import * as mongoClient from "@/lib/mongodbClient";
+import {
+  importAvatarFromUrl,
+  updateProfile,
+  getProfile,
+  getLikedItems,
+  getWatchedItems,
+} from "@/lib/mongodbClient";
 import { getPosterUrl } from "@/lib/tmdb";
 import { cn } from "@/lib/utils";
 import {
@@ -443,7 +449,7 @@ export default function Profile() {
 
     try {
       setIsProcessingAvatar(true);
-      const remoteBlob = await mongoClient.importAvatarFromUrl(urlValue);
+      const remoteBlob = await importAvatarFromUrl(urlValue);
       const optimized = await compressAvatarImage(remoteBlob);
       if (!isSupportedAvatarValue(optimized)) {
         throw new Error("Optimized image payload is still too large");
