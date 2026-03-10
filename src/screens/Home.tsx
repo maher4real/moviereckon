@@ -126,7 +126,7 @@ export default function Home() {
     queryFn: () => getTeluguMovies(),
     ...queryConfig,
     enabled: loadSecondaryShelves,
-  });}
+  });
 
   const { data: tvShowsData, isLoading: tvLoading } = useQuery({
     queryKey: ["popular-tv"],

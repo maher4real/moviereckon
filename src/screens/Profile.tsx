@@ -22,13 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import {
-  importAvatarFromUrl,
-  updateProfile,
-  getProfile,
-  getLikedItems,
-  getWatchedItems,
-} from "@/lib/mongodbClient";
+import { importAvatarFromUrl } from "@/lib/mongodbClient";
 import { getPosterUrl } from "@/lib/tmdb";
 import { cn } from "@/lib/utils";
 import {
