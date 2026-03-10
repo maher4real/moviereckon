@@ -5,6 +5,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
+import { sanitizeLanguageCode, sanitizeSingleLineText } from "../../lib/input.js";
 
 type ContentType = "movie" | "tv";
 type Database = Awaited<ReturnType<typeof connectToDatabase>>["db"];
@@ -35,18 +36,12 @@ function normalizeContentId(value: unknown): number | null {
 }
 
 function normalizeRequiredString(value: unknown, maxLength: number): string | null {
-  if (typeof value !== "string") return null;
-  const normalized = value.trim();
-  if (!normalized || normalized.length > maxLength) return null;
-  return normalized;
+  return sanitizeSingleLineText(value, maxLength);
 }
 
 function normalizeOptionalString(value: unknown, maxLength: number): string | null {
   if (value === undefined || value === null || value === "") return null;
-  if (typeof value !== "string") return null;
-  const normalized = value.trim();
-  if (!normalized || normalized.length > maxLength) return null;
-  return normalized;
+  return sanitizeSingleLineText(value, maxLength);
 }
 
 function normalizeGenres(value: unknown): number[] {
@@ -62,10 +57,7 @@ function normalizeGenres(value: unknown): number[] {
 
 function normalizeLanguage(value: unknown): string | null {
   if (value === undefined || value === null || value === "") return null;
-  if (typeof value !== "string") return null;
-  const normalized = value.trim().toLowerCase();
-  if (!/^[a-z]{2,10}(?:-[a-z]{2,10})?$/.test(normalized)) return null;
-  return normalized;
+  return sanitizeLanguageCode(value);
 }
 
 function getQueryParam(req: VercelRequest, key: string): string | undefined {

@@ -5,6 +5,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
+import { sanitizeSingleLineText } from "../../lib/input.js";
 
 type ContentType = "movie" | "tv";
 const DEFAULT_PAGE_SIZE = 200;
@@ -32,18 +33,12 @@ function normalizeContentId(value: unknown): number | null {
 }
 
 function normalizeRequiredString(value: unknown, maxLength: number): string | null {
-  if (typeof value !== "string") return null;
-  const normalized = value.trim();
-  if (!normalized || normalized.length > maxLength) return null;
-  return normalized;
+  return sanitizeSingleLineText(value, maxLength);
 }
 
 function normalizeOptionalString(value: unknown, maxLength: number): string | null {
   if (value === undefined || value === null || value === "") return null;
-  if (typeof value !== "string") return null;
-  const normalized = value.trim();
-  if (!normalized || normalized.length > maxLength) return null;
-  return normalized;
+  return sanitizeSingleLineText(value, maxLength);
 }
 
 function getQueryParam(req: VercelRequest, key: string): string | undefined {

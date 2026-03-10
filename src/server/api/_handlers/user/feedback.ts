@@ -5,6 +5,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
+import { sanitizeLanguageCode, sanitizeSingleLineText } from "../../lib/input.js";
 
 const FEEDBACK_TYPES = ["give_it_a_go", "one_time_watch", "must_watch", "skip"] as const;
 type FeedbackType = (typeof FEEDBACK_TYPES)[number];
@@ -57,10 +58,7 @@ function normalizeOptionalString(
   maxLength: number,
   fallback: string | null = "",
 ): string | null {
-  if (typeof value !== "string") return fallback;
-  const normalized = value.trim();
-  if (!normalized || normalized.length > maxLength) return fallback;
-  return normalized;
+  return sanitizeSingleLineText(value, maxLength, { fallback });
 }
 
 function normalizeGenres(value: unknown): number[] {
@@ -75,10 +73,7 @@ function normalizeGenres(value: unknown): number[] {
 }
 
 function normalizeLanguage(value: unknown): string {
-  if (typeof value !== "string") return "en";
-  const normalized = value.trim().toLowerCase();
-  if (!/^[a-z]{2,10}(?:-[a-z]{2,10})?$/.test(normalized)) return "en";
-  return normalized;
+  return sanitizeLanguageCode(value, "en") || "en";
 }
 
 function getQueryParam(req: VercelRequest, key: string): string | undefined {

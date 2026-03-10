@@ -223,6 +223,11 @@ export interface CommentItem {
   updated_at: string;
 }
 
+export interface RegistrationAvailability {
+  email_exists: boolean;
+  username_exists: boolean;
+}
+
 // ========== Auth API ==========
 
 export async function register(
@@ -595,11 +600,15 @@ export async function postComment(item: {
       method: "POST",
       body: JSON.stringify(item),
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || "Unable to post comment");
+    }
     const data = await response.json();
     return data.data || null;
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof Error) throw error;
+    throw new Error("Unable to post comment");
   }
 }
 
@@ -613,9 +622,44 @@ export async function updateComment(item: {
       method: "PUT",
       body: JSON.stringify(item),
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || "Unable to update comment");
+    }
     const data = await response.json();
     return data.data || null;
+  } catch (error) {
+    if (error instanceof Error) throw error;
+    throw new Error("Unable to update comment");
+  }
+}
+
+export async function checkRegistrationAvailability(payload: {
+  email?: string;
+  username?: string;
+}): Promise<RegistrationAvailability | null> {
+  try {
+    const query = new URLSearchParams();
+    const normalizedEmail = payload.email?.trim();
+    const normalizedUsername = payload.username?.trim();
+
+    if (normalizedEmail) query.set("email", normalizedEmail);
+    if (normalizedUsername) query.set("username", normalizedUsername);
+    if (!query.toString()) return null;
+
+    const response = await fetch(`${MONGODB_API_URL}/api/auth/availability?${query.toString()}`, {
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      credentials: "include",
+    });
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    return {
+      email_exists: data.email_exists === true,
+      username_exists: data.username_exists === true,
+    };
   } catch {
     return null;
   }

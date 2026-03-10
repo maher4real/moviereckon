@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import * as mongoClient from "@/lib/mongodbClient";
 import {
   getTrendingMovies,
   getTrendingTVShows,
@@ -39,8 +40,10 @@ const passwordSchema = z
   .max(100, "Password is too long");
 const usernameSchema = z
   .string()
-  .min(2, "Username must be at least 2 characters")
-  .max(50, "Username is too long");
+  .regex(
+    /^[a-zA-Z0-9_]{3,24}$/,
+    "Username must be 3-24 characters and only include letters, numbers, and underscores",
+  );
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -63,12 +66,16 @@ export default function Auth() {
   const [signinCaptchaResetNonce, setSigninCaptchaResetNonce] = useState(0);
   const [signupCaptchaResetNonce, setSignupCaptchaResetNonce] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [debouncedSignupEmail, setDebouncedSignupEmail] = useState("");
+  const [debouncedSignupUsername, setDebouncedSignupUsername] = useState("");
   const captchaSiteKey = (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "").trim();
 
   // Form state
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
+  const normalizedEmail = email.trim();
+  const normalizedUsername = username.trim();
 
   const { data: trendingMovies } = useQuery({
     queryKey: ["trending-movies"],
@@ -229,10 +236,77 @@ export default function Auth() {
     warmStartupSound();
   }, []);
 
+  useEffect(() => {
+    if (activeTab !== "signup") {
+      setDebouncedSignupEmail("");
+      setDebouncedSignupUsername("");
+      return;
+    }
+
+    const emailValid = emailSchema.safeParse(normalizedEmail).success;
+    const usernameValid = usernameSchema.safeParse(normalizedUsername).success;
+
+    if (!emailValid && !usernameValid) {
+      setDebouncedSignupEmail("");
+      setDebouncedSignupUsername("");
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSignupEmail(emailValid ? normalizedEmail : "");
+      setDebouncedSignupUsername(usernameValid ? normalizedUsername : "");
+    }, 350);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [activeTab, normalizedEmail, normalizedUsername]);
+
+  const { data: signupAvailability, isFetching: isCheckingSignupAvailability } = useQuery({
+    queryKey: ["signup-availability", debouncedSignupEmail, debouncedSignupUsername],
+    queryFn: () =>
+      mongoClient.checkRegistrationAvailability({
+        email: debouncedSignupEmail,
+        username: debouncedSignupUsername,
+      }),
+    enabled:
+      activeTab === "signup" &&
+      Boolean(debouncedSignupEmail || debouncedSignupUsername),
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
+
+  const isCurrentEmailAvailability =
+    debouncedSignupEmail.length > 0 && debouncedSignupEmail === normalizedEmail;
+  const isCurrentUsernameAvailability =
+    debouncedSignupUsername.length > 0 &&
+    debouncedSignupUsername === normalizedUsername;
+
+  const availabilityErrors = useMemo(() => {
+    if (activeTab !== "signup") return {};
+
+    const nextErrors: Record<string, string> = {};
+    if (isCurrentUsernameAvailability && signupAvailability?.username_exists) {
+      nextErrors.username = "Username already taken";
+    }
+    if (isCurrentEmailAvailability && signupAvailability?.email_exists) {
+      nextErrors.email = "Email already registered";
+    }
+    return nextErrors;
+  }, [
+    activeTab,
+    isCurrentEmailAvailability,
+    isCurrentUsernameAvailability,
+    signupAvailability,
+  ]);
+
+  const displayErrors = useMemo(
+    () => ({ ...availabilityErrors, ...errors }),
+    [availabilityErrors, errors],
+  );
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    const emailResult = emailSchema.safeParse(email);
+    const emailResult = emailSchema.safeParse(normalizedEmail);
     if (!emailResult.success) {
       newErrors.email = emailResult.error.issues[0]?.message || "Invalid email";
     }
@@ -243,9 +317,15 @@ export default function Auth() {
     }
 
     if (activeTab === "signup") {
-      const usernameResult = usernameSchema.safeParse(username);
+      const usernameResult = usernameSchema.safeParse(normalizedUsername);
       if (!usernameResult.success) {
         newErrors.username = usernameResult.error.issues[0]?.message || "Invalid username";
+      }
+      if (isCurrentUsernameAvailability && signupAvailability?.username_exists) {
+        newErrors.username = "Username already taken";
+      }
+      if (isCurrentEmailAvailability && signupAvailability?.email_exists) {
+        newErrors.email = "Email already registered";
       }
     }
 
@@ -259,6 +339,15 @@ export default function Auth() {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const clearError = (field: string) => {
+    setErrors((current) => {
+      if (!(field in current)) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -474,13 +563,16 @@ export default function Auth() {
                         type="email"
                         placeholder="you@example.com"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          clearError("email");
+                        }}
                         className="h-12 rounded-xl border-white/15 bg-background/80 pl-10 pr-3 text-sm"
                         autoComplete="email"
                       />
                     </div>
-                    {errors.email && (
-                      <p className="text-xs text-destructive">{errors.email}</p>
+                    {displayErrors.email && (
+                      <p className="text-xs text-destructive">{displayErrors.email}</p>
                     )}
                   </div>
 
@@ -495,7 +587,10 @@ export default function Auth() {
                         type={showPassword ? "text" : "password"}
                         placeholder="Enter your password"
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          clearError("password");
+                        }}
                         className="h-12 rounded-xl border-white/15 bg-background/80 pl-10 pr-10 text-sm"
                         autoComplete="current-password"
                       />
@@ -555,16 +650,25 @@ export default function Auth() {
                         type="text"
                         placeholder="Pick a username"
                         value={username}
-                        onChange={(e) => setUsername(e.target.value)}
+                        onChange={(e) => {
+                          setUsername(e.target.value);
+                          clearError("username");
+                        }}
                         className="h-12 rounded-xl border-white/15 bg-background/80 pl-10 pr-3 text-sm"
                         autoComplete="name"
                       />
                     </div>
-                    {errors.username && (
+                    {displayErrors.username && (
                       <p className="text-xs text-destructive">
-                        {errors.username}
+                        {displayErrors.username}
                       </p>
                     )}
+                    {!displayErrors.username &&
+                    activeTab === "signup" &&
+                    isCheckingSignupAvailability &&
+                    debouncedSignupUsername ? (
+                      <p className="text-xs text-muted-foreground">Checking username...</p>
+                    ) : null}
                   </div>
 
                   <div className="space-y-2">
@@ -578,14 +682,23 @@ export default function Auth() {
                         type="email"
                         placeholder="you@example.com"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          clearError("email");
+                        }}
                         className="h-12 rounded-xl border-white/15 bg-background/80 pl-10 pr-3 text-sm"
                         autoComplete="email"
                       />
                     </div>
-                    {errors.email && (
-                      <p className="text-xs text-destructive">{errors.email}</p>
+                    {displayErrors.email && (
+                      <p className="text-xs text-destructive">{displayErrors.email}</p>
                     )}
+                    {!displayErrors.email &&
+                    activeTab === "signup" &&
+                    isCheckingSignupAvailability &&
+                    debouncedSignupEmail ? (
+                      <p className="text-xs text-muted-foreground">Checking email...</p>
+                    ) : null}
                   </div>
 
                   <div className="space-y-2">
@@ -599,7 +712,10 @@ export default function Auth() {
                         type={showPassword ? "text" : "password"}
                         placeholder="At least 6 characters"
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          clearError("password");
+                        }}
                         className="h-12 rounded-xl border-white/15 bg-background/80 pl-10 pr-10 text-sm"
                         autoComplete="new-password"
                       />
@@ -626,7 +742,11 @@ export default function Auth() {
                   <Button
                     type="submit"
                     className="auth-submit-btn mt-1 h-12 w-full rounded-xl bg-gradient-to-r from-primary via-red-500 to-orange-500 text-base font-semibold text-white shadow-lg shadow-primary/35 transition-all hover:brightness-110"
-                    disabled={isSubmitting || isAuthenticating}
+                    disabled={
+                      isSubmitting ||
+                      isAuthenticating ||
+                      Boolean(availabilityErrors.email || availabilityErrors.username)
+                    }
                   >
                     <span className="inline-flex items-center gap-2">
                       {isSubmitting ? "Creating Account..." : "Create Account"}

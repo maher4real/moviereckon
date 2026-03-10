@@ -18,6 +18,7 @@ import { setAuthCookies } from "../../lib/cookies.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
 import { verifyCaptchaToken } from "../../lib/captcha.js";
 import { emitSecurityEvent } from "../../lib/abuse-telemetry.js";
+import { sanitizeEmailAddress, sanitizeSingleLineText } from "../../lib/input.js";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
@@ -48,10 +49,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+    const email = sanitizeEmailAddress(req.body?.email);
     const password = typeof req.body?.password === "string" ? req.body.password : "";
-    const username = typeof req.body?.username === "string" ? req.body.username.trim() : "";
-    const captchaToken = typeof req.body?.captcha_token === "string" ? req.body.captcha_token : "";
+    const username = sanitizeSingleLineText(req.body?.username, 128, {
+      fallback: "",
+      collapseWhitespace: false,
+    }) || "";
+    const captchaToken =
+      sanitizeSingleLineText(req.body?.captcha_token, 4096, {
+        fallback: "",
+        collapseWhitespace: false,
+      }) || "";
 
     const clientIp = getClientIp(req);
     const ipRateLimit = await consumeRateLimit(`auth:register:ip:${clientIp}`, 8, 30 * 60 * 1000);

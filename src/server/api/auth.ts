@@ -1,10 +1,11 @@
 /**
  * Auth Router - Consolidated serverless function
  * Routes: /api/auth/login, /api/auth/register, /api/auth/refresh, /api/auth/me,
- * /api/auth/logout, /api/auth/google-start, /api/auth/google-callback,
+ * /api/auth/logout, /api/auth/availability, /api/auth/google-start, /api/auth/google-callback,
  * /api/auth/verify-email
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import availabilityHandler from "./_handlers/auth/availability.js";
 import loginHandler from "./_handlers/auth/login.js";
 import registerHandler from "./_handlers/auth/register.js";
 import refreshHandler from "./_handlers/auth/refresh.js";
@@ -117,6 +118,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     switch (route) {
+      case "availability":
+        return availabilityHandler(req, res);
       case "login":
         return loginHandler(req, res);
       case "register":

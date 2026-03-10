@@ -5,6 +5,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
+import { sanitizeLanguageCode } from "../../lib/input.js";
 
 function normalizeLanguages(value: unknown): string[] | null {
   if (value === undefined) return null;
@@ -12,8 +13,8 @@ function normalizeLanguages(value: unknown): string[] | null {
 
   const normalized = value
     .filter((item): item is string => typeof item === "string")
-    .map((language) => language.trim().toLowerCase())
-    .filter((language) => /^[a-z]{2,10}(?:-[a-z]{2,10})?$/.test(language));
+    .map((language) => sanitizeLanguageCode(language))
+    .filter((language): language is string => Boolean(language));
 
   return [...new Set(normalized)].slice(0, 10);
 }

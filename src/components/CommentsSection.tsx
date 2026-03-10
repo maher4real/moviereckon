@@ -7,6 +7,7 @@ import MediaImage from "@/components/MediaImage";
 import { cn } from "@/lib/utils";
 import * as mongoClient from "@/lib/mongodbClient";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import {
   getMovieReviewsExpanded,
   getTMDBAvatarUrl,
@@ -109,6 +110,7 @@ export default function CommentsSection({
   >({});
 
   const { user } = useAuth();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -167,6 +169,16 @@ export default function CommentsSection({
 
       await queryClient.invalidateQueries({ queryKey });
     },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Unable to post comment",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Your comment could not be posted.",
+      });
+    },
   });
 
   const updateCommentMutation = useMutation({
@@ -199,6 +211,16 @@ export default function CommentsSection({
       setEditText("");
       setEditRating(8);
       await queryClient.invalidateQueries({ queryKey });
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Unable to update comment",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Your comment could not be updated.",
+      });
     },
   });
 

@@ -5,6 +5,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import { getUserFromRequest, normalizeUserRole } from "../../lib/auth.js";
+import { sanitizeSingleLineText } from "../../lib/input.js";
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
 const DATA_IMAGE_REGEX =
@@ -34,8 +35,8 @@ function isDuplicateUsernameError(error: unknown): boolean {
 }
 
 function normalizeUsername(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const username = value.trim();
+  const username = sanitizeSingleLineText(value, 128, { collapseWhitespace: false });
+  if (!username) return null;
   if (!USERNAME_REGEX.test(username)) return null;
   return username;
 }
@@ -45,7 +46,9 @@ function normalizeAvatarUrl(value: unknown): string | null | undefined {
   if (value === null || value === "") return null;
   if (typeof value !== "string") return undefined;
 
-  const normalized = value.trim();
+  const normalized = sanitizeSingleLineText(value, Number.MAX_SAFE_INTEGER, {
+    collapseWhitespace: false,
+  });
   if (!normalized) return null;
 
   if (normalized.startsWith("data:image/")) {

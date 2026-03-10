@@ -18,6 +18,7 @@ import { setAuthCookies } from "../../lib/cookies.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
 import { verifyCaptchaToken } from "../../lib/captcha.js";
 import { emitSecurityEvent } from "../../lib/abuse-telemetry.js";
+import { sanitizeEmailAddress, sanitizeSingleLineText } from "../../lib/input.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -25,9 +26,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+    const email = sanitizeEmailAddress(req.body?.email);
     const password = typeof req.body?.password === "string" ? req.body.password : "";
-    const captchaToken = typeof req.body?.captcha_token === "string" ? req.body.captcha_token : "";
+    const captchaToken =
+      sanitizeSingleLineText(req.body?.captcha_token, 4096, {
+        fallback: "",
+        collapseWhitespace: false,
+      }) || "";
 
     const clientIp = getClientIp(req);
     const ipRateLimit = await consumeRateLimit(`auth:login:ip:${clientIp}`, 25, 15 * 60 * 1000);

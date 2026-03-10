@@ -5,6 +5,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import { getUserFromRequest, userHasRoleAtLeast } from "../../lib/auth.js";
+import { sanitizeMultiLineText } from "../../lib/input.js";
+import { containsBlockedTerms } from "../../lib/profanity.js";
 
 const DEFAULT_PAGE_SIZE = 80;
 const MAX_PAGE_SIZE = 120;
@@ -142,7 +144,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === "POST") {
       const { content_id, content_type, text, rating } = req.body || {};
       const contentId = Number(content_id);
-      const normalizedText = typeof text === "string" ? text.trim() : "";
+      const normalizedText = sanitizeMultiLineText(text, Number.MAX_SAFE_INTEGER, "") || "";
       const normalizedRating = Number(rating);
 
       if (!contentId || !content_type || !["movie", "tv"].includes(content_type) || !normalizedText) {
@@ -159,6 +161,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: "Comment must be 1000 characters or less" });
       }
 
+      if (containsBlockedTerms(normalizedText)) {
+        return res.status(400).json({
+          error: "Comment contains blocked language. Please keep it respectful.",
+        });
+      }
       let username = user.username;
       let avatarUrl: string | null = null;
 
@@ -202,7 +209,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (req.method === "PUT") {
       const { comment_id, text, rating } = req.body || {};
-      const normalizedText = typeof text === "string" ? text.trim() : "";
+      const normalizedText = sanitizeMultiLineText(text, Number.MAX_SAFE_INTEGER, "") || "";
       const normalizedRating = Number(rating);
 
       if (!comment_id || !ObjectId.isValid(String(comment_id))) {
@@ -221,6 +228,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: "Comment must be 1000 characters or less" });
       }
 
+      if (containsBlockedTerms(normalizedText)) {
+        return res.status(400).json({
+          error: "Comment contains blocked language. Please keep it respectful.",
+        });
+      }
       const commentObjectId = new ObjectId(String(comment_id));
       const now = new Date().toISOString();
 
