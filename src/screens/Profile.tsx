@@ -54,32 +54,32 @@ const DEFAULT_AVATAR_OPTIONS = [
   {
     id: "aurora",
     label: "Aurora Lead",
-    url: "https://api.dicebear.com/7.x/avataaars/png?seed=Aurora&scale=80",
+    url: "/avatars/cinema-aurora.svg",
   },
   {
     id: "noir",
     label: "Noir Cut",
-    url: "https://api.dicebear.com/7.x/adventurer/png?seed=Noir&scale=80",
+    url: "/avatars/cinema-noir.svg",
   },
   {
     id: "sunset",
     label: "Sunset Frame",
-    url: "https://api.dicebear.com/7.x/big-ears/png?seed=Sunset&scale=80",
+    url: "/avatars/cinema-sunset.svg",
   },
   {
     id: "forest",
     label: "Forest Reel",
-    url: "https://api.dicebear.com/7.x/bottts/png?seed=Forest&scale=80",
+    url: "/avatars/cinema-forest.svg",
   },
   {
     id: "ocean",
     label: "Ocean Cast",
-    url: "https://api.dicebear.com/7.x/lorelei/png?seed=Ocean&scale=80",
+    url: "/avatars/cinema-ocean.svg",
   },
   {
     id: "rose",
     label: "Rose Spotlight",
-    url: "https://api.dicebear.com/7.x/fun-emoji/png?seed=Rose&scale=80",
+    url: "/avatars/cinema-rose.svg",
   },
 ];
 
@@ -99,26 +99,48 @@ const isValidHttpUrl = (value: string) => {
   }
 };
 
-const isSupportedAvatarValue = (value: string) => {
-  if (!value.trim()) return true;
+const getLocalAvatarPath = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (LOCAL_AVATAR_PATH_REGEX.test(trimmed)) return trimmed;
 
-  if (value.startsWith("data:image/")) {
+  try {
+    const parsed = new URL(trimmed);
+    return LOCAL_AVATAR_PATH_REGEX.test(parsed.pathname)
+      ? parsed.pathname
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+const normalizeAvatarValue = (value: string) => {
+  const trimmed = value.trim();
+  return getLocalAvatarPath(trimmed) || trimmed;
+};
+
+const isSupportedAvatarValue = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return true;
+
+  if (trimmed.startsWith("data:image/")) {
     return (
-      value.length <= MAX_AVATAR_DATA_URL_LENGTH && DATA_IMAGE_REGEX.test(value)
+      trimmed.length <= MAX_AVATAR_DATA_URL_LENGTH &&
+      DATA_IMAGE_REGEX.test(trimmed)
     );
   }
 
-  if (LOCAL_AVATAR_PATH_REGEX.test(value)) {
+  if (getLocalAvatarPath(trimmed)) {
     return true;
   }
 
-  return isValidHttpUrl(value);
+  return isValidHttpUrl(trimmed);
 };
 
 const isRemoteAvatarUrl = (value: string) =>
   Boolean(value.trim()) &&
-  !value.startsWith("data:image/") &&
-  !LOCAL_AVATAR_PATH_REGEX.test(value) &&
+  !value.trim().startsWith("data:image/") &&
+  !getLocalAvatarPath(value) &&
   isValidHttpUrl(value);
 
 const readFileAsDataUrl = (file: Blob) =>
@@ -242,17 +264,7 @@ const getInitials = (value: string) => {
 const isDefaultAvatarSelected = (
   currentValue: string,
   candidatePath: string,
-) => {
-  if (!currentValue) return false;
-  if (currentValue === candidatePath) return true;
-
-  try {
-    const parsed = new URL(currentValue);
-    return parsed.pathname === candidatePath;
-  } catch {
-    return false;
-  }
-};
+) => getLocalAvatarPath(currentValue) === candidatePath;
 
 type ActivityItem = {
   content_id: number;
@@ -366,16 +378,39 @@ export default function Profile() {
     }
   }, [user, authLoading, navigate]);
 
-  useEffect(() => {
-    setUsernameInput(profile?.username || user?.username || "");
-    setAvatarInput(profile?.avatar_url || "");
-  }, [profile?.username, profile?.avatar_url, user?.username]);
-
   const displayName = profile?.username || user?.username || "User";
-  const avatarUrl = profile?.avatar_url || null;
-  const normalizedAvatarInput = avatarInput.trim();
+  const avatarUrl = normalizeAvatarValue(profile?.avatar_url || "") || null;
+  const normalizedAvatarInput = normalizeAvatarValue(avatarInput);
+  const selectedAvatarValue = normalizedAvatarInput || avatarUrl || "";
+  const previewAvatar = selectedAvatarValue || undefined;
   const isUploadedAvatar = normalizedAvatarInput.startsWith("data:image/");
+  const isDefaultAvatar = Boolean(getLocalAvatarPath(normalizedAvatarInput));
   const isRemoteLinkedAvatar = isRemoteAvatarUrl(normalizedAvatarInput);
+  const avatarInputValue =
+    isUploadedAvatar || isDefaultAvatar ? "" : normalizedAvatarInput;
+  const avatarInputPlaceholder = isUploadedAvatar
+    ? "Uploaded image selected"
+    : isDefaultAvatar
+      ? "Default avatar selected"
+      : "https://example.com/avatar.jpg";
+  const avatarStatusLabel = isUploadedAvatar
+    ? "Optimized upload selected"
+    : isRemoteLinkedAvatar
+      ? "Remote image ready to import"
+      : isDefaultAvatar
+        ? "Default portrait selected"
+        : selectedAvatarValue
+          ? "Current avatar selected"
+          : "Initials avatar active";
+  const avatarStatusDescription = isUploadedAvatar
+    ? "Your image is already cropped and compressed for storage."
+    : isRemoteLinkedAvatar
+      ? "The pasted link will be fetched, cropped, and stored as a compact avatar when you save."
+      : isDefaultAvatar
+        ? "This bundled avatar loads instantly and does not rely on external services."
+        : selectedAvatarValue
+          ? "This avatar is already attached to your profile."
+          : "No image selected. Your initials will be used until you pick one.";
 
   const memberSince = profile?.created_at
     ? new Date(profile.created_at).toLocaleDateString("en-US", {
@@ -407,6 +442,14 @@ export default function Profile() {
     navigate("/");
   };
 
+  const handleEditOpenChange = (open: boolean) => {
+    if (open) {
+      setUsernameInput(profile?.username || user?.username || "");
+      setAvatarInput(normalizeAvatarValue(profile?.avatar_url || ""));
+    }
+    setEditOpen(open);
+  };
+
   const activityHistory = useMemo<ActivityItem[]>(
     () =>
       watchHistory.map((item) => ({
@@ -432,7 +475,8 @@ export default function Profile() {
   );
 
   const importAvatarFromLink = async (urlValue = avatarInput.trim()) => {
-    if (!isRemoteAvatarUrl(urlValue)) {
+    const normalizedUrlValue = normalizeAvatarValue(urlValue);
+    if (!isRemoteAvatarUrl(normalizedUrlValue)) {
       toast({
         variant: "destructive",
         title: "Invalid image link",
@@ -443,7 +487,7 @@ export default function Profile() {
 
     try {
       setIsProcessingAvatar(true);
-      const remoteBlob = await importAvatarFromUrl(urlValue);
+      const remoteBlob = await importAvatarFromUrl(normalizedUrlValue);
       const optimized = await compressAvatarImage(remoteBlob);
       if (!isSupportedAvatarValue(optimized)) {
         throw new Error("Optimized image payload is still too large");
@@ -472,7 +516,7 @@ export default function Profile() {
 
   const handleSaveProfile = async () => {
     const username = usernameInput.trim();
-    let avatar = avatarInput.trim();
+    let avatar = normalizeAvatarValue(avatarInput);
     const currentUsername = profile?.username || user?.username || "";
     const currentAvatar = profile?.avatar_url || user?.avatar_url || null;
 
@@ -510,11 +554,9 @@ export default function Profile() {
 
       const avatarForSave = (() => {
         if (!avatar) return null;
-        if (
-          LOCAL_AVATAR_PATH_REGEX.test(avatar) &&
-          typeof window !== "undefined"
-        ) {
-          return `${window.location.origin}${avatar}`;
+        const localAvatarPath = getLocalAvatarPath(avatar);
+        if (localAvatarPath && typeof window !== "undefined") {
+          return `${window.location.origin}${localAvatarPath}`;
         }
         return avatar;
       })();
@@ -609,6 +651,7 @@ export default function Profile() {
                 <div className="flex items-start gap-4 md:gap-5">
                   <Avatar className="h-20 w-20 md:h-24 md:w-24 border-4 border-background shadow-xl">
                     <AvatarImage
+                      key={avatarUrl || "profile-avatar"}
                       src={avatarUrl || undefined}
                       alt={`${displayName} avatar`}
                     />
@@ -640,7 +683,7 @@ export default function Profile() {
                     type="button"
                     variant="secondary"
                     className="gap-2"
-                    onClick={() => setEditOpen(true)}
+                    onClick={() => handleEditOpenChange(true)}
                   >
                     <Camera className="w-4 h-4" />
                     Edit Profile
@@ -799,9 +842,9 @@ export default function Profile() {
         </div>
       </main>
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent>
-          <DialogHeader>
+      <Dialog open={editOpen} onOpenChange={handleEditOpenChange}>
+        <DialogContent className="grid-rows-[auto_minmax(0,1fr)_auto] w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] max-w-4xl gap-0 overflow-hidden border-border/70 bg-background p-0 sm:w-full sm:max-h-[calc(100dvh-3rem)]">
+          <DialogHeader className="border-b border-border/70 px-5 py-5 pr-14 text-left sm:px-6">
             <DialogTitle>Edit Profile</DialogTitle>
             <DialogDescription>
               Update your username, import an image from a link, upload a photo,
@@ -809,171 +852,192 @@ export default function Profile() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-5">
-            <div className="rounded-2xl border border-border/70 bg-muted/30 p-4">
-              <div className="flex items-center gap-4">
-                <Avatar className="h-20 w-20 border border-border shadow-sm">
-                  <AvatarImage
-                    src={
-                      normalizedAvatarInput
-                        ? normalizedAvatarInput
-                        : avatarUrl || undefined
-                    }
-                    alt="Profile preview"
-                  />
-                  <AvatarFallback className="text-sm font-semibold">
-                    {getInitials(usernameInput || displayName)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Profile preview</p>
-                  <p className="text-sm text-muted-foreground">
-                    URL images are imported and compressed on save. Uploads are
-                    center-cropped and stored as compact WebP.
+          <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+            <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+              <div className="space-y-4">
+                <div className="rounded-3xl border border-border/70 bg-muted/25 p-5 shadow-sm">
+                  <div className="flex flex-col items-center gap-4 text-center">
+                    <Avatar className="h-28 w-28 border-4 border-background shadow-xl">
+                      <AvatarImage
+                        key={previewAvatar || "profile-preview"}
+                        src={previewAvatar}
+                        alt="Profile preview"
+                      />
+                      <AvatarFallback className="text-lg font-semibold">
+                        {getInitials(usernameInput || displayName)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="space-y-1">
+                      <p className="text-lg font-semibold">
+                        {usernameInput.trim() || displayName}
+                      </p>
+                      <p className="text-sm text-primary">{avatarStatusLabel}</p>
+                    </div>
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      {avatarStatusDescription}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-border/70 bg-card/55 p-4">
+                  <p className="text-sm font-medium">Avatar reset</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    Clear the current image if you want the profile badge to use
+                    your initials instead.
                   </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setAvatarInput("")}
+                    className="mt-4 w-full"
+                  >
+                    Use Initials
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="profile-username">Username</Label>
+                  <Input
+                    id="profile-username"
+                    value={usernameInput}
+                    onChange={(event) => setUsernameInput(event.target.value)}
+                    placeholder="Your username"
+                    maxLength={24}
+                  />
+                </div>
+
+                <div className="rounded-2xl border border-border/70 bg-card/50 p-4 sm:p-5">
+                  <div className="mb-3 space-y-1">
+                    <p className="text-sm font-medium">Image Link</p>
+                    <p className="text-xs text-muted-foreground">
+                      Paste a public image URL to fetch it through the server
+                      and compress it before saving.
+                    </p>
+                  </div>
+                  <div className="space-y-3">
+                    <Input
+                      id="profile-avatar-url"
+                      value={avatarInputValue}
+                      onChange={(event) => setAvatarInput(event.target.value)}
+                      placeholder={avatarInputPlaceholder}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={!isRemoteLinkedAvatar || isProcessingAvatar}
+                        onClick={() => void importAvatarFromLink()}
+                      >
+                        {isProcessingAvatar && isRemoteLinkedAvatar
+                          ? "Importing..."
+                          : "Import Link Image"}
+                      </Button>
+                      {normalizedAvatarInput && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setAvatarInput("")}
+                        >
+                          Clear Image
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-border/70 bg-card/50 p-4 sm:p-5">
+                  <div className="mb-3 space-y-1">
+                    <p className="text-sm font-medium">Upload Your Image</p>
+                    <p className="text-xs text-muted-foreground">
+                      PNG, JPG, WebP or GIF up to 3MB. Uploads are cropped to a
+                      square and compressed into a smaller WebP avatar.
+                    </p>
+                  </div>
+                  <input
+                    ref={avatarFileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    onChange={handleAvatarUpload}
+                    className="hidden"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={isProcessingAvatar}
+                      onClick={() => avatarFileInputRef.current?.click()}
+                    >
+                      {isProcessingAvatar && !isRemoteLinkedAvatar
+                        ? "Optimizing..."
+                        : "Upload Image"}
+                    </Button>
+                    {isUploadedAvatar && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setAvatarInput("")}
+                      >
+                        Remove Upload
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-border/70 bg-card/50 p-4 sm:p-5">
+                  <div className="mb-4 space-y-1">
+                    <p className="text-sm font-medium">Default Avatar Pack</p>
+                    <p className="text-xs text-muted-foreground">
+                      Local portrait avatars are bundled with the app, so they
+                      load instantly and always work offline.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {DEFAULT_AVATAR_OPTIONS.map((candidate) => {
+                      const isSelected = isDefaultAvatarSelected(
+                        normalizedAvatarInput,
+                        candidate.url,
+                      );
+
+                      return (
+                        <button
+                          key={candidate.id}
+                          type="button"
+                          onClick={() => setAvatarInput(candidate.url)}
+                          className={cn(
+                            "rounded-2xl border border-border bg-card/70 p-3 text-left transition-all hover:-translate-y-0.5 hover:border-primary hover:bg-card",
+                            isSelected && "border-primary ring-2 ring-primary/25",
+                          )}
+                        >
+                          <div className="relative mb-3 overflow-hidden rounded-xl border border-border/60 bg-muted/40">
+                            {isSelected ? (
+                              <span className="absolute right-2 top-2 z-10 rounded-full bg-background/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
+                                Selected
+                              </span>
+                            ) : null}
+                            <img
+                              src={candidate.url}
+                              alt={candidate.label}
+                              className="h-28 w-full object-cover"
+                              loading="lazy"
+                            />
+                          </div>
+                          <p className="text-sm font-medium">{candidate.label}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="profile-username">Username</Label>
-              <Input
-                id="profile-username"
-                value={usernameInput}
-                onChange={(event) => setUsernameInput(event.target.value)}
-                placeholder="Your username"
-                maxLength={24}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="profile-avatar-url">Image Link</Label>
-              <Input
-                id="profile-avatar-url"
-                value={isUploadedAvatar ? "" : avatarInput}
-                onChange={(event) => setAvatarInput(event.target.value)}
-                placeholder={
-                  isUploadedAvatar
-                    ? "Imported or uploaded image selected"
-                    : "https://example.com/avatar.jpg"
-                }
-              />
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={!isRemoteLinkedAvatar || isProcessingAvatar}
-                  onClick={() => void importAvatarFromLink()}
-                >
-                  {isProcessingAvatar && isRemoteLinkedAvatar
-                    ? "Importing..."
-                    : "Import Link Image"}
-                </Button>
-                {(isUploadedAvatar || isRemoteLinkedAvatar) && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setAvatarInput("")}
-                  >
-                    Clear Image
-                  </Button>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Paste a public image URL and import it into a smaller avatar
-                file before saving.
-              </p>
-              {isUploadedAvatar && (
-                <p className="text-xs text-muted-foreground">
-                  Optimized image selected.
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label>Upload Your Image</Label>
-              <input
-                ref={avatarFileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
-                onChange={handleAvatarUpload}
-                className="hidden"
-              />
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={isProcessingAvatar}
-                  onClick={() => avatarFileInputRef.current?.click()}
-                >
-                  {isProcessingAvatar && !isRemoteLinkedAvatar
-                    ? "Optimizing..."
-                    : "Upload Image"}
-                </Button>
-                {isUploadedAvatar && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setAvatarInput("")}
-                  >
-                    Remove Upload
-                  </Button>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                PNG, JPG, WebP or GIF. Max size: 3MB. Images are cropped to
-                square and compressed to reduce storage.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <p className="text-sm font-medium">Default Avatar Pack</p>
-                <p className="text-xs text-muted-foreground">
-                  Portrait-style defaults stored locally for instant loading.
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {DEFAULT_AVATAR_OPTIONS.map((candidate) => (
-                  <button
-                    key={candidate.id}
-                    type="button"
-                    onClick={() => setAvatarInput(candidate.url)}
-                    className={cn(
-                      "rounded-2xl border border-border bg-card/70 p-3 text-left transition-colors hover:border-primary hover:bg-card",
-                      isDefaultAvatarSelected(avatarInput, candidate.url) &&
-                        "border-primary ring-2 ring-primary/25",
-                    )}
-                  >
-                    <div className="mb-3 overflow-hidden rounded-xl border border-border/60 bg-muted/40">
-                      <img
-                        src={candidate.url}
-                        alt={candidate.label}
-                        className="h-28 w-full object-cover"
-                        loading="lazy"
-                      />
-                    </div>
-                    <p className="text-sm font-medium">{candidate.label}</p>
-                  </button>
-                ))}
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setAvatarInput("")}
-                className="w-full"
-              >
-                Use Initials
-              </Button>
-            </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t border-border/70 px-5 py-4 sm:px-6">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setEditOpen(false)}
+              onClick={() => handleEditOpenChange(false)}
             >
               Cancel
             </Button>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
-import { Film } from "lucide-react";
+import BrandLogo from "@/components/BrandLogo";
 import MediaImage from "@/components/MediaImage";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -15,9 +15,9 @@ import { cn } from "@/lib/utils";
 
 type OverlayPhase = "hidden" | "center" | "moving" | "fading";
 
-const MIN_CENTER_DURATION_MS = 800;
-const MOVE_DURATION_MS = 850;
-const FADE_DURATION_MS = 250;
+const MIN_CENTER_DURATION_MS = 700;
+const MOVE_DURATION_MS = 780;
+const FADE_DURATION_MS = 220;
 const ANCHOR_LOOKUP_TIMEOUT_MS = 2500;
 
 const INITIAL_TRANSFORM = {
@@ -42,7 +42,6 @@ export default function AuthTransitionOverlay() {
 
   const [phase, setPhase] = useState<OverlayPhase>("hidden");
   const [transform, setTransform] = useState(INITIAL_TRANSFORM);
-  const [compactTarget, setCompactTarget] = useState(false);
   const shouldFetchOverlayData =
     isAuthRoute(location.pathname) || phase !== "hidden" || isAuthenticating;
 
@@ -181,21 +180,6 @@ export default function AuthTransitionOverlay() {
           targetRect.width > 0 &&
           targetRect.height > 0
         ) {
-          const anchorText = anchor.querySelector<HTMLElement>("span");
-          const textRect = anchorText?.getBoundingClientRect();
-          const textStyles = anchorText
-            ? window.getComputedStyle(anchorText)
-            : null;
-          const labelVisible = Boolean(
-            anchorText &&
-            textRect &&
-            textRect.width > 0 &&
-            textStyles &&
-            textStyles.display !== "none" &&
-            textStyles.visibility !== "hidden",
-          );
-          setCompactTarget(!labelVisible);
-
           const sourceCenterX = sourceRect.left + sourceRect.width / 2;
           const sourceCenterY = sourceRect.top + sourceRect.height / 2;
           const targetCenterX = targetRect.left + targetRect.width / 2;
@@ -233,7 +217,6 @@ export default function AuthTransitionOverlay() {
     runIdRef.current = authTransitionRunId;
     startedAtRef.current = performance.now();
     setTransform(INITIAL_TRANSFORM);
-    setCompactTarget(false);
     setPhase("center");
 
     return clearPendingWork;
@@ -309,12 +292,11 @@ export default function AuthTransitionOverlay() {
   if (phase === "hidden") return null;
 
   const isCenter = phase === "center";
-  const morphToIcon = compactTarget && phase !== "center";
 
   return (
     <div
       className={cn(
-        "pointer-events-auto fixed inset-0 z-120 cursor-progress transition-opacity duration-450",
+        "pointer-events-auto fixed inset-0 z-120 cursor-progress transition-opacity duration-300",
         phase === "fading" ? "opacity-0" : "opacity-100",
       )}
     >
@@ -361,64 +343,24 @@ export default function AuthTransitionOverlay() {
       <div
         ref={logoRef}
         className={cn(
-          "absolute left-1/2 top-1/2 flex items-center gap-2 sm:gap-3 will-change-transform",
-          "transition-[transform,opacity,filter] duration-1450 ease-[cubic-bezier(0.22,1,0.36,1)]",
+          "absolute left-1/2 top-1/2 will-change-transform",
           phase === "fading" ? "opacity-0" : "opacity-100",
         )}
         style={{
           transform: `translate(-50%, -50%) translate3d(${transform.x}px, ${transform.y}px, 0) scale(${transform.scale})`,
+          transition: `transform ${MOVE_DURATION_MS}ms cubic-bezier(0.16, 1, 0.3, 1), opacity ${FADE_DURATION_MS}ms ease, filter ${MOVE_DURATION_MS}ms cubic-bezier(0.16, 1, 0.3, 1)`,
           filter: isCenter
-            ? "drop-shadow(0 0 30px hsl(var(--primary) / 0.38))"
-            : "drop-shadow(0 0 12px hsl(var(--primary) / 0.16))",
+            ? "drop-shadow(0 0 34px hsl(var(--primary) / 0.24))"
+            : "drop-shadow(0 0 16px hsl(var(--primary) / 0.12))",
         }}
       >
         <div
           className={cn(
-            "flex items-center gap-2 sm:gap-3",
+            "flex items-center",
             isCenter && "animate-auth-brand-intro",
           )}
         >
-          <Film
-            className={cn(
-              "h-10 w-10 text-primary sm:h-12 sm:w-12 rounded-full",
-              isCenter && "animate-auth-brand-pulse",
-              isCenter && "animate-auth-brand-gradient-flow",
-              isCenter && "animate-auth-brand-glow",
-            )}
-            style={
-              isCenter
-                ? {
-                    backgroundImage:
-                      "linear-gradient(90deg, transparent 0%, hsl(var(--primary)) 25%, transparent 50%, hsl(var(--secondary)) 75%, transparent 100%)",
-                    backgroundSize: "200% 100%",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    backgroundClip: "text",
-                  }
-                : undefined
-            }
-          />
-          <span
-            className={cn(
-              "relative text-3xl font-bold leading-none sm:text-4xl transition-[opacity,transform,filter] duration-900 ease-[cubic-bezier(0.22,1,0.36,1)]",
-              morphToIcon
-                ? "opacity-0 -translate-x-1 scale-95 blur-[1px]"
-                : "opacity-100 translate-x-0 scale-100 blur-0",
-            )}
-          >
-            <span className="text-gradient">MovieReckon</span>
-            <span
-              aria-hidden="true"
-              className={cn(
-                "absolute inset-0 bg-[linear-gradient(110deg,transparent_0%,hsl(var(--foreground)/0.95)_45%,transparent_70%)] bg-size-[220%_100%] bg-clip-text text-transparent transition-opacity duration-300",
-                isCenter
-                  ? "animate-auth-brand-shimmer opacity-100"
-                  : "opacity-0",
-              )}
-            >
-              MovieReckon
-            </span>
-          </span>
+          <BrandLogo size="xl" />
         </div>
       </div>
     </div>

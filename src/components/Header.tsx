@@ -1,7 +1,19 @@
-import { Link, useLocation, useNavigate, NavLink as RouterNavLink } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { Film, Search, Menu, X, User, Home, Tv, Clapperboard, LogOut, Sparkles, CalendarDays } from "lucide-react";
+import {
+  Search,
+  Menu,
+  X,
+  User,
+  Home,
+  Tv,
+  Clapperboard,
+  LogOut,
+  Sparkles,
+  CalendarDays,
+} from "lucide-react";
+import BrandLogo from "@/components/BrandLogo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -61,10 +73,9 @@ export default function Header() {
           <Link
             to="/home"
             data-brand-logo-anchor="true"
-            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+            className="inline-flex items-center transition-opacity hover:opacity-80"
           >
-            <Film className="w-7 h-7 text-primary" />
-            <span className="text-xl font-bold text-gradient hidden sm:block">MovieReckon</span>
+            <BrandLogo size="sm" labelClassName="hidden sm:inline" />
           </Link>
 
           {/* Desktop Navigation */}

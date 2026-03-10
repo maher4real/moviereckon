@@ -2,13 +2,13 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowUpRight,
   Compass,
-  Film,
   Heart,
   LifeBuoy,
   Search,
   Sparkles,
   UserRound,
 } from "lucide-react";
+import BrandLogo from "@/components/BrandLogo";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -64,11 +64,8 @@ export default function Footer() {
       <div className="container relative mx-auto px-4 py-10 md:py-12">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,2fr)]">
           <div className="rounded-2xl border border-border/80 bg-card/60 p-5 backdrop-blur">
-            <Link to="/home" className="mb-3 inline-flex items-center gap-2">
-              <span className="rounded-lg bg-primary/20 p-2 text-primary">
-                <Film className="h-5 w-5" />
-              </span>
-              <span className="text-xl font-bold text-gradient">MovieReckon</span>
+            <Link to="/home" className="mb-3 inline-flex items-center">
+              <BrandLogo size="md" />
             </Link>
 
             <p className="text-sm leading-relaxed text-muted-foreground">

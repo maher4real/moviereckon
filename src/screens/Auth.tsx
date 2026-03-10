@@ -10,6 +10,7 @@ import {
   getPosterUrl,
 } from "@/lib/tmdb";
 import { AuthPageSkeleton } from "@/components/AppSkeletons";
+import BrandLogo from "@/components/BrandLogo";
 import TurnstileCaptcha from "@/components/TurnstileCaptcha";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +21,6 @@ import {
   ArrowRight,
   Eye,
   EyeOff,
-  Film,
   Lock,
   Mail,
   User,
@@ -465,9 +465,8 @@ export default function Auth() {
       <div className="relative z-10 flex min-h-screen w-full items-center justify-center">
         <div className="w-full max-w-md animate-fade-in">
           <div className="mb-8 flex flex-col items-center">
-            <div className="mb-4 flex items-center gap-2">
-              <Film className="h-10 w-10 text-primary" />
-              <h1 className="text-4xl font-bold text-gradient">MovieReckon</h1>
+            <div className="mb-4 flex justify-center">
+              <BrandLogo size="xl" />
             </div>
             <p className="text-center text-muted-foreground">
               Your personalized gateway to Bollywood & Hollywood
