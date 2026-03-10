@@ -102,7 +102,9 @@ const isSupportedAvatarValue = (value: string) => {
   if (!value.trim()) return true;
 
   if (value.startsWith("data:image/")) {
-    return value.length <= MAX_AVATAR_DATA_URL_LENGTH && DATA_IMAGE_REGEX.test(value);
+    return (
+      value.length <= MAX_AVATAR_DATA_URL_LENGTH && DATA_IMAGE_REGEX.test(value)
+    );
   }
 
   if (LOCAL_AVATAR_PATH_REGEX.test(value)) {
@@ -145,8 +147,14 @@ const compressAvatarImage = async (file: Blob) => {
   const image = await loadImageFromDataUrl(dataUrl);
 
   const sourceSize = Math.min(image.naturalWidth, image.naturalHeight);
-  const sourceX = Math.max(0, Math.floor((image.naturalWidth - sourceSize) / 2));
-  const sourceY = Math.max(0, Math.floor((image.naturalHeight - sourceSize) / 2));
+  const sourceX = Math.max(
+    0,
+    Math.floor((image.naturalWidth - sourceSize) / 2),
+  );
+  const sourceY = Math.max(
+    0,
+    Math.floor((image.naturalHeight - sourceSize) / 2),
+  );
   let targetSize = Math.max(1, Math.min(MAX_AVATAR_DIMENSION, sourceSize));
   const minimumTargetSize = Math.min(targetSize, MIN_AVATAR_DIMENSION);
 
@@ -207,7 +215,10 @@ const compressAvatarImage = async (file: Blob) => {
 
   let output = findBestEncodedImage();
 
-  while (output.length > MAX_AVATAR_DATA_URL_LENGTH && targetSize > minimumTargetSize) {
+  while (
+    output.length > MAX_AVATAR_DATA_URL_LENGTH &&
+    targetSize > minimumTargetSize
+  ) {
     targetSize = Math.max(minimumTargetSize, Math.round(targetSize * 0.88));
     drawResizedImage(targetSize);
     output = findBestEncodedImage();
@@ -227,7 +238,10 @@ const getInitials = (value: string) => {
   return `${parts[0][0] || ""}${parts[1][0] || ""}`.toUpperCase();
 };
 
-const isDefaultAvatarSelected = (currentValue: string, candidatePath: string) => {
+const isDefaultAvatarSelected = (
+  currentValue: string,
+  candidatePath: string,
+) => {
   if (!currentValue) return false;
   if (currentValue === candidatePath) return true;
 
@@ -281,15 +295,26 @@ const ActivityListItem = memo(function ActivityListItem({
           >
             {item.title}
           </button>
-          <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+          <Badge
+            variant="outline"
+            className="text-[10px] uppercase tracking-wide"
+          >
             {item.content_type === "movie" ? "Movie" : "TV"}
           </Badge>
         </div>
-        <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{item.subtitle}</p>
+        <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+          {item.subtitle}
+        </p>
       </div>
 
       <div className="flex items-center gap-1.5 shrink-0">
-        <Button type="button" variant="ghost" size="sm" onClick={onOpen} className="h-8 px-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onOpen}
+          className="h-8 px-2"
+        >
           <ArrowUpRight className="h-3.5 w-3.5" />
         </Button>
         {onRemove && (
@@ -309,7 +334,13 @@ const ActivityListItem = memo(function ActivityListItem({
 });
 
 export default function Profile() {
-  const { user, profile, isLoading: authLoading, signOut, updateProfile } = useAuth();
+  const {
+    user,
+    profile,
+    isLoading: authLoading,
+    signOut,
+    updateProfile,
+  } = useAuth();
   const {
     watchHistory,
     likedItems,
@@ -354,7 +385,9 @@ export default function Profile() {
     : "today";
 
   const stats = useMemo(() => {
-    const movies = watchHistory.filter((w) => w.content_type === "movie").length;
+    const movies = watchHistory.filter(
+      (w) => w.content_type === "movie",
+    ).length;
     const tvShows = watchHistory.filter((w) => w.content_type === "tv").length;
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const activeThisWeek = watchHistory.filter(
@@ -417,7 +450,8 @@ export default function Profile() {
       setAvatarInput(optimized);
       toast({
         title: "Image imported",
-        description: "Image downloaded from the link and optimized for your profile.",
+        description:
+          "Image downloaded from the link and optimized for your profile.",
       });
       return optimized;
     } catch (error) {
@@ -451,7 +485,11 @@ export default function Profile() {
       return;
     }
 
-    if (avatar !== (currentAvatar || "") && avatar && !isSupportedAvatarValue(avatar)) {
+    if (
+      avatar !== (currentAvatar || "") &&
+      avatar &&
+      !isSupportedAvatarValue(avatar)
+    ) {
       toast({
         variant: "destructive",
         title: "Invalid avatar",
@@ -471,7 +509,10 @@ export default function Profile() {
 
       const avatarForSave = (() => {
         if (!avatar) return null;
-        if (LOCAL_AVATAR_PATH_REGEX.test(avatar) && typeof window !== "undefined") {
+        if (
+          LOCAL_AVATAR_PATH_REGEX.test(avatar) &&
+          typeof window !== "undefined"
+        ) {
           return `${window.location.origin}${avatar}`;
         }
         return avatar;
@@ -500,7 +541,9 @@ export default function Profile() {
     }
   };
 
-  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
@@ -532,7 +575,8 @@ export default function Profile() {
       setAvatarInput(optimized);
       toast({
         title: "Avatar optimized",
-        description: "Image cropped and compressed to a smaller WebP profile image.",
+        description:
+          "Image cropped and compressed to a smaller WebP profile image.",
       });
     } catch {
       toast({
@@ -563,18 +607,26 @@ export default function Profile() {
               <div className="flex flex-col lg:flex-row lg:items-center gap-5 lg:justify-between">
                 <div className="flex items-start gap-4 md:gap-5">
                   <Avatar className="h-20 w-20 md:h-24 md:w-24 border-4 border-background shadow-xl">
-                    <AvatarImage src={avatarUrl || undefined} alt={`${displayName} avatar`} />
+                    <AvatarImage
+                      src={avatarUrl || undefined}
+                      alt={`${displayName} avatar`}
+                    />
                     <AvatarFallback className="text-xl font-bold bg-gradient-to-br from-primary to-secondary text-primary-foreground">
                       {getInitials(displayName)}
                     </AvatarFallback>
                   </Avatar>
 
                   <div>
-                    <Badge variant="secondary" className="mb-2 bg-primary/15 text-primary">
+                    <Badge
+                      variant="secondary"
+                      className="mb-2 bg-primary/15 text-primary"
+                    >
                       <UserRound className="h-3.5 w-3.5 mr-1" />
                       Profile
                     </Badge>
-                    <h1 className="text-3xl md:text-4xl font-bold leading-tight">{displayName}</h1>
+                    <h1 className="text-3xl md:text-4xl font-bold leading-tight">
+                      {displayName}
+                    </h1>
                     <p className="text-muted-foreground mt-1 flex items-center gap-2">
                       <Calendar className="w-4 h-4" />
                       Member since {memberSince}
@@ -592,7 +644,12 @@ export default function Profile() {
                     <Camera className="w-4 h-4" />
                     Edit Profile
                   </Button>
-                  <Button type="button" variant="outline" onClick={handleSignOut} className="gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleSignOut}
+                    className="gap-2"
+                  >
                     <LogOut className="w-4 h-4" />
                     Sign Out
                   </Button>
@@ -662,8 +719,12 @@ export default function Profile() {
               <CardContent>
                 {activityHistory.length === 0 ? (
                   <div className="text-center py-10">
-                    <p className="text-muted-foreground mb-4">No watch history yet.</p>
-                    <Button onClick={() => navigate("/upcoming")}>Start Exploring</Button>
+                    <p className="text-muted-foreground mb-4">
+                      No watch history yet.
+                    </p>
+                    <Button onClick={() => navigate("/upcoming")}>
+                      Start Exploring
+                    </Button>
                   </div>
                 ) : (
                   <>
@@ -672,9 +733,14 @@ export default function Profile() {
                         <ActivityListItem
                           key={`${item.content_type}-${item.content_id}`}
                           item={item}
-                          onOpen={() => handleItemClick(item.content_id, item.content_type)}
+                          onOpen={() =>
+                            handleItemClick(item.content_id, item.content_type)
+                          }
                           onRemove={() =>
-                            removeFromWatchHistory(item.content_id, item.content_type)
+                            removeFromWatchHistory(
+                              item.content_id,
+                              item.content_type,
+                            )
                           }
                         />
                       ))}
@@ -699,8 +765,12 @@ export default function Profile() {
               <CardContent>
                 {activityLikes.length === 0 ? (
                   <div className="text-center py-10">
-                    <p className="text-muted-foreground mb-4">No liked content yet.</p>
-                    <Button onClick={() => navigate("/upcoming")}>Find Something to Like</Button>
+                    <p className="text-muted-foreground mb-4">
+                      No liked content yet.
+                    </p>
+                    <Button onClick={() => navigate("/upcoming")}>
+                      Find Something to Like
+                    </Button>
                   </div>
                 ) : (
                   <>
@@ -709,7 +779,9 @@ export default function Profile() {
                         <ActivityListItem
                           key={`${item.content_type}-${item.content_id}`}
                           item={item}
-                          onOpen={() => handleItemClick(item.content_id, item.content_type)}
+                          onOpen={() =>
+                            handleItemClick(item.content_id, item.content_type)
+                          }
                         />
                       ))}
                     </ul>
@@ -731,7 +803,8 @@ export default function Profile() {
           <DialogHeader>
             <DialogTitle>Edit Profile</DialogTitle>
             <DialogDescription>
-              Update your username, import an image from a link, upload a photo, or choose a portrait from the default pack.
+              Update your username, import an image from a link, upload a photo,
+              or choose a portrait from the default pack.
             </DialogDescription>
           </DialogHeader>
 
@@ -740,7 +813,11 @@ export default function Profile() {
               <div className="flex items-center gap-4">
                 <Avatar className="h-20 w-20 border border-border shadow-sm">
                   <AvatarImage
-                    src={normalizedAvatarInput ? normalizedAvatarInput : avatarUrl || undefined}
+                    src={
+                      normalizedAvatarInput
+                        ? normalizedAvatarInput
+                        : avatarUrl || undefined
+                    }
                     alt="Profile preview"
                   />
                   <AvatarFallback className="text-sm font-semibold">
@@ -750,7 +827,8 @@ export default function Profile() {
                 <div className="space-y-1">
                   <p className="text-sm font-medium">Profile preview</p>
                   <p className="text-sm text-muted-foreground">
-                    URL images are imported and compressed on save. Uploads are center-cropped and stored as compact WebP.
+                    URL images are imported and compressed on save. Uploads are
+                    center-cropped and stored as compact WebP.
                   </p>
                 </div>
               </div>
@@ -786,16 +864,23 @@ export default function Profile() {
                   disabled={!isRemoteLinkedAvatar || isProcessingAvatar}
                   onClick={() => void importAvatarFromLink()}
                 >
-                  {isProcessingAvatar && isRemoteLinkedAvatar ? "Importing..." : "Import Link Image"}
+                  {isProcessingAvatar && isRemoteLinkedAvatar
+                    ? "Importing..."
+                    : "Import Link Image"}
                 </Button>
                 {(isUploadedAvatar || isRemoteLinkedAvatar) && (
-                  <Button type="button" variant="outline" onClick={() => setAvatarInput("")}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setAvatarInput("")}
+                  >
                     Clear Image
                   </Button>
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                Paste a public image URL and import it into a smaller avatar file before saving.
+                Paste a public image URL and import it into a smaller avatar
+                file before saving.
               </p>
               {isUploadedAvatar && (
                 <p className="text-xs text-muted-foreground">
@@ -820,16 +905,23 @@ export default function Profile() {
                   disabled={isProcessingAvatar}
                   onClick={() => avatarFileInputRef.current?.click()}
                 >
-                  {isProcessingAvatar && !isRemoteLinkedAvatar ? "Optimizing..." : "Upload Image"}
+                  {isProcessingAvatar && !isRemoteLinkedAvatar
+                    ? "Optimizing..."
+                    : "Upload Image"}
                 </Button>
                 {isUploadedAvatar && (
-                  <Button type="button" variant="outline" onClick={() => setAvatarInput("")}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setAvatarInput("")}
+                  >
                     Remove Upload
                   </Button>
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                PNG, JPG, WebP or GIF. Max size: 3MB. Images are cropped to square and compressed to reduce storage.
+                PNG, JPG, WebP or GIF. Max size: 3MB. Images are cropped to
+                square and compressed to reduce storage.
               </p>
             </div>
 
@@ -877,7 +969,11 @@ export default function Profile() {
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setEditOpen(false)}
+            >
               Cancel
             </Button>
             <Button
