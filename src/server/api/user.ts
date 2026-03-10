@@ -1,14 +1,15 @@
 /**
  * User Router - Consolidated serverless function
  * Routes: /api/user/watch-history, /api/user/liked-items, /api/user/preferences,
- * /api/user/profile, /api/user/clear-history, /api/user/comments, /api/user/feedback,
- * /api/user/recommendations
+ * /api/user/profile, /api/user/avatar-import, /api/user/clear-history,
+ * /api/user/comments, /api/user/feedback, /api/user/recommendations
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import watchHistoryHandler from "./_handlers/user/watch-history.js";
 import likedItemsHandler from "./_handlers/user/liked-items.js";
 import preferencesHandler from "./_handlers/user/preferences.js";
 import profileHandler from "./_handlers/user/profile.js";
+import avatarImportHandler from "./_handlers/user/avatar-import.js";
 import clearHistoryHandler from "./_handlers/user/clear-history.js";
 import commentsHandler from "./_handlers/user/comments.js";
 import feedbackHandler from "./_handlers/user/feedback.js";
@@ -125,6 +126,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return preferencesHandler(req, res);
       case "profile":
         return profileHandler(req, res);
+      case "avatar-import":
+        return avatarImportHandler(req, res);
       case "clear-history":
         return clearHistoryHandler(req, res);
       case "comments":

@@ -31,7 +31,7 @@ interface AuthContextType {
   signIn: (email: string, password: string, captchaToken: string) => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
-  updateProfile: (updates: Partial<Profile>) => Promise<void>;
+  updateProfile: (updates: Partial<Profile>) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -238,7 +238,7 @@ export function AuthProvider({
 
   // Update Profile
   const updateProfile = async (updates: Partial<Profile>) => {
-    if (!user) return;
+    if (!user) return false;
 
     const updated = await mongoClient.updateProfile({
       username: updates.username,
@@ -252,7 +252,7 @@ export function AuthProvider({
         title: "Update failed",
         description: "Failed to update profile",
       });
-      return;
+      return false;
     }
 
     setUser(updated);
@@ -261,6 +261,7 @@ export function AuthProvider({
       title: "Profile updated",
       description: "Your profile has been updated successfully.",
     });
+    return true;
   };
 
   return (

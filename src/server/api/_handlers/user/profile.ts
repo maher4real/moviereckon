@@ -11,7 +11,7 @@ const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
 const DATA_IMAGE_REGEX =
   /^data:image\/(?:png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/i;
 const MAX_AVATAR_URL_LENGTH = 500;
-const MAX_AVATAR_DATA_URL_LENGTH = 700_000;
+const MAX_AVATAR_DATA_URL_LENGTH = 260_000;
 const PROFILE_PROJECTION = {
   email: 1,
   username: 1,
@@ -120,7 +120,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (avatarProvided && avatarUrl === undefined) {
         return res.status(400).json({
           error:
-            "avatar_url must be a valid http(s) URL, a base64 data:image URL under ~700KB, or null",
+            "avatar_url must be a valid http(s) URL, a base64 data:image URL under ~260KB, or null",
         });
       }
 

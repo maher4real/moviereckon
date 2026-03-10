@@ -665,6 +665,20 @@ export async function checkRegistrationAvailability(payload: {
   }
 }
 
+export async function importAvatarFromUrl(url: string): Promise<Blob> {
+  const response = await fetchWithAuth("/api/user/avatar-import", {
+    method: "POST",
+    body: JSON.stringify({ url }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || "Unable to import image from URL");
+  }
+
+  return response.blob();
+}
+
 export async function deleteComment(commentId: string): Promise<boolean> {
   try {
     const response = await fetchWithAuth("/api/user/comments", {

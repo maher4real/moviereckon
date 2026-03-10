@@ -40,45 +40,45 @@ import {
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
 const MAX_AVATAR_FILE_SIZE_BYTES = 3 * 1024 * 1024;
-const TARGET_AVATAR_DATA_URL_LENGTH = 520_000;
-const MAX_AVATAR_DATA_URL_LENGTH = 700_000;
+const TARGET_AVATAR_DATA_URL_LENGTH = 170_000;
+const MAX_AVATAR_DATA_URL_LENGTH = 240_000;
 const DATA_IMAGE_REGEX =
   /^data:image\/(?:png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/i;
 const LOCAL_AVATAR_PATH_REGEX =
   /^\/avatars\/[a-z0-9-_]+\.(?:svg|png|jpe?g|webp|gif)$/i;
-const MAX_AVATAR_DIMENSION = 512;
-const MIN_AVATAR_DIMENSION = 160;
+const MAX_AVATAR_DIMENSION = 320;
+const MIN_AVATAR_DIMENSION = 128;
 
 const DEFAULT_AVATAR_OPTIONS = [
   {
-    id: "net-red",
-    label: "Red Hero",
-    url: "/avatars/net-red.svg",
+    id: "aurora",
+    label: "Aurora Lead",
+    url: "https://api.dicebear.com/7.x/avataaars/png?seed=Aurora&scale=80",
   },
   {
-    id: "shadow",
-    label: "Shadow",
-    url: "/avatars/net-shadow.svg",
+    id: "noir",
+    label: "Noir Cut",
+    url: "https://api.dicebear.com/7.x/adventurer/png?seed=Noir&scale=80",
   },
   {
-    id: "ember",
-    label: "Ember",
-    url: "/avatars/net-ember.svg",
+    id: "sunset",
+    label: "Sunset Frame",
+    url: "https://api.dicebear.com/7.x/big-ears/png?seed=Sunset&scale=80",
   },
   {
-    id: "sky",
-    label: "Sky",
-    url: "/avatars/net-sky.svg",
+    id: "forest",
+    label: "Forest Reel",
+    url: "https://api.dicebear.com/7.x/bottts/png?seed=Forest&scale=80",
   },
   {
-    id: "mint",
-    label: "Mint",
-    url: "/avatars/net-mint.svg",
+    id: "ocean",
+    label: "Ocean Cast",
+    url: "https://api.dicebear.com/7.x/lorelei/png?seed=Ocean&scale=80",
   },
   {
-    id: "violet",
-    label: "Violet",
-    url: "/avatars/net-violet.svg",
+    id: "rose",
+    label: "Rose Spotlight",
+    url: "https://api.dicebear.com/7.x/fun-emoji/png?seed=Rose&scale=80",
   },
 ];
 
@@ -112,7 +112,13 @@ const isSupportedAvatarValue = (value: string) => {
   return isValidHttpUrl(value);
 };
 
-const readFileAsDataUrl = (file: File) =>
+const isRemoteAvatarUrl = (value: string) =>
+  Boolean(value.trim()) &&
+  !value.startsWith("data:image/") &&
+  !LOCAL_AVATAR_PATH_REGEX.test(value) &&
+  isValidHttpUrl(value);
+
+const readFileAsDataUrl = (file: Blob) =>
   new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -134,15 +140,15 @@ const loadImageFromDataUrl = (dataUrl: string) =>
     image.src = dataUrl;
   });
 
-const compressAvatarImage = async (file: File) => {
+const compressAvatarImage = async (file: Blob) => {
   const dataUrl = await readFileAsDataUrl(file);
   const image = await loadImageFromDataUrl(dataUrl);
 
-  const largestSide = Math.max(image.naturalWidth, image.naturalHeight);
-  const scale = largestSide > MAX_AVATAR_DIMENSION ? MAX_AVATAR_DIMENSION / largestSide : 1;
-
-  const targetWidth = Math.max(1, Math.round(image.naturalWidth * scale));
-  const targetHeight = Math.max(1, Math.round(image.naturalHeight * scale));
+  const sourceSize = Math.min(image.naturalWidth, image.naturalHeight);
+  const sourceX = Math.max(0, Math.floor((image.naturalWidth - sourceSize) / 2));
+  const sourceY = Math.max(0, Math.floor((image.naturalHeight - sourceSize) / 2));
+  let targetSize = Math.max(1, Math.min(MAX_AVATAR_DIMENSION, sourceSize));
+  const minimumTargetSize = Math.min(targetSize, MIN_AVATAR_DIMENSION);
 
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
@@ -150,21 +156,31 @@ const compressAvatarImage = async (file: File) => {
     throw new Error("Canvas is not available for image optimization");
   }
 
-  const drawResizedImage = (width: number, height: number) => {
-    canvas.width = width;
-    canvas.height = height;
+  const drawResizedImage = (size: number) => {
+    canvas.width = size;
+    canvas.height = size;
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = "high";
-    context.clearRect(0, 0, width, height);
-    context.drawImage(image, 0, 0, width, height);
+    context.clearRect(0, 0, size, size);
+    context.drawImage(
+      image,
+      sourceX,
+      sourceY,
+      sourceSize,
+      sourceSize,
+      0,
+      0,
+      size,
+      size,
+    );
   };
 
   const findBestEncodedImage = () => {
-    let best = canvas.toDataURL("image/webp", 0.94);
+    let best = canvas.toDataURL("image/webp", 0.82);
     if (best.length <= TARGET_AVATAR_DATA_URL_LENGTH) return best;
 
-    let low = 0.62;
-    let high = 0.94;
+    let low = 0.5;
+    let high = 0.82;
     let bestUnderTarget = "";
 
     for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -181,26 +197,19 @@ const compressAvatarImage = async (file: File) => {
 
     if (bestUnderTarget) return bestUnderTarget;
 
-    best = canvas.toDataURL("image/webp", 0.72);
+    best = canvas.toDataURL("image/webp", 0.6);
     if (best.length <= MAX_AVATAR_DATA_URL_LENGTH) return best;
 
     return best;
   };
 
-  let width = targetWidth;
-  let height = targetHeight;
-  drawResizedImage(width, height);
+  drawResizedImage(targetSize);
 
   let output = findBestEncodedImage();
 
-  while (
-    output.length > MAX_AVATAR_DATA_URL_LENGTH &&
-    width > MIN_AVATAR_DIMENSION &&
-    height > MIN_AVATAR_DIMENSION
-  ) {
-    width = Math.max(MIN_AVATAR_DIMENSION, Math.round(width * 0.88));
-    height = Math.max(MIN_AVATAR_DIMENSION, Math.round(height * 0.88));
-    drawResizedImage(width, height);
+  while (output.length > MAX_AVATAR_DATA_URL_LENGTH && targetSize > minimumTargetSize) {
+    targetSize = Math.max(minimumTargetSize, Math.round(targetSize * 0.88));
+    drawResizedImage(targetSize);
     output = findBestEncodedImage();
   }
 
@@ -332,7 +341,9 @@ export default function Profile() {
 
   const displayName = profile?.username || user?.username || "User";
   const avatarUrl = profile?.avatar_url || null;
-  const isUploadedAvatar = avatarInput.trim().startsWith("data:image/");
+  const normalizedAvatarInput = avatarInput.trim();
+  const isUploadedAvatar = normalizedAvatarInput.startsWith("data:image/");
+  const isRemoteLinkedAvatar = isRemoteAvatarUrl(normalizedAvatarInput);
 
   const memberSince = profile?.created_at
     ? new Date(profile.created_at).toLocaleDateString("en-US", {
@@ -386,9 +397,49 @@ export default function Profile() {
     [likedItems],
   );
 
+  const importAvatarFromLink = async (urlValue = avatarInput.trim()) => {
+    if (!isRemoteAvatarUrl(urlValue)) {
+      toast({
+        variant: "destructive",
+        title: "Invalid image link",
+        description: "Paste a direct public http(s) image URL to import it.",
+      });
+      return null;
+    }
+
+    try {
+      setIsProcessingAvatar(true);
+      const remoteBlob = await mongoClient.importAvatarFromUrl(urlValue);
+      const optimized = await compressAvatarImage(remoteBlob);
+      if (!isSupportedAvatarValue(optimized)) {
+        throw new Error("Optimized image payload is still too large");
+      }
+      setAvatarInput(optimized);
+      toast({
+        title: "Image imported",
+        description: "Image downloaded from the link and optimized for your profile.",
+      });
+      return optimized;
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Could not import image",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Try another public image URL.",
+      });
+      return null;
+    } finally {
+      setIsProcessingAvatar(false);
+    }
+  };
+
   const handleSaveProfile = async () => {
     const username = usernameInput.trim();
-    const avatar = avatarInput.trim();
+    let avatar = avatarInput.trim();
+    const currentUsername = profile?.username || user?.username || "";
+    const currentAvatar = profile?.avatar_url || user?.avatar_url || null;
 
     if (!USERNAME_REGEX.test(username)) {
       toast({
@@ -400,31 +451,53 @@ export default function Profile() {
       return;
     }
 
-    if (avatar && !isSupportedAvatarValue(avatar)) {
+    if (avatar !== (currentAvatar || "") && avatar && !isSupportedAvatarValue(avatar)) {
       toast({
         variant: "destructive",
         title: "Invalid avatar",
         description:
-          "Avatar must be a valid http(s) URL or an uploaded PNG/JPG/WebP/GIF image.",
+          "Avatar must be a valid public http(s) URL or an uploaded PNG/JPG/WebP/GIF image.",
       });
       return;
     }
 
     setIsSavingProfile(true);
-    const avatarForSave = (() => {
-      if (!avatar) return null;
-      if (LOCAL_AVATAR_PATH_REGEX.test(avatar) && typeof window !== "undefined") {
-        return `${window.location.origin}${avatar}`;
+    try {
+      if (isRemoteAvatarUrl(avatar)) {
+        const importedAvatar = await importAvatarFromLink(avatar);
+        if (!importedAvatar) return;
+        avatar = importedAvatar;
       }
-      return avatar;
-    })();
 
-    await updateProfile({
-      username,
-      avatar_url: avatarForSave,
-    });
-    setIsSavingProfile(false);
-    setEditOpen(false);
+      const avatarForSave = (() => {
+        if (!avatar) return null;
+        if (LOCAL_AVATAR_PATH_REGEX.test(avatar) && typeof window !== "undefined") {
+          return `${window.location.origin}${avatar}`;
+        }
+        return avatar;
+      })();
+
+      const updates: { username?: string; avatar_url?: string | null } = {};
+      if (username !== currentUsername) {
+        updates.username = username;
+      }
+      if (avatarForSave !== currentAvatar) {
+        updates.avatar_url = avatarForSave;
+      }
+
+      if (!updates.username && !("avatar_url" in updates)) {
+        setEditOpen(false);
+        return;
+      }
+
+      const updated = await updateProfile(updates);
+
+      if (updated) {
+        setEditOpen(false);
+      }
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -459,7 +532,7 @@ export default function Profile() {
       setAvatarInput(optimized);
       toast({
         title: "Avatar optimized",
-        description: "Image compressed for faster upload while keeping quality.",
+        description: "Image cropped and compressed to a smaller WebP profile image.",
       });
     } catch {
       toast({
@@ -658,23 +731,28 @@ export default function Profile() {
           <DialogHeader>
             <DialogTitle>Edit Profile</DialogTitle>
             <DialogDescription>
-              Update your username, upload your own image, or choose a default avatar pack.
+              Update your username, import an image from a link, upload a photo, or choose a portrait from the default pack.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <Avatar className="h-16 w-16 border border-border">
-                <AvatarImage
-                  src={avatarInput.trim() ? avatarInput.trim() : avatarUrl || undefined}
-                  alt="Profile preview"
-                />
-                <AvatarFallback className="text-sm font-semibold">
-                  {getInitials(usernameInput || displayName)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="text-sm text-muted-foreground">
-                Upload your image or select a default avatar.
+          <div className="space-y-5">
+            <div className="rounded-2xl border border-border/70 bg-muted/30 p-4">
+              <div className="flex items-center gap-4">
+                <Avatar className="h-20 w-20 border border-border shadow-sm">
+                  <AvatarImage
+                    src={normalizedAvatarInput ? normalizedAvatarInput : avatarUrl || undefined}
+                    alt="Profile preview"
+                  />
+                  <AvatarFallback className="text-sm font-semibold">
+                    {getInitials(usernameInput || displayName)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Profile preview</p>
+                  <p className="text-sm text-muted-foreground">
+                    URL images are imported and compressed on save. Uploads are center-cropped and stored as compact WebP.
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -690,20 +768,38 @@ export default function Profile() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="profile-avatar-url">Avatar URL</Label>
+              <Label htmlFor="profile-avatar-url">Image Link</Label>
               <Input
                 id="profile-avatar-url"
                 value={isUploadedAvatar ? "" : avatarInput}
                 onChange={(event) => setAvatarInput(event.target.value)}
                 placeholder={
                   isUploadedAvatar
-                    ? "Uploaded image selected (clear to use URL)"
+                    ? "Imported or uploaded image selected"
                     : "https://example.com/avatar.jpg"
                 }
               />
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={!isRemoteLinkedAvatar || isProcessingAvatar}
+                  onClick={() => void importAvatarFromLink()}
+                >
+                  {isProcessingAvatar && isRemoteLinkedAvatar ? "Importing..." : "Import Link Image"}
+                </Button>
+                {(isUploadedAvatar || isRemoteLinkedAvatar) && (
+                  <Button type="button" variant="outline" onClick={() => setAvatarInput("")}>
+                    Clear Image
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Paste a public image URL and import it into a smaller avatar file before saving.
+              </p>
               {isUploadedAvatar && (
                 <p className="text-xs text-muted-foreground">
-                  Uploaded image is currently selected.
+                  Optimized image selected.
                 </p>
               )}
             </div>
@@ -724,7 +820,7 @@ export default function Profile() {
                   disabled={isProcessingAvatar}
                   onClick={() => avatarFileInputRef.current?.click()}
                 >
-                  {isProcessingAvatar ? "Optimizing..." : "Upload Image"}
+                  {isProcessingAvatar && !isRemoteLinkedAvatar ? "Optimizing..." : "Upload Image"}
                 </Button>
                 {isUploadedAvatar && (
                   <Button type="button" variant="outline" onClick={() => setAvatarInput("")}>
@@ -733,41 +829,50 @@ export default function Profile() {
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                PNG, JPG, WebP or GIF. Max size: 3MB. Uploaded images are auto-compressed.
+                PNG, JPG, WebP or GIF. Max size: 3MB. Images are cropped to square and compressed to reduce storage.
               </p>
             </div>
 
-            <div>
-              <p className="text-xs text-muted-foreground mb-2">Default Avatar Pack</p>
-              <div className="flex flex-wrap gap-2.5">
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-medium">Default Avatar Pack</p>
+                <p className="text-xs text-muted-foreground">
+                  Portrait-style defaults stored locally for instant loading.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {DEFAULT_AVATAR_OPTIONS.map((candidate) => (
                   <button
                     key={candidate.id}
                     type="button"
                     onClick={() => setAvatarInput(candidate.url)}
                     className={cn(
-                      "rounded-full border border-border p-1.5 hover:border-primary transition-colors",
+                      "rounded-2xl border border-border bg-card/70 p-3 text-left transition-colors hover:border-primary hover:bg-card",
                       isDefaultAvatarSelected(avatarInput, candidate.url) &&
-                        "border-primary ring-2 ring-primary/30",
+                        "border-primary ring-2 ring-primary/25",
                     )}
-                    title={candidate.label}
                   >
-                    <Avatar className="h-9 w-9">
-                      <AvatarImage src={candidate.url} alt={candidate.label} />
-                      <AvatarFallback>AV</AvatarFallback>
-                    </Avatar>
+                    <div className="mb-3 overflow-hidden rounded-xl border border-border/60 bg-muted/40">
+                      <img
+                        src={candidate.url}
+                        alt={candidate.label}
+                        className="h-28 w-full object-cover"
+                        loading="lazy"
+                      />
+                    </div>
+                    <p className="text-sm font-medium">{candidate.label}</p>
                   </button>
                 ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setAvatarInput("")}
-                  className="h-11"
-                >
-                  Use Initials
-                </Button>
               </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setAvatarInput("")}
+                className="w-full"
+              >
+                Use Initials
+              </Button>
             </div>
           </div>
 
