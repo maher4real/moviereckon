@@ -5,27 +5,27 @@ import { cn } from "@/lib/utils";
 const SIZE_STYLES = {
   sm: {
     gap: "gap-2",
-    mark: "h-9 w-9 rounded-xl",
-    icon: "h-[18px] w-[18px]",
-    label: "text-lg",
+    mark: "",
+    icon: "h-7 w-7",
+    label: "text-xl",
   },
   md: {
     gap: "gap-2.5",
-    mark: "h-10 w-10 rounded-[1rem]",
-    icon: "h-5 w-5",
-    label: "text-xl",
+    mark: "",
+    icon: "h-8 w-8",
+    label: "text-2xl",
   },
   lg: {
     gap: "gap-3",
-    mark: "h-12 w-12 rounded-[1.1rem]",
-    icon: "h-6 w-6",
-    label: "text-[1.7rem]",
+    mark: "",
+    icon: "h-9 w-9",
+    label: "text-3xl",
   },
   xl: {
-    gap: "gap-3.5",
-    mark: "h-16 w-16 rounded-[1.35rem]",
-    icon: "h-8 w-8",
-    label: "text-[2.45rem]",
+    gap: "gap-2.5",
+    mark: "",
+    icon: "h-10 w-10",
+    label: "text-4xl",
   },
 } as const;
 
@@ -57,7 +57,7 @@ export default function BrandLogo({
       <span
         data-brand-mark="true"
         className={cn(
-          "flex shrink-0 items-center justify-center border border-white/12 bg-gradient-to-br from-primary via-primary to-orange-500 text-primary-foreground shadow-[0_18px_44px_-24px_hsl(var(--primary)/0.95)]",
+          "flex shrink-0 items-center justify-center text-primary",
           styles.mark,
           markClassName,
         )}
@@ -68,7 +68,7 @@ export default function BrandLogo({
         <span
           data-brand-label="true"
           className={cn(
-            "text-gradient font-black tracking-[-0.05em]",
+            "text-gradient font-bold",
             styles.label,
             labelClassName,
           )}
