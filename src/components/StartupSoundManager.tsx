@@ -14,7 +14,8 @@ import {
   warmStartupSound,
 } from "@/lib/startupSound";
 
-const isAuthRoute = (pathname: string) => pathname === "/" || pathname.startsWith("/auth");
+const isAuthRoute = (pathname: string) =>
+  pathname === "/" || pathname.startsWith("/auth");
 
 export default function StartupSoundManager() {
   const { user, isLoading: authLoading } = useAuth();
@@ -35,16 +36,18 @@ export default function StartupSoundManager() {
     warmStartupSound();
 
     let disposed = false;
-    let fallbackAttached = false;
+    let playAttempted = false;
     let visibilityAttached = false;
     let homeReadyAttached = false;
     let homeTimer: number | null = null;
+    let fallbackTimer: number | null = null;
+    let userInteractionListener: (() => void) | null = null;
 
-    const detachFallback = () => {
-      if (!fallbackAttached) return;
-      window.removeEventListener("pointerdown", onUserInteraction);
-      window.removeEventListener("keydown", onUserInteraction);
-      fallbackAttached = false;
+    const detachUserInteraction = () => {
+      if (!userInteractionListener) return;
+      window.removeEventListener("pointerdown", userInteractionListener);
+      window.removeEventListener("keydown", userInteractionListener);
+      userInteractionListener = null;
     };
 
     const detachVisibility = () => {
@@ -63,30 +66,54 @@ export default function StartupSoundManager() {
       }
     };
 
+    const clearFallback = () => {
+      if (fallbackTimer !== null) {
+        window.clearTimeout(fallbackTimer);
+        fallbackTimer = null;
+      }
+      detachUserInteraction();
+    };
+
     const markPlayed = () => {
       markStartupSoundPlayed();
       detachHomeReady();
       detachVisibility();
-      detachFallback();
+      clearFallback();
     };
 
     const tryPlay = () => {
-      if (disposed) return;
+      if (disposed || playAttempted || hasStartupSoundPlayed()) return;
+      playAttempted = true;
+
       void playStartupSound()
         .then(() => {
           if (disposed) return;
           markPlayed();
         })
         .catch(() => {
-          if (disposed || fallbackAttached) return;
-          window.addEventListener("pointerdown", onUserInteraction, { once: true });
-          window.addEventListener("keydown", onUserInteraction, { once: true });
-          fallbackAttached = true;
+          if (disposed) return;
+          // Only attach user interaction listener after a short delay to avoid triggering on the login click
+          if (fallbackTimer === null) {
+            fallbackTimer = window.setTimeout(() => {
+              if (disposed || hasStartupSoundPlayed()) return;
+              userInteractionListener = () => {
+                if (disposed || hasStartupSoundPlayed()) return;
+                clearFallback();
+                playWhenVisible();
+              };
+              window.addEventListener("pointerdown", userInteractionListener, {
+                once: true,
+              });
+              window.addEventListener("keydown", userInteractionListener, {
+                once: true,
+              });
+            }, 100);
+          }
         });
     };
 
     const playWhenVisible = () => {
-      if (disposed) return;
+      if (disposed || hasStartupSoundPlayed()) return;
       if (document.visibilityState === "visible") {
         tryPlay();
         return;
@@ -95,11 +122,6 @@ export default function StartupSoundManager() {
         document.addEventListener("visibilitychange", onVisibilityChange);
         visibilityAttached = true;
       }
-    };
-
-    const onUserInteraction = () => {
-      detachFallback();
-      playWhenVisible();
     };
 
     const onVisibilityChange = () => {
@@ -118,10 +140,12 @@ export default function StartupSoundManager() {
       if (consumeHomeHeroReady()) {
         playWhenVisible();
       } else {
-        window.addEventListener(HOME_HERO_READY_EVENT, onHomeReady, { once: true });
+        window.addEventListener(HOME_HERO_READY_EVENT, onHomeReady, {
+          once: true,
+        });
         homeReadyAttached = true;
         // Fallback in case the ready signal is missed by the listener.
-        homeTimer = window.setTimeout(onHomeReady, 350);
+        homeTimer = window.setTimeout(onHomeReady, 200);
       }
     } else {
       playWhenVisible();
@@ -131,7 +155,7 @@ export default function StartupSoundManager() {
       disposed = true;
       detachHomeReady();
       detachVisibility();
-      detachFallback();
+      clearFallback();
     };
   }, [authLoading, user, location.pathname]);
 

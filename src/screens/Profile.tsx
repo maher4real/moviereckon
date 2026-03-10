@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import * as mongoClient from "@/lib/mongodbClient";
 import { getPosterUrl } from "@/lib/tmdb";
 import { cn } from "@/lib/utils";
 import {

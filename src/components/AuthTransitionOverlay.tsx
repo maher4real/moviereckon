@@ -15,10 +15,10 @@ import { cn } from "@/lib/utils";
 
 type OverlayPhase = "hidden" | "center" | "moving" | "fading";
 
-const MIN_CENTER_DURATION_MS = 900;
-const MOVE_DURATION_MS = 1450;
-const FADE_DURATION_MS = 450;
-const ANCHOR_LOOKUP_TIMEOUT_MS = 5000;
+const MIN_CENTER_DURATION_MS = 800;
+const MOVE_DURATION_MS = 850;
+const FADE_DURATION_MS = 250;
+const ANCHOR_LOOKUP_TIMEOUT_MS = 2500;
 
 const INITIAL_TRANSFORM = {
   x: 0,
@@ -380,9 +380,23 @@ export default function AuthTransitionOverlay() {
         >
           <Film
             className={cn(
-              "h-10 w-10 text-primary sm:h-12 sm:w-12",
+              "h-10 w-10 text-primary sm:h-12 sm:w-12 rounded-full",
               isCenter && "animate-auth-brand-pulse",
+              isCenter && "animate-auth-brand-gradient-flow",
+              isCenter && "animate-auth-brand-glow",
             )}
+            style={
+              isCenter
+                ? {
+                    backgroundImage:
+                      "linear-gradient(90deg, transparent 0%, hsl(var(--primary)) 25%, transparent 50%, hsl(var(--secondary)) 75%, transparent 100%)",
+                    backgroundSize: "200% 100%",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                  }
+                : undefined
+            }
           />
           <span
             className={cn(

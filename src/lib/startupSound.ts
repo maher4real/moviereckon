@@ -10,6 +10,7 @@ export const HOME_HERO_READY_EVENT = "app:home-first-image-ready";
 
 let startupAudio: HTMLAudioElement | null = null;
 let homeHeroReady = false;
+let isAudioPlaying = false;
 
 const safeGetSession = (key: string) => {
   try {
@@ -47,7 +48,8 @@ export const queueStartupSound = () => {
   safeSetSession(STARTUP_SOUND_PENDING_KEY, "1");
 };
 
-export const isStartupSoundPending = () => safeGetSession(STARTUP_SOUND_PENDING_KEY) === "1";
+export const isStartupSoundPending = () =>
+  safeGetSession(STARTUP_SOUND_PENDING_KEY) === "1";
 
 export const clearStartupSoundPending = () => {
   safeRemoveSession(STARTUP_SOUND_PENDING_KEY);
@@ -61,6 +63,7 @@ export const markStartupSoundPlayed = () => {
   safeSetSession(STARTUP_SOUND_PLAYED_KEY, "1");
   safeSetSession(STARTUP_SOUND_VERSION_KEY, STARTUP_SOUND_VERSION);
   safeRemoveSession(STARTUP_SOUND_PENDING_KEY);
+  isAudioPlaying = false;
 };
 
 const getStartupAudio = () => {
@@ -102,11 +105,23 @@ export const primeStartupSoundFromGesture = async () => {
 };
 
 export const playStartupSound = async () => {
+  // Prevent double playback
+  if (isAudioPlaying || hasStartupSoundPlayed()) {
+    return;
+  }
+
+  isAudioPlaying = true;
   const audio = getStartupAudio();
   audio.muted = false;
   audio.volume = STARTUP_SOUND_VOLUME;
   audio.currentTime = 0;
-  await audio.play();
+
+  try {
+    await audio.play();
+  } catch (error) {
+    isAudioPlaying = false;
+    throw error;
+  }
 };
 
 export const releaseStartupSoundAudio = () => {
@@ -114,6 +129,7 @@ export const releaseStartupSoundAudio = () => {
   startupAudio.pause();
   startupAudio.src = "";
   startupAudio = null;
+  isAudioPlaying = false;
 };
 
 export const announceHomeHeroReady = () => {

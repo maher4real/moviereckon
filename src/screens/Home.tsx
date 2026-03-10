@@ -73,34 +73,9 @@ export default function Home() {
 
   useEffect(() => {
     if (!user || loadSecondaryShelves) return;
-    if (!isHeroVisualReady) return;
-
-    const idleApi = window as Window & {
-      requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
-      cancelIdleCallback?: (handle: number) => void;
-    };
-
-    if (typeof idleApi.requestIdleCallback === "function") {
-      const idleHandle = idleApi.requestIdleCallback(
-        () => setLoadSecondaryShelves(true),
-        { timeout: 1200 },
-      );
-
-      return () => {
-        if (typeof idleApi.cancelIdleCallback === "function") {
-          idleApi.cancelIdleCallback(idleHandle);
-        }
-      };
-    }
-
-    const timer = window.setTimeout(() => setLoadSecondaryShelves(true), 350);
+    // Start loading secondary shelves immediately while hero loads
+    const timer = window.setTimeout(() => setLoadSecondaryShelves(true), 50);
     return () => window.clearTimeout(timer);
-  }, [user, loadSecondaryShelves, isHeroVisualReady]);
-
-  useEffect(() => {
-    if (!user || loadSecondaryShelves) return;
-    const fallbackTimer = window.setTimeout(() => setLoadSecondaryShelves(true), 2500);
-    return () => window.clearTimeout(fallbackTimer);
   }, [user, loadSecondaryShelves]);
 
   // Fetch all data with optimized query config
@@ -151,7 +126,7 @@ export default function Home() {
     queryFn: () => getTeluguMovies(),
     ...queryConfig,
     enabled: loadSecondaryShelves,
-  });
+  });}
 
   const { data: tvShowsData, isLoading: tvLoading } = useQuery({
     queryKey: ["popular-tv"],
