@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { importAvatarFromUrl } from "@/lib/mongodbClient";
 import {
+  createDefaultAvatarDataUrl,
   compressAvatarImage,
   DEFAULT_AVATAR_OPTIONS,
   getInitials,
@@ -40,6 +41,9 @@ export default function ProfileEdit() {
   const [isProcessingAvatar, setIsProcessingAvatar] = useState(false);
   const [usernameInput, setUsernameInput] = useState("");
   const [avatarInput, setAvatarInput] = useState("");
+  const [defaultAvatarValues, setDefaultAvatarValues] = useState<
+    Record<string, string>
+  >({});
   const avatarFileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -53,13 +57,35 @@ export default function ProfileEdit() {
     setAvatarInput(normalizeAvatarValue(profile?.avatar_url || ""));
   }, [profile?.avatar_url, profile?.username, user?.avatar_url, user?.username]);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    setDefaultAvatarValues(
+      Object.fromEntries(
+        DEFAULT_AVATAR_OPTIONS.map((candidate) => [
+          candidate.id,
+          createDefaultAvatarDataUrl(candidate.id),
+        ]),
+      ),
+    );
+  }, []);
+
   const displayName = profile?.username || user?.username || "User";
   const currentAvatar = profile?.avatar_url || user?.avatar_url || null;
   const normalizedAvatarInput = normalizeAvatarValue(avatarInput);
+  const selectedDefaultAvatar =
+    DEFAULT_AVATAR_OPTIONS.find((candidate) =>
+      isDefaultAvatarSelected(
+        normalizedAvatarInput,
+        defaultAvatarValues[candidate.id] ||
+          createDefaultAvatarDataUrl(candidate.id),
+      ),
+    ) || null;
   const selectedAvatarValue = normalizedAvatarInput || currentAvatar || "";
   const previewAvatar = selectedAvatarValue || undefined;
-  const isUploadedAvatar = normalizedAvatarInput.startsWith("data:image/");
-  const isDefaultAvatar = normalizedAvatarInput.startsWith("/avatars/");
+  const isDefaultAvatar = Boolean(selectedDefaultAvatar);
+  const isUploadedAvatar =
+    normalizedAvatarInput.startsWith("data:image/") && !isDefaultAvatar;
   const isRemoteLinkedAvatar = isRemoteAvatarUrl(normalizedAvatarInput);
   const avatarInputValue =
     isUploadedAvatar || isDefaultAvatar ? "" : normalizedAvatarInput;
@@ -68,7 +94,7 @@ export default function ProfileEdit() {
     : isRemoteLinkedAvatar
       ? "Link image"
       : isDefaultAvatar
-        ? "Default avatar"
+        ? selectedDefaultAvatar?.label || "Gallery avatar"
         : selectedAvatarValue
           ? "Current avatar"
           : "Initials";
@@ -283,7 +309,7 @@ export default function ProfileEdit() {
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
-            <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">
+            <aside className="space-y-4 self-start">
               <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-gradient-to-br from-card via-card to-primary/10 p-5 shadow-sm">
                 <div className="absolute -right-12 -top-14 h-36 w-36 rounded-full bg-primary/20 blur-3xl" />
                 <div className="absolute -bottom-16 -left-12 h-36 w-36 rounded-full bg-secondary/20 blur-3xl" />
@@ -335,8 +361,8 @@ export default function ProfileEdit() {
                 <div className="grid grid-cols-2 gap-3">
                   <Button
                     type="button"
-                    variant="secondary"
-                    className="h-11 gap-2"
+                    variant="outline"
+                    className="btn-brand-soft h-11 gap-2 border-primary/25"
                     disabled={isProcessingAvatar}
                     onClick={() => avatarFileInputRef.current?.click()}
                   >
@@ -406,8 +432,8 @@ export default function ProfileEdit() {
                     />
                     <Button
                       type="button"
-                      variant="secondary"
-                      className="h-11"
+                      variant="outline"
+                      className="btn-brand-soft h-11 border-primary/25"
                       disabled={!isRemoteLinkedAvatar || isProcessingAvatar}
                       onClick={() => void importAvatarFromLink()}
                     >
@@ -442,16 +468,19 @@ export default function ProfileEdit() {
 
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
                   {DEFAULT_AVATAR_OPTIONS.map((candidate) => {
+                    const candidateValue =
+                      defaultAvatarValues[candidate.id] ||
+                      createDefaultAvatarDataUrl(candidate.id);
                     const isSelected = isDefaultAvatarSelected(
                       normalizedAvatarInput,
-                      candidate.url,
+                      candidateValue,
                     );
 
                     return (
                       <button
                         key={candidate.id}
                         type="button"
-                        onClick={() => setAvatarInput(candidate.url)}
+                        onClick={() => setAvatarInput(candidateValue)}
                         className={cn(
                           "group rounded-[24px] border border-border bg-background/70 p-3 text-left transition-all hover:-translate-y-0.5 hover:border-primary hover:bg-background",
                           isSelected && "border-primary ring-2 ring-primary/25",
@@ -463,12 +492,35 @@ export default function ProfileEdit() {
                               Selected
                             </span>
                           ) : null}
-                          <img
-                            src={candidate.url}
-                            alt={candidate.label}
-                            className="h-32 w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                            loading="lazy"
-                          />
+                          <div
+                            aria-hidden="true"
+                            className="relative h-32 w-full overflow-hidden transition-transform duration-300 group-hover:scale-[1.03]"
+                            style={{
+                              backgroundImage: `linear-gradient(135deg, ${candidate.colors[0]} 0%, ${candidate.colors[1]} 55%, ${candidate.colors[2]} 100%)`,
+                            }}
+                          >
+                            <div
+                              className="absolute -right-5 -top-5 h-20 w-20 rounded-full blur-2xl"
+                              style={{ backgroundColor: candidate.glow }}
+                            />
+                            <div className="absolute left-3 top-3 h-7 w-16 rounded-full border border-white/20 bg-white/14" />
+                            <div
+                              className="absolute inset-x-4 bottom-4 rounded-[22px] border border-white/16 p-3 backdrop-blur-sm"
+                              style={{ backgroundColor: candidate.surface }}
+                            >
+                              <div
+                                className="h-2.5 w-16 rounded-full"
+                                style={{ backgroundColor: candidate.accent }}
+                              />
+                              <div className="mt-2 flex items-center gap-2">
+                                <div className="h-9 w-9 rounded-2xl bg-white/14" />
+                                <div className="min-w-0 flex-1 space-y-1.5">
+                                  <div className="h-2.5 rounded-full bg-white/24" />
+                                  <div className="h-2.5 w-2/3 rounded-full bg-white/16" />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                         <p className="text-sm font-medium">{candidate.label}</p>
                       </button>

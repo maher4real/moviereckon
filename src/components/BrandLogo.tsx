@@ -74,7 +74,7 @@ export default function BrandLogo({
           className={cn(
             "text-gradient font-bold",
             animated &&
-              "animate-auth-brand-gradient-flow bg-[length:220%_100%] drop-shadow-[0_10px_34px_hsl(var(--primary)/0.16)]",
+              "brand-text-gradient-loop animate-auth-brand-gradient-flow drop-shadow-[0_10px_34px_hsl(var(--primary)/0.16)]",
             styles.label,
             labelClassName,
           )}
