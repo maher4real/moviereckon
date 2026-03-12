@@ -118,12 +118,17 @@ export default function TurnstileCaptcha({
 }: TurnstileCaptchaProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const widgetIdRef = useRef<string | null>(null);
+  const onTokenChangeRef = useRef(onTokenChange);
   const [loadError, setLoadError] = useState<string>("");
   const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
+    onTokenChangeRef.current = onTokenChange;
+  }, [onTokenChange]);
+
+  useEffect(() => {
     let canceled = false;
-    onTokenChange("");
+    onTokenChangeRef.current("");
 
     if (!siteKey) {
       setLoadError("CAPTCHA site key is missing.");
@@ -145,9 +150,9 @@ export default function TurnstileCaptcha({
           widgetIdRef.current = window.turnstile.render(containerRef.current, {
             sitekey: siteKey,
             action,
-            callback: (token) => onTokenChange(token),
-            "expired-callback": () => onTokenChange(""),
-            "error-callback": () => onTokenChange(""),
+            callback: (token) => onTokenChangeRef.current(token),
+            "expired-callback": () => onTokenChangeRef.current(""),
+            "error-callback": () => onTokenChangeRef.current(""),
           });
         } catch (renderError) {
           console.error("Turnstile render error:", renderError);
@@ -172,16 +177,16 @@ export default function TurnstileCaptcha({
         widgetIdRef.current = null;
       }
     };
-  }, [action, onTokenChange, retryNonce, siteKey]);
+  }, [action, retryNonce, siteKey]);
 
   useEffect(() => {
     if (!window.turnstile || !widgetIdRef.current) return;
     window.turnstile.reset(widgetIdRef.current);
-    onTokenChange("");
-  }, [onTokenChange, resetNonce]);
+    onTokenChangeRef.current("");
+  }, [resetNonce]);
 
   const handleRetry = () => {
-    onTokenChange("");
+    onTokenChangeRef.current("");
     setLoadError("");
     if (typeof window !== "undefined") {
       removeExistingTurnstileScript();
