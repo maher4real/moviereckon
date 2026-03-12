@@ -1,5 +1,8 @@
 import { createRoot } from "react-dom/client";
+import { installGlobalSafeLogging } from "@/lib/safeLogging";
 import "./index.css";
+
+installGlobalSafeLogging();
 
 // Global error handler for unhandled promise rejections
 window.addEventListener("unhandledrejection", (event) => {

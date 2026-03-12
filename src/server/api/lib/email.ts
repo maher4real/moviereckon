@@ -23,29 +23,45 @@ type MailerConfig = {
   host: string;
   port: number;
   secure: boolean;
+  requireTls: boolean;
   user: string;
   pass: string;
+  fromEmail: string;
   from: string;
   replyTo: string | null;
 };
 
 let cachedTransporter: nodemailer.Transporter | null = null;
 let cachedConfigKey: string | null = null;
+let cachedVerifyPromise: Promise<void> | null = null;
 
 function getTrimmedEnv(name: string): string {
   const value = process.env[name];
   return typeof value === "string" ? value.trim() : "";
 }
 
+function isGmailHost(host: string): boolean {
+  return host.trim().toLowerCase() === "smtp.gmail.com";
+}
+
+function isMailerSendHost(host: string): boolean {
+  return host.trim().toLowerCase() === "smtp.mailersend.net";
+}
+
 function getMailerConfig(): MailerConfig {
   const host = getTrimmedEnv("SMTP_HOST");
   const port = Number.parseInt(getTrimmedEnv("SMTP_PORT") || "587", 10);
   const user = getTrimmedEnv("SMTP_USER");
-  const pass = getTrimmedEnv("SMTP_PASS");
-  const fromEmail = getTrimmedEnv("SMTP_FROM_EMAIL");
+  const rawPass = getTrimmedEnv("SMTP_PASS");
+  const configuredFromEmail = getTrimmedEnv("SMTP_FROM_EMAIL");
   const fromName = getTrimmedEnv("SMTP_FROM_NAME") || "MovieReckon";
   const replyTo = getTrimmedEnv("SMTP_REPLY_TO_EMAIL") || null;
-  const secure = getTrimmedEnv("SMTP_SECURE") === "true" || port === 465;
+  const gmail = isGmailHost(host);
+  const mailerSend = isMailerSendHost(host);
+  const pass = gmail ? rawPass.replace(/\s+/g, "") : rawPass;
+  const fromEmail = gmail ? user : configuredFromEmail;
+  const secure = port === 465 ? true : (port === 587 || (mailerSend && port === 2525)) ? false : getTrimmedEnv("SMTP_SECURE") === "true";
+  const requireTls = !secure && (port === 587 || (mailerSend && port === 2525));
 
   if (!host || !Number.isFinite(port) || port <= 0 || !user || !pass || !fromEmail) {
     throw new Error("SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and SMTP_FROM_EMAIL must be configured");
@@ -55,8 +71,10 @@ function getMailerConfig(): MailerConfig {
     host,
     port,
     secure,
+    requireTls,
     user,
     pass,
+    fromEmail,
     from: `${fromName} <${fromEmail}>`,
     replyTo,
   };
@@ -71,15 +89,35 @@ function getTransporter(): nodemailer.Transporter {
       host: config.host,
       port: config.port,
       secure: config.secure,
+      requireTLS: config.requireTls,
+      connectionTimeout: 15_000,
+      greetingTimeout: 15_000,
+      socketTimeout: 20_000,
       auth: {
         user: config.user,
         pass: config.pass,
       },
+      tls: {
+        servername: config.host,
+      },
     });
     cachedConfigKey = configKey;
+    cachedVerifyPromise = null;
   }
 
   return cachedTransporter;
+}
+
+async function ensureTransporterReady() {
+  const transporter = getTransporter();
+  const config = getMailerConfig();
+  const configKey = JSON.stringify(config);
+
+  if (!cachedVerifyPromise || cachedConfigKey !== configKey) {
+    cachedVerifyPromise = transporter.verify().then(() => undefined);
+  }
+
+  return cachedVerifyPromise;
 }
 
 function escapeHtml(value: string): string {
@@ -166,15 +204,27 @@ function renderPasswordResetEmail(input: PasswordResetEmailInput) {
 async function sendEmail(input: SendEmailInput): Promise<void> {
   const transporter = getTransporter();
   const config = getMailerConfig();
+  await ensureTransporterReady();
 
-  await transporter.sendMail({
-    from: config.from,
-    to: input.to,
-    replyTo: config.replyTo || undefined,
-    subject: input.subject,
-    html: input.html,
-    text: input.text,
-  });
+  try {
+    await transporter.sendMail({
+      from: config.from,
+      to: input.to,
+      replyTo: config.replyTo || undefined,
+      subject: input.subject,
+      html: input.html,
+      text: input.text,
+    });
+  } catch (error) {
+    const providerHint = isMailerSendHost(config.host)
+      ? " Verify that SMTP_FROM_EMAIL uses a verified sender domain for MailerSend."
+      : "";
+    const message = `SMTP delivery failed.${providerHint}`;
+    if (error instanceof Error) {
+      throw new Error(message);
+    }
+    throw new Error(message);
+  }
 }
 
 export async function sendVerificationEmail(input: VerificationEmailInput): Promise<void> {

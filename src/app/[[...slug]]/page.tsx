@@ -1,4 +1,5 @@
 import App from "@/App";
+import { installGlobalSafeLogging } from "@/lib/safeLogging";
 import { dehydrate, QueryClient } from "@tanstack/react-query";
 import { headers } from "next/headers";
 import type { MongoUser } from "@/lib/mongodbClient";
@@ -29,6 +30,8 @@ import {
   getServerTrendingTVShows,
 } from "@/lib/server/tmdbServer";
 import { getUserById, getUserFromRequest } from "@/server/api/lib/auth";
+
+installGlobalSafeLogging();
 
 type SearchParams = Record<string, string | string[] | undefined>;
 type PageParams = {

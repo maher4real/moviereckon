@@ -6,6 +6,7 @@
  * /api/auth/reset-password
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { installGlobalSafeLogging } from "../../lib/safeLogging.js";
 import availabilityHandler from "./_handlers/auth/availability.js";
 import loginHandler from "./_handlers/auth/login.js";
 import registerHandler from "./_handlers/auth/register.js";
@@ -28,6 +29,8 @@ import {
 } from "./lib/cors.js";
 import { emitSecurityEvent } from "./lib/abuse-telemetry.js";
 import { consumeRateLimit, getClientIp } from "./lib/rate-limit.js";
+
+installGlobalSafeLogging();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   applyDefaultSecurityHeaders(res);

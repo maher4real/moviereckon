@@ -102,8 +102,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     console.error("Avatar upload error:", error);
     return res.status(500).json({
-      error:
-        error instanceof Error ? error.message : "Unable to upload avatar image.",
+      error: "Unable to upload avatar image right now.",
     });
   }
 }

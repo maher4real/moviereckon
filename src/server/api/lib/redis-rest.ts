@@ -84,13 +84,16 @@ export async function runRedisCommand<T = unknown>(
       error: null,
     };
   } catch (error) {
+    const errorCode =
+      error instanceof Error && error.name === "AbortError"
+        ? "redis_request_timeout"
+        : "redis_request_failed";
     return {
       ok: false,
       result: null,
-      error: error instanceof Error ? error.message : "redis_request_failed",
+      error: errorCode,
     };
   } finally {
     clearTimeout(timeout);
   }
 }
-
