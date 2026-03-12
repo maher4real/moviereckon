@@ -199,6 +199,8 @@ Required for full app behavior:
 - `TMDB_API_KEY`
 - `TURNSTILE_SECRET_KEY`
 - `NEXT_PUBLIC_TURNSTILE_SITE_KEY`
+- `TURNSTILE_VERIFY_TIMEOUT_MS`
+- `TURNSTILE_MAX_TOKEN_AGE_SECONDS`
 
 Public API base URL (optional in same-origin deploys):
 
@@ -297,7 +299,7 @@ Other:
 ## Auth Notes
 
 - Session is cookie-based (`HttpOnly` access + refresh cookies).
-- Turnstile captcha is enforced for login and signup.
+- Turnstile captcha is enforced for login and signup, with backend action, hostname, and challenge-age validation.
 - Email/password accounts must verify their email before the first sign-in.
 - Refresh tokens are stored hashed in MongoDB.
 - Local development logs a verification preview URL when Resend env vars are not configured.

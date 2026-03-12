@@ -263,12 +263,17 @@ export async function register(
       credentials: "include",
     });
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
       return {
         user: null,
-        error: data.error || "Registration failed",
+        error:
+          typeof data.error === "string"
+            ? data.error
+            : response.status >= 500
+              ? "Registration failed. Please try again."
+              : "Registration failed",
         requiresEmailVerification: false,
         verificationPreviewUrl: null,
         verificationProvider: emailVerificationProvider,

@@ -11,6 +11,7 @@ import {
   provisionFirebaseVerificationForSignup,
   resendFirebaseVerificationEmail,
   rollbackFirebaseVerificationSignup,
+  shouldFallbackToInternalVerification,
 } from "@/lib/firebaseEmailVerification";
 import { useToast } from "@/hooks/use-toast";
 
@@ -145,23 +146,27 @@ export function AuthProvider({
   ) => {
     setIsAuthenticating(true);
     try {
-      const verificationProvider: mongoClient.EmailVerificationProvider =
+      let verificationProvider: mongoClient.EmailVerificationProvider =
         isFirebaseVerificationEnabled() ? "firebase" : "internal";
 
       if (verificationProvider === "firebase") {
         const firebaseSignup = await provisionFirebaseVerificationForSignup(email, password);
         if (!firebaseSignup.ok) {
-          toast({
-            variant: "destructive",
-            title: "Sign up failed",
-            description: firebaseSignup.message,
-          });
-          return {
-            error: new Error(firebaseSignup.message),
-            requiresEmailVerification: false,
-            verificationPreviewUrl: null,
-            verificationProvider,
-          };
+          if (shouldFallbackToInternalVerification(firebaseSignup)) {
+            verificationProvider = "internal";
+          } else {
+            toast({
+              variant: "destructive",
+              title: "Sign up failed",
+              description: firebaseSignup.message,
+            });
+            return {
+              error: new Error(firebaseSignup.message),
+              requiresEmailVerification: false,
+              verificationPreviewUrl: null,
+              verificationProvider,
+            };
+          }
         }
       }
 

@@ -15,6 +15,18 @@ type FirebaseVerificationResult =
   | { ok: true; idToken?: string }
   | { ok: false; code: string; message: string };
 
+const FIREBASE_FALLBACK_ERROR_CODES = new Set([
+  "auth/network-request-failed",
+  "auth/internal-error",
+  "auth/invalid-api-key",
+  "auth/app-not-authorized",
+  "auth/operation-not-allowed",
+  "auth/unauthorized-continue-uri",
+  "auth/invalid-continue-uri",
+  "auth/missing-continue-uri",
+  "auth/too-many-requests",
+]);
+
 let authPersistencePromise: Promise<ReturnType<typeof getAuth>> | null = null;
 
 function mapFirebaseAuthError(error: unknown): { code: string; message: string } {
@@ -85,14 +97,32 @@ export async function provisionFirebaseVerificationForSignup(
   email: string,
   password: string,
 ): Promise<FirebaseVerificationResult> {
+  let createdUser: Awaited<ReturnType<typeof createUserWithEmailAndPassword>>["user"] | null = null;
   try {
     const auth = await getConfiguredAuth();
     const credential = await createUserWithEmailAndPassword(auth, email, password);
+    createdUser = credential.user;
     await sendEmailVerification(credential.user, getActionCodeSettings());
     return { ok: true };
   } catch (error) {
+    if (createdUser) {
+      try {
+        await deleteUser(createdUser);
+      } catch {
+        // Ignore cleanup errors and fall through to the surfaced signup error.
+      }
+    }
+    try {
+      await signOutSafely();
+    } catch {
+      // Ignore cleanup errors.
+    }
     return { ok: false, ...mapFirebaseAuthError(error) };
   }
+}
+
+export function shouldFallbackToInternalVerification(result: FirebaseVerificationResult): boolean {
+  return !result.ok && FIREBASE_FALLBACK_ERROR_CODES.has(result.code);
 }
 
 export async function rollbackFirebaseVerificationSignup(): Promise<void> {

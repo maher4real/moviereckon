@@ -129,8 +129,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         type: "captcha_failed",
         outcome: "blocked",
         route: "auth_register",
-        reason: "captcha_verification_failed",
+        reason: captchaResult.reason || "captcha_verification_failed",
         req,
+        metadata: {
+          captcha_error_codes: captchaResult.errorCodes,
+          captcha_response_action: captchaResult.responseAction,
+          captcha_response_hostname: captchaResult.responseHostname,
+        },
       });
       return res.status(400).json({ error: captchaResult.error || "CAPTCHA verification failed" });
     }

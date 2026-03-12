@@ -15,9 +15,22 @@ declare global {
         options: {
           sitekey: string;
           action?: string;
+          appearance?: "always" | "execute" | "interaction-only";
+          execution?: "render" | "execute";
+          size?: "normal" | "flexible" | "compact";
+          theme?: "light" | "dark" | "auto";
+          retry?: "auto" | "never";
+          "retry-interval"?: number;
+          "refresh-expired"?: "auto" | "manual" | "never";
+          "refresh-timeout"?: "auto" | "manual" | "never";
+          "response-field"?: boolean;
           callback?: (token: string) => void;
           "expired-callback"?: () => void;
           "error-callback"?: () => void;
+          "timeout-callback"?: () => void;
+          "before-interactive-callback"?: () => void;
+          "after-interactive-callback"?: () => void;
+          "unsupported-callback"?: () => void;
         },
       ) => string;
       reset: (widgetId?: string) => void;
@@ -121,6 +134,7 @@ export default function TurnstileCaptcha({
   const onTokenChangeRef = useRef(onTokenChange);
   const [loadError, setLoadError] = useState<string>("");
   const [retryNonce, setRetryNonce] = useState(0);
+  const [isInteractiveChallengeVisible, setIsInteractiveChallengeVisible] = useState(false);
 
   useEffect(() => {
     onTokenChangeRef.current = onTokenChange;
@@ -129,6 +143,7 @@ export default function TurnstileCaptcha({
   useEffect(() => {
     let canceled = false;
     onTokenChangeRef.current("");
+    setIsInteractiveChallengeVisible(false);
 
     if (!siteKey) {
       setLoadError("CAPTCHA site key is missing.");
@@ -150,9 +165,31 @@ export default function TurnstileCaptcha({
           widgetIdRef.current = window.turnstile.render(containerRef.current, {
             sitekey: siteKey,
             action,
+            appearance: "interaction-only",
+            execution: "render",
+            retry: "auto",
+            "refresh-expired": "auto",
+            "refresh-timeout": "auto",
+            "response-field": false,
             callback: (token) => onTokenChangeRef.current(token),
-            "expired-callback": () => onTokenChangeRef.current(""),
-            "error-callback": () => onTokenChangeRef.current(""),
+            "expired-callback": () => {
+              setIsInteractiveChallengeVisible(false);
+              onTokenChangeRef.current("");
+            },
+            "error-callback": () => {
+              setIsInteractiveChallengeVisible(false);
+              onTokenChangeRef.current("");
+            },
+            "timeout-callback": () => {
+              setIsInteractiveChallengeVisible(false);
+              onTokenChangeRef.current("");
+            },
+            "before-interactive-callback": () => setIsInteractiveChallengeVisible(true),
+            "after-interactive-callback": () => setIsInteractiveChallengeVisible(false),
+            "unsupported-callback": () => {
+              setIsInteractiveChallengeVisible(false);
+              setLoadError("This browser could not load CAPTCHA verification. Please update it and try again.");
+            },
           });
         } catch (renderError) {
           console.error("Turnstile render error:", renderError);
@@ -182,12 +219,14 @@ export default function TurnstileCaptcha({
   useEffect(() => {
     if (!window.turnstile || !widgetIdRef.current) return;
     window.turnstile.reset(widgetIdRef.current);
+    setIsInteractiveChallengeVisible(false);
     onTokenChangeRef.current("");
   }, [resetNonce]);
 
   const handleRetry = () => {
     onTokenChangeRef.current("");
     setLoadError("");
+    setIsInteractiveChallengeVisible(false);
     if (typeof window !== "undefined") {
       removeExistingTurnstileScript();
       try {
@@ -200,8 +239,14 @@ export default function TurnstileCaptcha({
   };
 
   return (
-    <div className={cn("space-y-2", className)}>
-      <div ref={containerRef} className="min-h-[65px]" />
+    <div className={cn(loadError ? "space-y-2" : "space-y-0", className)}>
+      <div
+        ref={containerRef}
+        className={cn(
+          "overflow-hidden transition-[min-height] duration-200",
+          isInteractiveChallengeVisible ? "min-h-[65px]" : "min-h-0",
+        )}
+      />
       {loadError ? (
         <div className="space-y-2">
           <p className="text-xs text-destructive">{loadError}</p>
