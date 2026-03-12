@@ -17,7 +17,6 @@ import {
   getYouTubeTrailerUrl,
   getLanguageLabel,
   Cast,
-  CrewMember,
   MovieKeyword,
   TVShow,
   Episode,
@@ -61,6 +60,19 @@ const LazyFeedbackButtons = lazy(() => import("@/frontend/components/FeedbackBut
 const LazyCommentsSection = lazy(() => import("@/frontend/components/CommentsSection"));
 const PREVIEW_AUTOPLAY_TIMEOUT_MS = 12000;
 const BACKGROUND_VIDEO_BOOT_DELAY_MS = 900;
+const TV_WRITER_JOBS = new Set([
+  "Writer",
+  "Screenplay",
+  "Story",
+  "Novel",
+  "Teleplay",
+  "Script Editor",
+]);
+const TV_PRODUCER_JOBS = new Set([
+  "Producer",
+  "Executive Producer",
+  "Co-Executive Producer",
+]);
 
 export default function TVDetail() {
   const { id } = useParams<{ id: string }>();
@@ -202,39 +214,49 @@ export default function TVDetail() {
     [crew],
   );
 
-  const pickUniqueNames = (members: CrewMember[]) =>
-    Array.from(new Set(members.map((member) => member.name)));
+  const crewSummary = useMemo(() => {
+    const fallbackCreators: string[] = [];
+    const writers: string[] = [];
+    const producers: string[] = [];
+    const seenCreators = new Set<string>();
+    const seenWriters = new Set<string>();
+    const seenProducers = new Set<string>();
 
-  const creators = useMemo(() => {
-    const createdBy = (tvShow?.created_by || []).map((member) => member.name).filter(Boolean);
-    if (createdBy.length > 0) return Array.from(new Set(createdBy)).slice(0, 3);
-    return pickUniqueNames(crew.filter((member) => member.job === "Creator")).slice(0, 3);
+    for (const member of crew) {
+      const name = member.name;
+
+      if (member.job === "Creator" && !seenCreators.has(name)) {
+        seenCreators.add(name);
+        fallbackCreators.push(name);
+      }
+
+      if (TV_WRITER_JOBS.has(member.job) && !seenWriters.has(name)) {
+        seenWriters.add(name);
+        writers.push(name);
+      }
+
+      if (TV_PRODUCER_JOBS.has(member.job) && !seenProducers.has(name)) {
+        seenProducers.add(name);
+        producers.push(name);
+      }
+    }
+
+    const createdByNames: string[] = [];
+    const seenCreatedBy = new Set<string>();
+    for (const member of tvShow?.created_by || []) {
+      const name = member.name?.trim();
+      if (!name || seenCreatedBy.has(name)) continue;
+      seenCreatedBy.add(name);
+      createdByNames.push(name);
+    }
+
+    return {
+      creators: (createdByNames.length > 0 ? createdByNames : fallbackCreators).slice(0, 3),
+      writers: writers.slice(0, 4),
+      producers: producers.slice(0, 4),
+    };
   }, [crew, tvShow]);
-  const writers = useMemo(
-    () =>
-      pickUniqueNames(
-        crew.filter((member) =>
-          [
-            "Writer",
-            "Screenplay",
-            "Story",
-            "Novel",
-            "Teleplay",
-            "Script Editor",
-          ].includes(member.job),
-        ),
-      ).slice(0, 4),
-    [crew],
-  );
-  const producers = useMemo(
-    () =>
-      pickUniqueNames(
-        crew.filter((member) =>
-          ["Producer", "Executive Producer", "Co-Executive Producer"].includes(member.job),
-        ),
-      ).slice(0, 4),
-    [crew],
-  );
+  const { creators, writers, producers } = crewSummary;
   const trailerUrl = videosData ? getYouTubeTrailerUrl(videosData.results) : null;
   const preferredTrailerKey = trailerUrl?.split("/embed/")[1]?.split("?")[0] || null;
   const backgroundTrailerKeys = useMemo(() => {

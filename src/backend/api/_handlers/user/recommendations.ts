@@ -725,12 +725,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       (async (): Promise<RecommendationsPayload> => {
         const genreScores: Record<number, number> = {};
         const languageScores: Record<string, number> = {};
+        const watchHistoryByContentKey = new Map(
+          watchHistory.map((entry) => [getContentKey(entry.content_type, entry.content_id), entry]),
+        );
 
         likedItems.forEach((item) => {
-          const watched = watchHistory.find(
-            (entry) =>
-              entry.content_id === item.content_id &&
-              entry.content_type === item.content_type,
+          const watched = watchHistoryByContentKey.get(
+            getContentKey(item.content_type, item.content_id),
           );
 
           if (!watched?.genres?.length) return;

@@ -47,7 +47,7 @@ function balanceCandidatesByLanguage(
       if (sizeDelta !== 0) return sizeDelta;
       return candidatePriority(right[0]) - candidatePriority(left[0]);
     })
-    .map((bucket) => [...bucket]);
+    .map((bucket) => ({ items: bucket, cursor: 0 }));
 
   const balanced: UnifiedContentItem[] = [];
 
@@ -55,9 +55,10 @@ function balanceCandidatesByLanguage(
     let pickedInRound = false;
 
     for (const bucket of orderedBuckets) {
-      const nextItem = bucket.shift();
+      const nextItem = bucket.items[bucket.cursor];
       if (!nextItem) continue;
 
+      bucket.cursor += 1;
       balanced.push(nextItem);
       pickedInRound = true;
 

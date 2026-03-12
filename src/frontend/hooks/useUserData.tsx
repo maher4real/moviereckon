@@ -94,6 +94,33 @@ function getContentKey(contentId: number, contentType: "movie" | "tv"): string {
   return `${contentType}:${contentId}`;
 }
 
+type ContentEntry = {
+  content_id: number;
+  content_type: "movie" | "tv";
+};
+
+function splitEntriesByContent<T extends ContentEntry>(
+  entries: T[],
+  contentId: number,
+  contentType: "movie" | "tv",
+): { match: T | null; remaining: T[] } {
+  let match: T | null = null;
+  const remaining: T[] = [];
+
+  for (const entry of entries) {
+    if (entry.content_id === contentId && entry.content_type === contentType) {
+      if (match === null) {
+        match = entry;
+      }
+      continue;
+    }
+
+    remaining.push(entry);
+  }
+
+  return { match, remaining };
+}
+
 export function UserDataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -113,6 +140,30 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     () => new Set(likedItems.map((entry) => getContentKey(entry.content_id, entry.content_type))),
     [likedItems],
   );
+  const feedbackLookup = useMemo(
+    () =>
+      new Map(
+        feedbackItems.map((entry) => [
+          getContentKey(entry.content_id, entry.content_type),
+          entry.feedback_type,
+        ]),
+      ),
+    [feedbackItems],
+  );
+  const topGenres = useMemo(() => {
+    if (!watchHistory.length) return [];
+
+    const genreCounts = new Map<number, number>();
+    for (const item of watchHistory) {
+      for (const genre of item.genres) {
+        genreCounts.set(genre, (genreCounts.get(genre) || 0) + 1);
+      }
+    }
+
+    return Array.from(genreCounts.entries())
+      .sort(([, a], [, b]) => b - a)
+      .map(([genre]) => genre);
+  }, [watchHistory]);
 
   // Get user ID
   const getUserId = useCallback(() => {
@@ -190,20 +241,12 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       let previousMatch: WatchedItem | null = null;
 
       setWatchHistory((prev) => {
-        previousMatch =
-          prev.find(
-            (entry) =>
-              entry.content_id === item.content_id &&
-              entry.content_type === item.content_type,
-          ) || null;
-
-        const filtered = prev.filter(
-          (entry) =>
-            !(
-              entry.content_id === item.content_id &&
-              entry.content_type === item.content_type
-            ),
+        const { match, remaining } = splitEntriesByContent(
+          prev,
+          item.content_id,
+          item.content_type,
         );
+        previousMatch = match;
 
         return [
           {
@@ -217,7 +260,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
             language: item.language || "en",
             watched_at: optimisticTimestamp,
           },
-          ...filtered,
+          ...remaining,
         ];
       });
 
@@ -228,27 +271,23 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
         }
 
         setWatchHistory((prev) => {
-          const filtered = prev.filter(
-            (entry) =>
-              !(
-                entry.content_id === item.content_id &&
-                entry.content_type === item.content_type
-              ),
+          const { remaining } = splitEntriesByContent(
+            prev,
+            item.content_id,
+            item.content_type,
           );
-          return [result as WatchedItem, ...filtered];
+          return [result as WatchedItem, ...remaining];
         });
         return;
       } catch (error) {
         console.error("Error adding to watch history:", error);
         setWatchHistory((prev) => {
-          const filtered = prev.filter(
-            (entry) =>
-              !(
-                entry.content_id === item.content_id &&
-                entry.content_type === item.content_type
-              ),
+          const { remaining } = splitEntriesByContent(
+            prev,
+            item.content_id,
+            item.content_type,
           );
-          return previousMatch ? [previousMatch, ...filtered] : filtered;
+          return previousMatch ? [previousMatch, ...remaining] : remaining;
         });
         toast({
           variant: "destructive",
@@ -301,21 +340,15 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       let previousMatch: LikedItem | null = null;
 
       setLikedItems((prev) => {
-        previousMatch =
-          prev.find(
-            (entry) =>
-              entry.content_id === item.content_id &&
-              entry.content_type === item.content_type,
-          ) || null;
+        const { match, remaining } = splitEntriesByContent(
+          prev,
+          item.content_id,
+          item.content_type,
+        );
+        previousMatch = match;
 
         if (previousMatch) {
-          return prev.filter(
-            (entry) =>
-              !(
-                entry.content_id === item.content_id &&
-                entry.content_type === item.content_type
-              ),
-          );
+          return remaining;
         }
 
         return [
@@ -328,7 +361,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
             poster_path: item.poster_path,
             liked_at: optimisticTimestamp,
           },
-          ...prev,
+          ...remaining,
         ];
       });
 
@@ -339,55 +372,41 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
         }
 
         if (result.action === "added" && result.data) {
-          setLikedItems((prev) =>
-            [
-              result.data as LikedItem,
-              ...prev.filter(
-                (entry) =>
-                  !(
-                    entry.content_id === item.content_id &&
-                    entry.content_type === item.content_type
-                  ),
-              ),
-            ],
-          );
+          setLikedItems((prev) => {
+            const { remaining } = splitEntriesByContent(
+              prev,
+              item.content_id,
+              item.content_type,
+            );
+            return [result.data as LikedItem, ...remaining];
+          });
           return;
         }
 
         if (result.action === "removed") {
           setLikedItems((prev) =>
-            prev.filter(
-              (entry) =>
-                !(
-                  entry.content_id === item.content_id &&
-                  entry.content_type === item.content_type
-                ),
-            ),
+            splitEntriesByContent(prev, item.content_id, item.content_type).remaining
           );
           return;
         }
 
         setLikedItems((prev) => {
-          const filtered = prev.filter(
-            (entry) =>
-              !(
-                entry.content_id === item.content_id &&
-                entry.content_type === item.content_type
-              ),
+          const { remaining } = splitEntriesByContent(
+            prev,
+            item.content_id,
+            item.content_type,
           );
-          return previousMatch ? [previousMatch, ...filtered] : filtered;
+          return previousMatch ? [previousMatch, ...remaining] : remaining;
         });
       } catch (error) {
         console.error("Error toggling like:", error);
         setLikedItems((prev) => {
-          const filtered = prev.filter(
-            (entry) =>
-              !(
-                entry.content_id === item.content_id &&
-                entry.content_type === item.content_type
-              ),
+          const { remaining } = splitEntriesByContent(
+            prev,
+            item.content_id,
+            item.content_type,
           );
-          return previousMatch ? [previousMatch, ...filtered] : filtered;
+          return previousMatch ? [previousMatch, ...remaining] : remaining;
         });
         toast({
           variant: "destructive",
@@ -427,21 +446,19 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
 
         if (result.action === "removed") {
           setFeedbackItems((prev) =>
-            prev.filter(
-              (feedback) =>
-                !(feedback.content_id === item.content_id && feedback.content_type === item.content_type)
-            )
+            splitEntriesByContent(prev, item.content_id, item.content_type).remaining
           );
           return;
         }
 
         if (result.data) {
           setFeedbackItems((prev) => {
-            const filtered = prev.filter(
-              (feedback) =>
-                !(feedback.content_id === result.data!.content_id && feedback.content_type === result.data!.content_type)
+            const { remaining } = splitEntriesByContent(
+              prev,
+              result.data!.content_id,
+              result.data!.content_type,
             );
-            return [result.data as FeedbackItem, ...filtered];
+            return [result.data as FeedbackItem, ...remaining];
           });
         }
       } catch (error) {
@@ -458,13 +475,9 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
 
   const getFeedback = useCallback(
     (contentId: number, contentType: "movie" | "tv") => {
-      return (
-        feedbackItems.find(
-          (item) => item.content_id === contentId && item.content_type === contentType
-        )?.feedback_type || null
-      );
+      return feedbackLookup.get(getContentKey(contentId, contentType)) || null;
     },
-    [feedbackItems]
+    [feedbackLookup]
   );
 
   // Get Recently Watched
@@ -478,21 +491,9 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
   // Get Top Genres
   const getTopGenres = useCallback(
     (limit = 5) => {
-      if (!watchHistory.length) return [];
-
-      const genreCounts: Record<number, number> = {};
-      watchHistory.forEach((item) => {
-        item.genres.forEach((genre) => {
-          genreCounts[genre] = (genreCounts[genre] || 0) + 1;
-        });
-      });
-
-      return Object.entries(genreCounts)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, limit)
-        .map(([genre]) => Number(genre));
+      return topGenres.slice(0, limit);
     },
-    [watchHistory]
+    [topGenres]
   );
 
   // Clear History

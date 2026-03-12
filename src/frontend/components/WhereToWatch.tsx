@@ -33,17 +33,53 @@ const providerUrls: Record<string, string> = {
 function WhereToWatch({ providers, link }: WhereToWatchProps) {
   if (!providers) return null;
 
-  const allProviders = [
-    ...(providers.flatrate || []),
-    ...(providers.rent || []),
-    ...(providers.buy || []),
-  ];
+  const providerStates = new Map<number, {
+    provider: WatchProvider;
+    isStream: boolean;
+    isRent: boolean;
+    isBuy: boolean;
+  }>();
 
-  // Deduplicate providers by id
-  const uniqueProviders = allProviders.filter(
-    (provider, index, self) =>
-      index === self.findIndex((p) => p.provider_id === provider.provider_id)
-  );
+  for (const provider of providers.flatrate || []) {
+    providerStates.set(provider.provider_id, {
+      provider,
+      isStream: true,
+      isRent: false,
+      isBuy: false,
+    });
+  }
+
+  for (const provider of providers.rent || []) {
+    const existing = providerStates.get(provider.provider_id);
+    if (existing) {
+      existing.isRent = true;
+      continue;
+    }
+
+    providerStates.set(provider.provider_id, {
+      provider,
+      isStream: false,
+      isRent: true,
+      isBuy: false,
+    });
+  }
+
+  for (const provider of providers.buy || []) {
+    const existing = providerStates.get(provider.provider_id);
+    if (existing) {
+      existing.isBuy = true;
+      continue;
+    }
+
+    providerStates.set(provider.provider_id, {
+      provider,
+      isStream: false,
+      isRent: false,
+      isBuy: true,
+    });
+  }
+
+  const uniqueProviders = Array.from(providerStates.values());
 
   if (uniqueProviders.length === 0) return null;
 
@@ -58,11 +94,9 @@ function WhereToWatch({ providers, link }: WhereToWatchProps) {
         Where to Watch
       </h2>
       <div className="flex flex-wrap gap-3">
-        {uniqueProviders.slice(0, 8).map((provider) => {
+        {uniqueProviders.slice(0, 8).map(({ provider, isStream, isRent }) => {
           const url = getProviderUrl(provider);
-          const isStream = providers.flatrate?.some((p) => p.provider_id === provider.provider_id);
-          const isRent = providers.rent?.some((p) => p.provider_id === provider.provider_id);
-          
+
           return (
             <a
               key={provider.provider_id}

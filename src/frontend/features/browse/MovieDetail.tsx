@@ -16,7 +16,6 @@ import {
   getYouTubeTrailerUrl,
   getLanguageLabel,
   Cast,
-  CrewMember,
   MovieKeyword,
   Movie,
 } from "@/shared/lib/tmdb";
@@ -57,6 +56,8 @@ const LazyFeedbackButtons = lazy(() => import("@/frontend/components/FeedbackBut
 const LazyCommentsSection = lazy(() => import("@/frontend/components/CommentsSection"));
 const PREVIEW_AUTOPLAY_TIMEOUT_MS = 12000;
 const BACKGROUND_VIDEO_BOOT_DELAY_MS = 900;
+const MOVIE_WRITER_JOBS = new Set(["Writer", "Screenplay", "Story", "Novel"]);
+const MOVIE_PRODUCER_JOBS = new Set(["Producer", "Executive Producer"]);
 
 export default function MovieDetail() {
   const { id } = useParams<{ id: string }>();
@@ -185,54 +186,70 @@ export default function MovieDetail() {
     [crew],
   );
 
-  const pickUniqueNames = (members: CrewMember[]) =>
-    Array.from(new Set(members.map((member) => member.name)));
+  const crewSummary = useMemo(() => {
+    const directors: string[] = [];
+    const writers: string[] = [];
+    const producers: string[] = [];
+    const seenDirectors = new Set<string>();
+    const seenWriters = new Set<string>();
+    const seenProducers = new Set<string>();
 
-  const directors = useMemo(
-    () => pickUniqueNames(crew.filter((member) => member.job === "Director")).slice(0, 3),
-    [crew],
-  );
-  const writers = useMemo(
-    () =>
-      pickUniqueNames(
-        crew.filter((member) =>
-          ["Writer", "Screenplay", "Story", "Novel"].includes(member.job),
-        ),
-      ).slice(0, 4),
-    [crew],
-  );
-  const producers = useMemo(
-    () =>
-      pickUniqueNames(
-        crew.filter((member) =>
-          ["Producer", "Executive Producer"].includes(member.job),
-        ),
-      ).slice(0, 4),
-    [crew],
-  );
+    for (const member of crew) {
+      const name = member.name;
+
+      if (member.job === "Director" && !seenDirectors.has(name)) {
+        seenDirectors.add(name);
+        directors.push(name);
+      }
+
+      if (MOVIE_WRITER_JOBS.has(member.job) && !seenWriters.has(name)) {
+        seenWriters.add(name);
+        writers.push(name);
+      }
+
+      if (MOVIE_PRODUCER_JOBS.has(member.job) && !seenProducers.has(name)) {
+        seenProducers.add(name);
+        producers.push(name);
+      }
+    }
+
+    return {
+      directors: directors.slice(0, 3),
+      writers: writers.slice(0, 4),
+      producers: producers.slice(0, 4),
+    };
+  }, [crew]);
+  const { directors, writers, producers } = crewSummary;
 
   const certification = useMemo(() => {
     const preferredRegions = ["US", "GB", "CA", "AU", "IN"];
     const results = releaseDatesData?.results || [];
+    const certificationsByRegion = new Map<string, string>();
+    let fallbackCertification: string | null = null;
 
-    const findCertification = (regionCode: string) => {
-      const region = results.find((entry) => entry.iso_3166_1 === regionCode);
-      if (!region) return null;
-      const release = region.release_dates.find((entry) => entry.certification?.trim());
-      return release?.certification?.trim() || null;
-    };
+    for (const region of results) {
+      let regionCertification: string | null = null;
+
+      for (const release of region.release_dates) {
+        const certificationValue = release.certification?.trim();
+        if (!certificationValue) continue;
+        regionCertification = certificationValue;
+        break;
+      }
+
+      if (!regionCertification) continue;
+      if (fallbackCertification === null) {
+        fallbackCertification = regionCertification;
+      }
+      certificationsByRegion.set(region.iso_3166_1, regionCertification);
+    }
 
     for (const regionCode of preferredRegions) {
-      const value = findCertification(regionCode);
+      const value = certificationsByRegion.get(regionCode);
       if (value) return value;
     }
 
-    for (const region of results) {
-      const release = region.release_dates.find((entry) => entry.certification?.trim());
-      if (release?.certification?.trim()) return release.certification.trim();
-    }
-
-    return null;
+    return fallbackCertification;
   }, [releaseDatesData]);
   const trailerUrl = videosData ? getYouTubeTrailerUrl(videosData.results) : null;
   const preferredTrailerKey = trailerUrl?.split("/embed/")[1]?.split("?")[0] || null;

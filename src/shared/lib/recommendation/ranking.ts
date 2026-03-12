@@ -6,6 +6,7 @@ import {
   scoreCandidate,
 } from "./scoring";
 import {
+  ContentType,
   DEFAULT_DIVERSIFICATION_TOP_N,
   DEFAULT_MAX_CANDIDATES,
   RankedRecommendation,
@@ -46,72 +47,96 @@ function languageKey(item: UnifiedContentItem): string {
   return (item.originalLanguage || "unknown").toLowerCase();
 }
 
-function setJaccard(left: number[], right: number[]): number {
-  if (left.length === 0 || right.length === 0) return 0;
-  const leftSet = new Set(left);
-  const rightSet = new Set(right);
+type SimilarityProfile = {
+  genreIds: Set<number>;
+  leadActorIds: Set<number>;
+  peopleIds: Set<number>;
+};
+
+type DiversificationState = {
+  dominantLanguage: string | null;
+  preferredLanguageSet: Set<string>;
+  selectedCount: number;
+  languageCounts: Map<string, number>;
+  typeCounts: Map<ContentType, number>;
+};
+
+const similarityProfileCache = new WeakMap<UnifiedContentItem, SimilarityProfile>();
+
+function getSimilarityProfile(item: UnifiedContentItem): SimilarityProfile {
+  const cached = similarityProfileCache.get(item);
+  if (cached) return cached;
+
+  const profile: SimilarityProfile = {
+    genreIds: new Set(item.genreIds),
+    leadActorIds: new Set(item.leadActors.map((person) => person.id)),
+    peopleIds: new Set(item.peopleIds),
+  };
+
+  similarityProfileCache.set(item, profile);
+  return profile;
+}
+
+function setJaccard(left: Set<number>, right: Set<number>): number {
+  if (left.size === 0 || right.size === 0) return 0;
   let intersection = 0;
 
-  leftSet.forEach((value) => {
-    if (rightSet.has(value)) intersection += 1;
+  const smaller = left.size <= right.size ? left : right;
+  const larger = smaller === left ? right : left;
+
+  smaller.forEach((value) => {
+    if (larger.has(value)) intersection += 1;
   });
 
-  const union = leftSet.size + rightSet.size - intersection;
+  const union = left.size + right.size - intersection;
   return union <= 0 ? 0 : intersection / union;
 }
 
-function recommendationSimilarity(a: UnifiedContentItem, b: UnifiedContentItem): number {
+function recommendationSimilarity(
+  a: UnifiedContentItem,
+  b: UnifiedContentItem,
+  similarityCache: Map<string, number>,
+): number {
   if (a.key === b.key) return 1;
+
+  const pairKey = a.key < b.key ? `${a.key}|${b.key}` : `${b.key}|${a.key}`;
+  const cached = similarityCache.get(pairKey);
+  if (cached !== undefined) return cached;
+
+  const leftProfile = getSimilarityProfile(a);
+  const rightProfile = getSimilarityProfile(b);
 
   const sameCollection =
     a.collectionId && b.collectionId && a.collectionId === b.collectionId ? 1 : 0;
   const samePrimaryGenre =
     a.primaryGenreId && b.primaryGenreId && a.primaryGenreId === b.primaryGenreId ? 1 : 0;
-  const genreSimilarity = setJaccard(a.genreIds, b.genreIds);
-  const leadActorSimilarity = setJaccard(
-    a.leadActors.map((person) => person.id),
-    b.leadActors.map((person) => person.id),
-  );
-  const peopleSimilarity = setJaccard(a.peopleIds, b.peopleIds);
+  const genreSimilarity = setJaccard(leftProfile.genreIds, rightProfile.genreIds);
+  const leadActorSimilarity = setJaccard(leftProfile.leadActorIds, rightProfile.leadActorIds);
+  const peopleSimilarity = setJaccard(leftProfile.peopleIds, rightProfile.peopleIds);
 
-  return clamp(
+  const similarity = clamp(
     sameCollection * 0.65 +
       samePrimaryGenre * 0.1 +
       genreSimilarity * 0.2 +
       leadActorSimilarity * 0.25 +
       peopleSimilarity * 0.15,
   );
+
+  similarityCache.set(pairKey, similarity);
+  return similarity;
 }
 
 function selectionBalanceAdjustment(
   candidate: RankedRecommendation,
-  selected: RankedRecommendation[],
-  userContext?: RecommendationUserContext,
+  state: DiversificationState,
 ): number {
-  if (selected.length === 0) return 0;
+  if (state.selectedCount === 0) return 0;
 
   const candidateLanguage = languageKey(candidate.item);
-  const dominantLanguage =
-    typeof userContext?.dominantLanguage === "string"
-      ? userContext.dominantLanguage.toLowerCase()
-      : null;
-  const preferredLanguages = new Set(
-    (userContext?.preferredLanguages || []).map((language) => language.toLowerCase()),
-  );
-
-  let sameLanguageCount = 0;
-  let sameTypeCount = 0;
-
-  for (const entry of selected) {
-    if (languageKey(entry.item) === candidateLanguage) {
-      sameLanguageCount += 1;
-    }
-    if (entry.item.type === candidate.item.type) {
-      sameTypeCount += 1;
-    }
-  }
-
-  const total = selected.length;
+  const dominantLanguage = state.dominantLanguage;
+  const sameLanguageCount = state.languageCounts.get(candidateLanguage) || 0;
+  const sameTypeCount = state.typeCounts.get(candidate.item.type) || 0;
+  const total = state.selectedCount;
   const languageShare = sameLanguageCount / total;
   const typeShare = sameTypeCount / total;
 
@@ -125,7 +150,7 @@ function selectionBalanceAdjustment(
     adjustment += 0.01;
   }
 
-  if (preferredLanguages.has(candidateLanguage) && candidateLanguage !== dominantLanguage) {
+  if (state.preferredLanguageSet.has(candidateLanguage) && candidateLanguage !== dominantLanguage) {
     adjustment += 0.028;
   }
 
@@ -144,6 +169,33 @@ function selectionBalanceAdjustment(
   return adjustment;
 }
 
+function createDiversificationState(
+  userContext?: RecommendationUserContext,
+): DiversificationState {
+  return {
+    dominantLanguage:
+      typeof userContext?.dominantLanguage === "string"
+        ? userContext.dominantLanguage.toLowerCase()
+        : null,
+    preferredLanguageSet: new Set(
+      (userContext?.preferredLanguages || []).map((language) => language.toLowerCase()),
+    ),
+    selectedCount: 0,
+    languageCounts: new Map<string, number>(),
+    typeCounts: new Map<ContentType, number>(),
+  };
+}
+
+function registerDiversifiedSelection(
+  entry: RankedRecommendation,
+  state: DiversificationState,
+): void {
+  state.selectedCount += 1;
+  const entryLanguage = languageKey(entry.item);
+  state.languageCounts.set(entryLanguage, (state.languageCounts.get(entryLanguage) || 0) + 1);
+  state.typeCounts.set(entry.item.type, (state.typeCounts.get(entry.item.type) || 0) + 1);
+}
+
 function diversifyTopResults(
   scoredItems: RankedRecommendation[],
   topN: number,
@@ -152,9 +204,14 @@ function diversifyTopResults(
   if (scoredItems.length <= 2) return scoredItems;
 
   const cut = Math.min(Math.max(2, topN), scoredItems.length);
-  const pool = scoredItems.slice(0, cut);
+  const pool = scoredItems.slice(0, cut).map((entry) => ({
+    entry,
+    maxSimilarity: 0,
+  }));
   const remainder = scoredItems.slice(cut);
   const selected: RankedRecommendation[] = [];
+  const similarityCache = new Map<string, number>();
+  const diversificationState = createDiversificationState(userContext);
   const lambda = 0.74;
 
   while (pool.length > 0) {
@@ -164,34 +221,43 @@ function diversifyTopResults(
 
     for (let index = 0; index < pool.length; index += 1) {
       const candidate = pool[index];
-
-      let maxSimilarity = 0;
-      for (const chosen of selected) {
-        maxSimilarity = Math.max(maxSimilarity, recommendationSimilarity(candidate.item, chosen.item));
-      }
+      const penalty = (1 - lambda) * candidate.maxSimilarity;
 
       const rankValue =
-        lambda * candidate.score -
-        (1 - lambda) * maxSimilarity +
-        selectionBalanceAdjustment(candidate, selected, userContext);
+        lambda * candidate.entry.score -
+        penalty +
+        selectionBalanceAdjustment(candidate.entry, diversificationState);
       if (rankValue > bestRank) {
         bestRank = rankValue;
         bestIndex = index;
-        bestPenalty = (1 - lambda) * maxSimilarity;
+        bestPenalty = penalty;
       }
     }
 
     const chosen = pool.splice(bestIndex, 1)[0];
     const nextBreakdown: ScoreBreakdown = {
-      ...chosen.scoreBreakdown,
+      ...chosen.entry.scoreBreakdown,
       diversityPenalty: bestPenalty,
     };
 
-    selected.push({
-      ...chosen,
-      score: Math.max(0, chosen.score - bestPenalty),
+    const selectedEntry = {
+      ...chosen.entry,
+      score: Math.max(0, chosen.entry.score - bestPenalty),
       scoreBreakdown: nextBreakdown,
-    });
+    };
+    selected.push(selectedEntry);
+    registerDiversifiedSelection(selectedEntry, diversificationState);
+
+    for (const candidate of pool) {
+      const nextSimilarity = recommendationSimilarity(
+        candidate.entry.item,
+        selectedEntry.item,
+        similarityCache,
+      );
+      if (nextSimilarity > candidate.maxSimilarity) {
+        candidate.maxSimilarity = nextSimilarity;
+      }
+    }
   }
 
   return [...selected, ...remainder];
@@ -274,9 +340,35 @@ function enforcePreferredLanguageCoverage(
   const windowSize = Math.min(12, rankedItems.length);
   const updatedTop = rankedItems.slice(0, windowSize);
   const preferredLanguageSet = new Set(preferredLanguages);
+  const availableCounts = new Map<string, number>();
+  const currentCounts = new Map<string, number>();
+  const selectedKeys = new Set(updatedTop.map((entry) => entry.item.key));
+  const replacementQueues = new Map<string, RankedRecommendation[]>();
+
+  for (const entry of rankedItems) {
+    const entryLanguage = languageKey(entry.item);
+    availableCounts.set(entryLanguage, (availableCounts.get(entryLanguage) || 0) + 1);
+
+    if (!preferredLanguageSet.has(entryLanguage) || selectedKeys.has(entry.item.key)) {
+      continue;
+    }
+
+    const queue = replacementQueues.get(entryLanguage);
+    if (queue) {
+      queue.push(entry);
+    } else {
+      replacementQueues.set(entryLanguage, [entry]);
+    }
+  }
+
+  for (const entry of updatedTop) {
+    const entryLanguage = languageKey(entry.item);
+    currentCounts.set(entryLanguage, (currentCounts.get(entryLanguage) || 0) + 1);
+  }
+
   const desiredCoverage = preferredLanguages
     .map((language) => {
-      const available = rankedItems.filter((entry) => languageKey(entry.item) === language).length;
+      const available = availableCounts.get(language) || 0;
       return {
         language,
         desired: available >= 2 ? 2 : available > 0 ? 1 : 0,
@@ -288,37 +380,30 @@ function enforcePreferredLanguageCoverage(
     return rankedItems;
   }
 
+  const replaceableIndexes = updatedTop
+    .map((entry, index) => ({ entry, index }))
+    .filter(({ entry }) => !preferredLanguageSet.has(languageKey(entry.item)))
+    .sort((left, right) => left.entry.score - right.entry.score)
+    .map(({ index }) => index);
+
   for (const { language, desired } of desiredCoverage) {
-    let existingCount = updatedTop.filter((entry) => languageKey(entry.item) === language).length;
+    let existingCount = currentCounts.get(language) || 0;
     if (existingCount >= desired) continue;
 
-    const replacements = rankedItems
-      .filter(
-        (entry) =>
-          languageKey(entry.item) === language &&
-          !updatedTop.some((selected) => selected.item.key === entry.item.key),
-      )
-      .sort((a, b) => b.score - a.score);
-
-    const replaceableIndexes = updatedTop
-      .map((entry, index) => ({ entry, index }))
-      .filter(({ entry }) => {
-        const entryLanguage = languageKey(entry.item);
-        if (entryLanguage === language) return false;
-        if (preferredLanguageSet.has(entryLanguage)) return false;
-        return true;
-      })
-      .sort((left, right) => left.entry.score - right.entry.score)
-      .map(({ index }) => index);
+    const replacements = replacementQueues.get(language) || [];
 
     while (existingCount < desired && replacements.length > 0 && replaceableIndexes.length > 0) {
       const replacement = replacements.shift();
       const replaceIndex = replaceableIndexes.shift();
-      if (!replacement || replaceIndex === undefined) {
+      if (!replacement || replaceIndex === undefined || selectedKeys.has(replacement.item.key)) {
         break;
       }
 
+      const replacedLanguage = languageKey(updatedTop[replaceIndex].item);
       updatedTop[replaceIndex] = replacement;
+      selectedKeys.add(replacement.item.key);
+      currentCounts.set(replacedLanguage, Math.max(0, (currentCounts.get(replacedLanguage) || 0) - 1));
+      currentCounts.set(language, existingCount + 1);
       existingCount += 1;
     }
   }
@@ -338,7 +423,7 @@ function baseFallbackRanking(
     .map((item) => {
       const qualityComponent = (Math.max(0, item.voteAverage) / 10) * 0.6;
       const popularityComponent = Math.min(1, item.popularity / 150) * 0.4;
-      const novelty = seenKeys.has(item.key) ? 0 : 0.05;
+      const novelty = 0.05;
 
       const scoreBreakdown: ScoreBreakdown = {
         genre: 0,

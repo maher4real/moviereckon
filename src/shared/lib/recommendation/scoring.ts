@@ -44,6 +44,15 @@ const GENRE_LABELS: Record<number, string> = {
 };
 
 const scoreCache = new Map<string, ScoreCandidateResult>();
+let itemSignalCache = new WeakMap<UnifiedContentItem, ItemSignals>();
+
+type ItemSignals = {
+  genreSet: Set<number>;
+  keywordSet: Set<string>;
+  leadActorSet: Set<number>;
+  creativeSet: Set<number>;
+  peopleSet: Set<number>;
+};
 
 function clamp(value: number, min = 0, max = 1): number {
   if (value < min) return min;
@@ -93,6 +102,32 @@ function toIdSet(values: number[]): Set<number> {
   return new Set(values.filter((value) => Number.isFinite(value)));
 }
 
+function getItemSignals(item: UnifiedContentItem): ItemSignals {
+  const cached = itemSignalCache.get(item);
+  if (cached) return cached;
+
+  const signals: ItemSignals = {
+    genreSet: toIdSet(item.genreIds),
+    keywordSet:
+      item.keywords.length > 0
+        ? new Set(
+            item.keywords.map((keyword) =>
+              keyword.id ? `id:${keyword.id}` : `name:${keyword.name.toLowerCase()}`,
+            ),
+          )
+        : new Set(item.keywordTokens),
+    leadActorSet: toIdSet(item.leadActors.map((actor) => actor.id)),
+    creativeSet: toIdSet([
+      ...item.directors.map((person) => person.id),
+      ...item.creators.map((person) => person.id),
+    ]),
+    peopleSet: toIdSet(item.peopleIds),
+  };
+
+  itemSignalCache.set(item, signals);
+  return signals;
+}
+
 function intersectionSize<T>(left: Set<T>, right: Set<T>): number {
   let count = 0;
   if (left.size < right.size) {
@@ -112,18 +147,6 @@ function jaccardFromSets<T>(left: Set<T>, right: Set<T>): number {
   const intersection = intersectionSize(left, right);
   const union = left.size + right.size - intersection;
   return union <= 0 ? 0 : intersection / union;
-}
-
-function keywordSet(item: UnifiedContentItem): Set<string> {
-  if (item.keywords.length > 0) {
-    return new Set(
-      item.keywords.map((keyword) =>
-        keyword.id ? `id:${keyword.id}` : `name:${keyword.name.toLowerCase()}`,
-      ),
-    );
-  }
-
-  return new Set(item.keywordTokens);
 }
 
 function linearProximity(a: number | null, b: number | null, window: number): number {
@@ -150,27 +173,18 @@ function scorePeopleSimilarity(seedItem: UnifiedContentItem, candidateItem: Unif
     return 0;
   }
 
-  const seedLead = toIdSet(seedItem.leadActors.map((actor) => actor.id));
-  const candidateLead = toIdSet(candidateItem.leadActors.map((actor) => actor.id));
-  const castOverlap = jaccardFromSets(seedLead, candidateLead);
-
-  const seedCreative = toIdSet([
-    ...seedItem.directors.map((person) => person.id),
-    ...seedItem.creators.map((person) => person.id),
-  ]);
-  const candidateCreative = toIdSet([
-    ...candidateItem.directors.map((person) => person.id),
-    ...candidateItem.creators.map((person) => person.id),
-  ]);
-  const creativeMatch = intersectionSize(seedCreative, candidateCreative) > 0 ? 1 : 0;
-
-  const peopleOverlap = jaccardFromSets(toIdSet(seedItem.peopleIds), toIdSet(candidateItem.peopleIds));
+  const seedSignals = getItemSignals(seedItem);
+  const candidateSignals = getItemSignals(candidateItem);
+  const castOverlap = jaccardFromSets(seedSignals.leadActorSet, candidateSignals.leadActorSet);
+  const creativeMatch =
+    intersectionSize(seedSignals.creativeSet, candidateSignals.creativeSet) > 0 ? 1 : 0;
+  const peopleOverlap = jaccardFromSets(seedSignals.peopleSet, candidateSignals.peopleSet);
 
   return clamp(creativeMatch * 0.65 + castOverlap * 0.25 + peopleOverlap * 0.10);
 }
 
 function toSeenKeySet(context?: RecommendationUserContext): Set<string> {
-  return new Set(context?.seenIds ? Array.from(context.seenIds) : []);
+  return new Set(context?.seenIds);
 }
 
 export function calculatePopularityMedian(items: UnifiedContentItem[]): number {
@@ -204,20 +218,28 @@ export function calculatePopularityCap(items: UnifiedContentItem[]): number {
 }
 
 function sharedGenreNames(seedItem: UnifiedContentItem, candidateItem: UnifiedContentItem): string[] {
-  const shared = seedItem.genreIds.filter((genreId) => candidateItem.genreIds.includes(genreId));
-  return shared
-    .slice(0, 3)
-    .map((genreId) => GENRE_LABELS[genreId] || `Genre ${genreId}`);
+  const candidateGenres = getItemSignals(candidateItem).genreSet;
+  const shared: string[] = [];
+
+  for (const genreId of seedItem.genreIds) {
+    if (!candidateGenres.has(genreId)) continue;
+    shared.push(GENRE_LABELS[genreId] || `Genre ${genreId}`);
+    if (shared.length >= 3) break;
+  }
+
+  return shared;
 }
 
 function sharedNames(left: { id: number; name?: string }[], right: { id: number; name?: string }[]): string[] {
   const rightById = new Map(right.map((item) => [item.id, item.name || ""]));
   const names: string[] = [];
+  const seenNames = new Set<string>();
 
   for (const item of left) {
     if (!rightById.has(item.id)) continue;
     const name = item.name || rightById.get(item.id) || "";
-    if (name && !names.includes(name)) {
+    if (name && !seenNames.has(name)) {
+      seenNames.add(name);
       names.push(name);
     }
   }
@@ -354,11 +376,10 @@ export function scoreCandidate(
     };
   }
 
-  const genreSimilarity = jaccardFromSets(toIdSet(seedItem.genreIds), toIdSet(candidateItem.genreIds));
-
-  const seedKeywords = keywordSet(seedItem);
-  const candidateKeywords = keywordSet(candidateItem);
-  const keywordSimilarity = jaccardFromSets(seedKeywords, candidateKeywords);
+  const seedSignals = getItemSignals(seedItem);
+  const candidateSignals = getItemSignals(candidateItem);
+  const genreSimilarity = jaccardFromSets(seedSignals.genreSet, candidateSignals.genreSet);
+  const keywordSimilarity = jaccardFromSets(seedSignals.keywordSet, candidateSignals.keywordSet);
 
   const peopleSimilarity = scorePeopleSimilarity(seedItem, candidateItem);
   const yearSimilarity = linearProximity(seedItem.year, candidateItem.year, YEAR_WINDOW);
@@ -416,4 +437,5 @@ export function isHiddenGem(item: UnifiedContentItem, medianPopularity: number):
 
 export function clearRecommendationScoreCache(): void {
   scoreCache.clear();
+  itemSignalCache = new WeakMap<UnifiedContentItem, ItemSignals>();
 }
