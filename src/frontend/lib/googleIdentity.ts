@@ -19,6 +19,7 @@ export type GooglePromptMomentNotification = {
 
 type GoogleIdApi = {
   cancel: () => void;
+  disableAutoSelect: () => void;
   initialize: (config: {
     auto_select?: boolean;
     callback: (response: GoogleCredentialResponse) => void | Promise<void>;
@@ -26,8 +27,26 @@ type GoogleIdApi = {
     client_id: string;
     context?: "signin" | "signup" | "use";
     itp_support?: boolean;
-    prompt_parent_id?: string;
+    nonce?: string;
   }) => void;
+  renderButton: (
+    parent: HTMLElement,
+    options: {
+      locale?: string;
+      logo_alignment?: "center" | "left";
+      shape?: "circle" | "pill" | "rectangular" | "square";
+      size?: "large" | "medium" | "small";
+      text?:
+        | "continue_with"
+        | "signin"
+        | "signup_with"
+        | "signin_with"
+        | "continue_with";
+      theme?: "filled_black" | "filled_blue" | "outline";
+      type?: "icon" | "standard";
+      width?: number | string;
+    },
+  ) => void;
   prompt: (listener?: (notification: GooglePromptMomentNotification) => void) => void;
 };
 
@@ -74,4 +93,8 @@ export async function loadGoogleIdentityScript(): Promise<void> {
 
 export function cancelGoogleOneTapPrompt(): void {
   window.google?.accounts?.id?.cancel();
+}
+
+export function disableGoogleAutoSelect(): void {
+  window.google?.accounts?.id?.disableAutoSelect();
 }

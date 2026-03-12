@@ -5,6 +5,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
 import * as mongoClient from "@/frontend/lib/mongodbClient";
 import { useToast } from "@/frontend/hooks/use-toast";
+import { disableGoogleAutoSelect } from "@/frontend/lib/googleIdentity";
 
 interface Profile {
   id: string;
@@ -299,6 +300,7 @@ export function AuthProvider({
   // Sign Out
   const signOut = async () => {
     await mongoClient.logout();
+    disableGoogleAutoSelect();
     setUser(null);
     setProfile(null);
 

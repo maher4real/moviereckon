@@ -234,6 +234,7 @@ export interface RegistrationAvailability {
 export interface GoogleOneTapConfig {
   enabled: boolean;
   client_id: string | null;
+  nonce: string | null;
 }
 
 // ========== Auth API ==========
@@ -559,11 +560,13 @@ export async function getGoogleOneTapConfig(): Promise<GoogleOneTapConfig> {
     return {
       enabled: data.enabled === true && typeof data.client_id === "string" && data.client_id.length > 0,
       client_id: typeof data.client_id === "string" ? data.client_id : null,
+      nonce: typeof data.nonce === "string" ? data.nonce : null,
     };
   } catch {
     return {
       enabled: false,
       client_id: null,
+      nonce: null,
     };
   }
 }

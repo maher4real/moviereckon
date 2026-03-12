@@ -2,7 +2,11 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import { sanitizeSingleLineText } from "../../lib/input.js";
 import {
+  clearGoogleOneTapNonceCookie,
+  createGoogleOneTapNonce,
   getGoogleOAuthClientId,
+  getGoogleOneTapNonceFromRequest,
+  setGoogleOneTapNonceCookie,
   verifyGoogleIdToken,
 } from "../../lib/google-oauth.js";
 import {
@@ -16,9 +20,16 @@ import { getClientIp } from "../../lib/rate-limit.js";
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "GET") {
     const clientId = getGoogleOAuthClientId();
+    const nonce = clientId ? createGoogleOneTapNonce() : null;
+    if (nonce) {
+      setGoogleOneTapNonceCookie(res, nonce);
+    } else {
+      clearGoogleOneTapNonceCookie(res);
+    }
     return res.status(200).json({
       enabled: clientId.length > 0,
       client_id: clientId || null,
+      nonce,
     });
   }
 
@@ -40,6 +51,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const clientId = getGoogleOAuthClientId();
     if (!clientId) {
       return res.status(503).json({ error: "Google sign-in is not configured" });
+    }
+    const nonce = getGoogleOneTapNonceFromRequest(req);
+    if (!nonce) {
+      return res.status(400).json({
+        error: "Google sign-in could not be completed. Please try again.",
+        code: "invalid_google_nonce",
+      });
     }
 
     const clientIp = getClientIp(req);
@@ -72,7 +90,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { profile, errorCode } = await verifyGoogleIdToken({
       credential,
       clientId,
+      nonce,
     });
+    clearGoogleOneTapNonceCookie(res);
     if (!profile || errorCode) {
       const statusCode = errorCode === "email_not_verified" ? 403 : 401;
       return res.status(statusCode).json({
@@ -98,6 +118,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ? "google_account_conflict"
         : "google_one_tap_failed";
 
+    clearGoogleOneTapNonceCookie(res);
     console.error("Google One Tap error:", error);
     return res.status(code === "google_account_conflict" ? 409 : 500).json({
       error:

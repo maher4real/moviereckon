@@ -1,11 +1,15 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { randomBytes } from "crypto";
+import jwt from "jsonwebtoken";
+import { getCookieValue } from "./cookies.js";
 
 const GOOGLE_AUTHORIZATION_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO_ENDPOINT = "https://openidconnect.googleapis.com/v1/userinfo";
-const GOOGLE_TOKENINFO_ENDPOINT = "https://oauth2.googleapis.com/tokeninfo";
+const GOOGLE_CERTS_ENDPOINT = "https://www.googleapis.com/oauth2/v1/certs";
 
 export const GOOGLE_OAUTH_STATE_COOKIE_NAME = "moviereckon_google_oauth_state";
+export const GOOGLE_ONE_TAP_NONCE_COOKIE_NAME = "moviereckon_google_one_tap_nonce";
 
 const GOOGLE_SCOPE = "openid email profile";
 const OAUTH_STATE_MAX_AGE_SECONDS = 10 * 60;
@@ -38,18 +42,25 @@ type GoogleTokenResponse = {
   error_description?: string;
 };
 
-type GoogleIdTokenInfoResponse = {
-  aud?: string;
-  azp?: string;
+type GoogleIdTokenPayload = {
+  aud?: string | string[];
   email?: string;
-  email_verified?: string | boolean;
-  exp?: string;
-  given_name?: string;
   iss?: string;
+  exp?: number;
+  given_name?: string;
   name?: string;
+  nonce?: string;
   picture?: string;
   sub?: string;
- };
+  email_verified?: boolean;
+};
+
+type GoogleCertCache = {
+  certs: Record<string, string>;
+  expiresAt: number;
+};
+
+let googleCertCache: GoogleCertCache | null = null;
 
 function getStringEnv(name: string): string {
   const value = process.env[name];
@@ -121,6 +132,15 @@ function appendSetCookie(res: VercelResponse, cookieValue: string): void {
   }
 
   res.setHeader("Set-Cookie", [String(existing), cookieValue]);
+}
+
+function getCacheMaxAgeMs(headerValue: string | null): number {
+  if (!headerValue) return 60 * 60 * 1000;
+  const match = headerValue.match(/max-age=(\d+)/i);
+  if (!match) return 60 * 60 * 1000;
+  const seconds = Number(match[1]);
+  if (!Number.isFinite(seconds) || seconds <= 0) return 60 * 60 * 1000;
+  return seconds * 1000;
 }
 
 function getHeaderFirstValue(value: string | string[] | undefined): string | null {
@@ -226,6 +246,47 @@ export function clearGoogleOAuthStateCookie(res: VercelResponse): void {
       expires: new Date(0),
     }),
   );
+}
+
+export function createGoogleOneTapNonce(): string {
+  return randomBytes(24).toString("base64url");
+}
+
+export function setGoogleOneTapNonceCookie(res: VercelResponse, nonce: string): void {
+  const secure = shouldUseSecureCookies();
+  const sameSite = getSameSiteValue(secure);
+
+  appendSetCookie(
+    res,
+    serializeCookie(GOOGLE_ONE_TAP_NONCE_COOKIE_NAME, nonce, {
+      httpOnly: true,
+      secure,
+      sameSite,
+      path: "/",
+      maxAge: 10 * 60,
+    }),
+  );
+}
+
+export function clearGoogleOneTapNonceCookie(res: VercelResponse): void {
+  const secure = shouldUseSecureCookies();
+  const sameSite = getSameSiteValue(secure);
+
+  appendSetCookie(
+    res,
+    serializeCookie(GOOGLE_ONE_TAP_NONCE_COOKIE_NAME, "", {
+      httpOnly: true,
+      secure,
+      sameSite,
+      path: "/",
+      maxAge: 0,
+      expires: new Date(0),
+    }),
+  );
+}
+
+export function getGoogleOneTapNonceFromRequest(req: VercelRequest): string | null {
+  return getCookieValue(req.headers.cookie, GOOGLE_ONE_TAP_NONCE_COOKIE_NAME) || null;
 }
 
 export function parseGoogleOAuthState(rawCookieValue: string | null): GoogleOAuthState | null {
@@ -347,59 +408,92 @@ export async function fetchGoogleProfile(params: {
   return { profile, errorCode: null };
 }
 
-export async function verifyGoogleIdToken(params: {
-  credential: string;
-  clientId: string;
-}): Promise<{ profile: GoogleProfile | null; errorCode: string | null }> {
-  const tokenInfoUrl = new URL(GOOGLE_TOKENINFO_ENDPOINT);
-  tokenInfoUrl.searchParams.set("id_token", params.credential);
+async function fetchGoogleSigningCertificates(forceRefresh = false): Promise<Record<string, string>> {
+  if (!forceRefresh && googleCertCache && googleCertCache.expiresAt > Date.now()) {
+    return googleCertCache.certs;
+  }
 
-  const tokenInfoResponse = await fetch(tokenInfoUrl, {
+  const response = await fetch(GOOGLE_CERTS_ENDPOINT, {
     headers: {
       Accept: "application/json",
     },
   });
+  const certs = (await parseJsonSafe(response)) as Record<string, unknown>;
+  if (!response.ok || typeof certs !== "object" || certs === null) {
+    throw new Error("google_certs_fetch_failed");
+  }
 
-  const tokenInfoJson = (await parseJsonSafe(tokenInfoResponse)) as GoogleIdTokenInfoResponse;
-  if (!tokenInfoResponse.ok) {
+  const normalizedCerts = Object.fromEntries(
+    Object.entries(certs).filter(([, value]) => typeof value === "string"),
+  ) as Record<string, string>;
+  if (Object.keys(normalizedCerts).length === 0) {
+    throw new Error("google_certs_missing");
+  }
+
+  googleCertCache = {
+    certs: normalizedCerts,
+    expiresAt: Date.now() + getCacheMaxAgeMs(response.headers.get("cache-control")),
+  };
+
+  return normalizedCerts;
+}
+
+export async function verifyGoogleIdToken(params: {
+  credential: string;
+  clientId: string;
+  nonce?: string | null;
+}): Promise<{ profile: GoogleProfile | null; errorCode: string | null }> {
+  try {
+    const decoded = jwt.decode(params.credential, { complete: true }) as
+      | { header?: { kid?: string; alg?: string } }
+      | null;
+    const kid = typeof decoded?.header?.kid === "string" ? decoded.header.kid : "";
+    const alg = typeof decoded?.header?.alg === "string" ? decoded.header.alg : "";
+    if (!kid || alg !== "RS256") {
+      return { profile: null, errorCode: "credential_verification_failed" };
+    }
+
+    let certs = await fetchGoogleSigningCertificates(false);
+    let cert = certs[kid];
+    if (!cert) {
+      certs = await fetchGoogleSigningCertificates(true);
+      cert = certs[kid];
+    }
+    if (!cert) {
+      return { profile: null, errorCode: "credential_verification_failed" };
+    }
+
+    const payload = jwt.verify(params.credential, cert, {
+      algorithms: ["RS256"],
+      audience: params.clientId,
+      issuer: ["accounts.google.com", "https://accounts.google.com"],
+    }) as GoogleIdTokenPayload;
+
+    if (params.nonce && payload.nonce !== params.nonce) {
+      return { profile: null, errorCode: "credential_verification_failed" };
+    }
+
+    const profile = {
+      sub: typeof payload.sub === "string" ? payload.sub : "",
+      email: typeof payload.email === "string" ? payload.email.trim().toLowerCase() : "",
+      email_verified: payload.email_verified === true,
+      name: typeof payload.name === "string" ? payload.name : undefined,
+      given_name: typeof payload.given_name === "string" ? payload.given_name : undefined,
+      picture: typeof payload.picture === "string" ? payload.picture : undefined,
+    } satisfies GoogleProfile;
+
+    if (!profile.sub || !profile.email) {
+      return { profile: null, errorCode: "profile_incomplete" };
+    }
+
+    if (!profile.email_verified) {
+      return { profile: null, errorCode: "email_not_verified" };
+    }
+
+    return { profile, errorCode: null };
+  } catch {
     return { profile: null, errorCode: "credential_verification_failed" };
   }
-
-  const audience = typeof tokenInfoJson.aud === "string" ? tokenInfoJson.aud : "";
-  const authorizedParty = typeof tokenInfoJson.azp === "string" ? tokenInfoJson.azp : audience;
-  const issuer = typeof tokenInfoJson.iss === "string" ? tokenInfoJson.iss : "";
-  const expiresAtSeconds = Number(tokenInfoJson.exp);
-
-  if (
-    audience !== params.clientId ||
-    authorizedParty !== params.clientId ||
-    !["accounts.google.com", "https://accounts.google.com"].includes(issuer) ||
-    !Number.isFinite(expiresAtSeconds) ||
-    expiresAtSeconds * 1000 <= Date.now()
-  ) {
-    return { profile: null, errorCode: "credential_verification_failed" };
-  }
-
-  const profile = {
-    sub: typeof tokenInfoJson.sub === "string" ? tokenInfoJson.sub : "",
-    email: typeof tokenInfoJson.email === "string" ? tokenInfoJson.email.trim().toLowerCase() : "",
-    email_verified:
-      tokenInfoJson.email_verified === true || tokenInfoJson.email_verified === "true",
-    name: typeof tokenInfoJson.name === "string" ? tokenInfoJson.name : undefined,
-    given_name:
-      typeof tokenInfoJson.given_name === "string" ? tokenInfoJson.given_name : undefined,
-    picture: typeof tokenInfoJson.picture === "string" ? tokenInfoJson.picture : undefined,
-  } satisfies GoogleProfile;
-
-  if (!profile.sub || !profile.email) {
-    return { profile: null, errorCode: "profile_incomplete" };
-  }
-
-  if (!profile.email_verified) {
-    return { profile: null, errorCode: "email_not_verified" };
-  }
-
-  return { profile, errorCode: null };
 }
 
 export function buildAuthErrorRedirectPath(errorCode: string): string {

@@ -81,8 +81,11 @@ export default function Auth() {
   const [debouncedSignupEmail, setDebouncedSignupEmail] = useState("");
   const [debouncedSignupUsername, setDebouncedSignupUsername] = useState("");
   const [googlePromptError, setGooglePromptError] = useState("");
+  const [googlePromptInfo, setGooglePromptInfo] = useState("");
+  const [isGoogleIdentityReady, setIsGoogleIdentityReady] = useState(false);
   const googleOneTapPromptedRef = useRef(false);
   const googleOneTapSigningInRef = useRef(false);
+  const googleButtonRef = useRef<HTMLDivElement | null>(null);
   const captchaSiteKey = (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "").trim();
 
   // Form state
@@ -230,7 +233,7 @@ export default function Auth() {
   const { data: googleOneTapConfig } = useQuery({
     queryKey: ["google-one-tap-config"],
     queryFn: () => mongoClient.getGoogleOneTapConfig(),
-    staleTime: 1000 * 60 * 10,
+    staleTime: 0,
     refetchOnWindowFocus: false,
     enabled: !user,
   });
@@ -259,16 +262,15 @@ export default function Auth() {
   useEffect(() => {
     if (activeTab !== "signin" || user || isLoading) {
       cancelGoogleOneTapPrompt();
+      setIsGoogleIdentityReady(false);
       googleOneTapPromptedRef.current = false;
       return;
     }
 
     if (
-      isSubmitting ||
-      isGoogleSubmitting ||
-      isAuthenticating ||
       !googleOneTapConfig?.enabled ||
       !googleOneTapConfig.client_id ||
+      !googleOneTapConfig.nonce ||
       googleOneTapPromptedRef.current
     ) {
       return;
@@ -276,7 +278,8 @@ export default function Auth() {
 
     let cancelled = false;
     const googleClientId = googleOneTapConfig.client_id;
-    if (!googleClientId) {
+    const googleNonce = googleOneTapConfig.nonce;
+    if (!googleClientId || !googleNonce) {
       googleOneTapPromptedRef.current = false;
       return;
     }
@@ -289,13 +292,17 @@ export default function Auth() {
 
         const googleIdApi = window.google?.accounts?.id;
         if (!googleIdApi) {
+          setIsGoogleIdentityReady(false);
           googleOneTapPromptedRef.current = false;
           return;
         }
 
+        setIsGoogleIdentityReady(true);
+        setGooglePromptInfo("");
         googleIdApi.cancel();
         googleIdApi.initialize({
           client_id: googleClientId,
+          nonce: googleNonce,
           callback: async (response) => {
             if (
               cancelled ||
@@ -328,10 +335,60 @@ export default function Auth() {
           cancel_on_tap_outside: true,
           context: "signin",
           itp_support: true,
-          prompt_parent_id: "google-one-tap-anchor",
         });
-        googleIdApi.prompt();
+
+        if (googleButtonRef.current) {
+          googleButtonRef.current.innerHTML = "";
+          googleIdApi.renderButton(googleButtonRef.current, {
+            type: "standard",
+            theme: "filled_black",
+            size: "large",
+            shape: "pill",
+            text: "continue_with",
+            width: 384,
+            logo_alignment: "left",
+          });
+        }
+
+        googleIdApi.prompt((notification) => {
+          if (cancelled) return;
+
+          if (notification.isNotDisplayed?.()) {
+            const reason = notification.getNotDisplayedReason?.() || "not_displayed";
+            if (
+              reason === "opt_out_or_no_session" ||
+              reason === "suppressed_by_user" ||
+              reason === "browser_not_supported"
+            ) {
+              setGooglePromptInfo("Google One Tap is unavailable in this browser session. Use the Google button below.");
+              return;
+            }
+
+            if (reason === "unregistered_origin") {
+              setGooglePromptError("Google sign-in is not allowed for this site origin yet.");
+              return;
+            }
+
+            if (reason === "invalid_client" || reason === "missing_client_id") {
+              setGooglePromptError("Google sign-in is not configured correctly on the server.");
+              return;
+            }
+
+            if (reason === "secure_http_required") {
+              setGooglePromptError("Google One Tap requires HTTPS on this origin.");
+              return;
+            }
+
+            setGooglePromptInfo("Google One Tap could not be shown. Use the Google button below.");
+            return;
+          }
+
+          if (notification.isSkippedMoment?.()) {
+            setGooglePromptInfo("Google One Tap was skipped. Use the Google button below if you still want to sign in with Google.");
+          }
+        });
       } catch {
+        setIsGoogleIdentityReady(false);
         googleOneTapPromptedRef.current = false;
       }
     })();
@@ -344,10 +401,8 @@ export default function Auth() {
     activeTab,
     googleOneTapConfig?.client_id,
     googleOneTapConfig?.enabled,
-    isAuthenticating,
-    isGoogleSubmitting,
+    googleOneTapConfig?.nonce,
     isLoading,
-    isSubmitting,
     signInWithGoogleOneTap,
     triggerAuthTransition,
     user,
@@ -570,6 +625,7 @@ export default function Auth() {
     void primeStartupSoundFromGesture();
     cancelGoogleOneTapPrompt();
     setGooglePromptError("");
+    setGooglePromptInfo("");
     setIsGoogleSubmitting(true);
 
     try {
@@ -599,10 +655,6 @@ export default function Auth() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-background p-4">
-      <div
-        id="google-one-tap-anchor"
-        className="pointer-events-auto fixed right-4 top-4 z-50 w-full max-w-[420px]"
-      />
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 scale-[1.08] -rotate-2">
           <div
@@ -675,28 +727,43 @@ export default function Auth() {
               </p>
             ) : null}
 
-            <Button
-              type="button"
-              variant="outline"
-              className="h-12 w-full rounded-xl border-white/20 bg-background/75 text-sm font-semibold transition-colors hover:bg-background"
-              onClick={handleGoogleSignIn}
-              disabled={isSubmitting || isGoogleSubmitting || isAuthenticating}
-            >
-              <span className="inline-flex items-center gap-3">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 48 48"
-                  className="h-5 w-5"
-                  aria-hidden="true"
+            <div className="space-y-3">
+              <div
+                ref={googleButtonRef}
+                className={cn(
+                  "flex min-h-12 w-full items-center justify-center rounded-xl",
+                  isGoogleIdentityReady ? "" : "hidden",
+                )}
+              />
+
+              {!isGoogleIdentityReady ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-12 w-full rounded-xl border-white/20 bg-background/75 text-sm font-semibold transition-colors hover:bg-background"
+                  onClick={handleGoogleSignIn}
+                  disabled={isSubmitting || isGoogleSubmitting || isAuthenticating}
                 >
-                  <path fill="#FFC107" d="M43.61 20.08H42V20H24v8h11.3A12 12 0 0 1 12 24 12 12 0 0 1 24 12c3.06 0 5.84 1.15 7.96 3.04l5.66-5.66A19.92 19.92 0 0 0 24 4C12.95 4 4 12.95 4 24s8.95 20 20 20 20-8.95 20-20c0-1.34-.14-2.65-.39-3.92" />
-                  <path fill="#FF3D00" d="M6.31 14.69 12.88 19.5A11.96 11.96 0 0 1 24 12c3.06 0 5.84 1.15 7.96 3.04l5.66-5.66A19.92 19.92 0 0 0 24 4 19.99 19.99 0 0 0 6.31 14.69" />
-                  <path fill="#4CAF50" d="M24 44c5.2 0 9.93-1.99 13.49-5.23l-6.23-5.27A11.95 11.95 0 0 1 24 36a12 12 0 0 1-11.28-7.8l-6.52 5.02A20 20 0 0 0 24 44" />
-                  <path fill="#1976D2" d="M43.61 20.08H42V20H24v8h11.3a12.03 12.03 0 0 1-4.04 5.5l6.23 5.27C36.99 39.03 44 34 44 24c0-1.34-.14-2.65-.39-3.92" />
-                </svg>
-                {isGoogleSubmitting ? "Redirecting..." : "Continue with Google"}
-              </span>
-            </Button>
+                  {isGoogleSubmitting ? "Redirecting..." : "Continue with Google"}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-10 w-full rounded-xl text-xs text-muted-foreground hover:text-foreground"
+                  onClick={handleGoogleSignIn}
+                  disabled={isSubmitting || isGoogleSubmitting || isAuthenticating}
+                >
+                  Open full Google sign-in instead
+                </Button>
+              )}
+
+              {googlePromptInfo ? (
+                <p className="text-center text-xs text-muted-foreground">
+                  {googlePromptInfo}
+                </p>
+              ) : null}
+            </div>
 
             <div className="my-5 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/80">
               <span className="h-px flex-1 bg-white/15" />
@@ -711,6 +778,7 @@ export default function Auth() {
                 setActiveTab(nextTab);
                 setErrors({});
                 setGooglePromptError("");
+                setGooglePromptInfo("");
                 setSigninCaptchaToken("");
                 setSignupCaptchaToken("");
                 setSigninCaptchaResetNonce((prev) => prev + 1);
