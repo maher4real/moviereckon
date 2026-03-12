@@ -13,6 +13,7 @@ interface MediaImageProps
 
 const TMDB_HOST = "image.tmdb.org";
 const TMDB_BASE_PATH = "/t/p/";
+const TMDB_IMAGE_PROXY_PATH = "/api/tmdb-image";
 const NEXT_IMAGE_REMOTE_HOST_PATTERNS = [
   /^image\.tmdb\.org$/i,
   /^secure\.gravatar\.com$/i,
@@ -72,6 +73,7 @@ function getRemoteHostname(src: string): string | null {
 
 function shouldUseNativeImageElement(src: string, srcSet?: string): boolean {
   if (!src || !!srcSet || src.startsWith("data:")) return true;
+  if (src.startsWith(TMDB_IMAGE_PROXY_PATH)) return true;
 
   const hostname = getRemoteHostname(src);
   if (!hostname) return false;
