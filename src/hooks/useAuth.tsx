@@ -4,15 +4,6 @@
  */
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
 import * as mongoClient from "@/lib/mongodbClient";
-import {
-  clearFirebaseVerificationSession,
-  getFirebaseVerifiedIdToken,
-  isFirebaseVerificationEnabled,
-  provisionFirebaseVerificationForSignup,
-  resendFirebaseVerificationEmail,
-  rollbackFirebaseVerificationSignup,
-  shouldFallbackToInternalVerification,
-} from "@/lib/firebaseEmailVerification";
 import { useToast } from "@/hooks/use-toast";
 
 interface Profile {
@@ -39,8 +30,6 @@ interface AuthContextType {
   ) => Promise<{
     error: Error | null;
     requiresEmailVerification: boolean;
-    verificationPreviewUrl: string | null;
-    verificationProvider: mongoClient.EmailVerificationProvider;
   }>;
   signIn: (
     email: string,
@@ -49,14 +38,8 @@ interface AuthContextType {
   ) => Promise<{
     error: Error | null;
     code: mongoClient.AuthErrorCode;
-    verificationProvider: mongoClient.EmailVerificationProvider | null;
   }>;
-  resendVerificationEmail: (
-    email: string,
-    password: string,
-    captchaToken: string,
-    verificationProvider: mongoClient.EmailVerificationProvider,
-  ) => Promise<{ error: Error | null; verificationPreviewUrl: string | null }>;
+  resendVerificationEmail: (email: string) => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<boolean>;
@@ -138,7 +121,7 @@ export function AuthProvider({
   }, [authResolved, initAuth]);
 
   // Sign Up
-  const signUp = async (
+  const signUp: AuthContextType["signUp"] = async (
     email: string,
     password: string,
     username: string,
@@ -146,42 +129,13 @@ export function AuthProvider({
   ) => {
     setIsAuthenticating(true);
     try {
-      let verificationProvider: mongoClient.EmailVerificationProvider =
-        isFirebaseVerificationEnabled() ? "firebase" : "internal";
-
-      if (verificationProvider === "firebase") {
-        const firebaseSignup = await provisionFirebaseVerificationForSignup(email, password);
-        if (!firebaseSignup.ok) {
-          if (shouldFallbackToInternalVerification(firebaseSignup)) {
-            verificationProvider = "internal";
-          } else {
-            toast({
-              variant: "destructive",
-              title: "Sign up failed",
-              description: firebaseSignup.message,
-            });
-            return {
-              error: new Error(firebaseSignup.message),
-              requiresEmailVerification: false,
-              verificationPreviewUrl: null,
-              verificationProvider,
-            };
-          }
-        }
-      }
-
       const {
         user: newUser,
         error,
         requiresEmailVerification,
-        verificationPreviewUrl,
-        verificationProvider: registeredVerificationProvider,
-      } = await mongoClient.register(email, password, username, captchaToken, verificationProvider);
+      } = await mongoClient.register(email, password, username, captchaToken);
 
       if (error) {
-        if (verificationProvider === "firebase") {
-          await rollbackFirebaseVerificationSignup();
-        }
         toast({
           variant: "destructive",
           title: "Sign up failed",
@@ -190,15 +144,10 @@ export function AuthProvider({
         return {
           error: new Error(error),
           requiresEmailVerification: false,
-          verificationPreviewUrl: null,
-          verificationProvider,
         };
       }
 
       if (requiresEmailVerification) {
-        if (verificationProvider === "firebase") {
-          await clearFirebaseVerificationSession();
-        }
         setUser(null);
         setProfile(null);
         toast({
@@ -208,13 +157,7 @@ export function AuthProvider({
         return {
           error: null,
           requiresEmailVerification: true,
-          verificationPreviewUrl,
-          verificationProvider: registeredVerificationProvider,
         };
-      }
-
-      if (verificationProvider === "firebase") {
-        await rollbackFirebaseVerificationSignup();
       }
 
       if (newUser) {
@@ -230,8 +173,6 @@ export function AuthProvider({
       return {
         error: null,
         requiresEmailVerification: false,
-        verificationPreviewUrl: null,
-        verificationProvider: registeredVerificationProvider,
       };
     } finally {
       setIsAuthenticating(false);
@@ -239,56 +180,14 @@ export function AuthProvider({
   };
 
   // Sign In
-  const signIn = async (email: string, password: string, captchaToken: string) => {
+  const signIn: AuthContextType["signIn"] = async (
+    email: string,
+    password: string,
+    captchaToken: string,
+  ) => {
     setIsAuthenticating(true);
     try {
-      let {
-        user: loggedInUser,
-        error,
-        code,
-        verificationProvider,
-      } = await mongoClient.login(email, password, captchaToken);
-
-      if (code === "email_not_verified" && verificationProvider === "firebase" && isFirebaseVerificationEnabled()) {
-        const firebaseVerification = await getFirebaseVerifiedIdToken(email, password);
-        if (!firebaseVerification.ok) {
-          const firebaseVerificationProvider: mongoClient.EmailVerificationProvider = "firebase";
-          const mappedAuthCode: mongoClient.AuthErrorCode =
-            firebaseVerification.code === "auth/email-not-verified" ? "email_not_verified" : null;
-          toast({
-            variant: mappedAuthCode === "email_not_verified" ? "default" : "destructive",
-            title: mappedAuthCode === "email_not_verified" ? "Verify your email" : "Sign in failed",
-            description: firebaseVerification.message,
-          });
-          return {
-            error: new Error(firebaseVerification.message),
-            code: mappedAuthCode,
-            verificationProvider: firebaseVerificationProvider,
-          };
-        }
-
-        if (!firebaseVerification.idToken) {
-          const firebaseVerificationProvider: mongoClient.EmailVerificationProvider = "firebase";
-          toast({
-            variant: "destructive",
-            title: "Sign in failed",
-            description: "Firebase verification proof was missing. Please try again.",
-          });
-          return {
-            error: new Error("Firebase verification proof was missing. Please try again."),
-            code: null,
-            verificationProvider: firebaseVerificationProvider,
-          };
-        }
-
-        await clearFirebaseVerificationSession();
-        ({
-          user: loggedInUser,
-          error,
-          code,
-          verificationProvider,
-        } = await mongoClient.login(email, password, captchaToken, firebaseVerification.idToken));
-      }
+      const { user: loggedInUser, error, code } = await mongoClient.login(email, password, captchaToken);
 
       if (error) {
         toast({
@@ -296,7 +195,7 @@ export function AuthProvider({
           title: code === "email_not_verified" ? "Verify your email" : "Sign in failed",
           description: error,
         });
-        return { error: new Error(error), code, verificationProvider };
+        return { error: new Error(error), code };
       }
 
       if (loggedInUser) {
@@ -309,55 +208,33 @@ export function AuthProvider({
         description: "You've been signed in successfully.",
       });
 
-      return { error: null, code: null, verificationProvider: null };
+      return { error: null, code: null };
     } finally {
       setIsAuthenticating(false);
     }
   };
 
-  const resendVerificationEmail = async (
+  const resendVerificationEmail: AuthContextType["resendVerificationEmail"] = async (
     email: string,
-    password: string,
-    captchaToken: string,
-    verificationProvider: mongoClient.EmailVerificationProvider,
   ) => {
     setIsAuthenticating(true);
     try {
-      if (verificationProvider === "firebase" && isFirebaseVerificationEnabled()) {
-        const firebaseResend = await resendFirebaseVerificationEmail(email, password);
-        if (!firebaseResend.ok) {
-          toast({
-            variant: firebaseResend.code === "auth/already-verified" ? "default" : "destructive",
-            title: firebaseResend.code === "auth/already-verified" ? "Already verified" : "Resend failed",
-            description: firebaseResend.message,
-          });
-          return { error: new Error(firebaseResend.message), verificationPreviewUrl: null };
-        }
-
-        toast({
-          title: "Verification email sent",
-          description: "Check your inbox for a fresh verification link.",
-        });
-        return { error: null, verificationPreviewUrl: null };
-      }
-
-      const { error, verificationPreviewUrl } = await mongoClient.resendVerificationEmail(email, captchaToken);
-
+      const { error, message } = await mongoClient.resendVerificationEmail(email);
       if (error) {
         toast({
           variant: "destructive",
           title: "Resend failed",
           description: error,
         });
-        return { error: new Error(error), verificationPreviewUrl: null };
+        return { error: new Error(error) };
       }
 
       toast({
         title: "Verification email sent",
-        description: "Check your inbox for a fresh verification link.",
+        description: message || "Check your inbox for a fresh verification link.",
       });
 
-      return { error: null, verificationPreviewUrl };
+      return { error: null };
     } finally {
       setIsAuthenticating(false);
     }

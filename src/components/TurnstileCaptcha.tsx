@@ -116,7 +116,7 @@ function loadTurnstileScript(): Promise<void> {
 
 type TurnstileCaptchaProps = {
   siteKey: string;
-  action: "login" | "signup";
+  action: "login" | "signup" | "forgot-password";
   onTokenChange: (token: string) => void;
   resetNonce: number;
   className?: string;

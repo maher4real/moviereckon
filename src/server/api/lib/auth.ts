@@ -10,6 +10,7 @@ import {
   DEVICE_ID_COOKIE_NAME,
   getCookieValue,
 } from "./cookies.js";
+import { isUserEmailVerified } from "./email-auth.js";
 import type { Db } from "mongodb";
 
 const JWT_SECRET = (() => {
@@ -296,7 +297,33 @@ export async function getUserFromRequest(request: RequestLike): Promise<UserPayl
   const token = headerToken || cookieToken;
   if (!token) return null;
 
-  return verifyAccessToken(token);
+  const payload = verifyAccessToken(token);
+  if (!payload || !ObjectId.isValid(payload.id)) return null;
+
+  const { db } = await connectToDatabase();
+  const user = await db.collection("users").findOne(
+    { _id: new ObjectId(payload.id) },
+    {
+      projection: {
+        email: 1,
+        username: 1,
+        role: 1,
+        emailVerified: 1,
+        email_verified: 1,
+      },
+    },
+  );
+
+  if (!user || !isUserEmailVerified(user)) {
+    return null;
+  }
+
+  return {
+    id: user._id.toString(),
+    email: user.email,
+    username: user.username,
+    role: normalizeUserRole(user.role),
+  };
 }
 
 export async function resolveCurrentUserRole(user: UserPayload): Promise<UserRole> {
@@ -323,8 +350,23 @@ export async function userHasRoleAtLeast(
 
 // Get full user from database
 export async function getUserById(userId: string) {
+  if (!ObjectId.isValid(userId)) return null;
   const { db } = await connectToDatabase();
-  const user = await db.collection("users").findOne({ _id: new ObjectId(userId) });
+  const user = await db.collection("users").findOne(
+    { _id: new ObjectId(userId) },
+    {
+      projection: {
+        email: 1,
+        username: 1,
+        role: 1,
+        avatar_url: 1,
+        created_at: 1,
+        updated_at: 1,
+        emailVerified: 1,
+        email_verified: 1,
+      },
+    },
+  );
   if (!user) return null;
 
   return {
@@ -335,5 +377,6 @@ export async function getUserById(userId: string) {
     avatar_url: user.avatar_url || null,
     created_at: user.created_at,
     updated_at: user.updated_at,
+    emailVerified: isUserEmailVerified(user),
   };
 }

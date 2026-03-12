@@ -5,11 +5,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import {
-  buildEmailVerificationUrl,
-  createEmailVerificationToken,
-} from "../../lib/email-verification.js";
-import { sendVerificationEmail } from "../../lib/email.js";
-import {
   generateDeviceId,
   getDefaultUserRoleForEmail,
   generateRefreshSessionId,
@@ -27,13 +22,19 @@ import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
 import { verifyCaptchaToken } from "../../lib/captcha.js";
 import { emitSecurityEvent } from "../../lib/abuse-telemetry.js";
 import { sanitizeEmailAddress, sanitizeSingleLineText } from "../../lib/input.js";
+import {
+  buildEmailVerificationUrl,
+  buildPendingVerificationUpdate,
+  buildVerifiedEmailUpdate,
+  createEmailToken,
+} from "../../lib/email-auth.js";
+import { getPasswordValidationError } from "../../lib/password-policy.js";
+import { sendVerificationEmail } from "../../lib/email.js";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
 
 const EMAIL_VERIFICATION_DISABLED = process.env.EMAIL_VERIFICATION_DISABLED === "true";
-const FIREBASE_VERIFICATION_PROVIDER = "firebase";
-const INTERNAL_VERIFICATION_PROVIDER = "internal";
 
 function parseDuplicateField(error: unknown): "email" | "username" | null {
   if (!error || typeof error !== "object") return null;
@@ -69,15 +70,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         fallback: "",
         collapseWhitespace: false,
       }) || "";
-    const requestedVerificationProvider =
-      sanitizeSingleLineText(req.body?.email_verification_provider, 32, {
-        fallback: "",
-        collapseWhitespace: false,
-      }) || "";
-    const emailVerificationProvider =
-      requestedVerificationProvider === FIREBASE_VERIFICATION_PROVIDER
-        ? FIREBASE_VERIFICATION_PROVIDER
-        : INTERNAL_VERIFICATION_PROVIDER;
 
     const clientIp = getClientIp(req);
     const ipRateLimit = await consumeRateLimit(`auth:register:ip:${clientIp}`, 8, 30 * 60 * 1000);
@@ -109,19 +101,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    if (password.length < 10) {
-      return res.status(400).json({ error: "Password must be at least 10 characters" });
+    const passwordError = getPasswordValidationError(password);
+    if (passwordError) {
+      return res.status(400).json({ error: passwordError });
     }
 
-    const hasUpper = /[A-Z]/.test(password);
-    const hasLower = /[a-z]/.test(password);
-    const hasNumber = /[0-9]/.test(password);
-
-    if (!hasUpper || !hasLower || !hasNumber) {
-      return res.status(400).json({
-        error: "Password must include uppercase, lowercase, and numeric characters",
-      });
-    }
+    const verificationDetails =
+      EMAIL_VERIFICATION_DISABLED
+        ? null
+        : createEmailToken("verify-email");
 
     const captchaResult = await verifyCaptchaToken(req, captchaToken, "signup");
     if (!captchaResult.ok) {
@@ -154,11 +142,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           username,
           role,
           avatar_url: null,
-          email_verification_provider: EMAIL_VERIFICATION_DISABLED
-            ? INTERNAL_VERIFICATION_PROVIDER
-            : emailVerificationProvider,
-          email_verified: EMAIL_VERIFICATION_DISABLED ? true : false,
-          email_verified_at: EMAIL_VERIFICATION_DISABLED ? now : null,
+          ...(EMAIL_VERIFICATION_DISABLED
+            ? buildVerifiedEmailUpdate(now)
+            : buildPendingVerificationUpdate(
+                verificationDetails!.tokenHash,
+                verificationDetails!.expiresAt,
+              )),
+          passwordResetTokenHash: null,
+          passwordResetTokenExpiresAt: null,
           created_at: now,
           updated_at: now,
         });
@@ -178,7 +169,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!result) return;
 
-    const userId = result.insertedId.toString();
+    const insertedUserId = result.insertedId;
+    const userId = insertedUserId.toString();
 
     // Create user preferences
     await db.collection("user_preferences").insertOne({
@@ -190,39 +182,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     if (!EMAIL_VERIFICATION_DISABLED) {
-      if (emailVerificationProvider === FIREBASE_VERIFICATION_PROVIDER) {
-        return res.status(201).json({
-          requires_email_verification: true,
-          verification_provider: FIREBASE_VERIFICATION_PROVIDER,
-          message: "Account created. Check your email to verify your address before signing in.",
-          user: null,
-          verification_preview_url: null,
-        });
-      }
-
-      const { rawToken } = await createEmailVerificationToken(db, { userId, email });
-      const verificationLink = buildEmailVerificationUrl(req, rawToken);
-
-      let verificationPreviewUrl: string | null = null;
+      const verificationUrl = buildEmailVerificationUrl(req, verificationDetails!.rawToken, email);
 
       try {
-        const emailResult = await sendVerificationEmail({
-          userId,
+        await sendVerificationEmail({
           toEmail: email,
           username,
-          verificationUrl: verificationLink,
+          verificationUrl,
         });
-        verificationPreviewUrl = emailResult.previewUrl;
-      } catch (verificationError) {
-        console.error("Verification email send error:", verificationError);
+      } catch (error) {
+        await db.collection("users").deleteOne({ _id: insertedUserId });
+        await db.collection("user_preferences").deleteOne({ user_id: userId });
+        console.error("Verification email send error:", error);
+        return res.status(500).json({
+          error: "Unable to send verification email right now. Please try again.",
+        });
       }
 
       return res.status(201).json({
         requires_email_verification: true,
-        verification_provider: INTERNAL_VERIFICATION_PROVIDER,
         message: "Account created. Check your email to verify your address before signing in.",
         user: null,
-        verification_preview_url: verificationPreviewUrl,
       });
     }
 
@@ -263,6 +243,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         avatar_url: null,
         created_at: now,
         updated_at: now,
+        emailVerified: true,
       },
       session: "cookie",
     });

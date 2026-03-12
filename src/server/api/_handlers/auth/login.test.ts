@@ -4,7 +4,6 @@ const findUserMock = vi.fn();
 const comparePasswordMock = vi.fn();
 const consumeRateLimitMock = vi.fn();
 const verifyCaptchaTokenMock = vi.fn();
-const verifyFirebaseEmailProofMock = vi.fn();
 
 vi.mock("../../lib/mongodb.js", () => ({
   connectToDatabase: vi.fn(async () => ({
@@ -50,10 +49,6 @@ vi.mock("../../lib/abuse-telemetry.js", () => ({
   emitSecurityEvent: vi.fn(),
 }));
 
-vi.mock("../../lib/firebase-verification.js", () => ({
-  verifyFirebaseEmailProof: verifyFirebaseEmailProofMock,
-}));
-
 function createResponse() {
   return {
     statusCode: 200,
@@ -79,7 +74,6 @@ describe("login handler", () => {
     vi.clearAllMocks();
     consumeRateLimitMock.mockResolvedValue({ allowed: true, retryAfterSeconds: 0, source: "local" });
     verifyCaptchaTokenMock.mockResolvedValue({ ok: true, error: null });
-    verifyFirebaseEmailProofMock.mockResolvedValue({ ok: false, errorCode: "missing_firebase_token" });
   });
 
   it("returns a verification error only after the password is correct for an unverified account", async () => {
@@ -156,15 +150,15 @@ describe("login handler", () => {
     });
   });
 
-  it("returns the firebase verification provider for firebase-backed unverified accounts", async () => {
+  it("returns the email verification error without leaking extra account state", async () => {
     findUserMock.mockResolvedValue({
       _id: { toString: () => "user-1" },
       email: "user@example.com",
       username: "cinefan",
       role: "user",
       password_hash: "hashed-password",
+      emailVerified: false,
       email_verified: false,
-      email_verification_provider: "firebase",
       avatar_url: null,
       created_at: "2026-03-01T00:00:00.000Z",
       updated_at: "2026-03-01T00:00:00.000Z",
@@ -181,7 +175,6 @@ describe("login handler", () => {
           email: "user@example.com",
           password: "Password123",
           captcha_token: "captcha-token",
-          firebase_id_token: "",
         },
         headers: {},
       } as never,
@@ -192,8 +185,6 @@ describe("login handler", () => {
     expect(response.body).toMatchObject({
       error: "Please verify your email before signing in.",
       code: "email_not_verified",
-      email_verification_provider: "firebase",
     });
-    expect(verifyFirebaseEmailProofMock).toHaveBeenCalledWith("", "user@example.com");
   });
 });

@@ -67,6 +67,16 @@ async function ensureMongoIndexes(db: Db): Promise<void> {
     await createIndexSafe(db, "users", { email: 1 }, { unique: true, name: "users_email_unique" });
     await createIndexSafe(db, "users", { username: 1 }, { unique: true, name: "users_username_unique" });
     await createIndexSafe(db, "users", { role: 1 }, { name: "users_role" });
+    await createIndexSafe(db, "users", { verificationTokenHash: 1 }, {
+      unique: true,
+      sparse: true,
+      name: "users_verification_token_hash_unique_sparse",
+    });
+    await createIndexSafe(db, "users", { passwordResetTokenHash: 1 }, {
+      unique: true,
+      sparse: true,
+      name: "users_password_reset_token_hash_unique_sparse",
+    });
     await createIndexSafe(db, "users", { google_sub: 1 }, {
       unique: true,
       sparse: true,
@@ -132,18 +142,6 @@ async function ensureMongoIndexes(db: Db): Promise<void> {
     await createIndexSafe(db, "refresh_tokens", { expires_at: 1 }, {
       expireAfterSeconds: 0,
       name: "refresh_tokens_ttl_expires_at",
-    });
-
-    await createIndexSafe(db, "email_verification_tokens", { token_hash: 1 }, {
-      unique: true,
-      name: "email_verification_tokens_hash_unique",
-    });
-    await createIndexSafe(db, "email_verification_tokens", { user_id: 1, used_at: 1 }, {
-      name: "email_verification_tokens_user_used",
-    });
-    await createIndexSafe(db, "email_verification_tokens", { expires_at: 1 }, {
-      expireAfterSeconds: 0,
-      name: "email_verification_tokens_ttl_expires_at",
     });
 
     await createIndexSafe(db, "security_event_aggregates", { bucket_start: 1, event_field: 1 }, {

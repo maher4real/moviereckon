@@ -1,14 +1,16 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase } from "../../lib/mongodb.js";
+import { clearAuthCookies } from "../../lib/cookies.js";
+import { hashPassword } from "../../lib/auth.js";
 import { sanitizeEmailAddress, sanitizeSingleLineText } from "../../lib/input.js";
 import {
-  buildVerifiedEmailUpdate,
+  clearPasswordResetUpdate,
   emailTokenMatches,
   isEmailTokenExpired,
-  isUserEmailVerified,
 } from "../../lib/email-auth.js";
+import { getPasswordValidationError } from "../../lib/password-policy.js";
 
-const INVALID_LINK_ERROR = "Invalid or expired verification link.";
+const INVALID_LINK_ERROR = "Invalid or expired password reset link.";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -22,9 +24,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         fallback: "",
         collapseWhitespace: false,
       }) || "";
+    const password = typeof req.body?.password === "string" ? req.body.password : "";
 
     if (!email || !token) {
       return res.status(400).json({ error: INVALID_LINK_ERROR });
+    }
+
+    const passwordError = getPasswordValidationError(password);
+    if (passwordError) {
+      return res.status(400).json({ error: passwordError });
     }
 
     const { db } = await connectToDatabase();
@@ -32,10 +40,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       { email },
       {
         projection: {
-          emailVerified: 1,
-          email_verified: 1,
-          verificationTokenHash: 1,
-          verificationTokenExpiresAt: 1,
+          passwordResetTokenHash: 1,
+          passwordResetTokenExpiresAt: 1,
         },
       },
     );
@@ -44,20 +50,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: INVALID_LINK_ERROR });
     }
 
-    if (isUserEmailVerified(user)) {
-      return res.status(200).json({
-        message: "Email already verified. You can sign in now.",
-        alreadyVerified: true,
-      });
-    }
-
-    if (isEmailTokenExpired(user.verificationTokenExpiresAt)) {
+    if (isEmailTokenExpired(user.passwordResetTokenExpiresAt)) {
       await db.collection("users").updateOne(
         { _id: user._id },
         {
           $set: {
-            verificationTokenHash: null,
-            verificationTokenExpiresAt: null,
+            ...clearPasswordResetUpdate(),
             updated_at: new Date().toISOString(),
           },
         },
@@ -65,24 +63,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: INVALID_LINK_ERROR });
     }
 
-    if (!emailTokenMatches(token, "verify-email", user.verificationTokenHash)) {
+    if (!emailTokenMatches(token, "reset-password", user.passwordResetTokenHash)) {
       return res.status(400).json({ error: INVALID_LINK_ERROR });
     }
 
     const now = new Date().toISOString();
+    const passwordHash = await hashPassword(password);
     await db.collection("users").updateOne(
       { _id: user._id },
       {
         $set: {
-          ...buildVerifiedEmailUpdate(now),
+          password_hash: passwordHash,
+          ...clearPasswordResetUpdate(),
           updated_at: now,
         },
       },
     );
+    await db.collection("refresh_tokens").deleteMany({ user_id: user._id.toString() });
+    clearAuthCookies(res);
 
-    return res.status(200).json({ message: "Email verified successfully." });
+    return res.status(200).json({ message: "Password reset successfully. You can sign in now." });
   } catch (error) {
-    console.error("Verify email error:", error);
+    console.error("Reset password error:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 }

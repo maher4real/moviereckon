@@ -1,14 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const insertUserMock = vi.fn();
+const deleteUserMock = vi.fn();
 const insertPreferencesMock = vi.fn();
+const deletePreferencesMock = vi.fn();
+const insertRefreshTokenMock = vi.fn();
 const consumeRateLimitMock = vi.fn();
 const verifyCaptchaTokenMock = vi.fn();
 const hashPasswordMock = vi.fn();
-const createEmailVerificationTokenMock = vi.fn();
-const sendVerificationEmailMock = vi.fn();
 const setAuthCookiesMock = vi.fn();
 const setDeviceCookieMock = vi.fn();
+const createEmailTokenMock = vi.fn();
+const sendVerificationEmailMock = vi.fn();
 
 vi.mock("../../lib/mongodb.js", () => ({
   connectToDatabase: vi.fn(async () => ({
@@ -17,12 +20,20 @@ vi.mock("../../lib/mongodb.js", () => ({
         if (name === "users") {
           return {
             insertOne: insertUserMock,
+            deleteOne: deleteUserMock,
           };
         }
 
         if (name === "user_preferences") {
           return {
             insertOne: insertPreferencesMock,
+            deleteOne: deletePreferencesMock,
+          };
+        }
+
+        if (name === "refresh_tokens") {
+          return {
+            insertOne: insertRefreshTokenMock,
           };
         }
 
@@ -30,15 +41,6 @@ vi.mock("../../lib/mongodb.js", () => ({
       }),
     },
   })),
-}));
-
-vi.mock("../../lib/email-verification.js", () => ({
-  buildEmailVerificationUrl: vi.fn(() => "https://moviereckon.test/api/auth/verify-email?token=test-token"),
-  createEmailVerificationToken: createEmailVerificationTokenMock,
-}));
-
-vi.mock("../../lib/email.js", () => ({
-  sendVerificationEmail: sendVerificationEmailMock,
 }));
 
 vi.mock("../../lib/auth.js", () => ({
@@ -60,6 +62,34 @@ vi.mock("../../lib/auth.js", () => ({
 vi.mock("../../lib/cookies.js", () => ({
   setAuthCookies: setAuthCookiesMock,
   setDeviceCookie: setDeviceCookieMock,
+}));
+
+vi.mock("../../lib/email-auth.js", () => ({
+  createEmailToken: createEmailTokenMock,
+  buildEmailVerificationUrl: vi.fn((req: { headers?: Record<string, string> }, rawToken: string, email: string) => {
+    const host = req.headers?.host || "moviereckon.test";
+    return `https://${host}/verify-email?token=${rawToken}&email=${encodeURIComponent(email)}`;
+  }),
+  buildPendingVerificationUpdate: vi.fn((tokenHash: string, expiresAt: string) => ({
+    emailVerified: false,
+    email_verified: false,
+    emailVerifiedAt: null,
+    email_verified_at: null,
+    verificationTokenHash: tokenHash,
+    verificationTokenExpiresAt: expiresAt,
+  })),
+  buildVerifiedEmailUpdate: vi.fn((now: string) => ({
+    emailVerified: true,
+    email_verified: true,
+    emailVerifiedAt: now,
+    email_verified_at: now,
+    verificationTokenHash: null,
+    verificationTokenExpiresAt: null,
+  })),
+}));
+
+vi.mock("../../lib/email.js", () => ({
+  sendVerificationEmail: sendVerificationEmailMock,
 }));
 
 vi.mock("../../lib/rate-limit.js", () => ({
@@ -105,21 +135,22 @@ describe("register handler", () => {
     consumeRateLimitMock.mockResolvedValue({ allowed: true, retryAfterSeconds: 0, source: "local" });
     verifyCaptchaTokenMock.mockResolvedValue({ ok: true, error: null });
     hashPasswordMock.mockResolvedValue("hashed-password");
+    createEmailTokenMock.mockReturnValue({
+      rawToken: "raw-verification-token",
+      tokenHash: "hashed-verification-token",
+      expiresAt: "2026-03-13T00:00:00.000Z",
+    });
+    sendVerificationEmailMock.mockResolvedValue(undefined);
     insertUserMock.mockResolvedValue({
       insertedId: { toString: () => "user-1" },
     });
     insertPreferencesMock.mockResolvedValue({ acknowledged: true });
-    createEmailVerificationTokenMock.mockResolvedValue({
-      rawToken: "test-token",
-      expiresAt: "2026-03-13T00:00:00.000Z",
-    });
-    sendVerificationEmailMock.mockResolvedValue({
-      sent: true,
-      previewUrl: null,
-    });
+    deleteUserMock.mockResolvedValue({ acknowledged: true });
+    deletePreferencesMock.mockResolvedValue({ acknowledged: true });
+    insertRefreshTokenMock.mockResolvedValue({ acknowledged: true });
   });
 
-  it("creates an unverified account and does not issue auth cookies when verification is required", async () => {
+  it("creates an unverified account and sends a verification email when verification is required", async () => {
     const { default: handler } = await import("./register.js");
     const response = createResponse();
 
@@ -145,18 +176,29 @@ describe("register handler", () => {
       requires_email_verification: true,
       user: null,
     });
-    expect(createEmailVerificationTokenMock).toHaveBeenCalled();
-    expect(sendVerificationEmailMock).toHaveBeenCalledWith(
+    expect(insertUserMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        toEmail: "user@example.com",
+        email: "user@example.com",
         username: "cinefan",
+        emailVerified: false,
+        verificationTokenHash: "hashed-verification-token",
+        verificationTokenExpiresAt: "2026-03-13T00:00:00.000Z",
       }),
     );
+    expect(sendVerificationEmailMock).toHaveBeenCalledWith({
+      toEmail: "user@example.com",
+      username: "cinefan",
+      verificationUrl:
+        "https://moviereckon.test/verify-email?token=raw-verification-token&email=user%40example.com",
+    });
     expect(setDeviceCookieMock).not.toHaveBeenCalled();
     expect(setAuthCookiesMock).not.toHaveBeenCalled();
+    expect(insertRefreshTokenMock).not.toHaveBeenCalled();
   });
 
-  it("skips internal email delivery when firebase is selected as the verification provider", async () => {
+  it("issues auth cookies when email verification is explicitly disabled", async () => {
+    process.env.EMAIL_VERIFICATION_DISABLED = "true";
+
     const { default: handler } = await import("./register.js");
     const response = createResponse();
 
@@ -164,11 +206,10 @@ describe("register handler", () => {
       {
         method: "POST",
         body: {
-          email: "firebase@example.com",
+          email: "user@example.com",
           password: "Password123",
-          username: "firebasefan",
+          username: "cinefan",
           captcha_token: "captcha-token",
-          email_verification_provider: "firebase",
         },
         headers: {
           host: "moviereckon.test",
@@ -180,11 +221,47 @@ describe("register handler", () => {
 
     expect(response.statusCode).toBe(201);
     expect(response.body).toMatchObject({
-      requires_email_verification: true,
-      verification_provider: "firebase",
-      verification_preview_url: null,
+      requires_email_verification: false,
+      message: "Account created successfully.",
+      user: expect.objectContaining({
+        email: "user@example.com",
+        username: "cinefan",
+      }),
     });
-    expect(createEmailVerificationTokenMock).not.toHaveBeenCalled();
+    expect(setDeviceCookieMock).toHaveBeenCalledWith(response, "device-id");
+    expect(setAuthCookiesMock).toHaveBeenCalledWith(response, "access-token", "refresh-token");
+    expect(insertRefreshTokenMock).toHaveBeenCalledTimes(1);
     expect(sendVerificationEmailMock).not.toHaveBeenCalled();
+  });
+
+  it("rolls back the new account when the verification email cannot be sent", async () => {
+    sendVerificationEmailMock.mockRejectedValueOnce(new Error("smtp unavailable"));
+
+    const { default: handler } = await import("./register.js");
+    const response = createResponse();
+
+    await handler(
+      {
+        method: "POST",
+        body: {
+          email: "user@example.com",
+          password: "Password123",
+          username: "cinefan",
+          captcha_token: "captcha-token",
+        },
+        headers: {
+          host: "moviereckon.test",
+          "x-forwarded-proto": "https",
+        },
+      } as never,
+      response as never,
+    );
+
+    expect(response.statusCode).toBe(500);
+    expect(response.body).toMatchObject({
+      error: "Unable to send verification email right now. Please try again.",
+    });
+    expect(deleteUserMock).toHaveBeenCalledTimes(1);
+    expect(deletePreferencesMock).toHaveBeenCalledWith({ user_id: "user-1" });
   });
 });

@@ -211,22 +211,17 @@ Optional auth/email variables:
 
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
-- `RESEND_API_KEY`
-- `RESEND_FROM_EMAIL`
-- `RESEND_FROM_NAME`
-- `RESEND_REPLY_TO_EMAIL`
-- `RESEND_TIMEOUT_MS`
-- `RESEND_MAX_ATTEMPTS`
-- `EMAIL_VERIFICATION_BASE_URL`
-- `EMAIL_VERIFICATION_REDIRECT_BASE_URL`
-- `EMAIL_VERIFICATION_TOKEN_PEPPER`
-- `NEXT_PUBLIC_FIREBASE_API_KEY`
-- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
-- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
-- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
-- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
-- `NEXT_PUBLIC_FIREBASE_APP_ID`
-- `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID`
+- `APP_URL`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_SECURE`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `SMTP_FROM_EMAIL`
+- `SMTP_FROM_NAME`
+- `SMTP_REPLY_TO_EMAIL`
+- `EMAIL_TOKEN_PEPPER`
+- `EMAIL_VERIFICATION_DISABLED`
 - `REFRESH_TOKEN_PEPPER`
 - `SESSION_COOKIE_SECURE`
 - `SESSION_COOKIE_SAMESITE`
@@ -272,13 +267,15 @@ Auth routes:
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
-- `POST /api/auth/resend-verification`
 - `POST /api/auth/refresh`
 - `GET /api/auth/me`
 - `POST /api/auth/logout`
+- `POST /api/auth/verify-email`
+- `POST /api/auth/resend-verification`
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
 - `GET /api/auth/google-start`
 - `GET /api/auth/google-callback`
-- `GET /api/auth/verify-email`
 
 User routes:
 
@@ -302,11 +299,8 @@ Other:
 - Turnstile captcha is enforced for login and signup, with backend action, hostname, and challenge-age validation.
 - Email/password accounts must verify their email before the first sign-in.
 - Refresh tokens are stored hashed in MongoDB.
-- Local development logs a verification preview URL when Resend env vars are not configured.
-- New email/password signups can use Firebase Auth just for the verification email step while MovieReckon still keeps MongoDB users and cookie sessions.
-- If you use Firebase verification, add your local and production app domains to Firebase Auth authorized domains so the action links can complete correctly.
-- Verification emails use Resend idempotency keys, explicit plain-text bodies, and tagged sends for safer retries and easier event tracing.
-- Prefer a verified sender domain and a monitored `RESEND_REPLY_TO_EMAIL` inbox instead of a dead-end no-reply address.
+- Email/password signups use Firebase Auth for verification while MovieReckon keeps MongoDB users and cookie sessions for app auth.
+- Add your local and production app domains to Firebase Auth authorized domains so the action links can complete correctly.
 - `EMAIL_VERIFICATION_DISABLED=true` is available only as an explicit override.
 
 ## Deployment

@@ -2,7 +2,8 @@
  * Auth Router - Consolidated serverless function
  * Routes: /api/auth/login, /api/auth/register, /api/auth/refresh, /api/auth/me,
  * /api/auth/logout, /api/auth/availability, /api/auth/google-start, /api/auth/google-callback,
- * /api/auth/resend-verification, /api/auth/verify-email
+ * /api/auth/verify-email, /api/auth/resend-verification, /api/auth/forgot-password,
+ * /api/auth/reset-password
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import availabilityHandler from "./_handlers/auth/availability.js";
@@ -13,8 +14,10 @@ import meHandler from "./_handlers/auth/me.js";
 import logoutHandler from "./_handlers/auth/logout.js";
 import googleStartHandler from "./_handlers/auth/google-start.js";
 import googleCallbackHandler from "./_handlers/auth/google-callback.js";
-import resendVerificationHandler from "./_handlers/auth/resend-verification.js";
 import verifyEmailHandler from "./_handlers/auth/verify-email.js";
+import resendVerificationHandler from "./_handlers/auth/resend-verification.js";
+import forgotPasswordHandler from "./_handlers/auth/forgot-password.js";
+import resetPasswordHandler from "./_handlers/auth/reset-password.js";
 import {
   applyApiCors,
   applyDefaultSecurityHeaders,
@@ -128,8 +131,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return loginHandler(req, res);
       case "register":
         return registerHandler(req, res);
-      case "resend-verification":
-        return resendVerificationHandler(req, res);
       case "refresh":
         return refreshHandler(req, res);
       case "me":
@@ -142,6 +143,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return googleCallbackHandler(req, res);
       case "verify-email":
         return verifyEmailHandler(req, res);
+      case "resend-verification":
+        return resendVerificationHandler(req, res);
+      case "forgot-password":
+        return forgotPasswordHandler(req, res);
+      case "reset-password":
+        return resetPasswordHandler(req, res);
       default:
         return res.status(404).json({ error: `Auth route not found: ${route}` });
     }

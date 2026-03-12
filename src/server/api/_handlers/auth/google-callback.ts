@@ -31,6 +31,11 @@ import {
   parseGoogleOAuthState,
   type GoogleProfile,
 } from "../../lib/google-oauth.js";
+import {
+  buildVerifiedEmailUpdate,
+  clearPasswordResetUpdate,
+  isUserEmailVerified,
+} from "../../lib/email-auth.js";
 
 const USERNAME_REGEX = /^[a-z0-9_]{3,24}$/;
 
@@ -91,14 +96,13 @@ async function resolveUserFromGoogleProfile(db: Db, profile: GoogleProfile) {
 
   let user = await users.findOne({ google_sub: profile.sub });
 
-  if (user && (user.email_verified !== true || !user.role)) {
+  if (user && (!isUserEmailVerified(user) || !user.role)) {
     const role = normalizeUserRole(user.role || defaultRole);
     await users.updateOne(
       { _id: user._id },
       {
         $set: {
-          email_verified: true,
-          email_verified_at: now,
+          ...buildVerifiedEmailUpdate(now),
           role,
           updated_at: now,
         },
@@ -126,9 +130,8 @@ async function resolveUserFromGoogleProfile(db: Db, profile: GoogleProfile) {
         updates.avatar_url = profile.picture;
       }
 
-      if (userByEmail.email_verified !== true) {
-        updates.email_verified = true;
-        updates.email_verified_at = now;
+      if (!isUserEmailVerified(userByEmail)) {
+        Object.assign(updates, buildVerifiedEmailUpdate(now));
       }
 
       if (!userByEmail.username || typeof userByEmail.username !== "string") {
@@ -158,8 +161,8 @@ async function resolveUserFromGoogleProfile(db: Db, profile: GoogleProfile) {
       role: defaultRole,
       avatar_url: profile.picture || null,
       google_sub: profile.sub,
-      email_verified: true,
-      email_verified_at: now,
+      ...buildVerifiedEmailUpdate(now),
+      ...clearPasswordResetUpdate(),
       created_at: now,
       updated_at: now,
     });

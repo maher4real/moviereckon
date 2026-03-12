@@ -1,22 +1,31 @@
-/**
- * POST /api/auth/resend-verification
- * Re-issue an email verification link for an existing unverified local account.
- */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase } from "../../lib/mongodb.js";
+import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
+import { sanitizeEmailAddress } from "../../lib/input.js";
 import {
   buildEmailVerificationUrl,
-  createEmailVerificationToken,
-} from "../../lib/email-verification.js";
+  buildPendingVerificationUpdate,
+  createEmailToken,
+  isUserEmailVerified,
+} from "../../lib/email-auth.js";
 import { sendVerificationEmail } from "../../lib/email.js";
-import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
-import { verifyCaptchaToken } from "../../lib/captcha.js";
-import { emitSecurityEvent } from "../../lib/abuse-telemetry.js";
-import { sanitizeEmailAddress, sanitizeSingleLineText } from "../../lib/input.js";
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const GENERIC_SUCCESS_MESSAGE =
-  "If an unverified account exists for that email, a new verification link has been sent.";
+const GENERIC_MESSAGE =
+  "If the account exists and still needs verification, we sent a fresh verification email.";
+
+async function getRetryAfterSeconds(email: string, clientIp: string) {
+  const [ipLimit, emailLimit, cooldownLimit] = await Promise.all([
+    consumeRateLimit(`auth:resend-verification:ip:${clientIp}`, 8, 60 * 60 * 1000),
+    consumeRateLimit(`auth:resend-verification:email:${email || "missing"}`, 4, 60 * 60 * 1000),
+    consumeRateLimit(`auth:resend-verification:cooldown:${email || "missing"}`, 1, 60 * 1000),
+  ]);
+
+  if (ipLimit.allowed && emailLimit.allowed && cooldownLimit.allowed) {
+    return 0;
+  }
+
+  return Math.max(ipLimit.retryAfterSeconds, emailLimit.retryAfterSeconds, cooldownLimit.retryAfterSeconds, 60);
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -25,56 +34,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const email = sanitizeEmailAddress(req.body?.email);
-    const captchaToken =
-      sanitizeSingleLineText(req.body?.captcha_token, 4096, {
-        fallback: "",
-        collapseWhitespace: false,
-      }) || "";
-
-    if (!email || !EMAIL_REGEX.test(email)) {
-      return res.status(400).json({ error: "Please provide a valid email address" });
-    }
-
     const clientIp = getClientIp(req);
-    const ipRateLimit = await consumeRateLimit(`auth:resend-verification:ip:${clientIp}`, 8, 30 * 60 * 1000);
-    const emailRateLimit = await consumeRateLimit(
-      `auth:resend-verification:email:${email}`,
-      5,
-      30 * 60 * 1000,
-    );
+    const retryAfterSeconds = await getRetryAfterSeconds(email, clientIp);
 
-    if (!ipRateLimit.allowed || !emailRateLimit.allowed) {
-      emitSecurityEvent({
-        type: "rate_limit_blocked",
-        outcome: "blocked",
-        route: "auth_resend_verification",
-        reason: "verification_resend_limit",
-        req,
-        metadata: {
-          ip_source: ipRateLimit.source,
-          email_source: emailRateLimit.source,
-        },
-      });
-      const retryAfter = Math.max(ipRateLimit.retryAfterSeconds, emailRateLimit.retryAfterSeconds, 60);
-      res.setHeader("Retry-After", String(retryAfter));
-      return res.status(429).json({ error: "Too many verification requests. Please try again later." });
+    if (retryAfterSeconds > 0) {
+      res.setHeader("Retry-After", String(retryAfterSeconds));
+      return res.status(429).json({ error: "Please wait before requesting another verification email." });
     }
 
-    const captchaResult = await verifyCaptchaToken(req, captchaToken, "login");
-    if (!captchaResult.ok) {
-      emitSecurityEvent({
-        type: "captcha_failed",
-        outcome: "blocked",
-        route: "auth_resend_verification",
-        reason: captchaResult.reason || "captcha_verification_failed",
-        req,
-        metadata: {
-          captcha_error_codes: captchaResult.errorCodes,
-          captcha_response_action: captchaResult.responseAction,
-          captcha_response_hostname: captchaResult.responseHostname,
-        },
-      });
-      return res.status(400).json({ error: captchaResult.error || "CAPTCHA verification failed" });
+    if (!email) {
+      return res.status(200).json({ message: GENERIC_MESSAGE });
     }
 
     const { db } = await connectToDatabase();
@@ -85,49 +54,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           email: 1,
           username: 1,
           password_hash: 1,
+          emailVerified: 1,
           email_verified: 1,
-          email_verification_provider: 1,
         },
       },
     );
 
-    if (!user || user.email_verified === true || typeof user.password_hash !== "string") {
-      return res.status(200).json({ message: GENERIC_SUCCESS_MESSAGE });
+    if (!user || typeof user.password_hash !== "string" || isUserEmailVerified(user)) {
+      return res.status(200).json({ message: GENERIC_MESSAGE });
     }
 
-    if (user.email_verification_provider === "firebase") {
-      return res.status(400).json({
-        error: "This account uses Firebase email verification. Sign in to resend the verification email.",
-        code: "firebase_client_required",
-      });
-    }
-
-    const { rawToken } = await createEmailVerificationToken(db, {
-      userId: user._id.toString(),
-      email,
-    });
-    const verificationUrl = buildEmailVerificationUrl(req, rawToken);
-
-    let verificationPreviewUrl: string | null = null;
+    const { rawToken, tokenHash, expiresAt } = createEmailToken("verify-email");
+    const now = new Date().toISOString();
+    await db.collection("users").updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          ...buildPendingVerificationUpdate(tokenHash, expiresAt),
+          updated_at: now,
+        },
+      },
+    );
 
     try {
-      const emailResult = await sendVerificationEmail({
-        userId: user._id.toString(),
-        toEmail: email,
-        username: typeof user.username === "string" ? user.username : "there",
-        verificationUrl,
+      await sendVerificationEmail({
+        toEmail: user.email,
+        username: user.username || "there",
+        verificationUrl: buildEmailVerificationUrl(req, rawToken, user.email),
       });
-      verificationPreviewUrl = emailResult.previewUrl;
-    } catch (verificationError) {
-      console.error("Verification resend email error:", verificationError);
+    } catch (error) {
+      console.error("Resend verification email error:", error);
     }
 
-    return res.status(200).json({
-      message: GENERIC_SUCCESS_MESSAGE,
-      verification_preview_url: verificationPreviewUrl,
-    });
+    return res.status(200).json({ message: GENERIC_MESSAGE });
   } catch (error) {
-    console.error("Resend verification error:", error);
+    console.error("Resend verification handler error:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 }

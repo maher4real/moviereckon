@@ -19,12 +19,14 @@ import {
 } from "../../lib/auth.js";
 import {
   REFRESH_TOKEN_COOKIE_NAME,
+  clearAuthCookies,
   getCookieValue,
   setAuthCookies,
   setDeviceCookie,
 } from "../../lib/cookies.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
 import { emitSecurityEvent } from "../../lib/abuse-telemetry.js";
+import { isUserEmailVerified } from "../../lib/email-auth.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -158,6 +160,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           email: 1,
           username: 1,
           role: 1,
+          emailVerified: 1,
+          email_verified: 1,
           avatar_url: 1,
           created_at: 1,
           updated_at: 1,
@@ -165,7 +169,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     );
     if (!user) {
+      await db.collection("refresh_tokens").deleteOne({ _id: storedToken._id });
+      clearAuthCookies(res);
       return res.status(401).json({ error: "User not found" });
+    }
+
+    if (!isUserEmailVerified(user)) {
+      await db.collection("refresh_tokens").deleteOne({ _id: storedToken._id });
+      clearAuthCookies(res);
+      return res.status(401).json({ error: "Email verification required" });
     }
 
     // Generate new tokens
@@ -209,6 +221,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         avatar_url: user.avatar_url || null,
         created_at: user.created_at,
         updated_at: user.updated_at,
+        emailVerified: true,
       },
       session: "cookie",
       // Legacy fallback response (disabled for security):

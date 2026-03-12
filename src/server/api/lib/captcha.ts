@@ -112,7 +112,7 @@ function getAllowedCaptchaHostnames(req: VercelRequest): Set<string> {
 export async function verifyCaptchaToken(
   req: VercelRequest,
   token: string,
-  expectedAction: "login" | "signup",
+  expectedAction: "login" | "signup" | "forgot-password",
 ): Promise<CaptchaVerificationResult> {
   const secret = getSecretKey();
   if (!secret) {

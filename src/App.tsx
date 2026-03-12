@@ -34,6 +34,9 @@ const NotFound = lazy(() => import("./screens/NotFound"));
 const Movies = lazy(() => import("./screens/Movies"));
 const Series = lazy(() => import("./screens/Series"));
 const InfoPage = lazy(() => import("./screens/InfoPage"));
+const VerifyEmail = lazy(() => import("./screens/VerifyEmail"));
+const ForgotPassword = lazy(() => import("./screens/ForgotPassword"));
+const ResetPassword = lazy(() => import("./screens/ResetPassword"));
 
 type AppProps = {
   initialLocation?: string;
@@ -91,6 +94,9 @@ const App = ({
                     <Routes>
                       <Route path="/" element={<Auth />} />
                       <Route path="/auth" element={<Auth />} />
+                      <Route path="/verify-email" element={<VerifyEmail />} />
+                      <Route path="/forgot-password" element={<ForgotPassword />} />
+                      <Route path="/reset-password" element={<ResetPassword />} />
                       <Route path="/home" element={<Home />} />
                       <Route path="/upcoming" element={<Upcoming />} />
                       <Route path="/browse" element={<Navigate to="/upcoming" replace />} />
