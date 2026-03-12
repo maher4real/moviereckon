@@ -299,7 +299,6 @@ export function AuthProvider({
 
   // Sign Out
   const signOut = async () => {
-    await mongoClient.logout();
     disableGoogleAutoSelect();
     setUser(null);
     setProfile(null);
@@ -308,6 +307,8 @@ export function AuthProvider({
       title: "Signed out",
       description: "You've been signed out successfully.",
     });
+
+    void mongoClient.logout({ keepalive: true });
   };
 
   // Update Profile

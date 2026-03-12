@@ -633,7 +633,9 @@ export async function signInWithGoogleCredential(credential: string): Promise<{
   }
 }
 
-export async function logout(): Promise<void> {
+export async function logout(options: { keepalive?: boolean } = {}): Promise<void> {
+  clearTokens();
+
   try {
     await fetch(`${MONGODB_API_URL}/api/auth/logout`, {
       method: "POST",
@@ -641,6 +643,8 @@ export async function logout(): Promise<void> {
         "X-Requested-With": "XMLHttpRequest",
       },
       credentials: "include",
+      keepalive: options.keepalive === true,
+      cache: "no-store",
     });
 
     // Legacy fallback (disabled for security):
@@ -654,8 +658,6 @@ export async function logout(): Promise<void> {
     // }
   } catch {
     // Ignore errors during logout
-  } finally {
-    clearTokens();
   }
 }
 

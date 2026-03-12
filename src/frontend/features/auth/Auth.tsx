@@ -341,11 +341,11 @@ export default function Auth() {
           googleButtonRef.current.innerHTML = "";
           googleIdApi.renderButton(googleButtonRef.current, {
             type: "standard",
-            theme: "filled_black",
+            theme: "outline",
             size: "large",
             shape: "pill",
             text: "continue_with",
-            width: 384,
+            width: 360,
             logo_alignment: "left",
           });
         }
@@ -727,42 +727,69 @@ export default function Auth() {
               </p>
             ) : null}
 
-            <div className="space-y-3">
-              <div
-                ref={googleButtonRef}
-                className={cn(
-                  "flex min-h-12 w-full items-center justify-center rounded-xl",
-                  isGoogleIdentityReady ? "" : "hidden",
+            <div className="mb-1 rounded-2xl border border-white/10 bg-white/[0.045] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Continue with Google</p>
+                  <p className="text-xs text-muted-foreground">
+                    Faster sign-in with your verified Google account.
+                  </p>
+                </div>
+                <div className="rounded-full border border-white/10 bg-background/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Quick
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div
+                  ref={googleButtonRef}
+                  className={cn(
+                    "mx-auto flex min-h-12 w-full max-w-[360px] items-center justify-center rounded-xl bg-background/45 p-1.5",
+                    isGoogleIdentityReady ? "" : "hidden",
+                  )}
+                />
+
+                {!isGoogleIdentityReady ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-12 w-full rounded-xl border-white/15 bg-white text-sm font-semibold text-slate-900 transition-colors hover:bg-white/90"
+                    onClick={handleGoogleSignIn}
+                    disabled={isSubmitting || isGoogleSubmitting || isAuthenticating}
+                  >
+                    <span className="inline-flex items-center gap-3">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 48 48"
+                        className="h-5 w-5"
+                        aria-hidden="true"
+                      >
+                        <path fill="#FFC107" d="M43.61 20.08H42V20H24v8h11.3A12 12 0 0 1 12 24 12 12 0 0 1 24 12c3.06 0 5.84 1.15 7.96 3.04l5.66-5.66A19.92 19.92 0 0 0 24 4C12.95 4 4 12.95 4 24s8.95 20 20 20 20-8.95 20-20c0-1.34-.14-2.65-.39-3.92" />
+                        <path fill="#FF3D00" d="M6.31 14.69 12.88 19.5A11.96 11.96 0 0 1 24 12c3.06 0 5.84 1.15 7.96 3.04l5.66-5.66A19.92 19.92 0 0 0 24 4 19.99 19.99 0 0 0 6.31 14.69" />
+                        <path fill="#4CAF50" d="M24 44c5.2 0 9.93-1.99 13.49-5.23l-6.23-5.27A11.95 11.95 0 0 1 24 36a12 12 0 0 1-11.28-7.8l-6.52 5.02A20 20 0 0 0 24 44" />
+                        <path fill="#1976D2" d="M43.61 20.08H42V20H24v8h11.3a12.03 12.03 0 0 1-4.04 5.5l6.23 5.27C36.99 39.03 44 34 44 24c0-1.34-.14-2.65-.39-3.92" />
+                      </svg>
+                      {isGoogleSubmitting ? "Redirecting..." : "Continue with Google"}
+                    </span>
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-10 w-full rounded-xl border border-white/10 bg-background/30 text-xs text-muted-foreground hover:bg-background/55 hover:text-foreground"
+                    onClick={handleGoogleSignIn}
+                    disabled={isSubmitting || isGoogleSubmitting || isAuthenticating}
+                  >
+                    Open full Google sign-in instead
+                  </Button>
                 )}
-              />
 
-              {!isGoogleIdentityReady ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-12 w-full rounded-xl border-white/20 bg-background/75 text-sm font-semibold transition-colors hover:bg-background"
-                  onClick={handleGoogleSignIn}
-                  disabled={isSubmitting || isGoogleSubmitting || isAuthenticating}
-                >
-                  {isGoogleSubmitting ? "Redirecting..." : "Continue with Google"}
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-10 w-full rounded-xl text-xs text-muted-foreground hover:text-foreground"
-                  onClick={handleGoogleSignIn}
-                  disabled={isSubmitting || isGoogleSubmitting || isAuthenticating}
-                >
-                  Open full Google sign-in instead
-                </Button>
-              )}
-
-              {googlePromptInfo ? (
-                <p className="text-center text-xs text-muted-foreground">
-                  {googlePromptInfo}
-                </p>
-              ) : null}
+                {googlePromptInfo ? (
+                  <p className="text-center text-[11px] leading-5 text-muted-foreground">
+                    {googlePromptInfo}
+                  </p>
+                ) : null}
+              </div>
             </div>
 
             <div className="my-5 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/80">
