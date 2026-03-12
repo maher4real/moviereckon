@@ -1,22 +1,20 @@
 <svg width="1920" height="1080" viewBox="0 0 1920 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1920" y2="1080" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#0E131B"/>
-      <stop offset="1" stop-color="#06090F"/>
+      <stop stop-color="#0B1017"/>
+      <stop offset="1" stop-color="#04070C"/>
     </linearGradient>
     <radialGradient id="light" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(960 420) rotate(90) scale(460 900)">
-      <stop stop-color="#EE3C3C" stop-opacity="0.24"/>
+      <stop stop-color="#EE3C3C" stop-opacity="0.12"/>
       <stop offset="1" stop-color="#EE3C3C" stop-opacity="0"/>
     </radialGradient>
   </defs>
 
   <rect width="1920" height="1080" fill="url(#bg)"/>
-  <rect x="80" y="80" width="1760" height="920" rx="36" fill="#121824"/>
+  <rect x="80" y="80" width="1760" height="920" rx="36" fill="#0E141D"/>
   <rect x="80" y="80" width="1760" height="920" rx="36" fill="url(#light)"/>
 
-  <circle cx="960" cy="520" r="122" fill="#EE3C3C" fill-opacity="0.22"/>
-  <path d="M924 460.5C924 451.993 933.26 446.488 940.92 450.712L1040.2 505.462C1048.1 509.819 1048.1 521.181 1040.2 525.538L940.92 580.288C933.26 584.512 924 579.007 924 570.5V460.5Z" fill="#EE3C3C"/>
-
-  <rect x="560" y="714" width="800" height="18" rx="9" fill="#2D3747"/>
-  <rect x="640" y="750" width="640" height="16" rx="8" fill="#29313F"/>
+  <circle cx="960" cy="520" r="118" fill="#EE3C3C" fill-opacity="0.09"/>
+  <circle cx="960" cy="520" r="86" stroke="#EE3C3C" stroke-opacity="0.18" stroke-width="2"/>
+  <path d="M928 466.5C928 458.466 936.742 453.269 943.992 457.266L1037.28 508.693C1044.76 512.814 1044.76 523.586 1037.28 527.707L943.992 579.134C936.742 583.131 928 577.934 928 569.9V466.5Z" fill="#EE3C3C"/>
 </svg>

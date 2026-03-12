@@ -1,6 +1,7 @@
 // TMDB API Configuration and Service Layer
 // All API calls go through the server-side API proxy.
 import { getPublicMongoApiUrl } from "@/lib/runtimeEnv";
+import { buildTmdbImageProxyUrl } from "@/lib/tmdbImageProxy";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 const FALLBACK_POSTER = "/fallbacks/poster.svg";
@@ -300,7 +301,14 @@ export function getPosterUrl(
   size: keyof typeof IMAGE_SIZES.poster = "medium",
 ): string {
   if (!path) return FALLBACK_POSTER;
-  return `${TMDB_IMAGE_BASE}/${IMAGE_SIZES.poster[size]}${path}`;
+  return (
+    buildTmdbImageProxyUrl({
+      apiBase: API_BASE,
+      path,
+      kind: "poster",
+      size: IMAGE_SIZES.poster[size],
+    }) || FALLBACK_POSTER
+  );
 }
 
 export function getBackdropUrl(
@@ -308,7 +316,14 @@ export function getBackdropUrl(
   size: keyof typeof IMAGE_SIZES.backdrop = "large",
 ): string {
   if (!path) return FALLBACK_BACKDROP;
-  return `${TMDB_IMAGE_BASE}/${IMAGE_SIZES.backdrop[size]}${path}`;
+  return (
+    buildTmdbImageProxyUrl({
+      apiBase: API_BASE,
+      path,
+      kind: "backdrop",
+      size: IMAGE_SIZES.backdrop[size],
+    }) || FALLBACK_BACKDROP
+  );
 }
 
 export function getProfileUrl(
@@ -316,7 +331,14 @@ export function getProfileUrl(
   size: keyof typeof IMAGE_SIZES.profile = "medium",
 ): string {
   if (!path) return FALLBACK_PROFILE;
-  return `${TMDB_IMAGE_BASE}/${IMAGE_SIZES.profile[size]}${path}`;
+  return (
+    buildTmdbImageProxyUrl({
+      apiBase: API_BASE,
+      path,
+      kind: "profile",
+      size: IMAGE_SIZES.profile[size],
+    }) || FALLBACK_PROFILE
+  );
 }
 
 // Movie endpoints
@@ -567,7 +589,14 @@ export function getStillUrl(
   size: "w185" | "w300" | "w500" | "original" = "w300",
 ): string {
   if (!path) return FALLBACK_STILL;
-  return `${TMDB_IMAGE_BASE}/${size}${path}`;
+  return (
+    buildTmdbImageProxyUrl({
+      apiBase: API_BASE,
+      path,
+      kind: "still",
+      size,
+    }) || FALLBACK_STILL
+  );
 }
 
 // Search
@@ -737,7 +766,14 @@ export function getLanguageBadgeClass(langCode: string): string {
 // Get provider logo URL
 export function getProviderLogoUrl(path: string | null): string {
   if (!path) return FALLBACK_STILL;
-  return `${TMDB_IMAGE_BASE}/w92${path}`;
+  return (
+    buildTmdbImageProxyUrl({
+      apiBase: API_BASE,
+      path,
+      kind: "provider",
+      size: "w92",
+    }) || FALLBACK_STILL
+  );
 }
 
 export function getTMDBAvatarUrl(path: string | null | undefined): string | null {
