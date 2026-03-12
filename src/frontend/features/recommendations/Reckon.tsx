@@ -92,8 +92,10 @@ export default function Reckon() {
   const {
     items: recommendations,
     isLoading: reckonLoading,
+    isRefreshing,
     isPersonalized,
     explanationById,
+    refreshRecommendations,
   } = useRecommendations();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
@@ -246,7 +248,19 @@ export default function Reckon() {
               )}
             </div>
 
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  void refreshRecommendations();
+                }}
+                disabled={isRefreshing}
+                className="gap-2"
+              >
+                <RefreshCw className={cn("w-4 h-4", isRefreshing && "animate-spin")} />
+                Refresh Picks
+              </Button>
               <span>{processedItems.length} recommendations</span>
             </div>
           </div>

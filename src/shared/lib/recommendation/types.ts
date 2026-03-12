@@ -72,6 +72,8 @@ export interface RecommendationUserContext {
   seenIds?: Iterable<string>;
   displayedIds?: Iterable<string>;
   seedWeights?: Record<string, number>;
+  preferredLanguages?: string[];
+  dominantLanguage?: string | null;
   popularityCap?: number;
   popularityMedian?: number;
   maxCandidates?: number;

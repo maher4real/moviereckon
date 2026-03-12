@@ -1,17 +1,25 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "./useAuth";
 import { useUserData } from "./useUserData";
 import type { Movie, TVShow } from "@/shared/lib/tmdb";
 import * as mongoClient from "@/frontend/lib/mongodbClient";
+import {
+  getRecommendationRotationBucket,
+  reorderDynamicRecommendations,
+} from "@/frontend/lib/dynamicRecommendations";
 
 type RecommendationExplanation = mongoClient.RecommendationExplanation;
+const RECOMMENDATION_ROTATION_POLL_MS = 60 * 1000;
+const RECOMMENDATION_REFETCH_INTERVAL_MS = 3 * 60 * 1000;
 
 interface RecommendationResult {
   items: (Movie | TVShow)[];
   isLoading: boolean;
+  isRefreshing: boolean;
   isPersonalized: boolean;
   explanationById: Record<string, RecommendationExplanation>;
+  refreshRecommendations: () => Promise<void>;
 }
 
 function getLatestTimestamp<T>(
@@ -32,6 +40,10 @@ export function useRecommendations(): RecommendationResult {
     preferences,
     isLoading: userDataLoading,
   } = useUserData();
+  const [manualRotationSeed, setManualRotationSeed] = useState(0);
+  const [rotationBucket, setRotationBucket] = useState(() =>
+    getRecommendationRotationBucket(),
+  );
 
   const preferenceFingerprint = useMemo(
     () =>
@@ -50,31 +62,77 @@ export function useRecommendations(): RecommendationResult {
     return `${historyPart}|${likedPart}|${feedbackPart}|${preferenceFingerprint}`;
   }, [feedbackItems, likedItems, preferenceFingerprint, watchHistory]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const syncRotationBucket = () => {
+      setRotationBucket((current) => {
+        const next = getRecommendationRotationBucket();
+        return current === next ? current : next;
+      });
+    };
+
+    syncRotationBucket();
+    const timer = window.setInterval(syncRotationBucket, RECOMMENDATION_ROTATION_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const rotationKey = useMemo(
+    () => `${personalizationRevision}:${rotationBucket}:${manualRotationSeed}`,
+    [manualRotationSeed, personalizationRevision, rotationBucket],
+  );
+
   const { data, isLoading, fetchStatus } = useQuery({
-    queryKey: ["recommendations-feed-v3", personalizationRevision],
-    queryFn: () => mongoClient.fetchRecommendationsFeed(),
+    queryKey: [
+      "recommendations-feed-v4",
+      personalizationRevision,
+      rotationBucket,
+      manualRotationSeed,
+    ],
+    queryFn: () => mongoClient.fetchRecommendationsFeed({ variant: rotationKey }),
     enabled: Boolean(user) && !userDataLoading,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60,
     gcTime: 1000 * 60 * 30,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    refetchInterval: user ? RECOMMENDATION_REFETCH_INTERVAL_MS : false,
     placeholderData: (previousData) => previousData,
   });
   const hasResolvedItems = Boolean(data && Array.isArray(data.items));
+  const dynamicItems = useMemo(
+    () =>
+      reorderDynamicRecommendations(
+        data?.items || [],
+        data?.explanationById || {},
+        rotationKey,
+      ),
+    [data?.explanationById, data?.items, rotationKey],
+  );
+
+  const refreshRecommendations = useCallback(async () => {
+    if (!user) return;
+    setManualRotationSeed((current) => current + 1);
+  }, [user]);
 
   if (!user) {
     return {
       items: [],
       isLoading: false,
+      isRefreshing: false,
       isPersonalized: false,
       explanationById: {},
+      refreshRecommendations: async () => {},
     };
   }
 
   return {
-    items: data?.items || [],
+    items: dynamicItems,
     isLoading:
       userDataLoading ||
       (!hasResolvedItems && (isLoading || fetchStatus === "fetching")),
+    isRefreshing: hasResolvedItems && fetchStatus === "fetching",
     isPersonalized: data?.isPersonalized === true,
     explanationById: data?.explanationById || {},
+    refreshRecommendations,
   };
 }

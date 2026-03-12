@@ -50,18 +50,40 @@ function makeCursor(rows: unknown[]) {
   return cursor;
 }
 
-function createMockDb() {
+function createMockDb(options?: {
+  watchHistory?: unknown[];
+  likedItems?: unknown[];
+  feedbackItems?: unknown[];
+  preferences?: Record<string, unknown>;
+}) {
+  const watchHistory = options?.watchHistory || [];
+  const likedItems = options?.likedItems || [];
+  const feedbackItems = options?.feedbackItems || [];
+  const preferences = options?.preferences || { preferred_genres: [] };
+
   return {
     collection: vi.fn((name: string) => {
       if (name === "user_preferences") {
         return {
-          findOne: vi.fn(async () => ({ preferred_genres: [] })),
+          findOne: vi.fn(async () => preferences),
         };
       }
 
-      if (["watch_history", "liked_items", "content_feedback"].includes(name)) {
+      if (name === "watch_history") {
         return {
-          find: vi.fn(() => makeCursor([])),
+          find: vi.fn(() => makeCursor(watchHistory)),
+        };
+      }
+
+      if (name === "liked_items") {
+        return {
+          find: vi.fn(() => makeCursor(likedItems)),
+        };
+      }
+
+      if (name === "content_feedback") {
+        return {
+          find: vi.fn(() => makeCursor(feedbackItems)),
         };
       }
 
@@ -193,5 +215,59 @@ describe("user recommendations endpoint", () => {
     expect(second.res.statusCode).toBe(200);
     expect(mocks.getServerTrendingMovies).toHaveBeenCalledTimes(1);
     expect(mocks.getServerTrendingTVShows).toHaveBeenCalledTimes(1);
+  });
+
+  it("sources recommendations for preferred and exploration languages", async () => {
+    const now = new Date().toISOString();
+
+    mocks.connectToDatabase.mockResolvedValue({
+      db: createMockDb({
+        watchHistory: [
+          {
+            content_id: 501,
+            content_type: "movie",
+            title: "Hindi Seed",
+            genres: [18],
+            language: "hi",
+            watched_at: now,
+          },
+        ],
+        preferences: {
+          preferred_genres: [18],
+          preferred_languages: ["hi", "en"],
+        },
+      }),
+    });
+
+    mocks.getServerMovieRecommendationProfile.mockResolvedValue({
+      id: 501,
+      title: "Hindi Seed",
+      original_title: "Hindi Seed",
+      overview: "Profile",
+      poster_path: null,
+      backdrop_path: null,
+      release_date: "2024-03-01",
+      vote_average: 7.8,
+      vote_count: 900,
+      popularity: 85,
+      genre_ids: [18],
+      original_language: "hi",
+      adult: false,
+      video: false,
+    });
+
+    const req = createMockReq("3.3.3.3");
+    const { res } = createMockRes();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+
+    const languageCalls = mocks.discoverServerMovies.mock.calls
+      .map(([filters]) => (filters as Record<string, unknown> | undefined)?.with_original_language)
+      .filter((value): value is string => typeof value === "string");
+
+    expect(languageCalls).toContain("hi");
+    expect(languageCalls).toContain("en");
   });
 });

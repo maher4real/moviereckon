@@ -17,6 +17,63 @@ function candidatePriority(item: UnifiedContentItem): number {
   return item.popularity * 0.6 + item.voteAverage * 4 + metadataDepth;
 }
 
+function languageBucketKey(item: UnifiedContentItem): string {
+  return (item.originalLanguage || "unknown").toLowerCase();
+}
+
+function balanceCandidatesByLanguage(
+  ranked: UnifiedContentItem[],
+  maxCandidates: number,
+): UnifiedContentItem[] {
+  if (ranked.length <= maxCandidates) {
+    return ranked;
+  }
+
+  const buckets = new Map<string, UnifiedContentItem[]>();
+  ranked.forEach((item) => {
+    const key = languageBucketKey(item);
+    const existing = buckets.get(key);
+    if (existing) {
+      existing.push(item);
+      return;
+    }
+
+    buckets.set(key, [item]);
+  });
+
+  const orderedBuckets = Array.from(buckets.values())
+    .sort((left, right) => {
+      const sizeDelta = right.length - left.length;
+      if (sizeDelta !== 0) return sizeDelta;
+      return candidatePriority(right[0]) - candidatePriority(left[0]);
+    })
+    .map((bucket) => [...bucket]);
+
+  const balanced: UnifiedContentItem[] = [];
+
+  while (balanced.length < maxCandidates) {
+    let pickedInRound = false;
+
+    for (const bucket of orderedBuckets) {
+      const nextItem = bucket.shift();
+      if (!nextItem) continue;
+
+      balanced.push(nextItem);
+      pickedInRound = true;
+
+      if (balanced.length >= maxCandidates) {
+        break;
+      }
+    }
+
+    if (!pickedInRound) {
+      break;
+    }
+  }
+
+  return balanced;
+}
+
 export function buildCandidateUnion(
   sources: CandidateSourceInput[],
   maxCandidates = DEFAULT_MAX_CANDIDATES,
@@ -47,7 +104,7 @@ export function buildCandidateUnion(
     (a, b) => candidatePriority(b) - candidatePriority(a),
   );
 
-  const capped = ranked.slice(0, Math.max(1, maxCandidates));
+  const capped = balanceCandidatesByLanguage(ranked, Math.max(1, maxCandidates));
 
   return {
     items: capped,

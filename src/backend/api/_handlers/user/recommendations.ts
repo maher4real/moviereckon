@@ -60,6 +60,7 @@ interface FeedbackItem {
 }
 
 interface UserPreferences {
+  preferred_languages: string[];
   preferred_genres: number[];
 }
 
@@ -102,6 +103,21 @@ const TMDB_TIMEOUT_MS = 6500;
 const BUILD_TIMEOUT_MS = 12_000;
 const MAX_IP_REQUESTS = 70;
 const MAX_USER_REQUESTS = 35;
+const LANGUAGE_DISCOVERY_LIMIT = 4;
+const CROSS_LANGUAGE_LIMIT = 2;
+const LANGUAGE_GENRE_DISCOVERY_LIMIT = 2;
+const DISCOVERY_LANGUAGE_FALLBACKS = [
+  "en",
+  "hi",
+  "ta",
+  "te",
+  "ml",
+  "kn",
+  "ko",
+  "ja",
+  "es",
+  "fr",
+] as const;
 
 interface RecommendationCacheEntry {
   userId: string;
@@ -113,7 +129,7 @@ interface RecommendationCacheEntry {
 }
 
 const recommendationsCache = new Map<string, RecommendationCacheEntry>();
-const RECOMMENDATIONS_CACHE_VERSION = "v2";
+const RECOMMENDATIONS_CACHE_VERSION = "v3";
 
 const WEIGHTS = {
   LIKED: 1.5,
@@ -161,6 +177,12 @@ function toTrimmedString(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value.trim() || fallback : fallback;
 }
 
+function normalizeLanguageCode(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  return /^[a-z]{2,3}$/.test(normalized) ? normalized : null;
+}
+
 function toGenreList(value: unknown): number[] {
   if (!Array.isArray(value)) return [];
   const unique = new Set<number>();
@@ -169,6 +191,20 @@ function toGenreList(value: unknown): number[] {
     if (genreId) unique.add(genreId);
   });
   return Array.from(unique).slice(0, 24);
+}
+
+function toLanguageList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  const unique = new Set<string>();
+  value.forEach((entry) => {
+    const normalized = normalizeLanguageCode(entry);
+    if (normalized) {
+      unique.add(normalized);
+    }
+  });
+
+  return Array.from(unique).slice(0, 10);
 }
 
 function toWatchHistory(items: unknown[]): WatchHistoryItem[] {
@@ -234,6 +270,7 @@ function toFeedbackItems(items: unknown[]): FeedbackItem[] {
 function toPreferences(value: unknown): UserPreferences {
   const doc = (value || {}) as Record<string, unknown>;
   return {
+    preferred_languages: toLanguageList(doc.preferred_languages),
     preferred_genres: toGenreList(doc.preferred_genres),
   };
 }
@@ -246,6 +283,45 @@ function getLatest<T>(items: T[], resolver: (item: T) => string | undefined): st
 
 function toSeedSlice(values: string[]): string {
   return values.slice(0, 6).join(",");
+}
+
+function addLanguageWeight(
+  languageScores: Record<string, number>,
+  language: string | null | undefined,
+  weight: number,
+): void {
+  const normalized = normalizeLanguageCode(language);
+  if (!normalized || !Number.isFinite(weight) || weight <= 0) return;
+  languageScores[normalized] = (languageScores[normalized] || 0) + weight;
+}
+
+function selectTopLanguages(
+  languageScores: Record<string, number>,
+  limit: number,
+): string[] {
+  return Object.entries(languageScores)
+    .sort(([, leftWeight], [, rightWeight]) => rightWeight - leftWeight)
+    .slice(0, limit)
+    .map(([language]) => language);
+}
+
+function getExplorationLanguages(
+  prioritizedLanguages: string[],
+  limit: number,
+): string[] {
+  const seen = new Set(prioritizedLanguages.map((language) => language.toLowerCase()));
+  const exploration: string[] = [];
+
+  for (const language of DISCOVERY_LANGUAGE_FALLBACKS) {
+    if (seen.has(language)) continue;
+    seen.add(language);
+    exploration.push(language);
+    if (exploration.length >= limit) {
+      break;
+    }
+  }
+
+  return exploration;
 }
 
 function buildRecommendationRevision(
@@ -265,12 +341,14 @@ function buildRecommendationRevision(
       (item) => `${item.content_type}:${item.content_id}:${item.feedback_type}`,
     ),
   );
+  const languagePrefs = [...preferences.preferred_languages].sort().join(",");
   const genrePrefs = [...preferences.preferred_genres].sort((a, b) => a - b).join(",");
 
   return [
     `w:${watchHistory.length}:${getLatest(watchHistory, (item) => item.watched_at)}:${watchSlice}`,
     `l:${likedItems.length}:${getLatest(likedItems, (item) => item.liked_at)}:${likedSlice}`,
     `f:${feedbackItems.length}:${feedbackSlice}`,
+    `lang:${languagePrefs}`,
     `g:${genrePrefs}`,
   ].join("|");
 }
@@ -646,6 +724,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const payload = await withTimeout(
       (async (): Promise<RecommendationsPayload> => {
         const genreScores: Record<number, number> = {};
+        const languageScores: Record<string, number> = {};
 
         likedItems.forEach((item) => {
           const watched = watchHistory.find(
@@ -667,6 +746,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const recentBoost = recencyMultiplier(item.watched_at);
           const baseWeight =
             recentBoost >= 0.95 ? WEIGHTS.WATCHED_RECENT : WEIGHTS.WATCHED_OLD;
+          addLanguageWeight(
+            languageScores,
+            item.language,
+            baseWeight * recentBoost * (item.content_type === "movie" ? 1.12 : 0.9),
+          );
           item.genres.forEach((genreId) => {
             genreScores[genreId] = (genreScores[genreId] || 0) + baseWeight * recentBoost;
           });
@@ -683,6 +767,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         preferences.preferred_genres.forEach((genreId) => {
           genreScores[genreId] = (genreScores[genreId] || 0) + 0.85;
+        });
+
+        preferences.preferred_languages.forEach((language, index) => {
+          addLanguageWeight(languageScores, language, Math.max(0.55, 1.05 - index * 0.12));
         });
 
         const topGenres = Object.entries(genreScores)
@@ -853,6 +941,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .slice(0, 2)
       .map(([personId]) => personId);
 
+    seedProfilesForRanking.forEach((seedItem, index) => {
+      addLanguageWeight(
+        languageScores,
+        seedItem.originalLanguage,
+        (seedSignals[index]?.weight || 1) * 1.1,
+      );
+    });
+
+    const prioritizedLanguages = selectTopLanguages(languageScores, 3);
+    const explorationLanguages = getExplorationLanguages(
+      prioritizedLanguages,
+      CROSS_LANGUAGE_LIMIT,
+    );
+    const discoveryLanguages = Array.from(
+      new Set([...prioritizedLanguages, ...explorationLanguages]),
+    ).slice(0, LANGUAGE_DISCOVERY_LIMIT);
+
     const peopleMovieResults = await Promise.all(
       creatorDirectorIds.map((personId) =>
         safe(
@@ -873,6 +978,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             with_people: personId.toString(),
             sort_by: "popularity.desc",
             "vote_count.gte": 80,
+            page: 1,
+          }),
+        ),
+      ),
+    );
+
+    const languageMovieResults = await Promise.all(
+      discoveryLanguages.map((language, index) =>
+        safe(
+          discoverServerMovies({
+            with_original_language: language,
+            sort_by: index === 0 ? "popularity.desc" : "vote_average.desc",
+            "vote_count.gte": index === 0 ? 90 : 140,
+            page: 1,
+          }),
+        ),
+      ),
+    );
+
+    const languageTVResults = await Promise.all(
+      discoveryLanguages.map((language, index) =>
+        safe(
+          discoverServerTVShows({
+            with_original_language: language,
+            sort_by: index === 0 ? "popularity.desc" : "vote_average.desc",
+            "vote_count.gte": index === 0 ? 70 : 120,
+            page: 1,
+          }),
+        ),
+      ),
+    );
+
+    const languageGenreSources = discoveryLanguages
+      .slice(0, LANGUAGE_GENRE_DISCOVERY_LIMIT)
+      .flatMap((language) =>
+        topGenres.slice(0, LANGUAGE_GENRE_DISCOVERY_LIMIT).map((genreId) => ({
+          language,
+          genreId,
+        })),
+      );
+
+    const languageGenreMovieResults = await Promise.all(
+      languageGenreSources.map(({ language, genreId }) =>
+        safe(
+          discoverServerMovies({
+            with_original_language: language,
+            with_genres: genreId.toString(),
+            sort_by: "vote_average.desc",
+            "vote_count.gte": 60,
             page: 1,
           }),
         ),
@@ -911,6 +1065,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           items: result?.results,
           typeHint: "tv" as const,
         })),
+        ...languageMovieResults.map((result, index) => ({
+          source: `discover:movie:language:${discoveryLanguages[index] || "none"}`,
+          items: result?.results,
+          typeHint: "movie" as const,
+        })),
+        ...languageTVResults.map((result, index) => ({
+          source: `discover:tv:language:${discoveryLanguages[index] || "none"}`,
+          items: result?.results,
+          typeHint: "tv" as const,
+        })),
+        ...languageGenreMovieResults.map((result, index) => ({
+          source: `discover:movie:language-genre:${languageGenreSources[index]?.language || "none"}:${languageGenreSources[index]?.genreId || "none"}`,
+          items: result?.results,
+          typeHint: "movie" as const,
+        })),
         ...peopleMovieResults.map((result, index) => ({
           source: `people:movie:${creatorDirectorIds[index] || "none"}`,
           items: result?.results,
@@ -947,6 +1116,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       {
         seedWeights,
         seenIds,
+        preferredLanguages: prioritizedLanguages,
+        dominantLanguage: prioritizedLanguages[0] || null,
         popularityMedian: candidateUnion.popularityMedian,
         maxCandidates: MAX_CANDIDATES,
         diversificationTopN: DIVERSIFICATION_TOP_N,

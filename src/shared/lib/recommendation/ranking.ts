@@ -42,6 +42,10 @@ function clamp(value: number, min = 0, max = 1): number {
   return value;
 }
 
+function languageKey(item: UnifiedContentItem): string {
+  return (item.originalLanguage || "unknown").toLowerCase();
+}
+
 function setJaccard(left: number[], right: number[]): number {
   if (left.length === 0 || right.length === 0) return 0;
   const leftSet = new Set(left);
@@ -79,9 +83,71 @@ function recommendationSimilarity(a: UnifiedContentItem, b: UnifiedContentItem):
   );
 }
 
+function selectionBalanceAdjustment(
+  candidate: RankedRecommendation,
+  selected: RankedRecommendation[],
+  userContext?: RecommendationUserContext,
+): number {
+  if (selected.length === 0) return 0;
+
+  const candidateLanguage = languageKey(candidate.item);
+  const dominantLanguage =
+    typeof userContext?.dominantLanguage === "string"
+      ? userContext.dominantLanguage.toLowerCase()
+      : null;
+  const preferredLanguages = new Set(
+    (userContext?.preferredLanguages || []).map((language) => language.toLowerCase()),
+  );
+
+  let sameLanguageCount = 0;
+  let sameTypeCount = 0;
+
+  for (const entry of selected) {
+    if (languageKey(entry.item) === candidateLanguage) {
+      sameLanguageCount += 1;
+    }
+    if (entry.item.type === candidate.item.type) {
+      sameTypeCount += 1;
+    }
+  }
+
+  const total = selected.length;
+  const languageShare = sameLanguageCount / total;
+  const typeShare = sameTypeCount / total;
+
+  let adjustment = 0;
+
+  if (sameLanguageCount === 0) {
+    adjustment += 0.03;
+  }
+
+  if (dominantLanguage && candidateLanguage !== dominantLanguage) {
+    adjustment += 0.01;
+  }
+
+  if (preferredLanguages.has(candidateLanguage) && candidateLanguage !== dominantLanguage) {
+    adjustment += 0.028;
+  }
+
+  if (dominantLanguage && candidateLanguage === dominantLanguage && languageShare >= 0.45) {
+    adjustment -= Math.min(0.08, 0.015 + (languageShare - 0.45) * 0.25);
+  } else if (languageShare >= 0.4) {
+    adjustment -= 0.015;
+  }
+
+  if (sameTypeCount === 0) {
+    adjustment += 0.006;
+  } else if (typeShare >= 0.8) {
+    adjustment -= 0.012;
+  }
+
+  return adjustment;
+}
+
 function diversifyTopResults(
   scoredItems: RankedRecommendation[],
   topN: number,
+  userContext?: RecommendationUserContext,
 ): RankedRecommendation[] {
   if (scoredItems.length <= 2) return scoredItems;
 
@@ -104,7 +170,10 @@ function diversifyTopResults(
         maxSimilarity = Math.max(maxSimilarity, recommendationSimilarity(candidate.item, chosen.item));
       }
 
-      const rankValue = lambda * candidate.score - (1 - lambda) * maxSimilarity;
+      const rankValue =
+        lambda * candidate.score -
+        (1 - lambda) * maxSimilarity +
+        selectionBalanceAdjustment(candidate, selected, userContext);
       if (rankValue > bestRank) {
         bestRank = rankValue;
         bestIndex = index;
@@ -172,6 +241,86 @@ function enforceHiddenGemBalance(
     updatedTop[replaceIndex] = replacement;
     hiddenCount += 1;
     shortage -= 1;
+  }
+
+  const pickedKeys = new Set(updatedTop.map((entry) => entry.item.key));
+  const tail = rankedItems.filter((entry) => !pickedKeys.has(entry.item.key));
+
+  return [...updatedTop, ...tail];
+}
+
+function enforcePreferredLanguageCoverage(
+  rankedItems: RankedRecommendation[],
+  userContext?: RecommendationUserContext,
+): RankedRecommendation[] {
+  if (rankedItems.length === 0) return rankedItems;
+
+  const dominantLanguage =
+    typeof userContext?.dominantLanguage === "string"
+      ? userContext.dominantLanguage.toLowerCase()
+      : null;
+  const preferredLanguages = Array.from(
+    new Set(
+      (userContext?.preferredLanguages || [])
+        .map((language) => language.toLowerCase())
+        .filter((language) => language && language !== dominantLanguage),
+    ),
+  );
+
+  if (preferredLanguages.length === 0) {
+    return rankedItems;
+  }
+
+  const windowSize = Math.min(12, rankedItems.length);
+  const updatedTop = rankedItems.slice(0, windowSize);
+  const preferredLanguageSet = new Set(preferredLanguages);
+  const desiredCoverage = preferredLanguages
+    .map((language) => {
+      const available = rankedItems.filter((entry) => languageKey(entry.item) === language).length;
+      return {
+        language,
+        desired: available >= 2 ? 2 : available > 0 ? 1 : 0,
+      };
+    })
+    .filter((entry) => entry.desired > 0);
+
+  if (desiredCoverage.length === 0) {
+    return rankedItems;
+  }
+
+  for (const { language, desired } of desiredCoverage) {
+    let existingCount = updatedTop.filter((entry) => languageKey(entry.item) === language).length;
+    if (existingCount >= desired) continue;
+
+    const replacements = rankedItems
+      .filter(
+        (entry) =>
+          languageKey(entry.item) === language &&
+          !updatedTop.some((selected) => selected.item.key === entry.item.key),
+      )
+      .sort((a, b) => b.score - a.score);
+
+    const replaceableIndexes = updatedTop
+      .map((entry, index) => ({ entry, index }))
+      .filter(({ entry }) => {
+        const entryLanguage = languageKey(entry.item);
+        if (entryLanguage === language) return false;
+        if (preferredLanguageSet.has(entryLanguage)) return false;
+        return true;
+      })
+      .sort((left, right) => left.entry.score - right.entry.score)
+      .map(({ index }) => index);
+
+    while (existingCount < desired && replacements.length > 0 && replaceableIndexes.length > 0) {
+      const replacement = replacements.shift();
+      const replaceIndex = replaceableIndexes.shift();
+      if (!replacement || replaceIndex === undefined) {
+        break;
+      }
+
+      updatedTop[replaceIndex] = replacement;
+      existingCount += 1;
+    }
   }
 
   const pickedKeys = new Set(updatedTop.map((entry) => entry.item.key));
@@ -257,8 +406,13 @@ export function getRecommendations(
     const diversifiedFallback = diversifyTopResults(
       fallback,
       userContext?.diversificationTopN || DEFAULT_DIVERSIFICATION_TOP_N,
+      userContext,
     );
-    return enforceHiddenGemBalance(diversifiedFallback, medianPopularity);
+    const languageBalancedFallback = enforcePreferredLanguageCoverage(
+      diversifiedFallback,
+      userContext,
+    );
+    return enforceHiddenGemBalance(languageBalancedFallback, medianPopularity);
   }
 
   const seedWeights = userContext?.seedWeights || {};
@@ -341,9 +495,12 @@ export function getRecommendations(
   const diversified = diversifyTopResults(
     scored,
     userContext?.diversificationTopN || DEFAULT_DIVERSIFICATION_TOP_N,
+    userContext,
   );
 
-  return enforceHiddenGemBalance(diversified, medianPopularity);
+  const languageBalanced = enforcePreferredLanguageCoverage(diversified, userContext);
+
+  return enforceHiddenGemBalance(languageBalanced, medianPopularity);
 }
 
 export function recommendationKey(entry: RankedRecommendation): string {

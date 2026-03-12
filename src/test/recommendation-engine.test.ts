@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildCandidateUnion,
   getRecommendations,
   normalizeTmdbItem,
   scoreCandidate,
@@ -98,5 +99,75 @@ describe("recommendation engine scoring", () => {
     const hiddenCount = topTwenty.filter((entry) => entry.isHiddenGem).length;
 
     expect(hiddenCount).toBeGreaterThanOrEqual(6);
+  });
+
+  it("preserves underrepresented languages in the candidate pool when capped", () => {
+    const sourceItems = [
+      ...Array.from({ length: 18 }, (_, index) =>
+        buildMovie(500 + index, {
+          title: `English ${index}`,
+          original_language: "en",
+          popularity: 220 - index,
+        }),
+      ),
+      ...Array.from({ length: 3 }, (_, index) =>
+        buildMovie(700 + index, {
+          title: `Hindi ${index}`,
+          original_language: "hi",
+          popularity: 62 - index,
+        }),
+      ),
+    ];
+
+    const union = buildCandidateUnion(
+      [{ source: "mixed-language", items: sourceItems, typeHint: "movie" }],
+      10,
+    );
+
+    const hindiCount = union.items.filter((item) => item.originalLanguage === "hi").length;
+
+    expect(hindiCount).toBeGreaterThanOrEqual(2);
+  });
+
+  it("keeps secondary preferred languages visible in the top recommendation window", () => {
+    const seed = normalizeTmdbItem(
+      buildMovie(900, {
+        title: "Anchor Seed",
+        original_language: "en",
+      }),
+    )!;
+
+    const englishCandidates = Array.from({ length: 12 }, (_, index) =>
+      buildMovie(901 + index, {
+        title: `English Candidate ${index}`,
+        original_language: "en",
+        popularity: 210 - index * 4,
+      }),
+    );
+
+    const hindiCandidates = Array.from({ length: 3 }, (_, index) =>
+      buildMovie(980 + index, {
+        title: `Hindi Candidate ${index}`,
+        original_language: "hi",
+        popularity: 92 - index * 3,
+      }),
+    );
+
+    const ranked = getRecommendations(
+      [seed],
+      [...englishCandidates, ...hindiCandidates],
+      {
+        preferredLanguages: ["en", "hi"],
+        dominantLanguage: "en",
+        maxCandidates: 60,
+        diversificationTopN: 12,
+      },
+    );
+
+    const topWindowLanguages = ranked
+      .slice(0, 12)
+      .map((entry) => entry.item.originalLanguage || "unknown");
+
+    expect(topWindowLanguages.filter((language) => language === "hi").length).toBeGreaterThanOrEqual(2);
   });
 });

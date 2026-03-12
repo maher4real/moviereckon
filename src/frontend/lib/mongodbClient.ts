@@ -712,7 +712,9 @@ export async function fetchUserFeedback(): Promise<FeedbackItem[]> {
   }
 }
 
-export async function fetchRecommendationsFeed(): Promise<PersonalizedRecommendationsPayload> {
+export async function fetchRecommendationsFeed(options?: {
+  variant?: string;
+}): Promise<PersonalizedRecommendationsPayload> {
   const emptyPayload: PersonalizedRecommendationsPayload = {
     items: [],
     isPersonalized: false,
@@ -720,7 +722,16 @@ export async function fetchRecommendationsFeed(): Promise<PersonalizedRecommenda
   };
 
   try {
-    const response = await fetchWithAuth("/api/user/recommendations");
+    const query = new URLSearchParams();
+    if (options?.variant) {
+      query.set("variant", options.variant);
+    }
+
+    const endpoint = query.size > 0
+      ? `/api/user/recommendations?${query.toString()}`
+      : "/api/user/recommendations";
+
+    const response = await fetchWithAuth(endpoint);
     if (!response.ok) return emptyPayload;
 
     const data = await response.json();
