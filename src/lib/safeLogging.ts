@@ -128,9 +128,10 @@ function sanitizeError(
     );
   }
 
+  const errorRecord = error as unknown as Record<string, unknown>;
   for (const key of Object.keys(error)) {
     if (key in output) continue;
-    output[key] = sanitizeValue((error as Record<string, unknown>)[key], options, depth + 1, seen);
+    output[key] = sanitizeValue(errorRecord[key], options, depth + 1, seen);
   }
 
   return output;
