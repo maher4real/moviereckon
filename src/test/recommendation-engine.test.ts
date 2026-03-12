@@ -3,7 +3,7 @@ import {
   getRecommendations,
   normalizeTmdbItem,
   scoreCandidate,
-} from "@/lib/recommendation";
+} from "@/shared/lib/recommendation";
 
 function buildMovie(
   id: number,

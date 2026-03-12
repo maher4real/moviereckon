@@ -4,7 +4,7 @@ import {
   decodeTmdbImageRef,
   encodeTmdbImageRef,
   resolveTmdbImageSourceUrl,
-} from "@/lib/tmdbImageProxy";
+} from "@/shared/lib/tmdbImageProxy";
 
 describe("tmdb image proxy urls", () => {
   it("builds same-origin proxy URLs instead of exposing tmdb hosts", () => {

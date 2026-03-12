@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeValue } from "@/lib/safeLogging";
+import { sanitizeValue } from "@/shared/lib/safeLogging";
 
 describe("safe logging redaction", () => {
   it("redacts sensitive object fields", () => {
