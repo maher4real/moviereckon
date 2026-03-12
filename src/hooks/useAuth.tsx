@@ -57,12 +57,11 @@ export function AuthProvider({
   });
 
   const [user, setUser] = useState<mongoClient.MongoUser | null>(
-    () => initialUser ?? mongoClient.getStoredUser(),
+    () => initialUser ?? null,
   );
   const [profile, setProfile] = useState<Profile | null>(() => {
     if (initialUser) return mapUserToProfile(initialUser);
-    const storedUser = mongoClient.getStoredUser();
-    return storedUser ? mapUserToProfile(storedUser) : null;
+    return null;
   });
   const [isLoading, setIsLoading] = useState(!authResolved);
   const [isAuthenticating, setIsAuthenticating] = useState(false);

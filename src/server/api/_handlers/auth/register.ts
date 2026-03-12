@@ -5,16 +5,19 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import {
+  generateDeviceId,
   getDefaultUserRoleForEmail,
   generateRefreshSessionId,
   generateTokens,
+  getDeviceIdFromRequest,
   getSessionFingerprintFromRequest,
+  hashDeviceId,
   hashPassword,
   hashRefreshToken,
   pruneRefreshTokensForUser,
   type UserPayload,
 } from "../../lib/auth.js";
-import { setAuthCookies } from "../../lib/cookies.js";
+import { setAuthCookies, setDeviceCookie } from "../../lib/cookies.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
 import { verifyCaptchaToken } from "../../lib/captcha.js";
 import { emitSecurityEvent } from "../../lib/abuse-telemetry.js";
@@ -181,11 +184,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const sessionId = generateRefreshSessionId();
     const tokens = generateTokens(userPayload, { refreshSessionId: sessionId });
     const sessionFingerprint = getSessionFingerprintFromRequest(req);
+    const deviceId = getDeviceIdFromRequest(req) || generateDeviceId();
 
     await db.collection("refresh_tokens").insertOne({
       user_id: userId,
       session_id: sessionId,
       session_fingerprint: sessionFingerprint,
+      device_id_hash: hashDeviceId(deviceId),
       token_hash: hashRefreshToken(tokens.refreshToken),
       created_at: now,
       last_used_at: now,
@@ -193,6 +198,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
     await pruneRefreshTokensForUser(db, userId);
 
+    setDeviceCookie(res, deviceId);
     setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
 
     return res.status(201).json({

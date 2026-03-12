@@ -7,16 +7,19 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { Db } from "mongodb";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import {
+  generateDeviceId,
   getDefaultUserRoleForEmail,
   generateRefreshSessionId,
   generateTokens,
+  getDeviceIdFromRequest,
   getSessionFingerprintFromRequest,
+  hashDeviceId,
   hashRefreshToken,
   normalizeUserRole,
   pruneRefreshTokensForUser,
   type UserPayload,
 } from "../../lib/auth.js";
-import { getCookieValue, setAuthCookies } from "../../lib/cookies.js";
+import { getCookieValue, setAuthCookies, setDeviceCookie } from "../../lib/cookies.js";
 import {
   GOOGLE_OAUTH_STATE_COOKIE_NAME,
   buildAuthErrorRedirectPath,
@@ -228,12 +231,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const sessionId = generateRefreshSessionId();
     const tokens = generateTokens(userPayload, { refreshSessionId: sessionId });
     const sessionFingerprint = getSessionFingerprintFromRequest(req);
+    const deviceId = getDeviceIdFromRequest(req) || generateDeviceId();
 
     const now = new Date().toISOString();
     await db.collection("refresh_tokens").insertOne({
       user_id: user._id.toString(),
       session_id: sessionId,
       session_fingerprint: sessionFingerprint,
+      device_id_hash: hashDeviceId(deviceId),
       token_hash: hashRefreshToken(tokens.refreshToken),
       created_at: now,
       last_used_at: now,
@@ -242,6 +247,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await pruneRefreshTokensForUser(db, user._id.toString());
 
     clearGoogleOAuthStateCookie(res);
+    setDeviceCookie(res, deviceId);
     setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
 
     const returnTo = normalizeReturnToPath(req, parsedState.returnTo);

@@ -6,15 +6,18 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import {
   comparePassword,
+  generateDeviceId,
   generateRefreshSessionId,
   generateTokens,
+  getDeviceIdFromRequest,
   getSessionFingerprintFromRequest,
+  hashDeviceId,
   hashRefreshToken,
   normalizeUserRole,
   pruneRefreshTokensForUser,
   UserPayload,
 } from "../../lib/auth.js";
-import { setAuthCookies } from "../../lib/cookies.js";
+import { setAuthCookies, setDeviceCookie } from "../../lib/cookies.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
 import { verifyCaptchaToken } from "../../lib/captcha.js";
 import { emitSecurityEvent } from "../../lib/abuse-telemetry.js";
@@ -122,6 +125,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const sessionId = generateRefreshSessionId();
     const tokens = generateTokens(userPayload, { refreshSessionId: sessionId });
     const sessionFingerprint = getSessionFingerprintFromRequest(req);
+    const deviceId = getDeviceIdFromRequest(req) || generateDeviceId();
 
     // Store refresh token hash (not raw token)
     const now = new Date().toISOString();
@@ -129,6 +133,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       user_id: user._id.toString(),
       session_id: sessionId,
       session_fingerprint: sessionFingerprint,
+      device_id_hash: hashDeviceId(deviceId),
       token_hash: hashRefreshToken(tokens.refreshToken),
       // Legacy fallback (disabled for security):
       // token: tokens.refreshToken,
@@ -138,6 +143,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
     await pruneRefreshTokensForUser(db, user._id.toString());
 
+    setDeviceCookie(res, deviceId);
     setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
 
     return res.status(200).json({

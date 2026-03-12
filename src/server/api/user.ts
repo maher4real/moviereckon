@@ -17,6 +17,7 @@ import recommendationsHandler from "./_handlers/user/recommendations.js";
 import {
   applyApiCors,
   applyDefaultSecurityHeaders,
+  applyNoStoreHeaders,
   hasAjaxHeader,
   isStateChangingMethod,
   isTrustedRequestOrigin,
@@ -52,6 +53,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
     return res.status(403).json({ error: "Origin not allowed" });
   }
+
+  applyNoStoreHeaders(res);
 
   const method = (req.method || "GET").toUpperCase();
   const routeRateLimit = await consumeRateLimit(

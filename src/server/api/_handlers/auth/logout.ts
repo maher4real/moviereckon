@@ -18,10 +18,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const user = await getUserFromRequest(req);
-    const bodyRefreshToken = typeof req.body?.refreshToken === "string" ? req.body.refreshToken : "";
     const cookieRefreshToken = getCookieValue(req.headers.cookie, REFRESH_TOKEN_COOKIE_NAME) || "";
     const allDevices = req.body?.all_devices === true;
-    const refreshToken = bodyRefreshToken || cookieRefreshToken;
+    const refreshToken = cookieRefreshToken;
 
     if (refreshToken) {
       const { db } = await connectToDatabase();

@@ -187,3 +187,9 @@ export function applyDefaultSecurityHeaders(res: VercelResponse) {
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
 }
+
+export function applyNoStoreHeaders(res: VercelResponse) {
+  res.setHeader("Cache-Control", "no-store, private, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+}

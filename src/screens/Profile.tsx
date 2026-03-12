@@ -16,7 +16,6 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -388,29 +387,15 @@ export default function Profile() {
   const isRemoteLinkedAvatar = isRemoteAvatarUrl(normalizedAvatarInput);
   const avatarInputValue =
     isUploadedAvatar || isDefaultAvatar ? "" : normalizedAvatarInput;
-  const avatarInputPlaceholder = isUploadedAvatar
-    ? "Uploaded image selected"
-    : isDefaultAvatar
-      ? "Default avatar selected"
-      : "https://example.com/avatar.jpg";
   const avatarStatusLabel = isUploadedAvatar
-    ? "Optimized upload selected"
+    ? "Uploaded"
     : isRemoteLinkedAvatar
-      ? "Remote image ready to import"
+      ? "Link image"
       : isDefaultAvatar
-        ? "Default portrait selected"
+        ? "Default avatar"
         : selectedAvatarValue
-          ? "Current avatar selected"
-          : "Initials avatar active";
-  const avatarStatusDescription = isUploadedAvatar
-    ? "Your image is already cropped and compressed for storage."
-    : isRemoteLinkedAvatar
-      ? "The pasted link will be fetched, cropped, and stored as a compact avatar when you save."
-      : isDefaultAvatar
-        ? "This bundled avatar loads instantly and does not rely on external services."
-        : selectedAvatarValue
-          ? "This avatar is already attached to your profile."
-          : "No image selected. Your initials will be used until you pick one.";
+          ? "Current avatar"
+          : "Initials";
 
   const memberSince = profile?.created_at
     ? new Date(profile.created_at).toLocaleDateString("en-US", {
@@ -843,197 +828,213 @@ export default function Profile() {
       </main>
 
       <Dialog open={editOpen} onOpenChange={handleEditOpenChange}>
-        <DialogContent className="grid-rows-[auto_minmax(0,1fr)_auto] w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] max-w-4xl gap-0 overflow-hidden border-border/70 bg-background p-0 sm:w-full sm:max-h-[calc(100dvh-3rem)]">
-          <DialogHeader className="border-b border-border/70 px-5 py-5 pr-14 text-left sm:px-6">
-            <DialogTitle>Edit Profile</DialogTitle>
-            <DialogDescription>
-              Update your username, import an image from a link, upload a photo,
-              or choose a portrait from the default pack.
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] max-w-5xl gap-0 overflow-hidden border-border/70 bg-background p-0 sm:w-full sm:max-h-[calc(100dvh-3rem)]">
+          <div className="grid min-h-0 lg:grid-cols-[320px_minmax(0,1fr)]">
+            <aside className="relative overflow-hidden border-b border-border/70 bg-gradient-to-br from-card via-card to-primary/10 p-5 sm:p-6 lg:border-b-0 lg:border-r">
+              <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
+              <div className="absolute -bottom-16 -left-16 h-40 w-40 rounded-full bg-secondary/20 blur-3xl" />
+              <div className="relative flex h-full flex-col gap-5">
+                <Badge
+                  variant="secondary"
+                  className="w-fit bg-background/75 text-foreground backdrop-blur-sm"
+                >
+                  <UserRound className="mr-1 h-3.5 w-3.5" />
+                  Profile Editor
+                </Badge>
 
-          <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
-            <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
-              <div className="space-y-4">
-                <div className="rounded-3xl border border-border/70 bg-muted/25 p-5 shadow-sm">
+                <div className="rounded-[28px] border border-white/10 bg-background/60 p-5 shadow-2xl backdrop-blur-md">
                   <div className="flex flex-col items-center gap-4 text-center">
-                    <Avatar className="h-28 w-28 border-4 border-background shadow-xl">
+                    <Avatar className="h-32 w-32 border-4 border-background shadow-xl">
                       <AvatarImage
                         key={previewAvatar || "profile-preview"}
                         src={previewAvatar}
                         alt="Profile preview"
                       />
-                      <AvatarFallback className="text-lg font-semibold">
+                      <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-xl font-semibold text-primary-foreground">
                         {getInitials(usernameInput || displayName)}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="space-y-1">
-                      <p className="text-lg font-semibold">
+
+                    <div className="space-y-2">
+                      <p className="text-2xl font-semibold">
                         {usernameInput.trim() || displayName}
                       </p>
-                      <p className="text-sm text-primary">{avatarStatusLabel}</p>
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        <Badge className="bg-primary/15 text-primary hover:bg-primary/15">
+                          {avatarStatusLabel}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className="border-white/15 bg-background/50"
+                        >
+                          Since {memberSince}
+                        </Badge>
+                      </div>
                     </div>
-                    <p className="text-sm leading-relaxed text-muted-foreground">
-                      {avatarStatusDescription}
-                    </p>
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-border/70 bg-card/55 p-4">
-                  <p className="text-sm font-medium">Avatar reset</p>
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                    Clear the current image if you want the profile badge to use
-                    your initials instead.
-                  </p>
+                <input
+                  ref={avatarFileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="h-11 gap-2"
+                    disabled={isProcessingAvatar}
+                    onClick={() => avatarFileInputRef.current?.click()}
+                  >
+                    <Camera className="h-4 w-4" />
+                    {isProcessingAvatar && !isRemoteLinkedAvatar
+                      ? "Optimizing..."
+                      : "Upload"}
+                  </Button>
                   <Button
                     type="button"
                     variant="outline"
+                    className="h-11"
                     onClick={() => setAvatarInput("")}
-                    className="mt-4 w-full"
                   >
                     Use Initials
                   </Button>
                 </div>
+
+                <p className="text-xs text-muted-foreground">
+                  PNG, JPG, WebP, GIF • 3MB max
+                </p>
               </div>
+            </aside>
 
-              <div className="space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="profile-username">Username</Label>
-                  <Input
-                    id="profile-username"
-                    value={usernameInput}
-                    onChange={(event) => setUsernameInput(event.target.value)}
-                    placeholder="Your username"
-                    maxLength={24}
-                  />
-                </div>
+            <div className="flex min-h-0 flex-col">
+              <DialogHeader className="border-b border-border/70 px-5 py-5 pr-14 text-left sm:px-6">
+                <DialogTitle className="text-xl">Edit Profile</DialogTitle>
+              </DialogHeader>
 
-                <div className="rounded-2xl border border-border/70 bg-card/50 p-4 sm:p-5">
-                  <div className="mb-3 space-y-1">
-                    <p className="text-sm font-medium">Image Link</p>
-                    <p className="text-xs text-muted-foreground">
-                      Paste a public image URL to fetch it through the server
-                      and compress it before saving.
-                    </p>
-                  </div>
-                  <div className="space-y-3">
+              <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+                <div className="space-y-5">
+                  <section className="rounded-3xl border border-border/70 bg-card/55 p-5 shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          Username
+                        </p>
+                        <Label htmlFor="profile-username" className="sr-only">
+                          Username
+                        </Label>
+                      </div>
+                      <Badge variant="outline" className="border-border/70">
+                        {usernameInput.trim().length || 0}/24
+                      </Badge>
+                    </div>
                     <Input
-                      id="profile-avatar-url"
-                      value={avatarInputValue}
-                      onChange={(event) => setAvatarInput(event.target.value)}
-                      placeholder={avatarInputPlaceholder}
+                      id="profile-username"
+                      value={usernameInput}
+                      onChange={(event) => setUsernameInput(event.target.value)}
+                      placeholder="Your username"
+                      maxLength={24}
+                      className="mt-3 h-12 bg-background/70 text-base"
                     />
-                    <div className="flex flex-wrap gap-2">
+                  </section>
+
+                  <section className="rounded-3xl border border-border/70 bg-card/55 p-5 shadow-sm">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        Image Link
+                      </p>
+                      {isRemoteLinkedAvatar ? (
+                        <Badge className="bg-secondary/15 text-secondary hover:bg-secondary/15">
+                          Ready
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                      <Input
+                        id="profile-avatar-url"
+                        value={avatarInputValue}
+                        onChange={(event) => setAvatarInput(event.target.value)}
+                        placeholder="https://example.com/avatar.jpg"
+                        className="h-11 bg-background/70"
+                      />
                       <Button
                         type="button"
                         variant="secondary"
+                        className="h-11"
                         disabled={!isRemoteLinkedAvatar || isProcessingAvatar}
                         onClick={() => void importAvatarFromLink()}
                       >
                         {isProcessingAvatar && isRemoteLinkedAvatar
                           ? "Importing..."
-                          : "Import Link Image"}
+                          : "Import"}
                       </Button>
-                      {normalizedAvatarInput && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setAvatarInput("")}
-                        >
-                          Clear Image
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-border/70 bg-card/50 p-4 sm:p-5">
-                  <div className="mb-3 space-y-1">
-                    <p className="text-sm font-medium">Upload Your Image</p>
-                    <p className="text-xs text-muted-foreground">
-                      PNG, JPG, WebP or GIF up to 3MB. Uploads are cropped to a
-                      square and compressed into a smaller WebP avatar.
-                    </p>
-                  </div>
-                  <input
-                    ref={avatarFileInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/gif"
-                    onChange={handleAvatarUpload}
-                    className="hidden"
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      disabled={isProcessingAvatar}
-                      onClick={() => avatarFileInputRef.current?.click()}
-                    >
-                      {isProcessingAvatar && !isRemoteLinkedAvatar
-                        ? "Optimizing..."
-                        : "Upload Image"}
-                    </Button>
-                    {isUploadedAvatar && (
                       <Button
                         type="button"
                         variant="outline"
+                        className="h-11"
+                        disabled={!normalizedAvatarInput}
                         onClick={() => setAvatarInput("")}
                       >
-                        Remove Upload
+                        Clear
                       </Button>
-                    )}
-                  </div>
-                </div>
+                    </div>
+                  </section>
 
-                <div className="rounded-2xl border border-border/70 bg-card/50 p-4 sm:p-5">
-                  <div className="mb-4 space-y-1">
-                    <p className="text-sm font-medium">Default Avatar Pack</p>
-                    <p className="text-xs text-muted-foreground">
-                      Local portrait avatars are bundled with the app, so they
-                      load instantly and always work offline.
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    {DEFAULT_AVATAR_OPTIONS.map((candidate) => {
-                      const isSelected = isDefaultAvatarSelected(
-                        normalizedAvatarInput,
-                        candidate.url,
-                      );
+                  <section className="rounded-3xl border border-border/70 bg-card/55 p-5 shadow-sm">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        Avatar Gallery
+                      </p>
+                      {isDefaultAvatar ? (
+                        <Badge className="bg-primary/15 text-primary hover:bg-primary/15">
+                          Selected
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {DEFAULT_AVATAR_OPTIONS.map((candidate) => {
+                        const isSelected = isDefaultAvatarSelected(
+                          normalizedAvatarInput,
+                          candidate.url,
+                        );
 
-                      return (
-                        <button
-                          key={candidate.id}
-                          type="button"
-                          onClick={() => setAvatarInput(candidate.url)}
-                          className={cn(
-                            "rounded-2xl border border-border bg-card/70 p-3 text-left transition-all hover:-translate-y-0.5 hover:border-primary hover:bg-card",
-                            isSelected && "border-primary ring-2 ring-primary/25",
-                          )}
-                        >
-                          <div className="relative mb-3 overflow-hidden rounded-xl border border-border/60 bg-muted/40">
-                            {isSelected ? (
-                              <span className="absolute right-2 top-2 z-10 rounded-full bg-background/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
-                                Selected
-                              </span>
-                            ) : null}
-                            <img
-                              src={candidate.url}
-                              alt={candidate.label}
-                              className="h-28 w-full object-cover"
-                              loading="lazy"
-                            />
-                          </div>
-                          <p className="text-sm font-medium">{candidate.label}</p>
-                        </button>
-                      );
-                    })}
-                  </div>
+                        return (
+                          <button
+                            key={candidate.id}
+                            type="button"
+                            onClick={() => setAvatarInput(candidate.url)}
+                            className={cn(
+                              "group rounded-[22px] border border-border bg-background/65 p-3 text-left transition-all hover:-translate-y-0.5 hover:border-primary hover:bg-background",
+                              isSelected && "border-primary ring-2 ring-primary/25",
+                            )}
+                          >
+                            <div className="relative mb-3 overflow-hidden rounded-2xl border border-border/60 bg-muted/40">
+                              {isSelected ? (
+                                <span className="absolute right-2 top-2 z-10 rounded-full bg-background/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
+                                  Selected
+                                </span>
+                              ) : null}
+                              <img
+                                src={candidate.url}
+                                alt={candidate.label}
+                                className="h-28 w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                                loading="lazy"
+                              />
+                            </div>
+                            <p className="text-sm font-medium">{candidate.label}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <DialogFooter className="border-t border-border/70 px-5 py-4 sm:px-6">
+              <DialogFooter className="border-t border-border/70 px-5 py-4 sm:px-6">
             <Button
               type="button"
               variant="outline"
@@ -1048,7 +1049,9 @@ export default function Profile() {
             >
               {isSavingProfile ? "Saving..." : "Save Changes"}
             </Button>
-          </DialogFooter>
+              </DialogFooter>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

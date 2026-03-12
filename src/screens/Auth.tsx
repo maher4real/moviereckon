@@ -36,8 +36,11 @@ import {
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z
   .string()
-  .min(6, "Password must be at least 6 characters")
-  .max(100, "Password is too long");
+  .min(10, "Password must be at least 10 characters")
+  .max(100, "Password is too long")
+  .regex(/[A-Z]/, "Password must include at least one uppercase letter")
+  .regex(/[a-z]/, "Password must include at least one lowercase letter")
+  .regex(/[0-9]/, "Password must include at least one number");
 const usernameSchema = z
   .string()
   .regex(
@@ -427,7 +430,10 @@ export default function Auth() {
     <div className="relative min-h-screen overflow-hidden bg-background p-4">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 scale-[1.08] -rotate-2">
-          <div className="flex h-full flex-col justify-center gap-3 opacity-45">
+          <div
+            className="flex h-full flex-col justify-center gap-3 opacity-64"
+            style={{ filter: "saturate(1.16) contrast(1.06) brightness(0.9)" }}
+          >
             {posterRows.map((row, rowIndex) => (
               <div
                 key={`row-${rowIndex}`}
@@ -456,17 +462,18 @@ export default function Auth() {
             ))}
           </div>
         </div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_22%,hsl(var(--secondary)/0.2),transparent_42%),radial-gradient(circle_at_84%_74%,hsl(var(--primary)/0.24),transparent_45%)]" />
-        <div className="absolute inset-0 bg-gradient-to-br from-background/76 via-background/56 to-background/72" />
-        <div className="absolute top-1/4 -left-1/4 h-1/2 w-1/2 rounded-full bg-primary/12 blur-[120px]" />
-        <div className="absolute bottom-1/4 -right-1/4 h-1/2 w-1/2 rounded-full bg-secondary/12 blur-[120px]" />
+        <div className="absolute inset-0 bg-black/22" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_22%,hsl(var(--secondary)/0.22),transparent_42%),radial-gradient(circle_at_84%_74%,hsl(var(--primary)/0.26),transparent_45%)]" />
+        <div className="absolute inset-0 bg-gradient-to-br from-background/68 via-background/44 to-background/62" />
+        <div className="absolute top-1/4 -left-1/4 h-1/2 w-1/2 rounded-full bg-primary/16 blur-[120px]" />
+        <div className="absolute bottom-1/4 -right-1/4 h-1/2 w-1/2 rounded-full bg-secondary/18 blur-[120px]" />
       </div>
 
       <div className="relative z-10 flex min-h-screen w-full items-center justify-center">
         <div className="w-full max-w-md animate-fade-in">
           <div className="mb-8 flex flex-col items-center">
             <div className="mb-4 flex justify-center">
-              <BrandLogo size="xl" />
+              <BrandLogo size="xl" animated={isSubmitting || isGoogleSubmitting || isAuthenticating || isLoading} />
             </div>
             <p className="text-center text-muted-foreground">
               Your personalized gateway to Bollywood & Hollywood

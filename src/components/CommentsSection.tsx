@@ -1,6 +1,17 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Globe, MessageSquare, Pencil, Star, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import MediaImage from "@/components/MediaImage";
@@ -277,11 +288,6 @@ export default function CommentsSection({
     });
   };
 
-  const handleDelete = (commentId: string) => {
-    if (!window.confirm("Delete this comment?")) return;
-    deleteCommentMutation.mutate(commentId);
-  };
-
   const togglePublicReviewExpanded = (reviewId: string) => {
     setExpandedPublicReviews((prev) => ({
       ...prev,
@@ -441,17 +447,37 @@ export default function CommentsSection({
                             >
                               <Pencil className="w-4 h-4" />
                             </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => handleDelete(comment.id)}
-                              disabled={deleteCommentMutation.isPending}
-                              title="Delete comment"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive"
+                                  disabled={deleteCommentMutation.isPending}
+                                  title="Delete comment"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent className="border-border bg-card/95 backdrop-blur-md">
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete comment?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently remove your comment from the discussion for this title.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Keep comment</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    onClick={() => deleteCommentMutation.mutate(comment.id)}
+                                  >
+                                    {deleteCommentMutation.isPending ? "Deleting..." : "Delete"}
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </div>
                         )}
                       </div>

@@ -5,7 +5,11 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { createHash, randomBytes } from "crypto";
 import { connectToDatabase, ObjectId } from "./mongodb.js";
-import { ACCESS_TOKEN_COOKIE_NAME, getCookieValue } from "./cookies.js";
+import {
+  ACCESS_TOKEN_COOKIE_NAME,
+  DEVICE_ID_COOKIE_NAME,
+  getCookieValue,
+} from "./cookies.js";
 import type { Db } from "mongodb";
 
 const JWT_SECRET = (() => {
@@ -27,6 +31,7 @@ const JWT_EXPIRES_IN = "15m";
 
 const REFRESH_TOKEN_EXPIRES_IN = "30d";
 const REFRESH_TOKEN_PEPPER = process.env.REFRESH_TOKEN_PEPPER || JWT_SECRET;
+const SESSION_FINGERPRINT_VERSION = "v2";
 
 export type UserRole = "user" | "moderator" | "admin";
 
@@ -80,6 +85,10 @@ export interface TokenPair {
 
 export function generateRefreshSessionId(): string {
   return randomBytes(16).toString("hex");
+}
+
+export function generateDeviceId(): string {
+  return randomBytes(24).toString("hex");
 }
 
 export function generateTokens(
@@ -144,6 +153,10 @@ export function hashRefreshToken(token: string): string {
   return createHash("sha256").update(`${REFRESH_TOKEN_PEPPER}:${token}`).digest("hex");
 }
 
+export function hashDeviceId(deviceId: string): string {
+  return createHash("sha256").update(`${REFRESH_TOKEN_PEPPER}:device:${deviceId}`).digest("hex");
+}
+
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 12);
 }
@@ -188,10 +201,64 @@ export function getSessionFingerprintFromRequest(request: RequestLike): string {
   const acceptLanguage = (getHeaderValue(request.headers, "accept-language") || "")
     .trim()
     .slice(0, 120);
+  const normalizedUserAgent = userAgent.toLowerCase();
+  const normalizedAcceptLanguage = acceptLanguage.toLowerCase();
 
-  return createHash("sha256")
-    .update(`${REFRESH_TOKEN_PEPPER}:ua:${userAgent}|lang:${acceptLanguage}`)
-    .digest("hex");
+  const browserFamily = (() => {
+    if (normalizedUserAgent.includes("edg/")) return "edge";
+    if (normalizedUserAgent.includes("opr/") || normalizedUserAgent.includes("opera")) {
+      return "opera";
+    }
+    if (normalizedUserAgent.includes("firefox/") || normalizedUserAgent.includes("fxios/")) {
+      return "firefox";
+    }
+    if (normalizedUserAgent.includes("crios/") || normalizedUserAgent.includes("chrome/")) {
+      return "chrome";
+    }
+    if (normalizedUserAgent.includes("safari/") && normalizedUserAgent.includes("version/")) {
+      return "safari";
+    }
+    return "other";
+  })();
+
+  const platformFamily = (() => {
+    if (normalizedUserAgent.includes("iphone")) return "iphone";
+    if (normalizedUserAgent.includes("ipad")) return "ipad";
+    if (normalizedUserAgent.includes("android")) return "android";
+    if (normalizedUserAgent.includes("macintosh") || normalizedUserAgent.includes("mac os x")) {
+      return "mac";
+    }
+    if (normalizedUserAgent.includes("windows")) return "windows";
+    if (normalizedUserAgent.includes("cros")) return "chromeos";
+    if (normalizedUserAgent.includes("linux")) return "linux";
+    return "other";
+  })();
+
+  const primaryLanguage =
+    normalizedAcceptLanguage
+      .split(",")[0]
+      ?.split(";")[0]
+      ?.trim()
+      ?.slice(0, 16) || "unknown";
+
+  return `${SESSION_FINGERPRINT_VERSION}:${createHash("sha256")
+    .update(
+      `${REFRESH_TOKEN_PEPPER}:browser:${browserFamily}|platform:${platformFamily}|lang:${primaryLanguage}`,
+    )
+    .digest("hex")}`;
+}
+
+export function isVersionedSessionFingerprint(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.startsWith(`${SESSION_FINGERPRINT_VERSION}:`) &&
+    value.length > SESSION_FINGERPRINT_VERSION.length + 1
+  );
+}
+
+export function getDeviceIdFromRequest(request: RequestLike): string | null {
+  const cookieHeader = getHeaderValue(request.headers, "cookie") ?? undefined;
+  return getCookieValue(cookieHeader, DEVICE_ID_COOKIE_NAME);
 }
 
 export async function pruneRefreshTokensForUser(

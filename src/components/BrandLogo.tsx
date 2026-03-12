@@ -30,6 +30,7 @@ const SIZE_STYLES = {
 } as const;
 
 type BrandLogoProps = {
+  animated?: boolean;
   className?: string;
   compact?: boolean;
   labelClassName?: string;
@@ -38,6 +39,7 @@ type BrandLogoProps = {
 };
 
 export default function BrandLogo({
+  animated = false,
   className,
   compact = false,
   labelClassName,
@@ -58,6 +60,8 @@ export default function BrandLogo({
         data-brand-mark="true"
         className={cn(
           "flex shrink-0 items-center justify-center text-primary",
+          animated &&
+            "animate-auth-brand-pulse drop-shadow-[0_0_24px_hsl(var(--primary)/0.28)]",
           styles.mark,
           markClassName,
         )}
@@ -69,6 +73,8 @@ export default function BrandLogo({
           data-brand-label="true"
           className={cn(
             "text-gradient font-bold",
+            animated &&
+              "animate-auth-brand-gradient-flow bg-[length:220%_100%] drop-shadow-[0_10px_34px_hsl(var(--primary)/0.16)]",
             styles.label,
             labelClassName,
           )}

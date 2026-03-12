@@ -1,3 +1,4 @@
+import BrandLogo from "@/components/BrandLogo";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -126,10 +127,10 @@ export function AppPageSkeleton({
 export function CenteredAppSkeleton() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <div className="w-full max-w-sm space-y-4">
-        <Skeleton className="h-8 w-44 mx-auto" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-4/5 mx-auto" />
+      <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-card/70 px-6 py-8 text-center shadow-2xl backdrop-blur-md">
+        <BrandLogo size="xl" animated />
+        <Skeleton className="mx-auto mt-5 h-4 w-40 bg-white/12" />
+        <Skeleton className="mx-auto mt-3 h-3 w-56 bg-white/10" />
       </div>
     </div>
   );
@@ -143,7 +144,10 @@ export function AuthPageSkeleton() {
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 scale-110 -rotate-2">
-          <div className="flex h-full flex-col justify-center gap-3 opacity-48">
+          <div
+            className="flex h-full flex-col justify-center gap-3 opacity-62"
+            style={{ filter: "saturate(1.12) contrast(1.04) brightness(0.92)" }}
+          >
             {Array.from({ length: rowCount }).map((_, rowIndex) => (
               <div
                 key={`auth-skeleton-row-${rowIndex}`}
@@ -165,18 +169,18 @@ export function AuthPageSkeleton() {
             ))}
           </div>
         </div>
-        <div className="absolute inset-0 bg-gradient-to-br from-background/76 via-background/56 to-background/72" />
-        <div className="absolute top-1/4 -left-1/4 w-1/2 h-1/2 bg-primary/10 rounded-full blur-[100px]" />
-        <div className="absolute bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-secondary/15 rounded-full blur-[100px]" />
+        <div className="absolute inset-0 bg-black/24" />
+        <div className="absolute inset-0 bg-gradient-to-br from-background/70 via-background/46 to-background/66" />
+        <div className="absolute top-1/4 -left-1/4 w-1/2 h-1/2 bg-primary/16 rounded-full blur-[100px]" />
+        <div className="absolute bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-secondary/18 rounded-full blur-[100px]" />
       </div>
 
       <div className="relative z-10 w-full max-w-md space-y-6">
         <div className="space-y-3 text-center">
-          <div className="flex items-center justify-center gap-2">
-            <Skeleton className="h-10 w-10 rounded-full" />
-            <Skeleton className="h-10 w-48" />
+          <div className="flex items-center justify-center">
+            <BrandLogo size="xl" animated />
           </div>
-          <Skeleton className="h-4 w-64 mx-auto" />
+          <Skeleton className="h-4 w-64 mx-auto bg-white/12" />
         </div>
 
         <div className="rounded-2xl border border-border bg-card/80 backdrop-blur-md p-8 shadow-2xl">

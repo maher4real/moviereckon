@@ -5,11 +5,15 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import {
+  generateDeviceId,
   generateRefreshSessionId,
+  getDeviceIdFromRequest,
   verifyRefreshToken,
   generateTokens,
   getSessionFingerprintFromRequest,
+  hashDeviceId,
   hashRefreshToken,
+  isVersionedSessionFingerprint,
   normalizeUserRole,
   UserPayload,
 } from "../../lib/auth.js";
@@ -17,6 +21,7 @@ import {
   REFRESH_TOKEN_COOKIE_NAME,
   getCookieValue,
   setAuthCookies,
+  setDeviceCookie,
 } from "../../lib/cookies.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
 import { emitSecurityEvent } from "../../lib/abuse-telemetry.js";
@@ -43,10 +48,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(429).json({ error: "Too many refresh requests. Please try again later." });
     }
 
-    const bodyRefreshToken = typeof req.body?.refreshToken === "string" ? req.body.refreshToken : "";
     const cookieRefreshToken = getCookieValue(req.headers.cookie, REFRESH_TOKEN_COOKIE_NAME) || "";
-
-    const refreshToken = bodyRefreshToken || cookieRefreshToken;
+    const refreshToken = cookieRefreshToken;
     if (!refreshToken) {
       return res.status(400).json({ error: "Refresh token is required" });
     }
@@ -65,7 +68,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       token_hash: hashRefreshToken(refreshToken),
       // Legacy fallback (disabled for security):
       // token: refreshToken,
-    }, { projection: { _id: 1, expires_at: 1, session_id: 1, session_fingerprint: 1 } });
+    }, {
+      projection: {
+        _id: 1,
+        expires_at: 1,
+        session_id: 1,
+        session_fingerprint: 1,
+        device_id_hash: 1,
+      },
+    });
 
     if (!storedToken) {
       return res.status(401).json({ error: "Refresh token not found or revoked" });
@@ -78,14 +89,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const currentSessionFingerprint = getSessionFingerprintFromRequest(req);
+    const requestDeviceId = getDeviceIdFromRequest(req);
+    const requestDeviceHash = requestDeviceId ? hashDeviceId(requestDeviceId) : null;
+    const storedDeviceHash =
+      typeof storedToken.device_id_hash === "string" && storedToken.device_id_hash.length > 0
+        ? storedToken.device_id_hash
+        : null;
+    const storedSessionFingerprint =
+      typeof storedToken.session_fingerprint === "string" && storedToken.session_fingerprint.length > 0
+        ? storedToken.session_fingerprint
+        : null;
     const strictSessionBinding =
       process.env.SESSION_BINDING_STRICT === "true" ||
       process.env.NODE_ENV === "production";
-    if (
+    const deviceIdToPersist = requestDeviceId || generateDeviceId();
+
+    if (strictSessionBinding && storedDeviceHash) {
+      if (!requestDeviceHash || requestDeviceHash !== storedDeviceHash) {
+        emitSecurityEvent({
+          type: "refresh_session_mismatch",
+          outcome: "blocked",
+          route: "auth_refresh",
+          reason: "device_binding_mismatch",
+          req,
+          userId: payload.id,
+        });
+        await db.collection("refresh_tokens").deleteOne({ _id: storedToken._id });
+        return res.status(401).json({ error: "Refresh token device mismatch" });
+      }
+    } else if (
       strictSessionBinding &&
-      typeof storedToken.session_fingerprint === "string" &&
-      storedToken.session_fingerprint.length > 0 &&
-      storedToken.session_fingerprint !== currentSessionFingerprint
+      isVersionedSessionFingerprint(storedSessionFingerprint) &&
+      storedSessionFingerprint !== currentSessionFingerprint
     ) {
       emitSecurityEvent({
         type: "refresh_session_mismatch",
@@ -97,6 +132,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
       await db.collection("refresh_tokens").deleteOne({ _id: storedToken._id });
       return res.status(401).json({ error: "Refresh token session mismatch" });
+    }
+
+    if (
+      strictSessionBinding &&
+      storedDeviceHash &&
+      storedSessionFingerprint &&
+      storedSessionFingerprint !== currentSessionFingerprint
+    ) {
+      emitSecurityEvent({
+        type: "refresh_session_context_changed",
+        outcome: "allowed",
+        route: "auth_refresh",
+        reason: "device_match_with_context_change",
+        req,
+        userId: payload.id,
+      });
     }
 
     // Get user
@@ -137,6 +188,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         $set: {
           session_id: refreshSessionId,
           session_fingerprint: currentSessionFingerprint,
+          device_id_hash: hashDeviceId(deviceIdToPersist),
           token_hash: hashRefreshToken(tokens.refreshToken),
           created_at: now,
           last_used_at: now,
@@ -145,6 +197,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     );
 
+    setDeviceCookie(res, deviceIdToPersist);
     setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
 
     return res.status(200).json({

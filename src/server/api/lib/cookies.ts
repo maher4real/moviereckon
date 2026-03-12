@@ -2,6 +2,7 @@ import type { VercelResponse } from "@vercel/node";
 
 export const ACCESS_TOKEN_COOKIE_NAME = "moviereckon_access";
 export const REFRESH_TOKEN_COOKIE_NAME = "moviereckon_refresh";
+export const DEVICE_ID_COOKIE_NAME = "moviereckon_device";
 
 type SameSite = "lax" | "strict" | "none";
 
@@ -16,6 +17,7 @@ type CookieOptions = {
 
 const ACCESS_TOKEN_MAX_AGE_SECONDS = 15 * 60;
 const REFRESH_TOKEN_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
+const DEVICE_ID_MAX_AGE_SECONDS = 180 * 24 * 60 * 60;
 
 function isProductionEnv() {
   return process.env.NODE_ENV === "production";
@@ -130,6 +132,25 @@ export function setAuthCookies(res: VercelResponse, accessToken: string, refresh
   );
 }
 
+export function setDeviceCookie(res: VercelResponse, deviceId: string) {
+  const secure = shouldUseSecureCookies();
+  let sameSite = getSameSiteValue();
+  if (!secure && sameSite === "none") {
+    sameSite = "lax";
+  }
+
+  appendSetCookie(
+    res,
+    serializeCookie(DEVICE_ID_COOKIE_NAME, deviceId, {
+      httpOnly: true,
+      secure,
+      sameSite,
+      path: "/",
+      maxAge: DEVICE_ID_MAX_AGE_SECONDS,
+    }),
+  );
+}
+
 export function clearAuthCookies(res: VercelResponse) {
   const secure = shouldUseSecureCookies();
   let sameSite = getSameSiteValue();
@@ -154,6 +175,18 @@ export function clearAuthCookies(res: VercelResponse) {
   appendSetCookie(
     res,
     serializeCookie(REFRESH_TOKEN_COOKIE_NAME, "", {
+      httpOnly: true,
+      secure,
+      sameSite,
+      path: "/",
+      maxAge: 0,
+      expires: expired,
+    }),
+  );
+
+  appendSetCookie(
+    res,
+    serializeCookie(DEVICE_ID_COOKIE_NAME, "", {
       httpOnly: true,
       secure,
       sameSite,

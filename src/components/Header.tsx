@@ -14,6 +14,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -59,6 +60,11 @@ export default function Header() {
     await signOut();
     navigate("/");
   };
+
+  const profileAvatarSrc =
+    typeof profile?.avatar_url === "string" && profile.avatar_url.trim().length > 0
+      ? profile.avatar_url.trim()
+      : undefined;
 
   return (
     <header
@@ -113,9 +119,15 @@ export default function Header() {
               variant="ghost"
               size="icon"
               onClick={() => navigate("/profile")}
-              className="text-muted-foreground hover:text-foreground"
+              className="h-10 w-10 rounded-full border border-white/10 bg-background/40 p-0 text-muted-foreground backdrop-blur-sm hover:bg-background/70 hover:text-foreground"
+              aria-label="Open profile"
             >
-              <User className="w-5 h-5" />
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={profileAvatarSrc} alt={profile?.username || "Profile"} />
+                <AvatarFallback className="bg-primary/10 text-primary">
+                  <User className="h-4 w-4" />
+                </AvatarFallback>
+              </Avatar>
             </Button>
 
             {/* Mobile Menu Toggle */}
