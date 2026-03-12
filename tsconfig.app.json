@@ -23,13 +23,9 @@
     "noFallthroughCasesInSwitch": false,
 
     /* Path aliases */
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
-    },
-
-    /* Silences baseUrl deprecation warning in TS6+ */
-    "ignoreDeprecations": "6.0"
+    }
   },
   "include": ["src"]
 }

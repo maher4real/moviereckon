@@ -212,9 +212,19 @@ Optional auth/email variables:
 - `RESEND_API_KEY`
 - `RESEND_FROM_EMAIL`
 - `RESEND_FROM_NAME`
+- `RESEND_REPLY_TO_EMAIL`
+- `RESEND_TIMEOUT_MS`
+- `RESEND_MAX_ATTEMPTS`
 - `EMAIL_VERIFICATION_BASE_URL`
 - `EMAIL_VERIFICATION_REDIRECT_BASE_URL`
 - `EMAIL_VERIFICATION_TOKEN_PEPPER`
+- `NEXT_PUBLIC_FIREBASE_API_KEY`
+- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+- `NEXT_PUBLIC_FIREBASE_APP_ID`
+- `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID`
 - `REFRESH_TOKEN_PEPPER`
 - `SESSION_COOKIE_SECURE`
 - `SESSION_COOKIE_SAMESITE`
@@ -260,6 +270,7 @@ Auth routes:
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
+- `POST /api/auth/resend-verification`
 - `POST /api/auth/refresh`
 - `GET /api/auth/me`
 - `POST /api/auth/logout`
@@ -287,16 +298,14 @@ Other:
 
 - Session is cookie-based (`HttpOnly` access + refresh cookies).
 - Turnstile captcha is enforced for login and signup.
+- Email/password accounts must verify their email before the first sign-in.
 - Refresh tokens are stored hashed in MongoDB.
-
-## Temporary Behavior
-
-Email verification is currently disabled in signup flow.
-
-- Flag location: `src/server/api/_handlers/auth/register.ts`
-- Current state: `EMAIL_VERIFICATION_DISABLED = true`
-
-New users are auto-marked verified and signed in immediately after registration.
+- Local development logs a verification preview URL when Resend env vars are not configured.
+- New email/password signups can use Firebase Auth just for the verification email step while MovieReckon still keeps MongoDB users and cookie sessions.
+- If you use Firebase verification, add your local and production app domains to Firebase Auth authorized domains so the action links can complete correctly.
+- Verification emails use Resend idempotency keys, explicit plain-text bodies, and tagged sends for safer retries and easier event tracing.
+- Prefer a verified sender domain and a monitored `RESEND_REPLY_TO_EMAIL` inbox instead of a dead-end no-reply address.
+- `EMAIL_VERIFICATION_DISABLED=true` is available only as an explicit override.
 
 ## Deployment
 

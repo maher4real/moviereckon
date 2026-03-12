@@ -4,6 +4,7 @@
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase } from "../../lib/mongodb.js";
+import { verifyFirebaseEmailProof } from "../../lib/firebase-verification.js";
 import {
   comparePassword,
   generateDeviceId,
@@ -33,6 +34,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const password = typeof req.body?.password === "string" ? req.body.password : "";
     const captchaToken =
       sanitizeSingleLineText(req.body?.captcha_token, 4096, {
+        fallback: "",
+        collapseWhitespace: false,
+      }) || "";
+    const firebaseIdToken =
+      sanitizeSingleLineText(req.body?.firebase_id_token, 4096, {
         fallback: "",
         collapseWhitespace: false,
       }) || "";
@@ -89,6 +95,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           username: 1,
           role: 1,
           password_hash: 1,
+          email_verified: 1,
+          email_verification_provider: 1,
           avatar_url: 1,
           created_at: 1,
           updated_at: 1,
@@ -99,11 +107,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
-    // Email verification check is temporarily disabled.
-    // if (user.email_verified === false) {
-    //   return res.status(403).json({ error: "Please verify your email before signing in." });
-    // }
-
     // Accounts created via OAuth may not have a local password hash.
     if (!user.password_hash || typeof user.password_hash !== "string") {
       return res.status(401).json({ error: "This account uses Google sign-in. Continue with Google." });
@@ -113,6 +116,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const isValid = await comparePassword(password, user.password_hash);
     if (!isValid) {
       return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    if (user.email_verified === false) {
+      const emailVerificationProvider =
+        user.email_verification_provider === "firebase" ? "firebase" : "internal";
+
+      if (emailVerificationProvider === "firebase") {
+        const firebaseProof = await verifyFirebaseEmailProof(firebaseIdToken, user.email);
+        if (!firebaseProof.ok) {
+          return res.status(403).json({
+            error: "Please verify your email before signing in.",
+            code: "email_not_verified",
+            email_verification_provider: "firebase",
+          });
+        }
+
+        const now = new Date().toISOString();
+        await db.collection("users").updateOne(
+          { _id: user._id },
+          {
+            $set: {
+              email_verified: true,
+              email_verified_at: now,
+              updated_at: now,
+            },
+          },
+        );
+        user.email_verified = true;
+      } else {
+        return res.status(403).json({
+          error: "Please verify your email before signing in.",
+          code: "email_not_verified",
+          email_verification_provider: "internal",
+        });
+      }
     }
 
     // Generate tokens

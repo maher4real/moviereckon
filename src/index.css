@@ -287,7 +287,7 @@
 
   /* Better placeholder for missing images */
   .poster-placeholder {
-    @apply bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center;
+    @apply bg-linear-to-br from-muted to-muted/50 flex items-center justify-center;
   }
 
   /* Carousel fade edges */

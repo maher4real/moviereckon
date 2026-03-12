@@ -12,6 +12,7 @@ import {
 import { AuthPageSkeleton } from "@/components/AppSkeletons";
 import BrandLogo from "@/components/BrandLogo";
 import TurnstileCaptcha from "@/components/TurnstileCaptcha";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,10 +20,14 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import MediaImage from "@/components/MediaImage";
 import {
   ArrowRight,
+  CircleAlert,
+  CircleCheckBig,
   Eye,
   EyeOff,
+  LoaderCircle,
   Lock,
   Mail,
+  MailCheck,
   User,
 } from "lucide-react";
 import { z } from "zod";
@@ -48,6 +53,11 @@ const usernameSchema = z
     "Username must be 3-24 characters and only include letters, numbers, and underscores",
   );
 
+type VerificationBannerState = {
+  tone: "success" | "error" | "info";
+  message: string;
+};
+
 export default function Auth() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -57,6 +67,7 @@ export default function Auth() {
     isAuthenticating,
     signUp,
     signIn,
+    resendVerificationEmail,
     signInWithGoogle,
     triggerAuthTransition,
   } = useAuth();
@@ -69,6 +80,11 @@ export default function Auth() {
   const [signinCaptchaResetNonce, setSigninCaptchaResetNonce] = useState(0);
   const [signupCaptchaResetNonce, setSignupCaptchaResetNonce] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
+  const [pendingVerificationProvider, setPendingVerificationProvider] =
+    useState<mongoClient.EmailVerificationProvider>("internal");
+  const [verificationBanner, setVerificationBanner] = useState<VerificationBannerState | null>(null);
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
   const [debouncedSignupEmail, setDebouncedSignupEmail] = useState("");
   const [debouncedSignupUsername, setDebouncedSignupUsername] = useState("");
   const captchaSiteKey = (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "").trim();
@@ -206,6 +222,7 @@ export default function Auth() {
     const params = new URLSearchParams(location.search);
     if (params.get("email_verified") === "1") {
       return {
+        code: "email_verified",
         tone: "success" as const,
         message: "Email verified successfully. You can sign in now.",
       };
@@ -217,12 +234,13 @@ export default function Auth() {
     const codeToMessage: Record<string, string> = {
       missing_token: "Verification link is incomplete.",
       invalid_token: "Verification link is invalid.",
-      expired_token: "Verification link expired. Please sign up again.",
+      expired_token: "Verification link expired. Request a new verification email.",
       user_not_found: "Account not found for this verification link.",
       server_error: "Verification failed due to a server issue.",
     };
 
     return {
+      code: verifyError,
       tone: "error" as const,
       message: codeToMessage[verifyError] || "Email verification failed. Please try again.",
     };
@@ -238,6 +256,17 @@ export default function Auth() {
   useEffect(() => {
     warmStartupSound();
   }, []);
+
+  useEffect(() => {
+    if (!emailVerificationStatus) return;
+    setActiveTab("signin");
+
+    if (emailVerificationStatus.tone === "success") {
+      setPendingVerificationEmail("");
+      setPendingVerificationProvider("internal");
+      setVerificationBanner(null);
+    }
+  }, [emailVerificationStatus]);
 
   useEffect(() => {
     if (activeTab !== "signup") {
@@ -353,6 +382,69 @@ export default function Auth() {
     });
   };
 
+  const handleResendVerification = async () => {
+    const targetEmail = pendingVerificationEmail || normalizedEmail;
+    const emailResult = emailSchema.safeParse(targetEmail);
+
+    if (!emailResult.success) {
+      setErrors((current) => ({
+        ...current,
+        email: "Enter the email address for the account you want to verify.",
+      }));
+      return;
+    }
+
+    if (!captchaSiteKey) {
+      setErrors((current) => ({
+        ...current,
+        captcha: "CAPTCHA is unavailable. Please contact support.",
+      }));
+      return;
+    }
+
+    if (!signinCaptchaToken) {
+      setErrors((current) => ({
+        ...current,
+        captcha: "Complete CAPTCHA before requesting a new verification email.",
+      }));
+      return;
+    }
+
+    if (pendingVerificationProvider === "firebase" && password.trim().length === 0) {
+      setErrors((current) => ({
+        ...current,
+        password: "Enter your password to resend the Firebase verification email.",
+      }));
+      return;
+    }
+
+    setIsResendingVerification(true);
+
+    try {
+      const { error, verificationPreviewUrl } = await resendVerificationEmail(
+        targetEmail,
+        password,
+        signinCaptchaToken,
+        pendingVerificationProvider,
+      );
+
+      if (!error) {
+        setPendingVerificationEmail(targetEmail);
+        setVerificationBanner({
+          tone: "success",
+          message: `Verification email sent to ${targetEmail}.`,
+        });
+        if (verificationPreviewUrl) {
+          console.info("Verification preview URL:", verificationPreviewUrl);
+        }
+      }
+    } finally {
+      setSigninCaptchaToken("");
+      setSigninCaptchaResetNonce((prev) => prev + 1);
+      setIsResendingVerification(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -369,12 +461,19 @@ export default function Auth() {
           error,
           requiresEmailVerification,
           verificationPreviewUrl,
+          verificationProvider,
         } = await signUp(email, password, username, signupCaptchaToken);
         setSignupCaptchaToken("");
         setSignupCaptchaResetNonce((prev) => prev + 1);
 
         if (!error) {
           if (requiresEmailVerification) {
+            setPendingVerificationEmail(normalizedEmail);
+            setPendingVerificationProvider(verificationProvider);
+            setVerificationBanner({
+              tone: "info",
+              message: `Account created. Check ${normalizedEmail} and verify your email before signing in.`,
+            });
             setPassword("");
             setShowPassword(false);
             setActiveTab("signin");
@@ -386,16 +485,35 @@ export default function Auth() {
             return;
           }
 
+          setPendingVerificationEmail("");
+          setPendingVerificationProvider("internal");
+          setVerificationBanner(null);
           triggerAuthTransition();
           queueStartupSound();
           navigate("/home");
         }
       } else {
-        const { error } = await signIn(email, password, signinCaptchaToken);
+        const { error, code, verificationProvider } = await signIn(email, password, signinCaptchaToken);
         setSigninCaptchaToken("");
         setSigninCaptchaResetNonce((prev) => prev + 1);
 
+        if (code === "email_not_verified") {
+          setPendingVerificationEmail(normalizedEmail);
+          setPendingVerificationProvider(verificationProvider || "internal");
+          setVerificationBanner({
+            tone: "info",
+            message:
+              verificationProvider === "firebase"
+                ? `Verify ${normalizedEmail} using the Firebase email we sent you before signing in.`
+                : `Verify ${normalizedEmail} before signing in.`,
+          });
+          return;
+        }
+
         if (!error) {
+          setPendingVerificationEmail("");
+          setPendingVerificationProvider("internal");
+          setVerificationBanner(null);
           triggerAuthTransition();
           queueStartupSound();
           navigate("/home");
@@ -416,6 +534,18 @@ export default function Auth() {
       setIsGoogleSubmitting(false);
     }
   };
+
+  const canPromptResendVerification =
+    activeTab === "signin" &&
+    (pendingVerificationEmail.length > 0 || emailVerificationStatus?.code === "expired_token");
+  const resendVerificationMessage = verificationBanner?.message
+    || (pendingVerificationEmail
+      ? `Check ${pendingVerificationEmail} for the verification link, then come back here to sign in.`
+      : "This verification link expired. Enter your email, complete CAPTCHA, and request a fresh link.");
+  const resendVerificationHint =
+    pendingVerificationProvider === "firebase"
+      ? "Enter your password and complete CAPTCHA below before resending."
+      : "Complete CAPTCHA below before resending.";
 
   if (user) {
     // Avoid blank first paint while the redirect effect navigates to /home.
@@ -464,7 +594,7 @@ export default function Auth() {
         </div>
         <div className="absolute inset-0 bg-black/22" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_22%,hsl(var(--secondary)/0.22),transparent_42%),radial-gradient(circle_at_84%_74%,hsl(var(--primary)/0.26),transparent_45%)]" />
-        <div className="absolute inset-0 bg-gradient-to-br from-background/68 via-background/44 to-background/62" />
+        <div className="absolute inset-0 bg-linear-to-br from-background/68 via-background/44 to-background/62" />
         <div className="absolute top-1/4 -left-1/4 h-1/2 w-1/2 rounded-full bg-primary/16 blur-[120px]" />
         <div className="absolute bottom-1/4 -right-1/4 h-1/2 w-1/2 rounded-full bg-secondary/18 blur-[120px]" />
       </div>
@@ -482,16 +612,25 @@ export default function Auth() {
 
           <section className="rounded-2xl border border-white/10 bg-card/78 p-8 shadow-2xl backdrop-blur-md">
             {emailVerificationStatus ? (
-              <p
+              <Alert
+                variant={emailVerificationStatus.tone === "error" ? "destructive" : "default"}
                 className={cn(
-                  "mb-5 rounded-xl border px-3 py-2 text-sm",
+                  "mb-5 rounded-xl border px-3 py-2",
                   emailVerificationStatus.tone === "success"
-                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-100 [&>svg]:text-emerald-300"
                     : "border-destructive/40 bg-destructive/10 text-destructive",
                 )}
               >
-                {emailVerificationStatus.message}
-              </p>
+                {emailVerificationStatus.tone === "success" ? (
+                  <CircleCheckBig className="h-4 w-4" />
+                ) : (
+                  <CircleAlert className="h-4 w-4" />
+                )}
+                <AlertTitle>
+                  {emailVerificationStatus.tone === "success" ? "Email verified" : "Verification issue"}
+                </AlertTitle>
+                <AlertDescription>{emailVerificationStatus.message}</AlertDescription>
+              </Alert>
             ) : null}
 
             {oauthErrorMessage ? (
@@ -557,6 +696,37 @@ export default function Auth() {
               </TabsList>
 
               <TabsContent value="signin" className="mt-0">
+                {canPromptResendVerification ? (
+                  <Alert className="mb-4 rounded-xl border-primary/25 bg-primary/10 text-primary-foreground [&>svg]:text-primary">
+                    <MailCheck className="h-4 w-4" />
+                    <AlertTitle>Verify your email</AlertTitle>
+                    <AlertDescription className="space-y-3">
+                      <p>{resendVerificationMessage}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="rounded-lg bg-gradient-to-r from-primary via-red-500 to-orange-500 text-white hover:brightness-110"
+                          onClick={handleResendVerification}
+                          disabled={isSubmitting || isAuthenticating || isResendingVerification}
+                        >
+                          {isResendingVerification ? (
+                            <span className="inline-flex items-center gap-2">
+                              <LoaderCircle className="h-4 w-4 animate-spin" />
+                              Sending...
+                            </span>
+                          ) : (
+                            "Resend verification email"
+                          )}
+                        </Button>
+                        <span className="text-xs text-primary-foreground/80">
+                          {resendVerificationHint}
+                        </span>
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                ) : null}
+
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="signin-email" className="text-sm font-medium">
@@ -570,8 +740,19 @@ export default function Auth() {
                         placeholder="you@example.com"
                         value={email}
                         onChange={(e) => {
-                          setEmail(e.target.value);
+                          const nextEmail = e.target.value;
+                          setEmail(nextEmail);
                           clearError("email");
+                          if (
+                            pendingVerificationEmail &&
+                            nextEmail.trim().toLowerCase() !== pendingVerificationEmail.toLowerCase()
+                          ) {
+                            setPendingVerificationEmail("");
+                            setPendingVerificationProvider("internal");
+                          }
+                          if (verificationBanner) {
+                            setVerificationBanner(null);
+                          }
                         }}
                         className="h-12 rounded-xl border-white/15 bg-background/80 pl-10 pr-3 text-sm"
                         autoComplete="email"
@@ -634,7 +815,10 @@ export default function Auth() {
                   <TurnstileCaptcha
                     siteKey={captchaSiteKey}
                     action="login"
-                    onTokenChange={setSigninCaptchaToken}
+                    onTokenChange={(token) => {
+                      setSigninCaptchaToken(token);
+                      clearError("captcha");
+                    }}
                     resetNonce={signinCaptchaResetNonce}
                   />
                   {errors.captcha && activeTab === "signin" ? (
@@ -691,6 +875,7 @@ export default function Auth() {
                         onChange={(e) => {
                           setEmail(e.target.value);
                           clearError("email");
+                          setVerificationBanner(null);
                         }}
                         className="h-12 rounded-xl border-white/15 bg-background/80 pl-10 pr-3 text-sm"
                         autoComplete="email"
@@ -716,7 +901,7 @@ export default function Auth() {
                       <Input
                         id="signup-password"
                         type={showPassword ? "text" : "password"}
-                        placeholder="At least 6 characters"
+                        placeholder="At least 10 characters"
                         value={password}
                         onChange={(e) => {
                           setPassword(e.target.value);
@@ -763,7 +948,10 @@ export default function Auth() {
                   <TurnstileCaptcha
                     siteKey={captchaSiteKey}
                     action="signup"
-                    onTokenChange={setSignupCaptchaToken}
+                    onTokenChange={(token) => {
+                      setSignupCaptchaToken(token);
+                      clearError("captcha");
+                    }}
                     resetNonce={signupCaptchaResetNonce}
                   />
                   {errors.captcha && activeTab === "signup" ? (

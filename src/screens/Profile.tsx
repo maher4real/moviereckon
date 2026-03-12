@@ -202,7 +202,7 @@ export default function Profile() {
 
       <main className="flex-1 pt-20 pb-12">
         <div className="container mx-auto px-4 space-y-7">
-          <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-gradient-to-br from-card via-card to-primary/10 p-5 md:p-7">
+          <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-linear-to-br from-card via-card to-primary/10 p-5 md:p-7">
             <div className="absolute -right-16 -top-20 h-52 w-52 rounded-full bg-primary/20 blur-3xl" />
             <div className="absolute -bottom-20 -left-20 h-52 w-52 rounded-full bg-secondary/20 blur-3xl" />
 
@@ -215,7 +215,7 @@ export default function Profile() {
                       src={avatarUrl || undefined}
                       alt={`${displayName} avatar`}
                     />
-                    <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-xl font-bold text-primary-foreground">
+                    <AvatarFallback className="bg-linear-to-br from-primary to-secondary text-xl font-bold text-primary-foreground">
                       {getInitials(displayName)}
                     </AvatarFallback>
                   </Avatar>

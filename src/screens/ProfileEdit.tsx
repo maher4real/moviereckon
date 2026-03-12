@@ -334,7 +334,7 @@ export default function ProfileEdit() {
 
           <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
             <aside className="space-y-4 self-start">
-              <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-gradient-to-br from-card via-card to-primary/10 p-5 shadow-sm">
+              <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-linear-to-br from-card via-card to-primary/10 p-5 shadow-sm">
                 <div className="absolute -right-12 -top-14 h-36 w-36 rounded-full bg-primary/20 blur-3xl" />
                 <div className="absolute -bottom-16 -left-12 h-36 w-36 rounded-full bg-secondary/20 blur-3xl" />
 
@@ -349,7 +349,7 @@ export default function ProfileEdit() {
 
                   <Avatar className="h-32 w-32 border-4 border-background shadow-xl">
                     <AvatarImage src={previewAvatar} alt="Profile preview" />
-                    <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-xl font-semibold text-primary-foreground">
+                    <AvatarFallback className="bg-linear-to-br from-primary to-secondary text-xl font-semibold text-primary-foreground">
                       {getInitials(usernameInput || displayName)}
                     </AvatarFallback>
                   </Avatar>
@@ -506,7 +506,7 @@ export default function ProfileEdit() {
                         type="button"
                         onClick={() => setAvatarInput(candidateValue)}
                         className={cn(
-                          "group rounded-[24px] border border-border bg-background/70 p-3 text-left transition-all hover:-translate-y-0.5 hover:border-primary hover:bg-background",
+                          "group rounded-3xl border border-border bg-background/70 p-3 text-left transition-all hover:-translate-y-0.5 hover:border-primary hover:bg-background",
                           isSelected && "border-primary ring-2 ring-primary/25",
                         )}
                       >

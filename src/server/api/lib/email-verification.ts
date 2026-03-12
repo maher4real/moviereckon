@@ -1,5 +1,7 @@
+import type { VercelRequest } from "@vercel/node";
 import { createHash, randomBytes } from "crypto";
 import type { Db } from "mongodb";
+import { getRequestOrigin } from "./google-oauth.js";
 
 const EMAIL_VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -23,6 +25,24 @@ export function hashEmailVerificationToken(token: string): string {
     throw new Error("EMAIL_VERIFICATION_TOKEN_PEPPER or JWT_SECRET must be configured");
   }
   return createHash("sha256").update(`${pepper}:${token}`).digest("hex");
+}
+
+export function getEmailVerificationBaseUrl(req: VercelRequest): string {
+  const configuredBaseUrl = process.env.EMAIL_VERIFICATION_BASE_URL;
+  if (typeof configuredBaseUrl === "string" && configuredBaseUrl.trim().length > 0) {
+    return configuredBaseUrl.trim().replace(/\/$/, "");
+  }
+
+  const requestOrigin = getRequestOrigin(req);
+  if (requestOrigin) {
+    return requestOrigin;
+  }
+
+  throw new Error("Unable to determine email verification base URL");
+}
+
+export function buildEmailVerificationUrl(req: VercelRequest, rawToken: string): string {
+  return `${getEmailVerificationBaseUrl(req)}/api/auth/verify-email?token=${encodeURIComponent(rawToken)}`;
 }
 
 export async function createEmailVerificationToken(

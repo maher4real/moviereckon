@@ -137,6 +137,9 @@ export interface AuthResponse {
   // refreshToken: string;
 }
 
+export type EmailVerificationProvider = "internal" | "firebase";
+export type AuthErrorCode = "email_not_verified" | null;
+
 export interface WatchedItem {
   id: string;
   user_id: string;
@@ -235,11 +238,13 @@ export async function register(
   password: string,
   username: string,
   captchaToken: string,
+  emailVerificationProvider: EmailVerificationProvider = "internal",
 ): Promise<{
   user: MongoUser | null;
   error: string | null;
   requiresEmailVerification: boolean;
   verificationPreviewUrl: string | null;
+  verificationProvider: EmailVerificationProvider;
 }> {
   try {
     const response = await fetch(`${MONGODB_API_URL}/api/auth/register`, {
@@ -248,7 +253,13 @@ export async function register(
         "Content-Type": "application/json",
         "X-Requested-With": "XMLHttpRequest",
       },
-      body: JSON.stringify({ email, password, username, captcha_token: captchaToken }),
+      body: JSON.stringify({
+        email,
+        password,
+        username,
+        captcha_token: captchaToken,
+        email_verification_provider: emailVerificationProvider,
+      }),
       credentials: "include",
     });
 
@@ -260,6 +271,7 @@ export async function register(
         error: data.error || "Registration failed",
         requiresEmailVerification: false,
         verificationPreviewUrl: null,
+        verificationProvider: emailVerificationProvider,
       };
     }
 
@@ -278,6 +290,8 @@ export async function register(
       requiresEmailVerification,
       verificationPreviewUrl:
         typeof data.verification_preview_url === "string" ? data.verification_preview_url : null,
+      verificationProvider:
+        data.verification_provider === "firebase" ? "firebase" : "internal",
     };
   } catch (error) {
     console.error("Registration error:", error);
@@ -286,6 +300,7 @@ export async function register(
       error: "Network error. Backend may be unavailable.",
       requiresEmailVerification: false,
       verificationPreviewUrl: null,
+      verificationProvider: emailVerificationProvider,
     };
   }
 }
@@ -294,7 +309,13 @@ export async function login(
   email: string,
   password: string,
   captchaToken: string,
-): Promise<{ user: MongoUser | null; error: string | null }> {
+  firebaseIdToken?: string,
+): Promise<{
+  user: MongoUser | null;
+  error: string | null;
+  code: AuthErrorCode;
+  verificationProvider: EmailVerificationProvider | null;
+}> {
   try {
     const response = await fetch(`${MONGODB_API_URL}/api/auth/login`, {
       method: "POST",
@@ -302,24 +323,84 @@ export async function login(
         "Content-Type": "application/json",
         "X-Requested-With": "XMLHttpRequest",
       },
-      body: JSON.stringify({ email, password, captcha_token: captchaToken }),
+      body: JSON.stringify({
+        email,
+        password,
+        captcha_token: captchaToken,
+        firebase_id_token: firebaseIdToken || "",
+      }),
       credentials: "include",
     });
 
     const data = await response.json();
+    const errorCode = data.code === "email_not_verified" ? "email_not_verified" : null;
+    const verificationProvider =
+      data.email_verification_provider === "firebase"
+        ? "firebase"
+        : data.email_verification_provider === "internal"
+          ? "internal"
+          : null;
 
     if (!response.ok) {
-      return { user: null, error: data.error || "Login failed" };
+      return {
+        user: null,
+        error: data.error || "Login failed",
+        code: errorCode,
+        verificationProvider,
+      };
     }
 
     // Legacy fallback (disabled for security):
     // setTokens(data.accessToken, data.refreshToken);
     setStoredUser(data.user);
 
-    return { user: data.user, error: null };
+    return { user: data.user, error: null, code: null, verificationProvider: null };
   } catch (error) {
     console.error("Login error:", error);
-    return { user: null, error: "Network error. Backend may be unavailable." };
+    return {
+      user: null,
+      error: "Network error. Backend may be unavailable.",
+      code: null,
+      verificationProvider: null,
+    };
+  }
+}
+
+export async function resendVerificationEmail(
+  email: string,
+  captchaToken: string,
+): Promise<{ error: string | null; verificationPreviewUrl: string | null }> {
+  try {
+    const response = await fetch(`${MONGODB_API_URL}/api/auth/resend-verification`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: JSON.stringify({ email, captcha_token: captchaToken }),
+      credentials: "include",
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        error: data.error || "Unable to resend verification email",
+        verificationPreviewUrl: null,
+      };
+    }
+
+    return {
+      error: null,
+      verificationPreviewUrl:
+        typeof data.verification_preview_url === "string" ? data.verification_preview_url : null,
+    };
+  } catch (error) {
+    console.error("Resend verification email error:", error);
+    return {
+      error: "Network error. Backend may be unavailable.",
+      verificationPreviewUrl: null,
+    };
   }
 }
 

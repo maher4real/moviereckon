@@ -170,7 +170,7 @@ export function AuthPageSkeleton() {
           </div>
         </div>
         <div className="absolute inset-0 bg-black/24" />
-        <div className="absolute inset-0 bg-gradient-to-br from-background/70 via-background/46 to-background/66" />
+        <div className="absolute inset-0 bg-linear-to-br from-background/70 via-background/46 to-background/66" />
         <div className="absolute top-1/4 -left-1/4 w-1/2 h-1/2 bg-primary/16 rounded-full blur-[100px]" />
         <div className="absolute bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-secondary/18 rounded-full blur-[100px]" />
       </div>

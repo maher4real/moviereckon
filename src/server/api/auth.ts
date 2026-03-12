@@ -2,7 +2,7 @@
  * Auth Router - Consolidated serverless function
  * Routes: /api/auth/login, /api/auth/register, /api/auth/refresh, /api/auth/me,
  * /api/auth/logout, /api/auth/availability, /api/auth/google-start, /api/auth/google-callback,
- * /api/auth/verify-email
+ * /api/auth/resend-verification, /api/auth/verify-email
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import availabilityHandler from "./_handlers/auth/availability.js";
@@ -13,6 +13,7 @@ import meHandler from "./_handlers/auth/me.js";
 import logoutHandler from "./_handlers/auth/logout.js";
 import googleStartHandler from "./_handlers/auth/google-start.js";
 import googleCallbackHandler from "./_handlers/auth/google-callback.js";
+import resendVerificationHandler from "./_handlers/auth/resend-verification.js";
 import verifyEmailHandler from "./_handlers/auth/verify-email.js";
 import {
   applyApiCors,
@@ -127,6 +128,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return loginHandler(req, res);
       case "register":
         return registerHandler(req, res);
+      case "resend-verification":
+        return resendVerificationHandler(req, res);
       case "refresh":
         return refreshHandler(req, res);
       case "me":

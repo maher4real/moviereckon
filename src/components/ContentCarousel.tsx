@@ -327,7 +327,7 @@ export default function ContentCarousel({
                   onClick={() => navigate(resolvedViewAllHref)}
                   className="flex-shrink-0 snap-start w-[128px] sm:w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/viewall"
                 >
-                  <div className="relative aspect-[2/3] rounded-lg overflow-hidden border border-border bg-gradient-to-br from-card to-muted/40 transition-all duration-300 group-hover/viewall:border-primary/40 group-hover/viewall:shadow-[0_10px_30px_rgba(0,0,0,0.35)] flex items-center justify-center">
+                  <div className="relative aspect-[2/3] rounded-lg overflow-hidden border border-border bg-linear-to-br from-card to-muted/40 transition-all duration-300 group-hover/viewall:border-primary/40 group-hover/viewall:shadow-[0_10px_30px_rgba(0,0,0,0.35)] flex items-center justify-center">
                     <div className="flex flex-col items-center justify-center gap-3 px-4 text-center">
                       <div className="w-12 h-12 rounded-full bg-primary/20 text-primary flex items-center justify-center group-hover/viewall:bg-primary group-hover/viewall:text-primary-foreground transition-all duration-300">
                         <ArrowRight className="w-6 h-6" />

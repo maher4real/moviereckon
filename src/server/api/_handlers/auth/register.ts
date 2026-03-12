@@ -5,6 +5,11 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import {
+  buildEmailVerificationUrl,
+  createEmailVerificationToken,
+} from "../../lib/email-verification.js";
+import { sendVerificationEmail } from "../../lib/email.js";
+import {
   generateDeviceId,
   getDefaultUserRoleForEmail,
   generateRefreshSessionId,
@@ -26,8 +31,9 @@ import { sanitizeEmailAddress, sanitizeSingleLineText } from "../../lib/input.js
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
 
-// Temporarily disable email verification until mail delivery is stable.
-const EMAIL_VERIFICATION_DISABLED = process.env.EMAIL_VERIFICATION_DISABLED !== "false";
+const EMAIL_VERIFICATION_DISABLED = process.env.EMAIL_VERIFICATION_DISABLED === "true";
+const FIREBASE_VERIFICATION_PROVIDER = "firebase";
+const INTERNAL_VERIFICATION_PROVIDER = "internal";
 
 function parseDuplicateField(error: unknown): "email" | "username" | null {
   if (!error || typeof error !== "object") return null;
@@ -63,6 +69,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         fallback: "",
         collapseWhitespace: false,
       }) || "";
+    const requestedVerificationProvider =
+      sanitizeSingleLineText(req.body?.email_verification_provider, 32, {
+        fallback: "",
+        collapseWhitespace: false,
+      }) || "";
+    const emailVerificationProvider =
+      requestedVerificationProvider === FIREBASE_VERIFICATION_PROVIDER
+        ? FIREBASE_VERIFICATION_PROVIDER
+        : INTERNAL_VERIFICATION_PROVIDER;
 
     const clientIp = getClientIp(req);
     const ipRateLimit = await consumeRateLimit(`auth:register:ip:${clientIp}`, 8, 30 * 60 * 1000);
@@ -134,6 +149,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           username,
           role,
           avatar_url: null,
+          email_verification_provider: EMAIL_VERIFICATION_DISABLED
+            ? INTERNAL_VERIFICATION_PROVIDER
+            : emailVerificationProvider,
           email_verified: EMAIL_VERIFICATION_DISABLED ? true : false,
           email_verified_at: EMAIL_VERIFICATION_DISABLED ? now : null,
           created_at: now,
@@ -166,14 +184,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       updated_at: now,
     });
 
-    // Email verification flow intentionally disabled for now.
-    // const { rawToken } = await createEmailVerificationToken(db, { userId, email });
-    // const verificationLink = `${getVerificationBaseUrl(req)}/api/auth/verify-email?token=${encodeURIComponent(rawToken)}`;
-    // await sendVerificationEmail({
-    //   toEmail: email,
-    //   username,
-    //   verificationUrl: verificationLink,
-    // });
+    if (!EMAIL_VERIFICATION_DISABLED) {
+      if (emailVerificationProvider === FIREBASE_VERIFICATION_PROVIDER) {
+        return res.status(201).json({
+          requires_email_verification: true,
+          verification_provider: FIREBASE_VERIFICATION_PROVIDER,
+          message: "Account created. Check your email to verify your address before signing in.",
+          user: null,
+          verification_preview_url: null,
+        });
+      }
+
+      const { rawToken } = await createEmailVerificationToken(db, { userId, email });
+      const verificationLink = buildEmailVerificationUrl(req, rawToken);
+
+      let verificationPreviewUrl: string | null = null;
+
+      try {
+        const emailResult = await sendVerificationEmail({
+          userId,
+          toEmail: email,
+          username,
+          verificationUrl: verificationLink,
+        });
+        verificationPreviewUrl = emailResult.previewUrl;
+      } catch (verificationError) {
+        console.error("Verification email send error:", verificationError);
+      }
+
+      return res.status(201).json({
+        requires_email_verification: true,
+        verification_provider: INTERNAL_VERIFICATION_PROVIDER,
+        message: "Account created. Check your email to verify your address before signing in.",
+        user: null,
+        verification_preview_url: verificationPreviewUrl,
+      });
+    }
 
     const userPayload: UserPayload = {
       id: userId,
