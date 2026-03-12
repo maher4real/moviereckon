@@ -109,27 +109,6 @@ async function resolveInitialUser(): Promise<MongoUser | null> {
   }
 }
 
-async function prefetchHomeQueries(queryClient: QueryClient) {
-  await Promise.allSettled([
-    queryClient.prefetchQuery({
-      queryKey: ["trending-movies"],
-      queryFn: () => getServerTrendingMovies("week"),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ["bollywood-movies"],
-      queryFn: () => getServerBollywoodMovies(),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ["hollywood-movies"],
-      queryFn: () => getServerHollywoodMovies(),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ["popular-tv"],
-      queryFn: () => getServerPopularTVShows(),
-    }),
-  ]);
-}
-
 async function prefetchSearchQueries(queryClient: QueryClient) {
   await queryClient.prefetchQuery({
     queryKey: ["search-popular-suggestions"],
@@ -406,22 +385,8 @@ async function prefetchUpcomingQueries(queryClient: QueryClient, searchParams: S
   });
 }
 
-async function prefetchAuthVisualQueries(queryClient: QueryClient) {
-  const [trendingMovies, trendingTV, bollywoodData] = await Promise.allSettled([
-    getServerTrendingMovies("week"),
-    getServerTrendingTVShows("week"),
-    getServerBollywoodMovies(1),
-  ]);
-
-  if (trendingMovies.status === "fulfilled") {
-    queryClient.setQueryData(["trending-movies"], trendingMovies.value);
-  }
-  if (trendingTV.status === "fulfilled") {
-    queryClient.setQueryData(["trending-tv-week"], trendingTV.value);
-  }
-  if (bollywoodData.status === "fulfilled") {
-    queryClient.setQueryData(["bollywood-movies"], bollywoodData.value);
-  }
+function shouldSkipVisualDehydration(pathname: string): boolean {
+  return pathname === "/" || pathname === "/auth" || pathname === "/home";
 }
 
 async function prefetchRouteData(
@@ -430,21 +395,11 @@ async function prefetchRouteData(
   searchParams: SearchParams,
   hasAuthenticatedUser: boolean,
 ) {
-  if (pathname === "/" || pathname === "/auth") {
-    if (hasAuthenticatedUser) {
-      await prefetchHomeQueries(queryClient);
-      return;
-    }
-    await prefetchAuthVisualQueries(queryClient);
+  if (shouldSkipVisualDehydration(pathname)) {
     return;
   }
 
   if (!hasAuthenticatedUser) return;
-
-  if (pathname === "/home") {
-    await prefetchHomeQueries(queryClient);
-    return;
-  }
 
   if (pathname === "/search") {
     await prefetchSearchQueries(queryClient);
