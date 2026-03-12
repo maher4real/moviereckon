@@ -28,6 +28,7 @@ const Search = lazy(() => import("./screens/Search"));
 const MovieDetail = lazy(() => import("./screens/MovieDetail"));
 const TVDetail = lazy(() => import("./screens/TVDetail"));
 const Profile = lazy(() => import("./screens/Profile"));
+const ProfileEdit = lazy(() => import("./screens/ProfileEdit"));
 const Reckon = lazy(() => import("./screens/Reckon"));
 const NotFound = lazy(() => import("./screens/NotFound"));
 const Movies = lazy(() => import("./screens/Movies"));
@@ -101,6 +102,7 @@ const App = ({
                       <Route path="/movie/:id" element={<MovieDetail />} />
                       <Route path="/tv/:id" element={<TVDetail />} />
                       <Route path="/profile" element={<Profile />} />
+                      <Route path="/profile/edit" element={<ProfileEdit />} />
                       <Route path="/reckon" element={<Reckon />} />
                       <Route path="/movies" element={<Movies />} />
                       <Route path="/series" element={<Series />} />
