@@ -244,13 +244,13 @@ export default function TurnstileCaptcha({
     <div className={cn("space-y-2", className)}>
       <div
         className={cn(
-          "w-full overflow-hidden rounded-xl transition-[opacity,filter] duration-200",
+          "w-full overflow-hidden transition-[opacity,filter] duration-200",
           isInteractiveChallengeVisible ? "opacity-100" : "opacity-95",
         )}
       >
         <div
           className={cn(
-            "w-full overflow-hidden rounded-xl bg-transparent",
+            "w-full overflow-hidden bg-transparent",
             isInteractiveChallengeVisible ? "brightness-105" : "",
           )}
         >
