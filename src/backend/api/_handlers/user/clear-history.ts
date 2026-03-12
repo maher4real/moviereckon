@@ -5,6 +5,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
+import { enforceRequestRateLimit } from "../../lib/request-rate-limit.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "DELETE") {
@@ -15,6 +16,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = await getUserFromRequest(req);
   if (!user) {
     return res.status(401).json({ error: "Invalid or expired token" });
+  }
+
+  if (
+    await enforceRequestRateLimit({
+      req,
+      res,
+      route: "user_clear_history",
+      reason: "clear_history_limit",
+      errorMessage: "Too many history reset requests. Please try again later.",
+      minRetryAfterSeconds: 60,
+      rules: [
+        {
+          key: `user:clear-history:user:${user.id}`,
+          maxRequests: 6,
+          windowMs: 60 * 60 * 1000,
+          metadataKey: "user",
+        },
+      ],
+    })
+  ) {
+    return;
   }
 
   const { db } = await connectToDatabase();

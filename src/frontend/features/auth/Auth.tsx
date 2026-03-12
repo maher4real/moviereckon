@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/frontend/hooks/useAuth";
@@ -42,6 +42,10 @@ import {
   signupPasswordSchema,
   usernameSchema,
 } from "@/shared/lib/authValidation";
+import {
+  cancelGoogleOneTapPrompt,
+  loadGoogleIdentityScript,
+} from "@/frontend/lib/googleIdentity";
 
 type VerificationBannerState = {
   tone: "success" | "error" | "info";
@@ -59,6 +63,7 @@ export default function Auth() {
     signIn,
     resendVerificationEmail,
     signInWithGoogle,
+    signInWithGoogleOneTap,
     triggerAuthTransition,
   } = useAuth();
   const [activeTab, setActiveTab] = useState<"signin" | "signup">("signin");
@@ -75,6 +80,9 @@ export default function Auth() {
   const [isResendingVerification, setIsResendingVerification] = useState(false);
   const [debouncedSignupEmail, setDebouncedSignupEmail] = useState("");
   const [debouncedSignupUsername, setDebouncedSignupUsername] = useState("");
+  const [googlePromptError, setGooglePromptError] = useState("");
+  const googleOneTapPromptedRef = useRef(false);
+  const googleOneTapSigningInRef = useRef(false);
   const captchaSiteKey = (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "").trim();
 
   // Form state
@@ -197,6 +205,7 @@ export default function Auth() {
       email_not_verified: "Your Google account email must be verified to continue.",
       google_account_conflict: "This email is already linked to a different Google account.",
       google_oauth_unavailable: "Google sign-in is not configured on the server yet.",
+      too_many_requests: "Too many Google sign-in attempts. Please wait and try again.",
       token_exchange_failed: "Google sign-in could not be completed. Please try again.",
       userinfo_fetch_failed: "Unable to fetch your Google account details. Please try again.",
       profile_incomplete: "Google did not return enough profile information.",
@@ -218,6 +227,14 @@ export default function Auth() {
     return null;
   }, [location.search]);
 
+  const { data: googleOneTapConfig } = useQuery({
+    queryKey: ["google-one-tap-config"],
+    queryFn: () => mongoClient.getGoogleOneTapConfig(),
+    staleTime: 1000 * 60 * 10,
+    refetchOnWindowFocus: false,
+    enabled: !user,
+  });
+
   // Redirect if already authenticated
   useEffect(() => {
     if (user) {
@@ -238,6 +255,103 @@ export default function Auth() {
       setVerificationBanner(null);
     }
   }, [emailVerificationStatus]);
+
+  useEffect(() => {
+    if (activeTab !== "signin" || user || isLoading) {
+      cancelGoogleOneTapPrompt();
+      googleOneTapPromptedRef.current = false;
+      return;
+    }
+
+    if (
+      isSubmitting ||
+      isGoogleSubmitting ||
+      isAuthenticating ||
+      !googleOneTapConfig?.enabled ||
+      !googleOneTapConfig.client_id ||
+      googleOneTapPromptedRef.current
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    const googleClientId = googleOneTapConfig.client_id;
+    if (!googleClientId) {
+      googleOneTapPromptedRef.current = false;
+      return;
+    }
+    googleOneTapPromptedRef.current = true;
+
+    void (async () => {
+      try {
+        await loadGoogleIdentityScript();
+        if (cancelled) return;
+
+        const googleIdApi = window.google?.accounts?.id;
+        if (!googleIdApi) {
+          googleOneTapPromptedRef.current = false;
+          return;
+        }
+
+        googleIdApi.cancel();
+        googleIdApi.initialize({
+          client_id: googleClientId,
+          callback: async (response) => {
+            if (
+              cancelled ||
+              googleOneTapSigningInRef.current ||
+              typeof response.credential !== "string" ||
+              response.credential.length === 0
+            ) {
+              return;
+            }
+
+            googleOneTapSigningInRef.current = true;
+            setGooglePromptError("");
+            setIsGoogleSubmitting(true);
+
+            try {
+              const { error } = await signInWithGoogleOneTap(response.credential);
+              if (!error) {
+                setPendingVerificationEmail("");
+                setVerificationBanner(null);
+                triggerAuthTransition();
+              } else {
+                setGooglePromptError(error.message);
+              }
+            } finally {
+              googleOneTapSigningInRef.current = false;
+              setIsGoogleSubmitting(false);
+            }
+          },
+          auto_select: false,
+          cancel_on_tap_outside: true,
+          context: "signin",
+          itp_support: true,
+          prompt_parent_id: "google-one-tap-anchor",
+        });
+        googleIdApi.prompt();
+      } catch {
+        googleOneTapPromptedRef.current = false;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      cancelGoogleOneTapPrompt();
+    };
+  }, [
+    activeTab,
+    googleOneTapConfig?.client_id,
+    googleOneTapConfig?.enabled,
+    isAuthenticating,
+    isGoogleSubmitting,
+    isLoading,
+    isSubmitting,
+    signInWithGoogleOneTap,
+    triggerAuthTransition,
+    user,
+  ]);
 
   useEffect(() => {
     if (activeTab !== "signup") {
@@ -454,6 +568,8 @@ export default function Auth() {
 
   const handleGoogleSignIn = async () => {
     void primeStartupSoundFromGesture();
+    cancelGoogleOneTapPrompt();
+    setGooglePromptError("");
     setIsGoogleSubmitting(true);
 
     try {
@@ -470,6 +586,7 @@ export default function Auth() {
       ? `Check ${pendingVerificationEmail} for the verification link, then come back here to sign in.`
       : "Enter your email and password to request another verification email.");
   const resendVerificationHint = "We limit resend requests to one email per minute.";
+  const combinedGoogleErrorMessage = googlePromptError || oauthErrorMessage;
 
   if (user) {
     // Avoid blank first paint while the redirect effect navigates to /home.
@@ -482,6 +599,10 @@ export default function Auth() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-background p-4">
+      <div
+        id="google-one-tap-anchor"
+        className="pointer-events-auto fixed right-4 top-4 z-50 w-full max-w-[420px]"
+      />
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 scale-[1.08] -rotate-2">
           <div
@@ -548,9 +669,9 @@ export default function Auth() {
               </Alert>
             ) : null}
 
-            {oauthErrorMessage ? (
+            {combinedGoogleErrorMessage ? (
               <p className="mb-5 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {oauthErrorMessage}
+                {combinedGoogleErrorMessage}
               </p>
             ) : null}
 
@@ -589,6 +710,7 @@ export default function Auth() {
                 const nextTab = value as "signin" | "signup";
                 setActiveTab(nextTab);
                 setErrors({});
+                setGooglePromptError("");
                 setSigninCaptchaToken("");
                 setSignupCaptchaToken("");
                 setSigninCaptchaResetNonce((prev) => prev + 1);

@@ -12,6 +12,8 @@ import {
   normalizeReturnToPath,
   setGoogleOAuthStateCookie,
 } from "../../lib/google-oauth.js";
+import { enforceRequestRateLimit } from "../../lib/request-rate-limit.js";
+import { getClientIp } from "../../lib/rate-limit.js";
 
 function redirect(res: VercelResponse, location: string) {
   res.setHeader("Cache-Control", "no-store");
@@ -25,6 +27,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    const clientIp = getClientIp(req);
+    if (
+      await enforceRequestRateLimit({
+        req,
+        res,
+        route: "auth_google_start",
+        reason: "google_oauth_start_limit",
+        errorMessage: "Too many sign-in attempts. Please try again shortly.",
+        rules: [
+          {
+            key: `auth:google-start:ip:${clientIp}`,
+            maxRequests: 24,
+            windowMs: 10 * 60 * 1000,
+            metadataKey: "ip",
+          },
+        ],
+        onBlocked: () => {
+          redirect(res, buildAuthErrorRedirectPath("too_many_requests"));
+        },
+      })
+    ) {
+      return;
+    }
+
     const { clientId } = getGoogleOAuthConfig();
     const callbackUrl = getGoogleCallbackUrl(req);
     const url = new URL(req.url || "", `http://${req.headers.host || "localhost"}`);

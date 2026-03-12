@@ -3,6 +3,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 const GOOGLE_AUTHORIZATION_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO_ENDPOINT = "https://openidconnect.googleapis.com/v1/userinfo";
+const GOOGLE_TOKENINFO_ENDPOINT = "https://oauth2.googleapis.com/tokeninfo";
 
 export const GOOGLE_OAUTH_STATE_COOKIE_NAME = "moviereckon_google_oauth_state";
 
@@ -36,6 +37,19 @@ type GoogleTokenResponse = {
   error?: string;
   error_description?: string;
 };
+
+type GoogleIdTokenInfoResponse = {
+  aud?: string;
+  azp?: string;
+  email?: string;
+  email_verified?: string | boolean;
+  exp?: string;
+  given_name?: string;
+  iss?: string;
+  name?: string;
+  picture?: string;
+  sub?: string;
+ };
 
 function getStringEnv(name: string): string {
   const value = process.env[name];
@@ -132,7 +146,7 @@ export function getRequestOrigin(req: VercelRequest): string | null {
 }
 
 export function getGoogleOAuthConfig(): OAuthConfig {
-  const clientId = getStringEnv("GOOGLE_CLIENT_ID");
+  const clientId = getGoogleOAuthClientId();
   const clientSecret = getStringEnv("GOOGLE_CLIENT_SECRET");
 
   if (!clientId || !clientSecret) {
@@ -140,6 +154,10 @@ export function getGoogleOAuthConfig(): OAuthConfig {
   }
 
   return { clientId, clientSecret };
+}
+
+export function getGoogleOAuthClientId(): string {
+  return getStringEnv("GOOGLE_CLIENT_ID");
 }
 
 export function getGoogleCallbackUrl(req: VercelRequest): string {
@@ -316,6 +334,61 @@ export async function fetchGoogleProfile(params: {
     name: typeof profileJson.name === "string" ? profileJson.name : undefined,
     given_name: typeof profileJson.given_name === "string" ? profileJson.given_name : undefined,
     picture: typeof profileJson.picture === "string" ? profileJson.picture : undefined,
+  } satisfies GoogleProfile;
+
+  if (!profile.sub || !profile.email) {
+    return { profile: null, errorCode: "profile_incomplete" };
+  }
+
+  if (!profile.email_verified) {
+    return { profile: null, errorCode: "email_not_verified" };
+  }
+
+  return { profile, errorCode: null };
+}
+
+export async function verifyGoogleIdToken(params: {
+  credential: string;
+  clientId: string;
+}): Promise<{ profile: GoogleProfile | null; errorCode: string | null }> {
+  const tokenInfoUrl = new URL(GOOGLE_TOKENINFO_ENDPOINT);
+  tokenInfoUrl.searchParams.set("id_token", params.credential);
+
+  const tokenInfoResponse = await fetch(tokenInfoUrl, {
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  const tokenInfoJson = (await parseJsonSafe(tokenInfoResponse)) as GoogleIdTokenInfoResponse;
+  if (!tokenInfoResponse.ok) {
+    return { profile: null, errorCode: "credential_verification_failed" };
+  }
+
+  const audience = typeof tokenInfoJson.aud === "string" ? tokenInfoJson.aud : "";
+  const authorizedParty = typeof tokenInfoJson.azp === "string" ? tokenInfoJson.azp : audience;
+  const issuer = typeof tokenInfoJson.iss === "string" ? tokenInfoJson.iss : "";
+  const expiresAtSeconds = Number(tokenInfoJson.exp);
+
+  if (
+    audience !== params.clientId ||
+    authorizedParty !== params.clientId ||
+    !["accounts.google.com", "https://accounts.google.com"].includes(issuer) ||
+    !Number.isFinite(expiresAtSeconds) ||
+    expiresAtSeconds * 1000 <= Date.now()
+  ) {
+    return { profile: null, errorCode: "credential_verification_failed" };
+  }
+
+  const profile = {
+    sub: typeof tokenInfoJson.sub === "string" ? tokenInfoJson.sub : "",
+    email: typeof tokenInfoJson.email === "string" ? tokenInfoJson.email.trim().toLowerCase() : "",
+    email_verified:
+      tokenInfoJson.email_verified === true || tokenInfoJson.email_verified === "true",
+    name: typeof tokenInfoJson.name === "string" ? tokenInfoJson.name : undefined,
+    given_name:
+      typeof tokenInfoJson.given_name === "string" ? tokenInfoJson.given_name : undefined,
+    picture: typeof tokenInfoJson.picture === "string" ? tokenInfoJson.picture : undefined,
   } satisfies GoogleProfile;
 
   if (!profile.sub || !profile.email) {

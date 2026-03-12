@@ -41,6 +41,9 @@ interface AuthContextType {
   }>;
   resendVerificationEmail: (email: string) => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
+  signInWithGoogleOneTap: (
+    credential: string,
+  ) => Promise<{ error: Error | null; code: string | null }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<boolean>;
 }
@@ -260,6 +263,39 @@ export function AuthProvider({
     }
   };
 
+  const signInWithGoogleOneTap: AuthContextType["signInWithGoogleOneTap"] = async (
+    credential: string,
+  ) => {
+    setIsAuthenticating(true);
+    try {
+      const { user: googleUser, error, code } =
+        await mongoClient.signInWithGoogleCredential(credential);
+
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Google sign in failed",
+          description: error,
+        });
+        return { error: new Error(error), code };
+      }
+
+      if (googleUser) {
+        setUser(googleUser);
+        setProfile(mapUserToProfile(googleUser));
+      }
+
+      toast({
+        title: "Welcome back!",
+        description: "You've been signed in successfully.",
+      });
+
+      return { error: null, code: null };
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
   // Sign Out
   const signOut = async () => {
     await mongoClient.logout();
@@ -313,6 +349,7 @@ export function AuthProvider({
         signIn,
         resendVerificationEmail,
         signInWithGoogle,
+        signInWithGoogleOneTap,
         signOut,
         updateProfile,
       }}

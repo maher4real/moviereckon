@@ -2,6 +2,7 @@
  * Auth Router - Consolidated serverless function
  * Routes: /api/auth/login, /api/auth/register, /api/auth/refresh, /api/auth/me,
  * /api/auth/logout, /api/auth/availability, /api/auth/google-start, /api/auth/google-callback,
+ * /api/auth/google-one-tap,
  * /api/auth/verify-email, /api/auth/resend-verification, /api/auth/forgot-password,
  * /api/auth/reset-password
  */
@@ -15,6 +16,7 @@ import meHandler from "./_handlers/auth/me.js";
 import logoutHandler from "./_handlers/auth/logout.js";
 import googleStartHandler from "./_handlers/auth/google-start.js";
 import googleCallbackHandler from "./_handlers/auth/google-callback.js";
+import googleOneTapHandler from "./_handlers/auth/google-one-tap.js";
 import verifyEmailHandler from "./_handlers/auth/verify-email.js";
 import resendVerificationHandler from "./_handlers/auth/resend-verification.js";
 import forgotPasswordHandler from "./_handlers/auth/forgot-password.js";
@@ -144,6 +146,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return googleStartHandler(req, res);
       case "google-callback":
         return googleCallbackHandler(req, res);
+      case "google-one-tap":
+        return googleOneTapHandler(req, res);
       case "verify-email":
         return verifyEmailHandler(req, res);
       case "resend-verification":

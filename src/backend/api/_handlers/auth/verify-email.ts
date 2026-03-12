@@ -7,6 +7,8 @@ import {
   isEmailTokenExpired,
   isUserEmailVerified,
 } from "../../lib/email-auth.js";
+import { enforceRequestRateLimit, hashRateLimitValue } from "../../lib/request-rate-limit.js";
+import { getClientIp } from "../../lib/rate-limit.js";
 
 const INVALID_LINK_ERROR = "Invalid or expired verification link.";
 
@@ -25,6 +27,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!email || !token) {
       return res.status(400).json({ error: INVALID_LINK_ERROR });
+    }
+
+    const clientIp = getClientIp(req);
+    if (
+      await enforceRequestRateLimit({
+        req,
+        res,
+        route: "auth_verify_email",
+        reason: "verify_email_limit",
+        errorMessage: "Please wait before trying that verification link again.",
+        minRetryAfterSeconds: 60,
+        rules: [
+          {
+            key: `auth:verify-email:ip:${clientIp}`,
+            maxRequests: 20,
+            windowMs: 60 * 60 * 1000,
+            metadataKey: "ip",
+          },
+          {
+            key: `auth:verify-email:email:${email}`,
+            maxRequests: 8,
+            windowMs: 60 * 60 * 1000,
+            metadataKey: "email",
+          },
+          {
+            key: `auth:verify-email:token:${hashRateLimitValue(token)}`,
+            maxRequests: 10,
+            windowMs: 60 * 60 * 1000,
+            metadataKey: "token",
+          },
+        ],
+      })
+    ) {
+      return;
     }
 
     const { db } = await connectToDatabase();

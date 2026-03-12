@@ -1,15 +1,26 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { createHash } from "crypto";
 import { installGlobalSafeLogging } from "@/shared/lib/safeLogging";
 import {
   isTmdbImageKind,
   resolveTmdbImageSourceUrl,
 } from "@/shared/lib/tmdbImageProxy";
+import { emitSecurityEvent } from "./lib/abuse-telemetry.js";
 import { applyDefaultSecurityHeaders } from "./lib/cors.js";
+import { consumeRateLimit, getClientIp } from "./lib/rate-limit.js";
 
 installGlobalSafeLogging();
 
 const IMAGE_PROXY_CACHE_CONTROL =
   "public, max-age=0, s-maxage=86400, stale-while-revalidate=604800";
+const IMAGE_PROXY_IP_LIMIT_MAX = 320;
+const IMAGE_PROXY_IP_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const IMAGE_PROXY_ASSET_LIMIT_MAX = 45;
+const IMAGE_PROXY_ASSET_LIMIT_WINDOW_MS = 5 * 60 * 1000;
+
+function hashImageRef(ref: string): string {
+  return createHash("sha256").update(ref).digest("hex").slice(0, 16);
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   applyDefaultSecurityHeaders(res);
@@ -21,6 +32,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const kindParam = Array.isArray(req.query.kind) ? req.query.kind[0] : req.query.kind;
   const refParam = Array.isArray(req.query.ref) ? req.query.ref[0] : req.query.ref;
   const sizeParam = Array.isArray(req.query.size) ? req.query.size[0] : req.query.size;
+  const clientIp = getClientIp(req);
+  const ipRateLimit = await consumeRateLimit(
+    `tmdb-image:ip:${clientIp}`,
+    IMAGE_PROXY_IP_LIMIT_MAX,
+    IMAGE_PROXY_IP_LIMIT_WINDOW_MS,
+  );
+
+  if (!ipRateLimit.allowed) {
+    emitSecurityEvent({
+      type: "rate_limit_blocked",
+      outcome: "blocked",
+      route: "tmdb_image_proxy",
+      reason: "ip_limit",
+      req,
+      metadata: {
+        kind: typeof kindParam === "string" ? kindParam : "unknown",
+        ip_source: ipRateLimit.source,
+      },
+    });
+    res.setHeader("Retry-After", String(Math.max(ipRateLimit.retryAfterSeconds, 30)));
+    return res.status(429).json({ error: "Too many image requests. Please try again later." });
+  }
 
   if (typeof kindParam !== "string" || !isTmdbImageKind(kindParam)) {
     return res.status(400).json({ error: "Invalid image kind" });
@@ -28,6 +61,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (typeof refParam !== "string" || refParam.trim().length === 0 || refParam.length > 512) {
     return res.status(400).json({ error: "Invalid image ref" });
+  }
+
+  const assetRateLimit = await consumeRateLimit(
+    `tmdb-image:asset:${clientIp}:${kindParam}:${hashImageRef(`${sizeParam || "default"}:${refParam}`)}`,
+    IMAGE_PROXY_ASSET_LIMIT_MAX,
+    IMAGE_PROXY_ASSET_LIMIT_WINDOW_MS,
+  );
+  if (!assetRateLimit.allowed) {
+    emitSecurityEvent({
+      type: "rate_limit_blocked",
+      outcome: "blocked",
+      route: "tmdb_image_proxy",
+      reason: "asset_limit",
+      req,
+      metadata: {
+        kind: kindParam,
+        size: typeof sizeParam === "string" && sizeParam.length > 0 ? sizeParam : "default",
+        ip_source: ipRateLimit.source,
+        asset_source: assetRateLimit.source,
+      },
+    });
+    const retryAfter = Math.max(ipRateLimit.retryAfterSeconds, assetRateLimit.retryAfterSeconds, 30);
+    res.setHeader("Retry-After", String(retryAfter));
+    return res.status(429).json({ error: "Too many image requests. Please try again later." });
   }
 
   const upstreamUrl = resolveTmdbImageSourceUrl({

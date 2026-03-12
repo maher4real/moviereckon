@@ -7,6 +7,7 @@ import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import { getUserFromRequest, normalizeUserRole } from "../../lib/auth.js";
 import { deleteManagedAvatarBlob } from "../../lib/blob.js";
 import { sanitizeSingleLineText } from "../../lib/input.js";
+import { enforceRequestRateLimit } from "../../lib/request-rate-limit.js";
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
 const DATA_IMAGE_REGEX =
@@ -74,6 +75,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const userPayload = await getUserFromRequest(req);
   if (!userPayload) {
     return res.status(401).json({ error: "Invalid or expired token" });
+  }
+
+  const method = (req.method || "GET").toUpperCase();
+  const methodLimits: Record<string, { maxRequests: number; windowMs: number }> = {
+    GET: { maxRequests: 60, windowMs: 5 * 60 * 1000 },
+    PUT: { maxRequests: 18, windowMs: 10 * 60 * 1000 },
+  };
+  const methodLimit = methodLimits[method];
+  if (
+    methodLimit &&
+    (await enforceRequestRateLimit({
+      req,
+      res,
+      route: "user_profile",
+      reason: "profile_limit",
+      errorMessage: "Too many profile requests. Please try again shortly.",
+      metadata: { method },
+      rules: [
+        {
+          key: `user:profile:user:${userPayload.id}:${method}`,
+          maxRequests: methodLimit.maxRequests,
+          windowMs: methodLimit.windowMs,
+          metadataKey: "user",
+        },
+      ],
+    }))
+  ) {
+    return;
   }
 
   const { db } = await connectToDatabase();

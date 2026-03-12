@@ -9,6 +9,8 @@ import {
   isEmailTokenExpired,
 } from "../../lib/email-auth.js";
 import { getPasswordValidationError } from "../../lib/password-policy.js";
+import { enforceRequestRateLimit, hashRateLimitValue } from "../../lib/request-rate-limit.js";
+import { getClientIp } from "../../lib/rate-limit.js";
 
 const INVALID_LINK_ERROR = "Invalid or expired password reset link.";
 
@@ -28,6 +30,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!email || !token) {
       return res.status(400).json({ error: INVALID_LINK_ERROR });
+    }
+
+    const clientIp = getClientIp(req);
+    if (
+      await enforceRequestRateLimit({
+        req,
+        res,
+        route: "auth_reset_password",
+        reason: "reset_password_limit",
+        errorMessage: "Please wait before trying that reset link again.",
+        minRetryAfterSeconds: 60,
+        rules: [
+          {
+            key: `auth:reset-password:ip:${clientIp}`,
+            maxRequests: 10,
+            windowMs: 60 * 60 * 1000,
+            metadataKey: "ip",
+          },
+          {
+            key: `auth:reset-password:email:${email}`,
+            maxRequests: 5,
+            windowMs: 60 * 60 * 1000,
+            metadataKey: "email",
+          },
+          {
+            key: `auth:reset-password:token:${hashRateLimitValue(token)}`,
+            maxRequests: 8,
+            windowMs: 60 * 60 * 1000,
+            metadataKey: "token",
+          },
+        ],
+      })
+    ) {
+      return;
     }
 
     const passwordError = getPasswordValidationError(password);

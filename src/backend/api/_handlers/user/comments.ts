@@ -7,6 +7,7 @@ import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import { getUserFromRequest, userHasRoleAtLeast } from "../../lib/auth.js";
 import { sanitizeMultiLineText } from "../../lib/input.js";
 import { containsBlockedTerms } from "../../lib/profanity.js";
+import { enforceRequestRateLimit } from "../../lib/request-rate-limit.js";
 
 const DEFAULT_PAGE_SIZE = 80;
 const MAX_PAGE_SIZE = 120;
@@ -59,6 +60,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = await getUserFromRequest(req);
   if (!user) {
     return res.status(401).json({ error: "Invalid or expired token" });
+  }
+
+  const method = (req.method || "GET").toUpperCase();
+  const methodLimits: Record<string, { maxRequests: number; windowMs: number }> = {
+    GET: { maxRequests: 140, windowMs: 5 * 60 * 1000 },
+    POST: { maxRequests: 20, windowMs: 10 * 60 * 1000 },
+    PUT: { maxRequests: 30, windowMs: 10 * 60 * 1000 },
+    DELETE: { maxRequests: 40, windowMs: 10 * 60 * 1000 },
+  };
+  const methodLimit = methodLimits[method];
+  if (
+    methodLimit &&
+    (await enforceRequestRateLimit({
+      req,
+      res,
+      route: "user_comments",
+      reason: "comments_limit",
+      errorMessage: "Too many comment requests. Please try again shortly.",
+      metadata: { method },
+      rules: [
+        {
+          key: `user:comments:user:${user.id}:${method}`,
+          maxRequests: methodLimit.maxRequests,
+          windowMs: methodLimit.windowMs,
+          metadataKey: "user",
+        },
+      ],
+    }))
+  ) {
+    return;
   }
 
   const { db } = await connectToDatabase();

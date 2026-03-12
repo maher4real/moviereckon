@@ -6,6 +6,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
 import { sanitizeSingleLineText } from "../../lib/input.js";
+import { enforceRequestRateLimit } from "../../lib/request-rate-limit.js";
 
 type ContentType = "movie" | "tv";
 const DEFAULT_PAGE_SIZE = 200;
@@ -79,6 +80,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = await getUserFromRequest(req);
   if (!user) {
     return res.status(401).json({ error: "Invalid or expired token" });
+  }
+
+  const method = (req.method || "GET").toUpperCase();
+  const methodLimits: Record<string, { maxRequests: number; windowMs: number }> = {
+    GET: { maxRequests: 120, windowMs: 5 * 60 * 1000 },
+    POST: { maxRequests: 140, windowMs: 10 * 60 * 1000 },
+    DELETE: { maxRequests: 140, windowMs: 10 * 60 * 1000 },
+  };
+  const methodLimit = methodLimits[method];
+  if (
+    methodLimit &&
+    (await enforceRequestRateLimit({
+      req,
+      res,
+      route: "user_liked_items",
+      reason: "liked_items_limit",
+      errorMessage: "Too many liked item requests. Please try again shortly.",
+      metadata: { method },
+      rules: [
+        {
+          key: `user:liked-items:user:${user.id}:${method}`,
+          maxRequests: methodLimit.maxRequests,
+          windowMs: methodLimit.windowMs,
+          metadataKey: "user",
+        },
+      ],
+    }))
+  ) {
+    return;
   }
 
   const { db } = await connectToDatabase();

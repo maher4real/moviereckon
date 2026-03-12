@@ -231,6 +231,11 @@ export interface RegistrationAvailability {
   username_exists: boolean;
 }
 
+export interface GoogleOneTapConfig {
+  enabled: boolean;
+  client_id: string | null;
+}
+
 // ========== Auth API ==========
 
 export async function register(
@@ -544,6 +549,25 @@ export function getGoogleSignInUrl(returnTo: string): string {
   return `${MONGODB_API_URL}/api/auth/google-start?${query.toString()}`;
 }
 
+export async function getGoogleOneTapConfig(): Promise<GoogleOneTapConfig> {
+  try {
+    const response = await fetch(`${MONGODB_API_URL}/api/auth/google-one-tap`, {
+      credentials: "include",
+    });
+    const data = await response.json().catch(() => ({}));
+
+    return {
+      enabled: data.enabled === true && typeof data.client_id === "string" && data.client_id.length > 0,
+      client_id: typeof data.client_id === "string" ? data.client_id : null,
+    };
+  } catch {
+    return {
+      enabled: false,
+      client_id: null,
+    };
+  }
+}
+
 export function signInWithGoogle(returnTo?: string): void {
   if (typeof window === "undefined") return;
 
@@ -554,6 +578,56 @@ export function signInWithGoogle(returnTo?: string): void {
       : fallbackReturnTo;
 
   window.location.assign(getGoogleSignInUrl(targetReturnTo));
+}
+
+export async function signInWithGoogleCredential(credential: string): Promise<{
+  user: MongoUser | null;
+  error: string | null;
+  code: string | null;
+}> {
+  try {
+    const response = await fetch(`${MONGODB_API_URL}/api/auth/google-one-tap`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: JSON.stringify({ credential }),
+      credentials: "include",
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return {
+        user: null,
+        error:
+          typeof data.error === "string"
+            ? data.error
+            : response.status >= 500
+              ? "Google sign-in could not be completed. Please try again."
+              : "Google sign-in failed",
+        code: typeof data.code === "string" ? data.code : null,
+      };
+    }
+
+    const authenticatedUser = data.user ?? null;
+    if (authenticatedUser) {
+      setStoredUser(authenticatedUser);
+    }
+
+    return {
+      user: authenticatedUser,
+      error: null,
+      code: null,
+    };
+  } catch (error) {
+    console.error("Google credential sign-in error:", error);
+    return {
+      user: null,
+      error: "Network error. Backend may be unavailable.",
+      code: null,
+    };
+  }
 }
 
 export async function logout(): Promise<void> {

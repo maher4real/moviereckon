@@ -10,6 +10,8 @@ import {
   clearAuthCookies,
   getCookieValue,
 } from "../../lib/cookies.js";
+import { enforceRequestRateLimit } from "../../lib/request-rate-limit.js";
+import { getClientIp } from "../../lib/rate-limit.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -18,6 +20,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const user = await getUserFromRequest(req);
+    const clientIp = getClientIp(req);
+    const rules = [
+      {
+        key: `auth:logout:ip:${clientIp}`,
+        maxRequests: 40,
+        windowMs: 15 * 60 * 1000,
+        metadataKey: "ip",
+      },
+    ];
+    if (user?.id) {
+      rules.push({
+        key: `auth:logout:user:${user.id}`,
+        maxRequests: 20,
+        windowMs: 15 * 60 * 1000,
+        metadataKey: "user",
+      });
+    }
+
+    if (
+      await enforceRequestRateLimit({
+        req,
+        res,
+        route: "auth_logout",
+        reason: "logout_limit",
+        errorMessage: "Too many logout requests. Please try again later.",
+        rules,
+      })
+    ) {
+      return;
+    }
+
     const cookieRefreshToken = getCookieValue(req.headers.cookie, REFRESH_TOKEN_COOKIE_NAME) || "";
     const allDevices = req.body?.all_devices === true;
     const refreshToken = cookieRefreshToken;
