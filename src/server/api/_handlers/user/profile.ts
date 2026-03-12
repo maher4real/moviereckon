@@ -5,6 +5,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import { getUserFromRequest, normalizeUserRole } from "../../lib/auth.js";
+import { deleteManagedAvatarBlob } from "../../lib/blob.js";
 import { sanitizeSingleLineText } from "../../lib/input.js";
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
@@ -105,6 +106,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // PUT - Update profile
     if (req.method === "PUT") {
+      const existingUser = await db.collection("users").findOne(
+        { _id: new ObjectId(userPayload.id) },
+        { projection: { avatar_url: 1 } }
+      );
+
+      if (!existingUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
       const body = req.body || {};
       const usernameProvided = body.username !== undefined;
       const avatarProvided = body.avatar_url !== undefined;
@@ -142,6 +152,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ error: "Username already taken" });
         }
         throw error;
+      }
+
+      if (
+        avatarProvided &&
+        typeof existingUser.avatar_url === "string" &&
+        existingUser.avatar_url !== avatarUrl
+      ) {
+        void deleteManagedAvatarBlob(existingUser.avatar_url).catch((error) => {
+          console.error("Previous avatar cleanup failed:", error);
+        });
       }
 
       const user = await db.collection("users").findOne(

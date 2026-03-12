@@ -679,6 +679,26 @@ export async function importAvatarFromUrl(url: string): Promise<Blob> {
   return response.blob();
 }
 
+export async function uploadAvatarAsset(payload: {
+  dataUrl: string;
+  filename?: string;
+}): Promise<string> {
+  const response = await fetchWithAuth("/api/user/avatar-upload", {
+    method: "POST",
+    body: JSON.stringify({
+      data_url: payload.dataUrl,
+      filename: payload.filename,
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || typeof data.url !== "string") {
+    throw new Error(data.error || "Unable to upload avatar image");
+  }
+
+  return data.url;
+}
+
 export async function deleteComment(commentId: string): Promise<boolean> {
   try {
     const response = await fetchWithAuth("/api/user/comments", {

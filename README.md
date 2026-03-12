@@ -218,6 +218,7 @@ Optional auth/email variables:
 - `REFRESH_TOKEN_PEPPER`
 - `SESSION_COOKIE_SECURE`
 - `SESSION_COOKIE_SAMESITE`
+- `BLOB_READ_WRITE_TOKEN` (required for Vercel Blob-backed avatar uploads)
 - `CORS_ORIGIN`
 
 ## Local Development

@@ -52,6 +52,28 @@ function getRevalidateSeconds(endpoint: string): number {
   return DEFAULT_REVALIDATE_SECONDS;
 }
 
+function getCacheTags(endpoint: string): string[] {
+  const segments = endpoint.split("/").filter(Boolean);
+  const resource = segments[0];
+  const identifier = segments[1];
+  const subresource = segments[2];
+  const tags = new Set<string>(["tmdb"]);
+
+  if (resource) {
+    tags.add(`tmdb:${resource}`);
+  }
+
+  if (resource && identifier) {
+    tags.add(`tmdb:${resource}:${identifier}`);
+  }
+
+  if (resource && subresource) {
+    tags.add(`tmdb:${resource}:${subresource}`);
+  }
+
+  return [...tags];
+}
+
 async function fetchTMDB<T>(
   endpoint: string,
   params: QueryParams = {},
@@ -70,7 +92,11 @@ async function fetchTMDB<T>(
   });
 
   const response = await fetch(url.toString(), {
-    next: { revalidate: getRevalidateSeconds(endpoint) },
+    cache: "force-cache",
+    next: {
+      revalidate: getRevalidateSeconds(endpoint),
+      tags: getCacheTags(endpoint),
+    },
   });
   const data = await response.json().catch(() => ({}));
 

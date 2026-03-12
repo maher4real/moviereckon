@@ -1,8 +1,11 @@
+import Image from "next/image";
 import { ImgHTMLAttributes, useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 
-interface MediaImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, "src"> {
+interface MediaImageProps
+  extends Omit<ImgHTMLAttributes<HTMLImageElement>, "src" | "srcSet"> {
   src?: string | null;
+  srcSet?: string;
   fallbackSrc?: string;
   fadeIn?: boolean;
   priority?: boolean;
@@ -10,6 +13,14 @@ interface MediaImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, "src
 
 const TMDB_HOST = "image.tmdb.org";
 const TMDB_BASE_PATH = "/t/p/";
+const NEXT_IMAGE_REMOTE_HOST_PATTERNS = [
+  /^image\.tmdb\.org$/i,
+  /^secure\.gravatar\.com$/i,
+  /^www\.gravatar\.com$/i,
+  /^avatars\.githubusercontent\.com$/i,
+  /(^|\.)googleusercontent\.com$/i,
+  /(^|\.)public\.blob\.vercel-storage\.com$/i,
+];
 
 const TMDB_GROUPS = [
   {
@@ -49,6 +60,27 @@ interface ResponsiveSource {
   sizes: string;
 }
 
+function getRemoteHostname(src: string): string | null {
+  if (!src || src.startsWith("/") || src.startsWith("data:")) return null;
+
+  try {
+    return new URL(src).hostname;
+  } catch {
+    return null;
+  }
+}
+
+function shouldUseNativeImageElement(src: string, srcSet?: string): boolean {
+  if (!src || !!srcSet || src.startsWith("data:")) return true;
+
+  const hostname = getRemoteHostname(src);
+  if (!hostname) return false;
+
+  return !NEXT_IMAGE_REMOTE_HOST_PATTERNS.some((pattern) =>
+    pattern.test(hostname),
+  );
+}
+
 function buildTmdbResponsiveSource(src: string): ResponsiveSource | null {
   try {
     const url = new URL(src);
@@ -74,7 +106,7 @@ function buildTmdbResponsiveSource(src: string): ResponsiveSource | null {
     if (matchingGroups.length !== 1) return null;
     const [group] = matchingGroups;
 
-    const srcSet = group.tokens
+    const srcSetValue = group.tokens
       .map((token) => {
         const width = TMDB_WIDTH_HINTS[token];
         if (!width) return null;
@@ -83,10 +115,10 @@ function buildTmdbResponsiveSource(src: string): ResponsiveSource | null {
       .filter((value): value is string => value !== null)
       .join(", ");
 
-    if (!srcSet) return null;
+    if (!srcSetValue) return null;
 
     return {
-      srcSet,
+      srcSet: srcSetValue,
       sizes: group.defaultSizes,
     };
   } catch {
@@ -96,6 +128,7 @@ function buildTmdbResponsiveSource(src: string): ResponsiveSource | null {
 
 export default function MediaImage({
   src,
+  srcSet,
   fallbackSrc = "/fallbacks/poster.svg",
   fadeIn = false,
   priority = false,
@@ -120,18 +153,38 @@ export default function MediaImage({
   }, [fadeIn]);
 
   const responsiveSource = useMemo(() => {
-    if (imgProps.srcSet || !resolvedSrc || resolvedSrc.startsWith("/")) return null;
+    if (srcSet || !resolvedSrc || resolvedSrc.startsWith("/")) return null;
     return buildTmdbResponsiveSource(resolvedSrc);
-  }, [imgProps.srcSet, resolvedSrc]);
+  }, [resolvedSrc, srcSet]);
+  const shouldUseNativeImg = useMemo(
+    () => shouldUseNativeImageElement(resolvedSrc, srcSet),
+    [resolvedSrc, srcSet],
+  );
   const loading = imgProps.loading ?? (priority ? "eager" : "lazy");
   const fetchPriority = imgProps.fetchPriority ?? (priority ? "high" : "auto");
+  const alt = imgProps.alt || "";
+  const width =
+    typeof imgProps.width === "number" ? imgProps.width : undefined;
+  const height =
+    typeof imgProps.height === "number" ? imgProps.height : undefined;
+  const sizes = imgProps.sizes ?? responsiveSource?.sizes ?? "100vw";
+  const imageClassName = cn(
+    "block",
+    className,
+    fadeIn && "transition-opacity duration-700 ease-out",
+    fadeIn && (isLoaded ? "opacity-100" : "opacity-0"),
+  );
 
-  const handleLoad: ImgHTMLAttributes<HTMLImageElement>["onLoad"] = (event) => {
+  const handleNativeLoad: ImgHTMLAttributes<HTMLImageElement>["onLoad"] = (
+    event,
+  ) => {
     setIsLoaded(true);
     onLoad?.(event);
   };
 
-  const handleError: ImgHTMLAttributes<HTMLImageElement>["onError"] = (event) => {
+  const handleNativeError: ImgHTMLAttributes<HTMLImageElement>["onError"] = (
+    event,
+  ) => {
     if (resolvedSrc !== fallbackSrc) {
       setResolvedSrc(fallbackSrc);
       setIsLoaded(!fadeIn);
@@ -139,23 +192,67 @@ export default function MediaImage({
     onError?.(event);
   };
 
+  const handleNextLoad = () => {
+    setIsLoaded(true);
+  };
+
+  const handleNextError = () => {
+    if (resolvedSrc !== fallbackSrc) {
+      setResolvedSrc(fallbackSrc);
+      setIsLoaded(!fadeIn);
+    }
+  };
+
+  if (shouldUseNativeImg) {
+    return (
+      <img
+        {...imgProps}
+        alt={alt}
+        src={resolvedSrc}
+        srcSet={srcSet ?? responsiveSource?.srcSet}
+        sizes={imgProps.sizes ?? responsiveSource?.sizes}
+        loading={loading}
+        fetchPriority={fetchPriority}
+        decoding={imgProps.decoding ?? "async"}
+        onLoad={handleNativeLoad}
+        onError={handleNativeError}
+        className={imageClassName}
+      />
+    );
+  }
+
+  if (width && height) {
+    return (
+      <Image
+        alt={alt}
+        src={resolvedSrc}
+        width={width}
+        height={height}
+        sizes={sizes}
+        priority={priority}
+        loading={priority ? undefined : loading}
+        fetchPriority={fetchPriority}
+        className={imageClassName}
+        onLoad={handleNextLoad}
+        onError={handleNextError}
+      />
+    );
+  }
+
   return (
-    <img
-      {...imgProps}
-      src={resolvedSrc}
-      srcSet={imgProps.srcSet ?? responsiveSource?.srcSet}
-      sizes={imgProps.sizes ?? responsiveSource?.sizes}
-      loading={loading}
-      fetchPriority={fetchPriority}
-      decoding={imgProps.decoding ?? "async"}
-      onLoad={handleLoad}
-      onError={handleError}
-      className={cn(
-        "block",
-        className,
-        fadeIn && "transition-opacity duration-700 ease-out",
-        fadeIn && (isLoaded ? "opacity-100" : "opacity-0"),
-      )}
-    />
+    <span className={cn("relative block overflow-hidden", className)}>
+      <Image
+        alt={alt}
+        src={resolvedSrc}
+        fill
+        sizes={sizes}
+        priority={priority}
+        loading={priority ? undefined : loading}
+        fetchPriority={fetchPriority}
+        className={imageClassName}
+        onLoad={handleNextLoad}
+        onError={handleNextError}
+      />
+    </span>
   );
 }

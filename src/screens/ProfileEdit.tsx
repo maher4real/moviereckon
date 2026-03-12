@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { importAvatarFromUrl } from "@/lib/mongodbClient";
+import { importAvatarFromUrl, uploadAvatarAsset } from "@/lib/mongodbClient";
 import {
   createDefaultAvatarDataUrl,
   compressAvatarImage,
@@ -188,6 +188,30 @@ export default function ProfileEdit() {
         const importedAvatar = await importAvatarFromLink(avatar);
         if (!importedAvatar) return;
         avatar = importedAvatar;
+      }
+
+      if (avatar.startsWith("data:image/")) {
+        setIsProcessingAvatar(true);
+        try {
+          const uploadedAvatarUrl = await uploadAvatarAsset({
+            dataUrl: avatar,
+            filename: `${username || "user"}-avatar`,
+          });
+          avatar = uploadedAvatarUrl;
+          setAvatarInput(uploadedAvatarUrl);
+        } catch (error) {
+          toast({
+            variant: "destructive",
+            title: "Avatar upload failed",
+            description:
+              error instanceof Error
+                ? error.message
+                : "Could not store your avatar image.",
+          });
+          return;
+        } finally {
+          setIsProcessingAvatar(false);
+        }
       }
 
       const avatarForSave = (() => {
