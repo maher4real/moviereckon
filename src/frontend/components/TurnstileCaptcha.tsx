@@ -165,8 +165,10 @@ export default function TurnstileCaptcha({
           widgetIdRef.current = window.turnstile.render(containerRef.current, {
             sitekey: siteKey,
             action,
-            appearance: "interaction-only",
+            appearance: "always",
             execution: "render",
+            size: "flexible",
+            theme: "dark",
             retry: "auto",
             "refresh-expired": "auto",
             "refresh-timeout": "auto",
@@ -239,16 +241,42 @@ export default function TurnstileCaptcha({
   };
 
   return (
-    <div className={cn(loadError ? "space-y-2" : "space-y-0", className)}>
+    <div className={cn("space-y-2", className)}>
       <div
-        ref={containerRef}
         className={cn(
-          "overflow-hidden transition-[min-height] duration-200",
-          isInteractiveChallengeVisible ? "min-h-[65px]" : "min-h-0",
+          "rounded-xl border bg-background/70 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm transition-colors",
+          loadError ? "border-destructive/35 bg-destructive/5" : "border-white/12",
         )}
-      />
+      >
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/80">
+              Security Check
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Complete the CAPTCHA to continue.
+            </p>
+          </div>
+          <div className="rounded-full border border-white/10 bg-background/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Protected
+          </div>
+        </div>
+
+        <div
+          className={cn(
+            "overflow-hidden rounded-lg border bg-black/20 px-2 py-2 transition-[border-color,box-shadow,background-color] duration-200 sm:px-3",
+            loadError ? "border-destructive/25 bg-destructive/5" : "border-white/10",
+            isInteractiveChallengeVisible ? "ring-1 ring-primary/25" : "",
+          )}
+        >
+          <div
+            ref={containerRef}
+            className="mx-auto flex min-h-[66px] w-full items-center justify-center [&_iframe]:max-w-full"
+          />
+        </div>
+      </div>
       {loadError ? (
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2">
           <p className="text-xs text-destructive">{loadError}</p>
           <button
             type="button"
