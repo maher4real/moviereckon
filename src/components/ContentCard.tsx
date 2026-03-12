@@ -92,7 +92,7 @@ function ContentCardComponent({
   return (
     <div
       onClick={handleClick}
-      className="flex-shrink-0 w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/card"
+      className="min-w-0 w-full cursor-pointer group/card"
     >
       {/* Poster */}
       <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
