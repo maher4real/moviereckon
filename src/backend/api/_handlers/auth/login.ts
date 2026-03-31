@@ -118,12 +118,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
-    if (!isUserEmailVerified(user)) {
-      return res.status(403).json({
-        error: "Please verify your email before signing in.",
-        code: "email_not_verified",
-      });
-    }
+    // TODO: Email verification disabled for now
+    // if (!isUserEmailVerified(user)) {
+    //   return res.status(403).json({
+    //     error: "Please verify your email before signing in.",
+    //     code: "email_not_verified",
+    //   });
+    // }
 
     // Generate tokens
     const userPayload: UserPayload = {

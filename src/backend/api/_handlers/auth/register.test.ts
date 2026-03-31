@@ -150,7 +150,7 @@ describe("register handler", () => {
     insertRefreshTokenMock.mockResolvedValue({ acknowledged: true });
   });
 
-  it("creates an unverified account and sends a verification email when verification is required", async () => {
+  it("creates a verified account without sending verification email (email verification disabled)", async () => {
     const { default: handler } = await import("./register.js");
     const response = createResponse();
 
@@ -173,27 +173,24 @@ describe("register handler", () => {
 
     expect(response.statusCode).toBe(201);
     expect(response.body).toMatchObject({
-      requires_email_verification: true,
-      user: null,
+      requires_email_verification: false,
+      message: "Account created successfully.",
+      user: expect.objectContaining({
+        email: "user@example.com",
+        username: "cinefan",
+      }),
     });
     expect(insertUserMock).toHaveBeenCalledWith(
       expect.objectContaining({
         email: "user@example.com",
         username: "cinefan",
-        emailVerified: false,
-        verificationTokenHash: "hashed-verification-token",
-        verificationTokenExpiresAt: "2026-03-13T00:00:00.000Z",
+        emailVerified: true,
       }),
     );
-    expect(sendVerificationEmailMock).toHaveBeenCalledWith({
-      toEmail: "user@example.com",
-      username: "cinefan",
-      verificationUrl:
-        "https://moviereckon.test/verify-email?token=raw-verification-token&email=user%40example.com",
-    });
-    expect(setDeviceCookieMock).not.toHaveBeenCalled();
-    expect(setAuthCookiesMock).not.toHaveBeenCalled();
-    expect(insertRefreshTokenMock).not.toHaveBeenCalled();
+    expect(sendVerificationEmailMock).not.toHaveBeenCalled();
+    expect(setDeviceCookieMock).toHaveBeenCalledWith(response, "device-id");
+    expect(setAuthCookiesMock).toHaveBeenCalledWith(response, "access-token", "refresh-token");
+    expect(insertRefreshTokenMock).toHaveBeenCalledTimes(1);
   });
 
   it("issues auth cookies when email verification is explicitly disabled", async () => {
@@ -234,9 +231,7 @@ describe("register handler", () => {
     expect(sendVerificationEmailMock).not.toHaveBeenCalled();
   });
 
-  it("rolls back the new account when the verification email cannot be sent", async () => {
-    sendVerificationEmailMock.mockRejectedValueOnce(new Error("smtp unavailable"));
-
+  it("does not send verification email when registration succeeds (email verification disabled)", async () => {
     const { default: handler } = await import("./register.js");
     const response = createResponse();
 
@@ -257,11 +252,13 @@ describe("register handler", () => {
       response as never,
     );
 
-    expect(response.statusCode).toBe(500);
+    expect(response.statusCode).toBe(201);
     expect(response.body).toMatchObject({
-      error: "Unable to send verification email right now. Please try again.",
+      requires_email_verification: false,
+      message: "Account created successfully.",
     });
-    expect(deleteUserMock).toHaveBeenCalledTimes(1);
-    expect(deletePreferencesMock).toHaveBeenCalledWith({ user_id: "user-1" });
+    expect(sendVerificationEmailMock).not.toHaveBeenCalled();
+    expect(deleteUserMock).not.toHaveBeenCalled();
+    expect(deletePreferencesMock).not.toHaveBeenCalled();
   });
 });

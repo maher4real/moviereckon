@@ -401,9 +401,10 @@ export async function fetchGoogleProfile(params: {
     return { profile: null, errorCode: "profile_incomplete" };
   }
 
-  if (!profile.email_verified) {
-    return { profile: null, errorCode: "email_not_verified" };
-  }
+  // TODO: Email verification disabled for now
+  // if (!profile.email_verified) {
+  //   return { profile: null, errorCode: "email_not_verified" };
+  // }
 
   return { profile, errorCode: null };
 }
@@ -486,9 +487,10 @@ export async function verifyGoogleIdToken(params: {
       return { profile: null, errorCode: "profile_incomplete" };
     }
 
-    if (!profile.email_verified) {
-      return { profile: null, errorCode: "email_not_verified" };
-    }
+    // TODO: Email verification disabled for now
+    // if (!profile.email_verified) {
+    //   return { profile: null, errorCode: "email_not_verified" };
+    // }
 
     return { profile, errorCode: null };
   } catch {

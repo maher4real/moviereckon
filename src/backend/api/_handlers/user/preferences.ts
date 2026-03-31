@@ -39,7 +39,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const method = (req.method || "GET").toUpperCase();
-  const methodLimits: Record<string, { maxRequests: number; windowMs: number }> = {
+  const methodLimits: Record<
+    string,
+    { maxRequests: number; windowMs: number }
+  > = {
     GET: { maxRequests: 60, windowMs: 5 * 60 * 1000 },
     PUT: { maxRequests: 24, windowMs: 10 * 60 * 1000 },
   };
@@ -69,29 +72,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { db } = await connectToDatabase();
 
   try {
-    // GET - Fetch preferences
+    // GET - Fetch preferences (atomic creation on first access)
     if (req.method === "GET") {
-      let prefs = await db.collection("user_preferences").findOne({ user_id: user.id });
+      const now = new Date().toISOString();
 
+      // Use findOneAndUpdate with upsert to atomically create if missing
+      const result = await db.collection("user_preferences").findOneAndUpdate(
+        { user_id: user.id },
+        {
+          $setOnInsert: {
+            user_id: user.id,
+            preferred_languages: [],
+            preferred_genres: [],
+            created_at: now,
+            updated_at: now,
+          },
+        },
+        {
+          upsert: true,
+          returnDocument: "after",
+        },
+      );
+
+      const prefs = result?.value;
       if (!prefs) {
-        // Create default preferences
-        const now = new Date().toISOString();
-        const result = await db.collection("user_preferences").insertOne({
-          user_id: user.id,
-          preferred_languages: [],
-          preferred_genres: [],
-          created_at: now,
-          updated_at: now,
-        });
-
-        prefs = {
-          _id: result.insertedId,
-          user_id: user.id,
-          preferred_languages: [],
-          preferred_genres: [],
-          created_at: now,
-          updated_at: now,
-        };
+        return res
+          .status(500)
+          .json({ error: "Failed to fetch user preferences" });
       }
 
       return res.status(200).json({
@@ -113,19 +120,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const preferredGenres = normalizeGenres(body.preferred_genres);
 
       if (
-        (body.preferred_languages !== undefined && preferredLanguages === null) ||
+        (body.preferred_languages !== undefined &&
+          preferredLanguages === null) ||
         (body.preferred_genres !== undefined && preferredGenres === null)
       ) {
-        return res.status(400).json({ error: "Invalid preference payload format" });
+        return res
+          .status(400)
+          .json({ error: "Invalid preference payload format" });
       }
 
       if (preferredLanguages === null && preferredGenres === null) {
-        return res.status(400).json({ error: "At least one preference field is required" });
+        return res
+          .status(400)
+          .json({ error: "At least one preference field is required" });
       }
 
       const now = new Date().toISOString();
       const updates: Record<string, unknown> = { updated_at: now };
-      if (preferredLanguages !== null) updates.preferred_languages = preferredLanguages;
+      if (preferredLanguages !== null)
+        updates.preferred_languages = preferredLanguages;
       if (preferredGenres !== null) updates.preferred_genres = preferredGenres;
 
       await db.collection("user_preferences").updateOne(
@@ -139,10 +152,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             created_at: now,
           },
         },
-        { upsert: true }
+        { upsert: true },
       );
 
-      const prefs = await db.collection("user_preferences").findOne({ user_id: user.id });
+      const prefs = await db
+        .collection("user_preferences")
+        .findOne({ user_id: user.id });
 
       return res.status(200).json({
         data: {

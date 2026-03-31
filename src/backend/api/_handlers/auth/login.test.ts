@@ -4,13 +4,21 @@ const findUserMock = vi.fn();
 const comparePasswordMock = vi.fn();
 const consumeRateLimitMock = vi.fn();
 const verifyCaptchaTokenMock = vi.fn();
+const insertRefreshTokenMock = vi.fn();
 
 vi.mock("../../lib/mongodb.js", () => ({
   connectToDatabase: vi.fn(async () => ({
     db: {
-      collection: vi.fn(() => ({
-        findOne: findUserMock,
-      })),
+      collection: vi.fn((name: string) => {
+        if (name === "refresh_tokens") {
+          return {
+            insertOne: insertRefreshTokenMock,
+          };
+        }
+        return {
+          findOne: findUserMock,
+        };
+      }),
     },
   })),
 }));
@@ -74,9 +82,10 @@ describe("login handler", () => {
     vi.clearAllMocks();
     consumeRateLimitMock.mockResolvedValue({ allowed: true, retryAfterSeconds: 0, source: "local" });
     verifyCaptchaTokenMock.mockResolvedValue({ ok: true, error: null });
+    insertRefreshTokenMock.mockResolvedValue({ acknowledged: true });
   });
 
-  it("returns a verification error only after the password is correct for an unverified account", async () => {
+  it("allows login without email verification (email verification disabled)", async () => {
     findUserMock.mockResolvedValue({
       _id: { toString: () => "user-1" },
       email: "user@example.com",
@@ -106,10 +115,13 @@ describe("login handler", () => {
       response as never,
     );
 
-    expect(response.statusCode).toBe(403);
+    expect(response.statusCode).toBe(200);
     expect(response.body).toMatchObject({
-      error: "Please verify your email before signing in.",
-      code: "email_not_verified",
+      user: {
+        id: "user-1",
+        email: "user@example.com",
+        username: "cinefan",
+      },
     });
     expect(comparePasswordMock).toHaveBeenCalledWith("Password123", "hashed-password");
   });
@@ -150,7 +162,7 @@ describe("login handler", () => {
     });
   });
 
-  it("returns the email verification error without leaking extra account state", async () => {
+  it("allows login without checking account verification status (email verification disabled)", async () => {
     findUserMock.mockResolvedValue({
       _id: { toString: () => "user-1" },
       email: "user@example.com",
@@ -181,10 +193,13 @@ describe("login handler", () => {
       response as never,
     );
 
-    expect(response.statusCode).toBe(403);
+    expect(response.statusCode).toBe(200);
     expect(response.body).toMatchObject({
-      error: "Please verify your email before signing in.",
-      code: "email_not_verified",
+      user: {
+        id: "user-1",
+        email: "user@example.com",
+        username: "cinefan",
+      },
     });
   });
 });

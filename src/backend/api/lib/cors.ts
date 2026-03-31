@@ -1,8 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-const DEFAULT_ALLOWED_ORIGINS_PROD = [
-  "https://moviereckon.vercel.app",
-];
+const DEFAULT_ALLOWED_ORIGINS_PROD = ["https://moviereckon.vercel.app"];
 
 const DEFAULT_ALLOWED_ORIGINS_DEV = [
   "https://moviereckon.vercel.app",
@@ -38,7 +36,9 @@ function normalizeOriginList(origins: string[]): string[] {
 function getAllowedOrigins(): Set<string> {
   const isProduction = process.env.NODE_ENV === "production";
   const raw = process.env.CORS_ORIGIN;
-  const defaults = isProduction ? DEFAULT_ALLOWED_ORIGINS_PROD : DEFAULT_ALLOWED_ORIGINS_DEV;
+  const defaults = isProduction
+    ? DEFAULT_ALLOWED_ORIGINS_PROD
+    : DEFAULT_ALLOWED_ORIGINS_DEV;
 
   if (!raw || raw.trim().length === 0) {
     const initial = new Set(normalizeOriginList(defaults));
@@ -74,7 +74,9 @@ function getAllowedOrigins(): Set<string> {
   return new Set(normalized);
 }
 
-function getHeaderFirstValue(value: string | string[] | undefined): string | undefined {
+function getHeaderFirstValue(
+  value: string | string[] | undefined,
+): string | undefined {
   if (typeof value === "string" && value.trim().length > 0) {
     return value.split(",")[0]?.trim();
   }
@@ -103,19 +105,43 @@ function hasSameHost(req: VercelRequest, origin: string): boolean {
   }
 }
 
-function isAllowedOrigin(req: VercelRequest, origin: string, allowedOrigins: Set<string>): boolean {
+function isAllowedOrigin(
+  req: VercelRequest,
+  origin: string,
+  allowedOrigins: Set<string>,
+): boolean {
   return hasSameHost(req, origin) || allowedOrigins.has(origin);
 }
 
-export function applyApiCors(req: VercelRequest, res: VercelResponse): { originAllowed: boolean } {
+export function applyApiCors(
+  req: VercelRequest,
+  res: VercelResponse,
+): { originAllowed: boolean } {
   const allowedOrigins = getAllowedOrigins();
   const originHeader = getHeaderFirstValue(req.headers.origin);
   const origin = originHeader ? toNormalizedOrigin(originHeader) : null;
-  const originAllowed = !originHeader || (!!origin && isAllowedOrigin(req, origin, allowedOrigins));
+
+  // State-changing methods require valid Origin header (CSRF protection)
+  const isStateChangingMethod = !SAFE_HTTP_METHODS.has(
+    (req.method || "GET").toUpperCase(),
+  );
+  if (isStateChangingMethod && !originHeader) {
+    // Missing Origin header on state-changing requests - reject
+    return { originAllowed: false };
+  }
+
+  const originAllowed =
+    !originHeader || (!!origin && isAllowedOrigin(req, origin, allowedOrigins));
 
   res.setHeader("Vary", "Origin");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+  );
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-Requested-With",
+  );
   res.setHeader("Access-Control-Max-Age", "600");
 
   if (origin && originAllowed) {
@@ -145,12 +171,15 @@ export function isTrustedRequestOrigin(
   options: TrustedOriginOptions = {},
 ): boolean {
   const allowRefererFallback = options.allowRefererFallback !== false;
-  const allowMissingOriginForSafeMethods = options.allowMissingOriginForSafeMethods !== false;
+  const allowMissingOriginForSafeMethods =
+    options.allowMissingOriginForSafeMethods !== false;
   const method = (req.method || "GET").toUpperCase();
   const allowedOrigins = getAllowedOrigins();
 
   const originHeader = getHeaderFirstValue(req.headers.origin);
-  const normalizedOrigin = originHeader ? toNormalizedOrigin(originHeader) : null;
+  const normalizedOrigin = originHeader
+    ? toNormalizedOrigin(originHeader)
+    : null;
   if (originHeader && !normalizedOrigin) {
     return false;
   }

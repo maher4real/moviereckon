@@ -106,10 +106,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: passwordError });
     }
 
-    const verificationDetails =
-      EMAIL_VERIFICATION_DISABLED
-        ? null
-        : createEmailToken("verify-email");
+    // TODO: Email verification disabled for now - always skip verification
+    const verificationDetails = null; // EMAIL_VERIFICATION_DISABLED
+      // ? null
+      // : createEmailToken("verify-email");;
 
     const captchaResult = await verifyCaptchaToken(req, captchaToken, "signup");
     if (!captchaResult.ok) {
@@ -142,12 +142,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           username,
           role,
           avatar_url: null,
-          ...(EMAIL_VERIFICATION_DISABLED
-            ? buildVerifiedEmailUpdate(now)
-            : buildPendingVerificationUpdate(
-                verificationDetails!.tokenHash,
-                verificationDetails!.expiresAt,
-              )),
+          ...buildVerifiedEmailUpdate(now), // TODO: Always verified, verification disabled
+          // ...(EMAIL_VERIFICATION_DISABLED
+          //   ? buildVerifiedEmailUpdate(now)
+          //   : buildPendingVerificationUpdate(
+          //       verificationDetails!.tokenHash,
+          //       verificationDetails!.expiresAt,
+          //     )),
           passwordResetTokenHash: null,
           passwordResetTokenExpiresAt: null,
           created_at: now,
@@ -181,30 +182,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       updated_at: now,
     });
 
-    if (!EMAIL_VERIFICATION_DISABLED) {
-      const verificationUrl = buildEmailVerificationUrl(req, verificationDetails!.rawToken, email);
-
-      try {
-        await sendVerificationEmail({
-          toEmail: email,
-          username,
-          verificationUrl,
-        });
-      } catch (error) {
-        await db.collection("users").deleteOne({ _id: insertedUserId });
-        await db.collection("user_preferences").deleteOne({ user_id: userId });
-        console.error("Verification email send error:", error);
-        return res.status(500).json({
-          error: "Unable to send verification email right now. Please try again.",
-        });
-      }
-
-      return res.status(201).json({
-        requires_email_verification: true,
-        message: "Account created. Check your email to verify your address before signing in.",
-        user: null,
-      });
-    }
+    // TODO: Email verification disabled for now
+    // if (!EMAIL_VERIFICATION_DISABLED) {
+    //   const verificationUrl = buildEmailVerificationUrl(req, verificationDetails!.rawToken, email);
+    //
+    //   try {
+    //     await sendVerificationEmail({
+    //       toEmail: email,
+    //       username,
+    //       verificationUrl,
+    //     });
+    //   } catch (error) {
+    //     await db.collection("users").deleteOne({ _id: insertedUserId });
+    //     await db.collection("user_preferences").deleteOne({ user_id: userId });
+    //     console.error("Verification email send error:", error);
+    //     return res.status(500).json({
+    //       error: "Unable to send verification email right now. Please try again.",
+    //     });
+    //   }
+    //
+    //   return res.status(201).json({
+    //     requires_email_verification: true,
+    //     message: "Account created. Check your email to verify your address before signing in.",
+    //     user: null,
+    //   });
+    // }
 
     const userPayload: UserPayload = {
       id: userId,

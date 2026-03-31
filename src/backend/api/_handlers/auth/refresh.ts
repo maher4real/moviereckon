@@ -174,11 +174,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(401).json({ error: "User not found" });
     }
 
-    if (!isUserEmailVerified(user)) {
-      await db.collection("refresh_tokens").deleteOne({ _id: storedToken._id });
-      clearAuthCookies(res);
-      return res.status(401).json({ error: "Email verification required" });
-    }
+    // TODO: Email verification disabled for now
+    // if (!isUserEmailVerified(user)) {
+    //   await db.collection("refresh_tokens").deleteOne({ _id: storedToken._id });
+    //   clearAuthCookies(res);
+    //   return res.status(401).json({ error: "Email verification required" });
+    // }
 
     // Generate new tokens
     const userPayload: UserPayload = {

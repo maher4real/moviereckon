@@ -155,8 +155,8 @@ This project uses a hybrid approach:
 
 - Next.js serves the app and API routes.
 - A catch-all app route (`src/app/[[...slug]]/page.tsx`) prefetches data server-side for important pages.
-- The UI itself is routed by React Router in `src/App.tsx`.
-- API entrypoints are in `src/pages/api/*` and delegate to handlers in `src/server/api/*`.
+- The UI itself is routed by React Router in `src/frontend/app/App.tsx`.
+- API entrypoints are in `src/pages/api/*` and delegate to handlers in `src/backend/api/_handlers/*`.
 
 ### Rendering Strategy
 
@@ -179,11 +179,20 @@ src/
     [[...slug]]/page.tsx         # Next catch-all SSR prefetch entry
     layout.tsx                   # root metadata/layout
   pages/api/                     # Next API route wrappers
-  server/api/                    # API routers + handlers + server libs
-  screens/                       # route-level UI screens
-  components/                    # shared UI
-  hooks/                         # auth, user data, recommendations
-  lib/                           # client libs, tmdb client, mongodb client
+  backend/
+    api/                         # API handlers and server libs
+      _handlers/                 # handler implementations
+      lib/                       # auth, database, utilities
+  frontend/
+    app/                         # React app with SPA routing
+    components/                  # shared UI components
+    features/                    # feature-specific components
+    hooks/                       # React hooks
+    lib/                         # client-specific utilities
+  shared/
+    lib/                         # shared utilities (cross-platform)
+  integrations/                  # external service integrations
+  test/                          # test files and fixtures
 ```
 
 ## Environment Variables
@@ -298,10 +307,11 @@ Other:
 - Session is cookie-based (`HttpOnly` access + refresh cookies).
 - Turnstile captcha is enforced for login and signup, with backend action, hostname, and challenge-age validation.
 - Email/password accounts must verify their email before the first sign-in.
+- Email verification uses nodemailer for transactional emails with signed JWT tokens.
 - Refresh tokens are stored hashed in MongoDB.
-- Email/password signups use Firebase Auth for verification while MovieReckon keeps MongoDB users and cookie sessions for app auth.
-- Add your local and production app domains to Firebase Auth authorized domains so the action links can complete correctly.
-- `EMAIL_VERIFICATION_DISABLED=true` is available only as an explicit override.
+- Google OAuth is optionally supported as a federated auth provider.
+- User sessions and authentication state are managed via MongoDB and signed cookies.
+- `EMAIL_VERIFICATION_DISABLED=true` is available only as an explicit override (development only).
 
 ## Deployment
 
