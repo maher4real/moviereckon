@@ -21,7 +21,10 @@ import { setAuthCookies, setDeviceCookie } from "../../lib/cookies.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
 import { verifyCaptchaToken } from "../../lib/captcha.js";
 import { emitSecurityEvent } from "../../lib/abuse-telemetry.js";
-import { sanitizeEmailAddress, sanitizeSingleLineText } from "../../lib/input.js";
+import {
+  sanitizeEmailAddress,
+  sanitizeSingleLineText,
+} from "../../lib/input.js";
 import { isUserEmailVerified } from "../../lib/email-auth.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -31,7 +34,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const email = sanitizeEmailAddress(req.body?.email);
-    const password = typeof req.body?.password === "string" ? req.body.password : "";
+    const password =
+      typeof req.body?.password === "string" ? req.body.password : "";
     const captchaToken =
       sanitizeSingleLineText(req.body?.captcha_token, 4096, {
         fallback: "",
@@ -39,7 +43,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }) || "";
 
     const clientIp = getClientIp(req);
-    const ipRateLimit = await consumeRateLimit(`auth:login:ip:${clientIp}`, 25, 15 * 60 * 1000);
+    const ipRateLimit = await consumeRateLimit(
+      `auth:login:ip:${clientIp}`,
+      25,
+      15 * 60 * 1000,
+    );
     const emailRateLimit = await consumeRateLimit(
       `auth:login:email:${email || "missing"}`,
       12,
@@ -58,9 +66,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           email_source: emailRateLimit.source,
         },
       });
-      const retryAfter = Math.max(ipRateLimit.retryAfterSeconds, emailRateLimit.retryAfterSeconds, 60);
+      const retryAfter = Math.max(
+        ipRateLimit.retryAfterSeconds,
+        emailRateLimit.retryAfterSeconds,
+        60,
+      );
       res.setHeader("Retry-After", String(retryAfter));
-      return res.status(429).json({ error: "Too many login attempts. Please try again later." });
+      return res
+        .status(429)
+        .json({ error: "Too many login attempts. Please try again later." });
     }
 
     if (!email || !password) {
@@ -81,7 +95,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           captcha_response_hostname: captchaResult.responseHostname,
         },
       });
-      return res.status(400).json({ error: captchaResult.error || "CAPTCHA verification failed" });
+      return res
+        .status(400)
+        .json({ error: captchaResult.error || "CAPTCHA verification failed" });
     }
 
     const { db } = await connectToDatabase();
@@ -109,7 +125,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Accounts created via OAuth may not have a local password hash.
     if (!user.password_hash || typeof user.password_hash !== "string") {
-      return res.status(401).json({ error: "This account uses Google sign-in. Continue with Google." });
+      return res
+        .status(401)
+        .json({
+          error: "This account uses Google sign-in. Continue with Google.",
+        });
     }
 
     // Check password

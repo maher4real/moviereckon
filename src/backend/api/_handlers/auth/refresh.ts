@@ -35,7 +35,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const clientIp = getClientIp(req);
-    const ipRateLimit = await consumeRateLimit(`auth:refresh:ip:${clientIp}`, 40, 15 * 60 * 1000);
+    const ipRateLimit = await consumeRateLimit(
+      `auth:refresh:ip:${clientIp}`,
+      40,
+      15 * 60 * 1000,
+    );
 
     if (!ipRateLimit.allowed) {
       emitSecurityEvent({
@@ -46,11 +50,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         req,
         metadata: { source: ipRateLimit.source },
       });
-      res.setHeader("Retry-After", String(Math.max(ipRateLimit.retryAfterSeconds, 60)));
-      return res.status(429).json({ error: "Too many refresh requests. Please try again later." });
+      res.setHeader(
+        "Retry-After",
+        String(Math.max(ipRateLimit.retryAfterSeconds, 60)),
+      );
+      return res
+        .status(429)
+        .json({ error: "Too many refresh requests. Please try again later." });
     }
 
-    const cookieRefreshToken = getCookieValue(req.headers.cookie, REFRESH_TOKEN_COOKIE_NAME) || "";
+    const cookieRefreshToken =
+      getCookieValue(req.headers.cookie, REFRESH_TOKEN_COOKIE_NAME) || "";
     const refreshToken = cookieRefreshToken;
     if (!refreshToken) {
       return res.status(400).json({ error: "Refresh token is required" });
@@ -59,29 +69,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Verify refresh token
     const payload = verifyRefreshToken(refreshToken);
     if (!payload) {
-      return res.status(401).json({ error: "Invalid or expired refresh token" });
+      return res
+        .status(401)
+        .json({ error: "Invalid or expired refresh token" });
     }
 
     const { db } = await connectToDatabase();
 
     // Check if refresh token exists in database
-    const storedToken = await db.collection("refresh_tokens").findOne({
-      user_id: payload.id,
-      token_hash: hashRefreshToken(refreshToken),
-      // Legacy fallback (disabled for security):
-      // token: refreshToken,
-    }, {
-      projection: {
-        _id: 1,
-        expires_at: 1,
-        session_id: 1,
-        session_fingerprint: 1,
-        device_id_hash: 1,
+    const storedToken = await db.collection("refresh_tokens").findOne(
+      {
+        user_id: payload.id,
+        token_hash: hashRefreshToken(refreshToken),
+        // Legacy fallback (disabled for security):
+        // token: refreshToken,
       },
-    });
+      {
+        projection: {
+          _id: 1,
+          expires_at: 1,
+          session_id: 1,
+          session_fingerprint: 1,
+          device_id_hash: 1,
+        },
+      },
+    );
 
     if (!storedToken) {
-      return res.status(401).json({ error: "Refresh token not found or revoked" });
+      return res
+        .status(401)
+        .json({ error: "Refresh token not found or revoked" });
     }
 
     // Check if token is expired
@@ -92,13 +109,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const currentSessionFingerprint = getSessionFingerprintFromRequest(req);
     const requestDeviceId = getDeviceIdFromRequest(req);
-    const requestDeviceHash = requestDeviceId ? hashDeviceId(requestDeviceId) : null;
+    const requestDeviceHash = requestDeviceId
+      ? hashDeviceId(requestDeviceId)
+      : null;
     const storedDeviceHash =
-      typeof storedToken.device_id_hash === "string" && storedToken.device_id_hash.length > 0
+      typeof storedToken.device_id_hash === "string" &&
+      storedToken.device_id_hash.length > 0
         ? storedToken.device_id_hash
         : null;
     const storedSessionFingerprint =
-      typeof storedToken.session_fingerprint === "string" && storedToken.session_fingerprint.length > 0
+      typeof storedToken.session_fingerprint === "string" &&
+      storedToken.session_fingerprint.length > 0
         ? storedToken.session_fingerprint
         : null;
     const strictSessionBinding =
@@ -116,7 +137,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           req,
           userId: payload.id,
         });
-        await db.collection("refresh_tokens").deleteOne({ _id: storedToken._id });
+        await db
+          .collection("refresh_tokens")
+          .deleteOne({ _id: storedToken._id });
         return res.status(401).json({ error: "Refresh token device mismatch" });
       }
     } else if (
@@ -189,7 +212,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       role: normalizeUserRole(user.role),
     };
     const refreshSessionId =
-      (typeof storedToken.session_id === "string" && storedToken.session_id.length > 0
+      (typeof storedToken.session_id === "string" &&
+      storedToken.session_id.length > 0
         ? storedToken.session_id
         : payload.sid) || generateRefreshSessionId();
     const tokens = generateTokens(userPayload, { refreshSessionId });

@@ -3,13 +3,16 @@ import { randomBytes } from "crypto";
 import jwt from "jsonwebtoken";
 import { getCookieValue } from "./cookies.js";
 
-const GOOGLE_AUTHORIZATION_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
+const GOOGLE_AUTHORIZATION_ENDPOINT =
+  "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
-const GOOGLE_USERINFO_ENDPOINT = "https://openidconnect.googleapis.com/v1/userinfo";
+const GOOGLE_USERINFO_ENDPOINT =
+  "https://openidconnect.googleapis.com/v1/userinfo";
 const GOOGLE_CERTS_ENDPOINT = "https://www.googleapis.com/oauth2/v1/certs";
 
 export const GOOGLE_OAUTH_STATE_COOKIE_NAME = "moviereckon_google_oauth_state";
-export const GOOGLE_ONE_TAP_NONCE_COOKIE_NAME = "moviereckon_google_one_tap_nonce";
+export const GOOGLE_ONE_TAP_NONCE_COOKIE_NAME =
+  "moviereckon_google_one_tap_nonce";
 
 const GOOGLE_SCOPE = "openid email profile";
 const OAUTH_STATE_MAX_AGE_SECONDS = 10 * 60;
@@ -87,14 +90,18 @@ function getSameSiteValue(secure: boolean): SameSite {
   return sameSite;
 }
 
-function serializeCookie(name: string, value: string, options: {
-  httpOnly?: boolean;
-  secure?: boolean;
-  sameSite?: SameSite;
-  path?: string;
-  maxAge?: number;
-  expires?: Date;
-} = {}): string {
+function serializeCookie(
+  name: string,
+  value: string,
+  options: {
+    httpOnly?: boolean;
+    secure?: boolean;
+    sameSite?: SameSite;
+    path?: string;
+    maxAge?: number;
+    expires?: Date;
+  } = {},
+): string {
   const parts = [`${name}=${encodeURIComponent(value)}`];
 
   if (options.maxAge !== undefined) {
@@ -143,12 +150,18 @@ function getCacheMaxAgeMs(headerValue: string | null): number {
   return seconds * 1000;
 }
 
-function getHeaderFirstValue(value: string | string[] | undefined): string | null {
+function getHeaderFirstValue(
+  value: string | string[] | undefined,
+): string | null {
   if (typeof value === "string" && value.trim().length > 0) {
     return value.split(",")[0]?.trim() || null;
   }
 
-  if (Array.isArray(value) && value.length > 0 && typeof value[0] === "string") {
+  if (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    typeof value[0] === "string"
+  ) {
     return value[0].split(",")[0]?.trim() || null;
   }
 
@@ -170,7 +183,9 @@ export function getGoogleOAuthConfig(): OAuthConfig {
   const clientSecret = getStringEnv("GOOGLE_CLIENT_SECRET");
 
   if (!clientId || !clientSecret) {
-    throw new Error("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be configured");
+    throw new Error(
+      "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be configured",
+    );
   }
 
   return { clientId, clientSecret };
@@ -186,13 +201,18 @@ export function getGoogleCallbackUrl(req: VercelRequest): string {
 
   const origin = getRequestOrigin(req);
   if (!origin) {
-    throw new Error("Unable to determine request origin for Google OAuth callback");
+    throw new Error(
+      "Unable to determine request origin for Google OAuth callback",
+    );
   }
 
   return `${origin}/api/auth/google-callback`;
 }
 
-export function normalizeReturnToPath(req: VercelRequest, rawValue: string | null): string {
+export function normalizeReturnToPath(
+  req: VercelRequest,
+  rawValue: string | null,
+): string {
   const fallback = "/home";
   if (!rawValue || rawValue.trim().length === 0) return fallback;
 
@@ -214,10 +234,15 @@ export function normalizeReturnToPath(req: VercelRequest, rawValue: string | nul
   }
 }
 
-export function setGoogleOAuthStateCookie(res: VercelResponse, state: GoogleOAuthState): void {
+export function setGoogleOAuthStateCookie(
+  res: VercelResponse,
+  state: GoogleOAuthState,
+): void {
   const secure = shouldUseSecureCookies();
   const sameSite = getSameSiteValue(secure);
-  const encodedState = Buffer.from(JSON.stringify(state), "utf8").toString("base64url");
+  const encodedState = Buffer.from(JSON.stringify(state), "utf8").toString(
+    "base64url",
+  );
 
   appendSetCookie(
     res,
@@ -252,7 +277,10 @@ export function createGoogleOneTapNonce(): string {
   return randomBytes(24).toString("base64url");
 }
 
-export function setGoogleOneTapNonceCookie(res: VercelResponse, nonce: string): void {
+export function setGoogleOneTapNonceCookie(
+  res: VercelResponse,
+  nonce: string,
+): void {
   const secure = shouldUseSecureCookies();
   const sameSite = getSameSiteValue(secure);
 
@@ -285,11 +313,17 @@ export function clearGoogleOneTapNonceCookie(res: VercelResponse): void {
   );
 }
 
-export function getGoogleOneTapNonceFromRequest(req: VercelRequest): string | null {
-  return getCookieValue(req.headers.cookie, GOOGLE_ONE_TAP_NONCE_COOKIE_NAME) || null;
+export function getGoogleOneTapNonceFromRequest(
+  req: VercelRequest,
+): string | null {
+  return (
+    getCookieValue(req.headers.cookie, GOOGLE_ONE_TAP_NONCE_COOKIE_NAME) || null
+  );
 }
 
-export function parseGoogleOAuthState(rawCookieValue: string | null): GoogleOAuthState | null {
+export function parseGoogleOAuthState(
+  rawCookieValue: string | null,
+): GoogleOAuthState | null {
   if (!rawCookieValue) return null;
 
   try {
@@ -338,7 +372,9 @@ export function buildGoogleAuthorizationUrl(params: {
   return url.toString();
 }
 
-async function parseJsonSafe(response: Response): Promise<Record<string, unknown>> {
+async function parseJsonSafe(
+  response: Response,
+): Promise<Record<string, unknown>> {
   try {
     const parsed = (await response.json()) as unknown;
     return typeof parsed === "object" && parsed !== null
@@ -390,11 +426,18 @@ export async function fetchGoogleProfile(params: {
 
   const profile = {
     sub: typeof profileJson.sub === "string" ? profileJson.sub : "",
-    email: typeof profileJson.email === "string" ? profileJson.email.trim().toLowerCase() : "",
+    email:
+      typeof profileJson.email === "string"
+        ? profileJson.email.trim().toLowerCase()
+        : "",
     email_verified: profileJson.email_verified === true,
     name: typeof profileJson.name === "string" ? profileJson.name : undefined,
-    given_name: typeof profileJson.given_name === "string" ? profileJson.given_name : undefined,
-    picture: typeof profileJson.picture === "string" ? profileJson.picture : undefined,
+    given_name:
+      typeof profileJson.given_name === "string"
+        ? profileJson.given_name
+        : undefined,
+    picture:
+      typeof profileJson.picture === "string" ? profileJson.picture : undefined,
   } satisfies GoogleProfile;
 
   if (!profile.sub || !profile.email) {
@@ -409,8 +452,14 @@ export async function fetchGoogleProfile(params: {
   return { profile, errorCode: null };
 }
 
-async function fetchGoogleSigningCertificates(forceRefresh = false): Promise<Record<string, string>> {
-  if (!forceRefresh && googleCertCache && googleCertCache.expiresAt > Date.now()) {
+async function fetchGoogleSigningCertificates(
+  forceRefresh = false,
+): Promise<Record<string, string>> {
+  if (
+    !forceRefresh &&
+    googleCertCache &&
+    googleCertCache.expiresAt > Date.now()
+  ) {
     return googleCertCache.certs;
   }
 
@@ -433,7 +482,8 @@ async function fetchGoogleSigningCertificates(forceRefresh = false): Promise<Rec
 
   googleCertCache = {
     certs: normalizedCerts,
-    expiresAt: Date.now() + getCacheMaxAgeMs(response.headers.get("cache-control")),
+    expiresAt:
+      Date.now() + getCacheMaxAgeMs(response.headers.get("cache-control")),
   };
 
   return normalizedCerts;
@@ -445,11 +495,13 @@ export async function verifyGoogleIdToken(params: {
   nonce?: string | null;
 }): Promise<{ profile: GoogleProfile | null; errorCode: string | null }> {
   try {
-    const decoded = jwt.decode(params.credential, { complete: true }) as
-      | { header?: { kid?: string; alg?: string } }
-      | null;
-    const kid = typeof decoded?.header?.kid === "string" ? decoded.header.kid : "";
-    const alg = typeof decoded?.header?.alg === "string" ? decoded.header.alg : "";
+    const decoded = jwt.decode(params.credential, { complete: true }) as {
+      header?: { kid?: string; alg?: string };
+    } | null;
+    const kid =
+      typeof decoded?.header?.kid === "string" ? decoded.header.kid : "";
+    const alg =
+      typeof decoded?.header?.alg === "string" ? decoded.header.alg : "";
     if (!kid || alg !== "RS256") {
       return { profile: null, errorCode: "credential_verification_failed" };
     }
@@ -476,11 +528,16 @@ export async function verifyGoogleIdToken(params: {
 
     const profile = {
       sub: typeof payload.sub === "string" ? payload.sub : "",
-      email: typeof payload.email === "string" ? payload.email.trim().toLowerCase() : "",
+      email:
+        typeof payload.email === "string"
+          ? payload.email.trim().toLowerCase()
+          : "",
       email_verified: payload.email_verified === true,
       name: typeof payload.name === "string" ? payload.name : undefined,
-      given_name: typeof payload.given_name === "string" ? payload.given_name : undefined,
-      picture: typeof payload.picture === "string" ? payload.picture : undefined,
+      given_name:
+        typeof payload.given_name === "string" ? payload.given_name : undefined,
+      picture:
+        typeof payload.picture === "string" ? payload.picture : undefined,
     } satisfies GoogleProfile;
 
     if (!profile.sub || !profile.email) {

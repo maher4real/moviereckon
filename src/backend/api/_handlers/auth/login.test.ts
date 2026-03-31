@@ -80,7 +80,11 @@ describe("login handler", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    consumeRateLimitMock.mockResolvedValue({ allowed: true, retryAfterSeconds: 0, source: "local" });
+    consumeRateLimitMock.mockResolvedValue({
+      allowed: true,
+      retryAfterSeconds: 0,
+      source: "local",
+    });
     verifyCaptchaTokenMock.mockResolvedValue({ ok: true, error: null });
     insertRefreshTokenMock.mockResolvedValue({ acknowledged: true });
   });
@@ -123,7 +127,10 @@ describe("login handler", () => {
         username: "cinefan",
       },
     });
-    expect(comparePasswordMock).toHaveBeenCalledWith("Password123", "hashed-password");
+    expect(comparePasswordMock).toHaveBeenCalledWith(
+      "Password123",
+      "hashed-password",
+    );
   });
 
   it("keeps the response generic when the password is wrong for an unverified account", async () => {

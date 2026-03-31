@@ -21,7 +21,10 @@ import { setAuthCookies, setDeviceCookie } from "../../lib/cookies.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
 import { verifyCaptchaToken } from "../../lib/captcha.js";
 import { emitSecurityEvent } from "../../lib/abuse-telemetry.js";
-import { sanitizeEmailAddress, sanitizeSingleLineText } from "../../lib/input.js";
+import {
+  sanitizeEmailAddress,
+  sanitizeSingleLineText,
+} from "../../lib/input.js";
 import {
   buildEmailVerificationUrl,
   buildPendingVerificationUpdate,
@@ -34,7 +37,8 @@ import { sendVerificationEmail } from "../../lib/email.js";
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
 
-const EMAIL_VERIFICATION_DISABLED = process.env.EMAIL_VERIFICATION_DISABLED === "true";
+const EMAIL_VERIFICATION_DISABLED =
+  process.env.EMAIL_VERIFICATION_DISABLED === "true";
 
 function parseDuplicateField(error: unknown): "email" | "username" | null {
   if (!error || typeof error !== "object") return null;
@@ -48,8 +52,13 @@ function parseDuplicateField(error: unknown): "email" | "username" | null {
   if (duplicate.keyPattern?.username) return "username";
 
   const message = String(duplicate.message || "").toLowerCase();
-  if (message.includes("users_email_unique") || message.includes(" email")) return "email";
-  if (message.includes("users_username_unique") || message.includes(" username")) return "username";
+  if (message.includes("users_email_unique") || message.includes(" email"))
+    return "email";
+  if (
+    message.includes("users_username_unique") ||
+    message.includes(" username")
+  )
+    return "username";
   return null;
 }
 
@@ -60,11 +69,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const email = sanitizeEmailAddress(req.body?.email);
-    const password = typeof req.body?.password === "string" ? req.body.password : "";
-    const username = sanitizeSingleLineText(req.body?.username, 128, {
-      fallback: "",
-      collapseWhitespace: false,
-    }) || "";
+    const password =
+      typeof req.body?.password === "string" ? req.body.password : "";
+    const username =
+      sanitizeSingleLineText(req.body?.username, 128, {
+        fallback: "",
+        collapseWhitespace: false,
+      }) || "";
     const captchaToken =
       sanitizeSingleLineText(req.body?.captcha_token, 4096, {
         fallback: "",
@@ -72,7 +83,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }) || "";
 
     const clientIp = getClientIp(req);
-    const ipRateLimit = await consumeRateLimit(`auth:register:ip:${clientIp}`, 8, 30 * 60 * 1000);
+    const ipRateLimit = await consumeRateLimit(
+      `auth:register:ip:${clientIp}`,
+      8,
+      30 * 60 * 1000,
+    );
 
     if (!ipRateLimit.allowed) {
       emitSecurityEvent({
@@ -83,21 +98,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         req,
         metadata: { source: ipRateLimit.source },
       });
-      res.setHeader("Retry-After", String(Math.max(ipRateLimit.retryAfterSeconds, 60)));
-      return res.status(429).json({ error: "Too many registration attempts. Please try again later." });
+      res.setHeader(
+        "Retry-After",
+        String(Math.max(ipRateLimit.retryAfterSeconds, 60)),
+      );
+      return res
+        .status(429)
+        .json({
+          error: "Too many registration attempts. Please try again later.",
+        });
     }
 
     if (!email || !password || !username) {
-      return res.status(400).json({ error: "Email, password, and username are required" });
+      return res
+        .status(400)
+        .json({ error: "Email, password, and username are required" });
     }
 
     if (!EMAIL_REGEX.test(email)) {
-      return res.status(400).json({ error: "Please provide a valid email address" });
+      return res
+        .status(400)
+        .json({ error: "Please provide a valid email address" });
     }
 
     if (!USERNAME_REGEX.test(username)) {
       return res.status(400).json({
-        error: "Username must be 3-24 chars and only include letters, numbers, and underscores",
+        error:
+          "Username must be 3-24 chars and only include letters, numbers, and underscores",
       });
     }
 
@@ -108,8 +135,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // TODO: Email verification disabled for now - always skip verification
     const verificationDetails = null; // EMAIL_VERIFICATION_DISABLED
-      // ? null
-      // : createEmailToken("verify-email");;
+    // ? null
+    // : createEmailToken("verify-email");;
 
     const captchaResult = await verifyCaptchaToken(req, captchaToken, "signup");
     if (!captchaResult.ok) {
@@ -125,7 +152,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           captcha_response_hostname: captchaResult.responseHostname,
         },
       });
-      return res.status(400).json({ error: captchaResult.error || "CAPTCHA verification failed" });
+      return res
+        .status(400)
+        .json({ error: captchaResult.error || "CAPTCHA verification failed" });
     }
 
     const { db } = await connectToDatabase();

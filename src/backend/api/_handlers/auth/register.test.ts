@@ -66,18 +66,26 @@ vi.mock("../../lib/cookies.js", () => ({
 
 vi.mock("../../lib/email-auth.js", () => ({
   createEmailToken: createEmailTokenMock,
-  buildEmailVerificationUrl: vi.fn((req: { headers?: Record<string, string> }, rawToken: string, email: string) => {
-    const host = req.headers?.host || "moviereckon.test";
-    return `https://${host}/verify-email?token=${rawToken}&email=${encodeURIComponent(email)}`;
-  }),
-  buildPendingVerificationUpdate: vi.fn((tokenHash: string, expiresAt: string) => ({
-    emailVerified: false,
-    email_verified: false,
-    emailVerifiedAt: null,
-    email_verified_at: null,
-    verificationTokenHash: tokenHash,
-    verificationTokenExpiresAt: expiresAt,
-  })),
+  buildEmailVerificationUrl: vi.fn(
+    (
+      req: { headers?: Record<string, string> },
+      rawToken: string,
+      email: string,
+    ) => {
+      const host = req.headers?.host || "moviereckon.test";
+      return `https://${host}/verify-email?token=${rawToken}&email=${encodeURIComponent(email)}`;
+    },
+  ),
+  buildPendingVerificationUpdate: vi.fn(
+    (tokenHash: string, expiresAt: string) => ({
+      emailVerified: false,
+      email_verified: false,
+      emailVerifiedAt: null,
+      email_verified_at: null,
+      verificationTokenHash: tokenHash,
+      verificationTokenExpiresAt: expiresAt,
+    }),
+  ),
   buildVerifiedEmailUpdate: vi.fn((now: string) => ({
     emailVerified: true,
     email_verified: true,
@@ -132,7 +140,11 @@ describe("register handler", () => {
     vi.resetModules();
     vi.clearAllMocks();
     delete process.env.EMAIL_VERIFICATION_DISABLED;
-    consumeRateLimitMock.mockResolvedValue({ allowed: true, retryAfterSeconds: 0, source: "local" });
+    consumeRateLimitMock.mockResolvedValue({
+      allowed: true,
+      retryAfterSeconds: 0,
+      source: "local",
+    });
     verifyCaptchaTokenMock.mockResolvedValue({ ok: true, error: null });
     hashPasswordMock.mockResolvedValue("hashed-password");
     createEmailTokenMock.mockReturnValue({
@@ -189,7 +201,11 @@ describe("register handler", () => {
     );
     expect(sendVerificationEmailMock).not.toHaveBeenCalled();
     expect(setDeviceCookieMock).toHaveBeenCalledWith(response, "device-id");
-    expect(setAuthCookiesMock).toHaveBeenCalledWith(response, "access-token", "refresh-token");
+    expect(setAuthCookiesMock).toHaveBeenCalledWith(
+      response,
+      "access-token",
+      "refresh-token",
+    );
     expect(insertRefreshTokenMock).toHaveBeenCalledTimes(1);
   });
 
@@ -226,7 +242,11 @@ describe("register handler", () => {
       }),
     });
     expect(setDeviceCookieMock).toHaveBeenCalledWith(response, "device-id");
-    expect(setAuthCookiesMock).toHaveBeenCalledWith(response, "access-token", "refresh-token");
+    expect(setAuthCookiesMock).toHaveBeenCalledWith(
+      response,
+      "access-token",
+      "refresh-token",
+    );
     expect(insertRefreshTokenMock).toHaveBeenCalledTimes(1);
     expect(sendVerificationEmailMock).not.toHaveBeenCalled();
   });
