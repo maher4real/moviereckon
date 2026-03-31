@@ -125,9 +125,8 @@ export function isEmailVerificationDisabled(): boolean {
   const explicit = readBooleanEnv("EMAIL_VERIFICATION_DISABLED");
   if (explicit !== null) return explicit;
 
-  // Default to bypass in non-production for local development ergonomics.
-  // In production, verification remains enabled unless explicitly disabled.
-  return process.env.NODE_ENV !== "production";
+  // Verification is opt-in until email infrastructure is explicitly enabled.
+  return true;
 }
 
 export function isEmailVerificationSatisfied(

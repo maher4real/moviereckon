@@ -314,7 +314,7 @@ Other:
 - `EMAIL_VERIFICATION_DISABLED` can explicitly force behavior:
   - `true`: bypass verification checks (useful for local/staging).
   - `false`: enforce verification checks in every environment.
-  - unset: defaults to bypass outside production, enforce in production.
+  - unset: bypass verification by default.
 
 ## Deployment
 
