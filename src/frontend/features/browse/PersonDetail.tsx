@@ -6,8 +6,8 @@ import {
   BriefcaseBusiness,
   CalendarDays,
   Clapperboard,
-  Globe,
   MapPin,
+  Sparkles,
   Star,
   Tv,
   UserRound,
@@ -17,6 +17,7 @@ import Footer from "@/frontend/components/Footer";
 import BottomNav from "@/frontend/components/BottomNav";
 import MediaImage from "@/frontend/components/MediaImage";
 import { Button } from "@/frontend/components/ui/button";
+import { ScrollArea, ScrollBar } from "@/frontend/components/ui/scroll-area";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import {
   getPersonCombinedCredits,
@@ -31,15 +32,44 @@ import { cn } from "@/shared/lib/utils";
 type MediaFilter = "all" | "movie" | "tv";
 type WorkCredit = PersonCombinedCastCredit | PersonCombinedCrewCredit;
 
-function formatDate(value?: string | null): string {
-  if (!value) return "Unknown";
+function parseDate(value?: string | null): Date | null {
+  if (!value) return null;
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
+function formatDate(value?: string | null): string {
+  const parsed = parseDate(value);
+  if (!parsed) return value || "Unknown";
   return parsed.toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
+}
+
+function calculateAge(birthday?: string | null, until?: string | null): number | null {
+  const birth = parseDate(birthday);
+  if (!birth) return null;
+
+  const end = parseDate(until) || new Date();
+  let age = end.getFullYear() - birth.getFullYear();
+  const monthDelta = end.getMonth() - birth.getMonth();
+  const dayDelta = end.getDate() - birth.getDate();
+  if (monthDelta < 0 || (monthDelta === 0 && dayDelta < 0)) {
+    age -= 1;
+  }
+  return age >= 0 ? age : null;
+}
+
+function formatBornWithAge(birthday?: string | null, deathday?: string | null): string {
+  if (!birthday) return "Unknown";
+  const formatted = formatDate(birthday);
+  const age = calculateAge(birthday, deathday);
+  if (age === null) return formatted;
+  if (deathday) return `${formatted} (${age} at passing)`;
+  return `${formatted} (${age} years old)`;
 }
 
 function getCreditDateValue(credit: WorkCredit): number {
@@ -74,6 +104,14 @@ function buildCrewRoleLabel(credit: PersonCombinedCrewCredit): string {
     return `${credit.job} • ${credit.department}`;
   }
   return credit.job || credit.department || "Crew";
+}
+
+function getKnownForScore(credit: WorkCredit): number {
+  const ratingWeight = (credit.vote_average || 0) * 1000;
+  const voteWeight = credit.vote_count || 0;
+  const popularityWeight = credit.popularity || 0;
+  const recencyWeight = getCreditDateValue(credit) / 1_000_000_000_000;
+  return ratingWeight + voteWeight + popularityWeight + recencyWeight;
 }
 
 function WorkCard({
@@ -125,6 +163,37 @@ function WorkCard({
   );
 }
 
+function KnownForCard({
+  credit,
+  fromPath,
+}: {
+  credit: WorkCredit;
+  fromPath: string;
+}) {
+  const navigate = useNavigate();
+  const title = getCreditTitle(credit);
+
+  return (
+    <button
+      type="button"
+      onClick={() => navigate(`/${credit.media_type}/${credit.id}`, { state: { from: fromPath } })}
+      className="group w-40 shrink-0 text-left"
+    >
+      <div className="overflow-hidden rounded-xl border border-border/70 bg-card/45 transition-all duration-300 group-hover:border-primary/40">
+        <MediaImage
+          src={getPosterUrl(credit.poster_path, "medium")}
+          alt={title}
+          className="aspect-[2/3] w-full object-cover bg-muted/30 transition-transform duration-300 group-hover:scale-[1.04]"
+          fallbackSrc="/fallbacks/poster.svg"
+        />
+      </div>
+      <p className="mt-2 line-clamp-2 text-sm font-medium group-hover:text-primary transition-colors">
+        {title}
+      </p>
+    </button>
+  );
+}
+
 export default function PersonDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -133,6 +202,7 @@ export default function PersonDetail() {
   const [mediaFilter, setMediaFilter] = useState<MediaFilter>("all");
 
   const personId = Number(id);
+  const currentPath = `${location.pathname}${location.search}${location.hash}`;
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -158,25 +228,39 @@ export default function PersonDetail() {
 
   const castCredits = useMemo(
     () =>
-      [...(creditsData?.cast || [])]
-        .sort(
-          (a, b) =>
-            getCreditDateValue(b) - getCreditDateValue(a) ||
-            (b.popularity || 0) - (a.popularity || 0),
-        ),
+      [...(creditsData?.cast || [])].sort(
+        (a, b) =>
+          getCreditDateValue(b) - getCreditDateValue(a) ||
+          (b.popularity || 0) - (a.popularity || 0),
+      ),
     [creditsData],
   );
 
   const crewCredits = useMemo(
     () =>
-      [...(creditsData?.crew || [])]
-        .sort(
-          (a, b) =>
-            getCreditDateValue(b) - getCreditDateValue(a) ||
-            (b.popularity || 0) - (a.popularity || 0),
-        ),
+      [...(creditsData?.crew || [])].sort(
+        (a, b) =>
+          getCreditDateValue(b) - getCreditDateValue(a) ||
+          (b.popularity || 0) - (a.popularity || 0),
+      ),
     [creditsData],
   );
+
+  const knownForCredits = useMemo(() => {
+    const combined = [...castCredits, ...crewCredits]
+      .filter((credit) => credit.poster_path)
+      .sort((a, b) => getKnownForScore(b) - getKnownForScore(a));
+
+    const byMediaId = new Map<string, WorkCredit>();
+    for (const credit of combined) {
+      const key = `${credit.media_type}:${credit.id}`;
+      if (!byMediaId.has(key)) {
+        byMediaId.set(key, credit);
+      }
+    }
+
+    return Array.from(byMediaId.values()).slice(0, 12);
+  }, [castCredits, crewCredits]);
 
   const filteredCastCredits = useMemo(
     () => filterCreditsByMedia(castCredits, mediaFilter),
@@ -187,22 +271,34 @@ export default function PersonDetail() {
     [crewCredits, mediaFilter],
   );
 
-  const fromPath = `${location.pathname}${location.search}${location.hash}`;
-  const birthDate = formatDate(person?.birthday);
-  const deathDate = person?.deathday ? formatDate(person.deathday) : null;
+  const bornWithAge = formatBornWithAge(person?.birthday, person?.deathday);
+  const statusValue = person?.deathday ? `Deceased • ${formatDate(person.deathday)}` : "Alive";
   const profileImageSrc = getProfileUrl(person?.profile_path || null, "large");
   const biography = person?.biography?.trim() || "Biography is not available for this person.";
+  const previousFrom = (location.state as { from?: string } | null)?.from;
+  const safeFrom =
+    typeof previousFrom === "string" && previousFrom.length > 0 && previousFrom !== currentPath
+      ? previousFrom
+      : null;
 
-  const backDestination =
-    (location.state as { from?: string } | null)?.from ||
-    (typeof window !== "undefined" && window.history.length > 1 ? -1 : "/home");
+  const handleBack = () => {
+    if (safeFrom) {
+      navigate(safeFrom);
+      return;
+    }
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate("/home");
+  };
 
   if (authLoading || personLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
         <div className="pt-24 container mx-auto px-4 space-y-4">
-          <div className="h-12 w-40 animate-pulse rounded-md bg-muted" />
+          <div className="h-12 w-14 animate-pulse rounded-full bg-muted" />
           <div className="h-72 animate-pulse rounded-2xl bg-muted" />
           <div className="h-48 animate-pulse rounded-2xl bg-muted" />
         </div>
@@ -228,29 +324,28 @@ export default function PersonDetail() {
       <Header />
 
       <main className="pt-20">
-        <section className="relative border-b border-border/60 bg-gradient-to-b from-primary/10 via-background to-background">
-          <div className="container mx-auto px-4 py-6 md:py-8">
+        <section className="relative overflow-hidden border-b border-border/60">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(220,38,38,0.22),transparent_42%),radial-gradient(circle_at_85%_20%,rgba(251,146,60,0.15),transparent_30%),linear-gradient(to_bottom,rgba(15,15,18,0.8),rgba(10,10,12,1))]" />
+          <div className="container relative mx-auto px-4 py-6 md:py-8">
             <Button
               variant="ghost"
-              onClick={() =>
-                typeof backDestination === "number"
-                  ? navigate(backDestination)
-                  : navigate(backDestination)
-              }
-              className="mb-5 rounded-full border border-border/70 bg-background/70 px-4 hover:bg-background"
+              onClick={handleBack}
+              aria-label="Go back"
+              className="mb-5 h-11 w-11 rounded-full border border-border/70 bg-background/75 p-0 hover:bg-background"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+              <ArrowLeft className="h-4 w-4" />
             </Button>
 
-            <div className="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
-              <div className="mx-auto w-full max-w-[260px]">
-                <MediaImage
-                  src={profileImageSrc}
-                  alt={person.name}
-                  className="aspect-[3/4] w-full rounded-2xl border border-border/70 object-cover bg-muted/30 shadow-2xl"
-                  fallbackSrc="/fallbacks/profile.svg"
-                />
+            <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
+              <div className="mx-auto w-full max-w-[280px]">
+                <div className="rounded-3xl border border-border/70 bg-gradient-to-b from-card/70 to-card/35 p-3 shadow-2xl">
+                  <MediaImage
+                    src={profileImageSrc}
+                    alt={person.name}
+                    className="aspect-[3/4] w-full rounded-2xl object-cover bg-muted/30"
+                    fallbackSrc="/fallbacks/profile.svg"
+                  />
+                </div>
               </div>
 
               <div className="space-y-4">
@@ -274,14 +369,14 @@ export default function PersonDetail() {
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl border border-border/70 bg-card/50 p-3">
+                  <div className="rounded-xl border border-border/70 bg-card/55 p-3">
                     <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                       <CalendarDays className="h-4 w-4" />
                       Born
                     </p>
-                    <p className="mt-1 text-sm font-semibold">{birthDate}</p>
+                    <p className="mt-1 text-sm font-semibold">{bornWithAge}</p>
                   </div>
-                  <div className="rounded-xl border border-border/70 bg-card/50 p-3">
+                  <div className="rounded-xl border border-border/70 bg-card/55 p-3">
                     <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                       <MapPin className="h-4 w-4" />
                       Place of Birth
@@ -290,20 +385,20 @@ export default function PersonDetail() {
                       {person.place_of_birth || "Unknown"}
                     </p>
                   </div>
-                  <div className="rounded-xl border border-border/70 bg-card/50 p-3">
+                  <div className="rounded-xl border border-border/70 bg-card/55 p-3">
                     <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                       <UserRound className="h-4 w-4" />
-                      Died
+                      Status
                     </p>
-                    <p className="mt-1 text-sm font-semibold">{deathDate || "Alive"}</p>
+                    <p className="mt-1 text-sm font-semibold">{statusValue}</p>
                   </div>
-                  <div className="rounded-xl border border-border/70 bg-card/50 p-3">
+                  <div className="rounded-xl border border-border/70 bg-card/55 p-3">
                     <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                      <Globe className="h-4 w-4" />
-                      IMDb
+                      <BriefcaseBusiness className="h-4 w-4" />
+                      Known For
                     </p>
-                    <p className="mt-1 text-sm font-semibold break-all">
-                      {person.imdb_id || "Unavailable"}
+                    <p className="mt-1 text-sm font-semibold">
+                      {person.known_for_department || "Not specified"}
                     </p>
                   </div>
                 </div>
@@ -334,6 +429,27 @@ export default function PersonDetail() {
             </div>
           </div>
         </section>
+
+        {knownForCredits.length > 0 && (
+          <section className="container mx-auto px-4 pt-8">
+            <h2 className="mb-3 flex items-center gap-2 text-2xl font-bold">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Known For
+            </h2>
+            <ScrollArea className="w-full">
+              <div className="flex gap-4 pb-3 pr-2">
+                {knownForCredits.map((credit) => (
+                  <KnownForCard
+                    key={`${credit.media_type}:${credit.id}`}
+                    credit={credit}
+                    fromPath={currentPath}
+                  />
+                ))}
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+          </section>
+        )}
 
         <section className="container mx-auto px-4 py-8">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -379,7 +495,7 @@ export default function PersonDetail() {
                       key={credit.credit_id}
                       credit={credit}
                       roleLabel={credit.character || "Character not specified"}
-                      fromPath={fromPath}
+                      fromPath={currentPath}
                     />
                   ))}
                 </div>
@@ -402,7 +518,7 @@ export default function PersonDetail() {
                       key={credit.credit_id}
                       credit={credit}
                       roleLabel={buildCrewRoleLabel(credit)}
-                      fromPath={fromPath}
+                      fromPath={currentPath}
                     />
                   ))}
                 </div>
