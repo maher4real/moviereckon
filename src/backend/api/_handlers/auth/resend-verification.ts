@@ -6,6 +6,7 @@ import {
   buildEmailVerificationUrl,
   buildPendingVerificationUpdate,
   createEmailToken,
+  isEmailVerificationDisabled,
   isUserEmailVerified,
 } from "../../lib/email-auth.js";
 import { sendVerificationEmail } from "../../lib/email.js";
@@ -30,6 +31,12 @@ async function getRetryAfterSeconds(email: string, clientIp: string) {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  if (isEmailVerificationDisabled()) {
+    return res.status(200).json({
+      message: "Email verification is currently disabled. You can sign in now.",
+    });
   }
 
   try {

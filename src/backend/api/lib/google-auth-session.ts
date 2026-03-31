@@ -16,8 +16,8 @@ import {
 } from "./auth.js";
 import { setAuthCookies, setDeviceCookie } from "./cookies.js";
 import {
+  buildVerificationTokenUnset,
   buildVerifiedEmailUpdate,
-  clearPasswordResetUpdate,
   isUserEmailVerified,
 } from "./email-auth.js";
 import type { GoogleProfile } from "./google-oauth.js";
@@ -86,15 +86,22 @@ export async function resolveUserFromGoogleProfile(
 
   if (user && (!isUserEmailVerified(user) || !user.role)) {
     const role = normalizeUserRole(user.role || defaultRole);
+    const updateDoc: {
+      $set: Record<string, unknown>;
+      $unset?: Record<string, string>;
+    } = {
+      $set: {
+        ...buildVerifiedEmailUpdate(now),
+        role,
+        updated_at: now,
+      },
+    };
+    if (!isUserEmailVerified(user)) {
+      updateDoc.$unset = buildVerificationTokenUnset();
+    }
     await users.updateOne(
       { _id: user._id },
-      {
-        $set: {
-          ...buildVerifiedEmailUpdate(now),
-          role,
-          updated_at: now,
-        },
-      },
+      updateDoc,
     );
     user = await users.findOne({ _id: user._id });
   }
@@ -109,6 +116,7 @@ export async function resolveUserFromGoogleProfile(
       const updates: Record<string, unknown> = {
         updated_at: now,
       };
+      let shouldUnsetVerificationTokens = false;
 
       if (!userByEmail.google_sub) {
         updates.google_sub = profile.sub;
@@ -120,6 +128,7 @@ export async function resolveUserFromGoogleProfile(
 
       if (!isUserEmailVerified(userByEmail)) {
         Object.assign(updates, buildVerifiedEmailUpdate(now));
+        shouldUnsetVerificationTokens = true;
       }
 
       if (!userByEmail.username || typeof userByEmail.username !== "string") {
@@ -131,7 +140,14 @@ export async function resolveUserFromGoogleProfile(
       }
 
       if (Object.keys(updates).length > 0) {
-        await users.updateOne({ _id: userByEmail._id }, { $set: updates });
+        const updateDoc: {
+          $set: Record<string, unknown>;
+          $unset?: Record<string, string>;
+        } = { $set: updates };
+        if (shouldUnsetVerificationTokens) {
+          updateDoc.$unset = buildVerificationTokenUnset();
+        }
+        await users.updateOne({ _id: userByEmail._id }, updateDoc);
       }
 
       user = await users.findOne({ _id: userByEmail._id });
@@ -148,7 +164,6 @@ export async function resolveUserFromGoogleProfile(
       avatar_url: profile.picture || null,
       google_sub: profile.sub,
       ...buildVerifiedEmailUpdate(now),
-      ...clearPasswordResetUpdate(),
       created_at: now,
       updated_at: now,
     });

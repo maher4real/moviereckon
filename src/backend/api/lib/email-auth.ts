@@ -11,6 +11,16 @@ type EmailVerificationShape = Record<string, unknown> & {
   email_verified?: unknown;
 };
 
+function readBooleanEnv(name: string): boolean | null {
+  const value = process.env[name];
+  if (typeof value !== "string") return null;
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return null;
+}
+
 function getTokenPepper(): string {
   const value = process.env.EMAIL_TOKEN_PEPPER || process.env.JWT_SECRET || "";
   if (!value || value.length < 32) {
@@ -111,20 +121,33 @@ export function isUserEmailVerified(user: EmailVerificationShape | null | undefi
   return user?.emailVerified === true || user?.email_verified === true;
 }
 
+export function isEmailVerificationDisabled(): boolean {
+  const explicit = readBooleanEnv("EMAIL_VERIFICATION_DISABLED");
+  if (explicit !== null) return explicit;
+
+  // Default to bypass in non-production for local development ergonomics.
+  // In production, verification remains enabled unless explicitly disabled.
+  return process.env.NODE_ENV !== "production";
+}
+
+export function isEmailVerificationSatisfied(
+  user: EmailVerificationShape | null | undefined,
+): boolean {
+  return isEmailVerificationDisabled() || isUserEmailVerified(user);
+}
+
 export function buildVerifiedEmailUpdate(now: string) {
   return {
     emailVerified: true,
     email_verified: true,
     emailVerifiedAt: now,
     email_verified_at: now,
-    verificationTokenHash: null,
-    verificationTokenExpiresAt: null,
   };
 }
 
 export function buildPendingVerificationUpdate(
-  tokenHash: string | null,
-  expiresAt: string | null,
+  tokenHash: string,
+  expiresAt: string,
 ) {
   return {
     emailVerified: false,
@@ -136,9 +159,16 @@ export function buildPendingVerificationUpdate(
   };
 }
 
-export function clearPasswordResetUpdate() {
+export function buildVerificationTokenUnset() {
   return {
-    passwordResetTokenHash: null,
-    passwordResetTokenExpiresAt: null,
+    verificationTokenHash: "",
+    verificationTokenExpiresAt: "",
+  };
+}
+
+export function buildPasswordResetTokenUnset() {
+  return {
+    passwordResetTokenHash: "",
+    passwordResetTokenExpiresAt: "",
   };
 }

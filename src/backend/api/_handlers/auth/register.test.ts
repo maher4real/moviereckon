@@ -12,6 +12,7 @@ const setAuthCookiesMock = vi.fn();
 const setDeviceCookieMock = vi.fn();
 const createEmailTokenMock = vi.fn();
 const sendVerificationEmailMock = vi.fn();
+const isEmailVerificationDisabledMock = vi.fn();
 
 vi.mock("../../lib/mongodb.js", () => ({
   connectToDatabase: vi.fn(async () => ({
@@ -65,6 +66,7 @@ vi.mock("../../lib/cookies.js", () => ({
 }));
 
 vi.mock("../../lib/email-auth.js", () => ({
+  isEmailVerificationDisabled: isEmailVerificationDisabledMock,
   createEmailToken: createEmailTokenMock,
   buildEmailVerificationUrl: vi.fn(
     (
@@ -91,8 +93,6 @@ vi.mock("../../lib/email-auth.js", () => ({
     email_verified: true,
     emailVerifiedAt: now,
     email_verified_at: now,
-    verificationTokenHash: null,
-    verificationTokenExpiresAt: null,
   })),
 }));
 
@@ -140,6 +140,7 @@ describe("register handler", () => {
     vi.resetModules();
     vi.clearAllMocks();
     delete process.env.EMAIL_VERIFICATION_DISABLED;
+    isEmailVerificationDisabledMock.mockReturnValue(true);
     consumeRateLimitMock.mockResolvedValue({
       allowed: true,
       retryAfterSeconds: 0,
@@ -211,6 +212,7 @@ describe("register handler", () => {
 
   it("issues auth cookies when email verification is explicitly disabled", async () => {
     process.env.EMAIL_VERIFICATION_DISABLED = "true";
+    isEmailVerificationDisabledMock.mockReturnValue(true);
 
     const { default: handler } = await import("./register.js");
     const response = createResponse();
@@ -280,5 +282,39 @@ describe("register handler", () => {
     expect(sendVerificationEmailMock).not.toHaveBeenCalled();
     expect(deleteUserMock).not.toHaveBeenCalled();
     expect(deletePreferencesMock).not.toHaveBeenCalled();
+  });
+
+  it("requires email verification when verification policy is enabled", async () => {
+    isEmailVerificationDisabledMock.mockReturnValue(false);
+
+    const { default: handler } = await import("./register.js");
+    const response = createResponse();
+
+    await handler(
+      {
+        method: "POST",
+        body: {
+          email: "user@example.com",
+          password: "Password123",
+          username: "cinefan",
+          captcha_token: "captcha-token",
+        },
+        headers: {
+          host: "moviereckon.test",
+          "x-forwarded-proto": "https",
+        },
+      } as never,
+      response as never,
+    );
+
+    expect(response.statusCode).toBe(201);
+    expect(response.body).toMatchObject({
+      requires_email_verification: true,
+      user: null,
+    });
+    expect(sendVerificationEmailMock).toHaveBeenCalledTimes(1);
+    expect(setDeviceCookieMock).not.toHaveBeenCalled();
+    expect(setAuthCookiesMock).not.toHaveBeenCalled();
+    expect(insertRefreshTokenMock).not.toHaveBeenCalled();
   });
 });

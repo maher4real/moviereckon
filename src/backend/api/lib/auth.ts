@@ -10,7 +10,7 @@ import {
   DEVICE_ID_COOKIE_NAME,
   getCookieValue,
 } from "./cookies.js";
-import { isUserEmailVerified } from "./email-auth.js";
+import { isEmailVerificationSatisfied } from "./email-auth.js";
 import type { Db } from "mongodb";
 
 const JWT_SECRET = (() => {
@@ -314,7 +314,7 @@ export async function getUserFromRequest(request: RequestLike): Promise<UserPayl
     },
   );
 
-  if (!user || !isUserEmailVerified(user)) {
+  if (!user || !isEmailVerificationSatisfied(user)) {
     return null;
   }
 
@@ -377,6 +377,6 @@ export async function getUserById(userId: string) {
     avatar_url: user.avatar_url || null,
     created_at: user.created_at,
     updated_at: user.updated_at,
-    emailVerified: isUserEmailVerified(user),
+    emailVerified: isEmailVerificationSatisfied(user),
   };
 }

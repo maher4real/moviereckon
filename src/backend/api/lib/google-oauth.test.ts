@@ -8,6 +8,17 @@ const { privateKey, publicKey } = generateKeyPairSync("rsa", {
   publicKeyEncoding: { type: "spki", format: "pem" },
 });
 
+function stubGoogleCertFetch() {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      new Response(JSON.stringify({ "test-kid": publicKey }), {
+        status: 200,
+        headers: { "cache-control": "public, max-age=60" },
+      })),
+  );
+}
+
 describe("verifyGoogleIdToken", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -15,14 +26,7 @@ describe("verifyGoogleIdToken", () => {
   });
 
   it("verifies a signed Google credential with matching nonce", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        new Response(JSON.stringify({ "test-kid": publicKey }), {
-          status: 200,
-          headers: { "cache-control": "public, max-age=60" },
-        })),
-    );
+    stubGoogleCertFetch();
 
     const credential = jwt.sign(
       {
@@ -61,14 +65,7 @@ describe("verifyGoogleIdToken", () => {
   });
 
   it("rejects a credential when the nonce does not match", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        new Response(JSON.stringify({ "test-kid": publicKey }), {
-          status: 200,
-          headers: { "cache-control": "public, max-age=60" },
-        })),
-    );
+    stubGoogleCertFetch();
 
     const credential = jwt.sign(
       {
@@ -96,5 +93,36 @@ describe("verifyGoogleIdToken", () => {
 
     expect(result.profile).toBeNull();
     expect(result.errorCode).toBe("credential_verification_failed");
+  });
+
+  it("rejects an unverified Google email", async () => {
+    stubGoogleCertFetch();
+
+    const credential = jwt.sign(
+      {
+        sub: "google-user-2",
+        email: "user@example.com",
+        email_verified: false,
+        nonce: "nonce-123",
+      },
+      privateKey,
+      {
+        algorithm: "RS256",
+        audience: "google-client-id",
+        issuer: "https://accounts.google.com",
+        expiresIn: "5m",
+        header: { kid: "test-kid" },
+      },
+    );
+
+    const { verifyGoogleIdToken } = await import("./google-oauth.js");
+    const result = await verifyGoogleIdToken({
+      credential,
+      clientId: "google-client-id",
+      nonce: "nonce-123",
+    });
+
+    expect(result.profile).toBeNull();
+    expect(result.errorCode).toBe("email_not_verified");
   });
 });

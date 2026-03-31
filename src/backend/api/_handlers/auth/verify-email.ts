@@ -3,7 +3,9 @@ import { connectToDatabase } from "../../lib/mongodb.js";
 import { sanitizeEmailAddress, sanitizeSingleLineText } from "../../lib/input.js";
 import {
   buildVerifiedEmailUpdate,
+  buildVerificationTokenUnset,
   emailTokenMatches,
+  isEmailVerificationDisabled,
   isEmailTokenExpired,
   isUserEmailVerified,
 } from "../../lib/email-auth.js";
@@ -15,6 +17,13 @@ const INVALID_LINK_ERROR = "Invalid or expired verification link.";
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  if (isEmailVerificationDisabled()) {
+    return res.status(200).json({
+      message: "Email verification is currently disabled. You can sign in now.",
+      alreadyVerified: true,
+    });
   }
 
   try {
@@ -92,10 +101,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         { _id: user._id },
         {
           $set: {
-            verificationTokenHash: null,
-            verificationTokenExpiresAt: null,
             updated_at: new Date().toISOString(),
           },
+          $unset: buildVerificationTokenUnset(),
         },
       );
       return res.status(400).json({ error: INVALID_LINK_ERROR });
@@ -113,6 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ...buildVerifiedEmailUpdate(now),
           updated_at: now,
         },
+        $unset: buildVerificationTokenUnset(),
       },
     );
 

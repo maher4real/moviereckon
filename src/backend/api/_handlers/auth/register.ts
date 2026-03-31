@@ -30,15 +30,13 @@ import {
   buildPendingVerificationUpdate,
   buildVerifiedEmailUpdate,
   createEmailToken,
+  isEmailVerificationDisabled,
 } from "../../lib/email-auth.js";
 import { getPasswordValidationError } from "../../lib/password-policy.js";
 import { sendVerificationEmail } from "../../lib/email.js";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
-
-const EMAIL_VERIFICATION_DISABLED =
-  process.env.EMAIL_VERIFICATION_DISABLED === "true";
 
 function parseDuplicateField(error: unknown): "email" | "username" | null {
   if (!error || typeof error !== "object") return null;
@@ -133,10 +131,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: passwordError });
     }
 
-    // TODO: Email verification disabled for now - always skip verification
-    const verificationDetails = null; // EMAIL_VERIFICATION_DISABLED
-    // ? null
-    // : createEmailToken("verify-email");;
+    const emailVerificationDisabled = isEmailVerificationDisabled();
+    const verificationDetails = emailVerificationDisabled
+      ? null
+      : createEmailToken("verify-email");
 
     const captchaResult = await verifyCaptchaToken(req, captchaToken, "signup");
     if (!captchaResult.ok) {
@@ -171,15 +169,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           username,
           role,
           avatar_url: null,
-          ...buildVerifiedEmailUpdate(now), // TODO: Always verified, verification disabled
-          // ...(EMAIL_VERIFICATION_DISABLED
-          //   ? buildVerifiedEmailUpdate(now)
-          //   : buildPendingVerificationUpdate(
-          //       verificationDetails!.tokenHash,
-          //       verificationDetails!.expiresAt,
-          //     )),
-          passwordResetTokenHash: null,
-          passwordResetTokenExpiresAt: null,
+          ...(emailVerificationDisabled
+            ? buildVerifiedEmailUpdate(now)
+            : buildPendingVerificationUpdate(
+                verificationDetails!.tokenHash,
+                verificationDetails!.expiresAt,
+              )),
           created_at: now,
           updated_at: now,
         });
@@ -211,31 +206,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       updated_at: now,
     });
 
-    // TODO: Email verification disabled for now
-    // if (!EMAIL_VERIFICATION_DISABLED) {
-    //   const verificationUrl = buildEmailVerificationUrl(req, verificationDetails!.rawToken, email);
-    //
-    //   try {
-    //     await sendVerificationEmail({
-    //       toEmail: email,
-    //       username,
-    //       verificationUrl,
-    //     });
-    //   } catch (error) {
-    //     await db.collection("users").deleteOne({ _id: insertedUserId });
-    //     await db.collection("user_preferences").deleteOne({ user_id: userId });
-    //     console.error("Verification email send error:", error);
-    //     return res.status(500).json({
-    //       error: "Unable to send verification email right now. Please try again.",
-    //     });
-    //   }
-    //
-    //   return res.status(201).json({
-    //     requires_email_verification: true,
-    //     message: "Account created. Check your email to verify your address before signing in.",
-    //     user: null,
-    //   });
-    // }
+    if (!emailVerificationDisabled && verificationDetails) {
+      const verificationUrl = buildEmailVerificationUrl(
+        req,
+        verificationDetails.rawToken,
+        email,
+      );
+
+      try {
+        await sendVerificationEmail({
+          toEmail: email,
+          username,
+          verificationUrl,
+        });
+      } catch (error) {
+        await db.collection("users").deleteOne({ _id: insertedUserId });
+        await db.collection("user_preferences").deleteOne({ user_id: userId });
+        console.error("Verification email send error:", error);
+        return res.status(500).json({
+          error: "Unable to send verification email right now. Please try again.",
+        });
+      }
+
+      return res.status(201).json({
+        requires_email_verification: true,
+        message:
+          "Account created. Check your email to verify your address before signing in.",
+        user: null,
+      });
+    }
 
     const userPayload: UserPayload = {
       id: userId,

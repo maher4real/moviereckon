@@ -25,7 +25,7 @@ import {
   sanitizeEmailAddress,
   sanitizeSingleLineText,
 } from "../../lib/input.js";
-import { isUserEmailVerified } from "../../lib/email-auth.js";
+import { isEmailVerificationSatisfied } from "../../lib/email-auth.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -138,13 +138,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
-    // TODO: Email verification disabled for now
-    // if (!isUserEmailVerified(user)) {
-    //   return res.status(403).json({
-    //     error: "Please verify your email before signing in.",
-    //     code: "email_not_verified",
-    //   });
-    // }
+    if (!isEmailVerificationSatisfied(user)) {
+      return res.status(403).json({
+        error: "Please verify your email before signing in.",
+        code: "email_not_verified",
+      });
+    }
 
     // Generate tokens
     const userPayload: UserPayload = {
@@ -186,7 +185,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         avatar_url: user.avatar_url || null,
         created_at: user.created_at,
         updated_at: user.updated_at,
-        emailVerified: true,
+        emailVerified: isEmailVerificationSatisfied(user),
       },
       session: "cookie",
       // Legacy fallback response (disabled for security):

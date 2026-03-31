@@ -4,7 +4,7 @@ import { clearAuthCookies } from "../../lib/cookies.js";
 import { hashPassword } from "../../lib/auth.js";
 import { sanitizeEmailAddress, sanitizeSingleLineText } from "../../lib/input.js";
 import {
-  clearPasswordResetUpdate,
+  buildPasswordResetTokenUnset,
   emailTokenMatches,
   isEmailTokenExpired,
 } from "../../lib/email-auth.js";
@@ -91,9 +91,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         { _id: user._id },
         {
           $set: {
-            ...clearPasswordResetUpdate(),
             updated_at: new Date().toISOString(),
           },
+          $unset: buildPasswordResetTokenUnset(),
         },
       );
       return res.status(400).json({ error: INVALID_LINK_ERROR });
@@ -110,9 +110,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       {
         $set: {
           password_hash: passwordHash,
-          ...clearPasswordResetUpdate(),
           updated_at: now,
         },
+        $unset: buildPasswordResetTokenUnset(),
       },
     );
     await db.collection("refresh_tokens").deleteMany({ user_id: user._id.toString() });

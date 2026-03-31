@@ -306,12 +306,15 @@ Other:
 
 - Session is cookie-based (`HttpOnly` access + refresh cookies).
 - Turnstile captcha is enforced for login and signup, with backend action, hostname, and challenge-age validation.
-- Email/password accounts must verify their email before the first sign-in.
+- Email/password accounts require verified email in production by default.
 - Email verification uses nodemailer for transactional emails with signed JWT tokens.
 - Refresh tokens are stored hashed in MongoDB.
 - Google OAuth is optionally supported as a federated auth provider.
 - User sessions and authentication state are managed via MongoDB and signed cookies.
-- `EMAIL_VERIFICATION_DISABLED=true` is available only as an explicit override (development only).
+- `EMAIL_VERIFICATION_DISABLED` can explicitly force behavior:
+  - `true`: bypass verification checks (useful for local/staging).
+  - `false`: enforce verification checks in every environment.
+  - unset: defaults to bypass outside production, enforce in production.
 
 ## Deployment
 
