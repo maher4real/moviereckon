@@ -174,6 +174,70 @@ export interface TMDBCreditsResponse {
   crew: CrewMember[];
 }
 
+export interface PersonDetails {
+  id: number;
+  name: string;
+  biography: string;
+  birthday: string | null;
+  deathday: string | null;
+  place_of_birth: string | null;
+  known_for_department: string;
+  also_known_as: string[];
+  gender: number;
+  homepage: string | null;
+  imdb_id: string | null;
+  profile_path: string | null;
+  popularity: number;
+  adult: boolean;
+}
+
+export type PersonCreditMediaType = "movie" | "tv";
+
+export interface PersonCombinedCastCredit {
+  id: number;
+  credit_id: string;
+  media_type: PersonCreditMediaType;
+  title?: string;
+  name?: string;
+  original_title?: string;
+  original_name?: string;
+  overview: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  character?: string;
+  release_date?: string;
+  first_air_date?: string;
+  vote_average: number;
+  vote_count: number;
+  popularity: number;
+}
+
+export interface PersonCombinedCrewCredit {
+  id: number;
+  credit_id: string;
+  media_type: PersonCreditMediaType;
+  title?: string;
+  name?: string;
+  original_title?: string;
+  original_name?: string;
+  overview: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  department?: string;
+  job?: string;
+  release_date?: string;
+  first_air_date?: string;
+  vote_average: number;
+  vote_count: number;
+  popularity: number;
+}
+
+export interface PersonCombinedCreditsResponse {
+  id: number;
+  cast: PersonCombinedCastCredit[];
+  crew: PersonCombinedCrewCredit[];
+}
+
 export interface EnrichedMovieDetails extends MovieDetails {
   credits?: TMDBCreditsResponse;
   keywords?: MovieKeywordsResponse;
@@ -581,6 +645,17 @@ export async function getTVShowReviewsExpanded(
     const bTime = new Date(b.created_at).getTime();
     return (Number.isNaN(bTime) ? 0 : bTime) - (Number.isNaN(aTime) ? 0 : aTime);
   });
+}
+
+// Person endpoints
+export async function getPersonDetails(personId: number): Promise<PersonDetails> {
+  return fetchTMDB<PersonDetails>(`/person/${personId}`);
+}
+
+export async function getPersonCombinedCredits(
+  personId: number,
+): Promise<PersonCombinedCreditsResponse> {
+  return fetchTMDB<PersonCombinedCreditsResponse>(`/person/${personId}/combined_credits`);
 }
 
 // Get still image URL for episodes

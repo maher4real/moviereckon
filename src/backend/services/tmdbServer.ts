@@ -10,6 +10,8 @@ import type {
   Movie,
   MovieDetails,
   MovieKeyword,
+  PersonCombinedCreditsResponse,
+  PersonDetails,
   MovieReleaseDatesResponse,
   SeasonDetails,
   TVShow,
@@ -274,6 +276,16 @@ export async function getServerTVWatchProviders(tvId: number): Promise<WatchProv
 export async function getServerTVShowKeywords(tvId: number): Promise<MovieKeyword[]> {
   const data = await fetchTMDB<TVKeywordsResponse>(`/tv/${tvId}/keywords`);
   return data.results || [];
+}
+
+export async function getServerPersonDetails(personId: number): Promise<PersonDetails> {
+  return fetchTMDB<PersonDetails>(`/person/${personId}`);
+}
+
+export async function getServerPersonCombinedCredits(
+  personId: number,
+): Promise<PersonCombinedCreditsResponse> {
+  return fetchTMDB<PersonCombinedCreditsResponse>(`/person/${personId}/combined_credits`);
 }
 
 export async function getServerMovieGenres(): Promise<Genre[]> {

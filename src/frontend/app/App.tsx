@@ -27,6 +27,7 @@ const Upcoming = lazy(() => import("@/frontend/features/browse/Upcoming"));
 const Search = lazy(() => import("@/frontend/features/browse/Search"));
 const MovieDetail = lazy(() => import("@/frontend/features/browse/MovieDetail"));
 const TVDetail = lazy(() => import("@/frontend/features/browse/TVDetail"));
+const PersonDetail = lazy(() => import("@/frontend/features/browse/PersonDetail"));
 const Profile = lazy(() => import("@/frontend/features/profile/Profile"));
 const ProfileEdit = lazy(() => import("@/frontend/features/profile/ProfileEdit"));
 const Reckon = lazy(() => import("@/frontend/features/recommendations/Reckon"));
@@ -107,6 +108,7 @@ const App = ({
                       <Route path="/search" element={<Search />} />
                       <Route path="/movie/:id" element={<MovieDetail />} />
                       <Route path="/tv/:id" element={<TVDetail />} />
+                      <Route path="/person/:id" element={<PersonDetail />} />
                       <Route path="/profile" element={<Profile />} />
                       <Route path="/profile/edit" element={<ProfileEdit />} />
                       <Route path="/reckon" element={<Reckon />} />

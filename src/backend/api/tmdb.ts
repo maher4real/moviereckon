@@ -25,6 +25,8 @@ const ALLOWED_ENDPOINT_PATTERNS = [
   /^\/(movie|tv)\/\d+\/(credits|videos|similar|recommendations|watch\/providers|reviews|keywords)$/,
   /^\/movie\/\d+\/(release_dates|keywords)$/,
   /^\/tv\/\d+\/season\/\d+$/,
+  /^\/person\/\d+$/,
+  /^\/person\/\d+\/combined_credits$/,
   /^\/search\/(movie|tv|multi)$/,
   /^\/genre\/(movie|tv)\/list$/,
 ];

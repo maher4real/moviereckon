@@ -16,6 +16,8 @@ import {
   getServerMovieReleaseDates,
   getServerMovieVideos,
   getServerMovieWatchProviders,
+  getServerPersonCombinedCredits,
+  getServerPersonDetails,
   getServerPopularTVShows,
   getServerSimilarMovies,
   getServerSimilarTVShows,
@@ -196,6 +198,19 @@ async function prefetchTVDetailQueries(queryClient: QueryClient, tvId: number) {
     queryClient.prefetchQuery({
       queryKey: ["tv-keywords", tvId],
       queryFn: () => getServerTVShowKeywords(tvId),
+    }),
+  ]);
+}
+
+async function prefetchPersonDetailQueries(queryClient: QueryClient, personId: number) {
+  await Promise.allSettled([
+    queryClient.prefetchQuery({
+      queryKey: ["person", personId],
+      queryFn: () => getServerPersonDetails(personId),
+    }),
+    queryClient.prefetchQuery({
+      queryKey: ["person-combined-credits", personId],
+      queryFn: () => getServerPersonCombinedCredits(personId),
     }),
   ]);
 }
@@ -425,6 +440,15 @@ async function prefetchRouteData(
     const tvId = Number(tvMatch[1]);
     if (tvId > 0) {
       await prefetchTVDetailQueries(queryClient, tvId);
+    }
+    return;
+  }
+
+  const personMatch = /^\/person\/(\d+)$/.exec(pathname);
+  if (personMatch) {
+    const personId = Number(personMatch[1]);
+    if (personId > 0) {
+      await prefetchPersonDetailQueries(queryClient, personId);
     }
   }
 }
