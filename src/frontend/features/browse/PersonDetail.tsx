@@ -130,20 +130,20 @@ function WorkCard({
     <button
       type="button"
       onClick={() => navigate(`/${credit.media_type}/${credit.id}`, { state: { from: fromPath } })}
-      className="group rounded-xl border border-border/70 bg-card/45 p-3 text-left transition-all duration-300 hover:border-primary/40 hover:bg-card/70"
+      className="group rounded-xl border border-border/70 bg-card/45 p-2.5 sm:p-3 text-left transition-all duration-300 hover:border-primary/40 hover:bg-card/70"
     >
-      <div className="flex gap-3">
+      <div className="flex gap-2.5 sm:gap-3">
         <MediaImage
           src={getPosterUrl(credit.poster_path, "small")}
           alt={title}
-          className="h-24 w-16 shrink-0 rounded-md object-cover bg-muted/30"
+          className="h-20 w-14 sm:h-24 sm:w-16 shrink-0 rounded-md object-cover bg-muted/30"
           fallbackSrc="/fallbacks/poster.svg"
         />
         <div className="min-w-0 flex-1">
-          <p className="line-clamp-2 text-sm font-semibold leading-tight group-hover:text-primary transition-colors">
+          <p className="line-clamp-2 text-[13px] sm:text-sm font-semibold leading-tight group-hover:text-primary transition-colors">
             {title}
           </p>
-          <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="mt-1 flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-muted-foreground">
             {credit.media_type === "movie" ? (
               <Clapperboard className="h-3.5 w-3.5" />
             ) : (
@@ -153,8 +153,8 @@ function WorkCard({
             <span>•</span>
             <span>{getCreditYear(credit)}</span>
           </div>
-          <p className="mt-2 line-clamp-2 text-xs text-foreground/90">{roleLabel}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1.5 sm:mt-2 line-clamp-2 text-[11px] sm:text-xs text-foreground/90">{roleLabel}</p>
+          <p className="mt-1 text-[11px] sm:text-xs text-muted-foreground">
             Rating: {credit.vote_average > 0 ? credit.vote_average.toFixed(1) : "N/A"}
           </p>
         </div>
@@ -177,7 +177,7 @@ function KnownForCard({
     <button
       type="button"
       onClick={() => navigate(`/${credit.media_type}/${credit.id}`, { state: { from: fromPath } })}
-      className="group w-40 shrink-0 text-left"
+      className="group w-32 sm:w-36 md:w-40 shrink-0 text-left"
     >
       <div className="overflow-hidden rounded-xl border border-border/70 bg-card/45 transition-all duration-300 group-hover:border-primary/40">
         <MediaImage
@@ -297,7 +297,7 @@ export default function PersonDetail() {
     return (
       <div className="min-h-screen bg-background">
         <Header />
-        <div className="pt-24 container mx-auto px-4 space-y-4">
+        <div className="pt-20 sm:pt-24 container mx-auto px-3 sm:px-4 space-y-3 sm:space-y-4">
           <div className="h-12 w-14 animate-pulse rounded-full bg-muted" />
           <div className="h-72 animate-pulse rounded-2xl bg-muted" />
           <div className="h-48 animate-pulse rounded-2xl bg-muted" />
@@ -323,21 +323,21 @@ export default function PersonDetail() {
     <div className="min-h-screen bg-background pb-20 md:pb-0 overflow-x-hidden">
       <Header />
 
-      <main className="pt-20">
+      <main className="pt-16 sm:pt-20">
         <section className="relative overflow-hidden border-b border-border/60">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(220,38,38,0.22),transparent_42%),radial-gradient(circle_at_85%_20%,rgba(251,146,60,0.15),transparent_30%),linear-gradient(to_bottom,rgba(15,15,18,0.8),rgba(10,10,12,1))]" />
-          <div className="container relative mx-auto px-4 py-6 md:py-8">
+          <div className="container relative mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8">
             <Button
               variant="ghost"
               onClick={handleBack}
               aria-label="Go back"
-              className="mb-5 h-11 w-11 rounded-full border border-border/70 bg-background/75 p-0 hover:bg-background"
+              className="mb-4 sm:mb-5 h-10 w-10 sm:h-11 sm:w-11 rounded-full border border-border/70 bg-background/75 p-0 hover:bg-background"
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
 
-            <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
-              <div className="mx-auto w-full max-w-[280px]">
+            <div className="grid gap-4 sm:gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
+              <div className="mx-auto w-full max-w-[210px] sm:max-w-[240px] xl:max-w-[280px]">
                 <div className="rounded-3xl border border-border/70 bg-gradient-to-b from-card/70 to-card/35 p-3 shadow-2xl">
                   <MediaImage
                     src={profileImageSrc}
@@ -353,51 +353,51 @@ export default function PersonDetail() {
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
                     Biography
                   </p>
-                  <h1 className="mt-1 text-3xl sm:text-4xl font-bold tracking-tight">{person.name}</h1>
+                  <h1 className="mt-1 text-2xl sm:text-4xl font-bold tracking-tight">{person.name}</h1>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <span className="rounded-full border border-border/70 bg-card/70 px-3 py-1 text-xs text-foreground/90">
+                  <span className="rounded-full border border-border/70 bg-card/70 px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs text-foreground/90">
                     {person.known_for_department || "Department Unknown"}
                   </span>
-                  <span className="rounded-full border border-border/70 bg-card/70 px-3 py-1 text-xs text-foreground/90">
+                  <span className="rounded-full border border-border/70 bg-card/70 px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs text-foreground/90">
                     Gender: {getGenderLabel(person.gender)}
                   </span>
-                  <span className="rounded-full border border-border/70 bg-card/70 px-3 py-1 text-xs text-foreground/90">
+                  <span className="rounded-full border border-border/70 bg-card/70 px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs text-foreground/90">
                     Popularity: {person.popularity ? person.popularity.toFixed(1) : "N/A"}
                   </span>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl border border-border/70 bg-card/55 p-3">
+                  <div className="rounded-xl border border-border/70 bg-card/55 p-2.5 sm:p-3">
                     <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                       <CalendarDays className="h-4 w-4" />
                       Born
                     </p>
-                    <p className="mt-1 text-sm font-semibold">{bornWithAge}</p>
+                    <p className="mt-1 text-[13px] sm:text-sm font-semibold">{bornWithAge}</p>
                   </div>
-                  <div className="rounded-xl border border-border/70 bg-card/55 p-3">
+                  <div className="rounded-xl border border-border/70 bg-card/55 p-2.5 sm:p-3">
                     <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                       <MapPin className="h-4 w-4" />
                       Place of Birth
                     </p>
-                    <p className="mt-1 text-sm font-semibold">
+                    <p className="mt-1 text-[13px] sm:text-sm font-semibold">
                       {person.place_of_birth || "Unknown"}
                     </p>
                   </div>
-                  <div className="rounded-xl border border-border/70 bg-card/55 p-3">
+                  <div className="rounded-xl border border-border/70 bg-card/55 p-2.5 sm:p-3">
                     <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                       <UserRound className="h-4 w-4" />
                       Status
                     </p>
-                    <p className="mt-1 text-sm font-semibold">{statusValue}</p>
+                    <p className="mt-1 text-[13px] sm:text-sm font-semibold">{statusValue}</p>
                   </div>
-                  <div className="rounded-xl border border-border/70 bg-card/55 p-3">
+                  <div className="rounded-xl border border-border/70 bg-card/55 p-2.5 sm:p-3">
                     <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                       <BriefcaseBusiness className="h-4 w-4" />
                       Known For
                     </p>
-                    <p className="mt-1 text-sm font-semibold">
+                    <p className="mt-1 text-[13px] sm:text-sm font-semibold">
                       {person.known_for_department || "Not specified"}
                     </p>
                   </div>
@@ -405,19 +405,19 @@ export default function PersonDetail() {
 
                 <div className="rounded-2xl border border-border/70 bg-card/45 p-4">
                   <h2 className="text-lg font-semibold mb-2">Biography</h2>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
+                  <p className="text-[13px] sm:text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
                     {biography}
                   </p>
                 </div>
 
                 {person.also_known_as?.length > 0 && (
-                  <div className="rounded-2xl border border-border/70 bg-card/45 p-4">
+                  <div className="rounded-2xl border border-border/70 bg-card/45 p-3 sm:p-4">
                     <h2 className="text-lg font-semibold mb-2">Also Known As</h2>
                     <div className="flex flex-wrap gap-2">
                       {person.also_known_as.map((alias) => (
                         <span
                           key={alias}
-                          className="rounded-full border border-border/70 bg-background/60 px-3 py-1 text-xs text-foreground/90"
+                          className="rounded-full border border-border/70 bg-background/60 px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs text-foreground/90"
                         >
                           {alias}
                         </span>
@@ -431,8 +431,8 @@ export default function PersonDetail() {
         </section>
 
         {knownForCredits.length > 0 && (
-          <section className="container mx-auto px-4 pt-8">
-            <h2 className="mb-3 flex items-center gap-2 text-2xl font-bold">
+          <section className="container mx-auto px-3 sm:px-4 pt-6 sm:pt-8">
+            <h2 className="mb-3 flex items-center gap-2 text-xl sm:text-2xl font-bold">
               <Sparkles className="h-5 w-5 text-primary" />
               Known For
             </h2>
@@ -451,10 +451,10 @@ export default function PersonDetail() {
           </section>
         )}
 
-        <section className="container mx-auto px-4 py-8">
+        <section className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-2xl font-bold">Filmography</h2>
+              <h2 className="text-xl sm:text-2xl font-bold">Filmography</h2>
               <p className="text-sm text-muted-foreground">
                 Complete credits fetched from TMDB API.
               </p>

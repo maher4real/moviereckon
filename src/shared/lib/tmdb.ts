@@ -64,6 +64,28 @@ export interface TVShow {
   origin_country: string[];
 }
 
+export interface PersonSearchResult {
+  id: number;
+  media_type: "person";
+  name: string;
+  profile_path: string | null;
+  known_for_department?: string;
+  popularity?: number;
+  adult?: boolean;
+  gender?: number;
+  known_for?: Array<{
+    id: number;
+    media_type?: "movie" | "tv";
+    title?: string;
+    name?: string;
+  }>;
+}
+
+export type MultiSearchResult =
+  | (Movie & { media_type?: "movie" })
+  | (TVShow & { media_type?: "tv" })
+  | PersonSearchResult;
+
 export interface MovieDetails extends Movie {
   runtime: number;
   genres: { id: number; name: string }[];
@@ -675,8 +697,8 @@ export function getStillUrl(
 }
 
 // Search
-export async function searchMulti(query: string, page = 1): Promise<TMDBResponse<Movie | TVShow>> {
-  return fetchTMDB<TMDBResponse<Movie | TVShow>>("/search/multi", {
+export async function searchMulti(query: string, page = 1): Promise<TMDBResponse<MultiSearchResult>> {
+  return fetchTMDB<TMDBResponse<MultiSearchResult>>("/search/multi", {
     query,
     page,
     include_adult: "false",

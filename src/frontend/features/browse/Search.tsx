@@ -7,8 +7,11 @@ import {
   getTrendingMovies,
   getTrendingTVShows,
   Movie,
+  MultiSearchResult,
+  PersonSearchResult,
   TVShow,
   getPosterUrl,
+  getProfileUrl,
   getLanguageBadgeClass,
 } from "@/shared/lib/tmdb";
 import Header from "@/frontend/components/Header";
@@ -25,24 +28,63 @@ import { cn } from "@/shared/lib/utils";
 const RECENT_SEARCHES_KEY = "moviereckon_recent_searches";
 const MAX_RECENT_SEARCHES = 10;
 
-type FilterType = "all" | "movie" | "tv";
+type FilterType = "all" | "movie" | "tv" | "person";
+
+function isPersonResult(item: MultiSearchResult): item is PersonSearchResult {
+  return (item as PersonSearchResult).media_type === "person";
+}
+
+function isTVResult(item: MultiSearchResult): item is TVShow {
+  return "first_air_date" in item;
+}
+
+function isMovieResult(item: MultiSearchResult): item is Movie {
+  return "title" in item;
+}
 
 // Memoized result card
-const ResultCard = memo(({ item, onClick }: { item: Movie | TVShow; onClick: () => void }) => {
-  const isTV = "first_air_date" in item;
-  const title = isTV ? (item as TVShow).name : (item as Movie).title;
-  const date = isTV ? (item as TVShow).first_air_date : (item as Movie).release_date;
-  const year = date?.split("-")[0] || "";
+const ResultCard = memo(({ item, onClick }: { item: MultiSearchResult; onClick: () => void }) => {
+  const personResult = isPersonResult(item) ? item : null;
+  const mediaItem = personResult ? null : (item as Movie | TVShow);
+  const title = (() => {
+    if (personResult) return personResult.name;
+    if (!mediaItem) return "Untitled";
+    if (isTVResult(mediaItem)) return mediaItem.name;
+    return mediaItem.title;
+  })();
+  const subtitle = (() => {
+    if (personResult) {
+      const department = personResult.known_for_department?.trim();
+      const knownFor = (personResult.known_for || [])
+        .map((credit) => credit.title || credit.name)
+        .filter((value): value is string => Boolean(value))
+        .slice(0, 2)
+        .join(" • ");
+      if (department && knownFor) return `${department} • ${knownFor}`;
+      if (department) return department;
+      if (knownFor) return knownFor;
+      return "Cast";
+    }
+    if (!mediaItem) return "";
+    const isTV = isTVResult(mediaItem);
+    const date = isTV ? mediaItem.first_air_date : mediaItem.release_date;
+    const year = date?.split("-")[0] || "";
+    return `${year} • ${isTV ? "TV" : "Movie"}`;
+  })();
+  const imageSrc = personResult
+    ? getProfileUrl(personResult.profile_path, "large")
+    : getPosterUrl(mediaItem?.poster_path || null, "medium");
+  const rating = mediaItem && mediaItem.vote_average > 0 ? mediaItem.vote_average.toFixed(1) : null;
 
   return (
     <div onClick={onClick} className="cursor-pointer group">
       <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
         <MediaImage
-          src={getPosterUrl(item.poster_path, "medium")}
+          src={imageSrc}
           alt={title}
           className="w-full h-full object-cover"
           loading="lazy"
-          fallbackSrc="/fallbacks/poster.svg"
+          fallbackSrc={personResult ? "/fallbacks/profile.svg" : "/fallbacks/poster.svg"}
         />
 
         {/* Hover Overlay */}
@@ -53,14 +95,20 @@ const ResultCard = memo(({ item, onClick }: { item: Movie | TVShow; onClick: () 
         </div>
 
         {/* Language Badge */}
-        <div className={cn("absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold", getLanguageBadgeClass(item.original_language))}>
-          {item.original_language.toUpperCase()}
-        </div>
+        {personResult ? (
+          <div className="absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold bg-primary/90 text-primary-foreground">
+            Cast
+          </div>
+        ) : (
+          <div className={cn("absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold", getLanguageBadgeClass(mediaItem?.original_language || "en"))}>
+            {(mediaItem?.original_language || "en").toUpperCase()}
+          </div>
+        )}
 
         {/* Rating Badge */}
-        {item.vote_average > 0 && (
+        {rating && (
           <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
-            ⭐ {item.vote_average.toFixed(1)}
+            ⭐ {rating}
           </div>
         )}
       </div>
@@ -68,7 +116,7 @@ const ResultCard = memo(({ item, onClick }: { item: Movie | TVShow; onClick: () 
       <h3 className="mt-2 font-medium text-sm line-clamp-1 group-hover:text-primary transition-colors">
         {title}
       </h3>
-      <p className="text-xs text-muted-foreground">{year} • {isTV ? "TV" : "Movie"}</p>
+      <p className="text-xs text-muted-foreground line-clamp-2">{subtitle}</p>
     </div>
   );
 });
@@ -150,15 +198,12 @@ export default function Search() {
     if (!searchResults?.results) return [];
 
     return searchResults.results.filter((item) => {
-      // Filter out people
-      if (!("title" in item) && !("name" in item)) return false;
-      if (!("poster_path" in item)) return false;
-
       if (filterType === "all") return true;
-      if (filterType === "movie") return "title" in item;
-      if (filterType === "tv") return "first_air_date" in item;
+      if (filterType === "movie") return isMovieResult(item);
+      if (filterType === "tv") return isTVResult(item);
+      if (filterType === "person") return isPersonResult(item);
       return true;
-    }) as (Movie | TVShow)[];
+    });
   }, [searchResults, filterType]);
 
   // Save to recent searches
@@ -178,13 +223,16 @@ export default function Search() {
     localStorage.removeItem(RECENT_SEARCHES_KEY);
   }, []);
 
-  const handleItemClick = useCallback((item: Movie | TVShow) => {
+  const handleItemClick = useCallback((item: MultiSearchResult) => {
     if (debouncedQuery) {
       saveRecentSearch(debouncedQuery);
     }
-    const isTV = "first_air_date" in item;
     const fromPath = `${location.pathname}${location.search}${location.hash}`;
-    navigate(`/${isTV ? "tv" : "movie"}/${item.id}`, {
+    if (isPersonResult(item)) {
+      navigate(`/person/${item.id}`, { state: { from: fromPath } });
+      return;
+    }
+    navigate(`/${isTVResult(item) ? "tv" : "movie"}/${item.id}`, {
       state: { from: fromPath },
     });
   }, [navigate, debouncedQuery, saveRecentSearch, location.pathname, location.search, location.hash]);
@@ -209,7 +257,7 @@ export default function Search() {
               <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <Input
                 type="text"
-                placeholder="Search movies, TV shows..."
+                placeholder="Search movies, TV shows, cast..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="h-14 pl-12 pr-12 text-lg bg-card border-border focus:border-primary"
@@ -238,6 +286,7 @@ export default function Search() {
                   <TabsTrigger value="all">All</TabsTrigger>
                   <TabsTrigger value="movie">Movies</TabsTrigger>
                   <TabsTrigger value="tv">TV Shows</TabsTrigger>
+                  <TabsTrigger value="person">Cast</TabsTrigger>
                 </TabsList>
               </Tabs>
             )}
@@ -317,7 +366,7 @@ export default function Search() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {filteredResults.map((item) => (
                 <ResultCard
-                  key={`${item.id}-${"first_air_date" in item ? "tv" : "movie"}`}
+                  key={`${item.id}-${isPersonResult(item) ? "person" : isTVResult(item) ? "tv" : "movie"}`}
                   item={item}
                   onClick={() => handleItemClick(item)}
                 />
