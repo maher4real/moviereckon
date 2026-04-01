@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle2,
@@ -9,7 +9,6 @@ import {
   Pencil,
   Rocket,
   Star,
-  ThumbsUp,
   Timer,
   Trash2,
 } from "lucide-react";
@@ -55,8 +54,6 @@ interface StarRatingProps {
   sizeClass?: string;
 }
 
-type TabId = "write" | "community" | "reviews" | "feedback";
-
 const INITIAL_PUBLIC_REVIEWS_VISIBLE = 6;
 const PUBLIC_REVIEWS_LOAD_STEP = 6;
 const PUBLIC_REVIEW_PREVIEW_LENGTH = 420;
@@ -64,23 +61,16 @@ const PUBLIC_REVIEW_PREVIEW_LENGTH = 420;
 type FeedbackOption = {
   value: mongoClient.FeedbackType;
   label: string;
-  hint: string;
   icon: typeof Rocket;
+  color: string;
 };
 
 const FEEDBACK_OPTIONS: FeedbackOption[] = [
-  { value: "give_it_a_go", label: "Give it a go", hint: "Worth trying at least once.", icon: Rocket },
-  { value: "one_time_watch", label: "One-time watch", hint: "Decent, but not a rewatch.", icon: Timer },
-  { value: "must_watch", label: "Must Watch", hint: "Highly recommended by viewers.", icon: Medal },
-  { value: "skip", label: "Skip", hint: "Not worth your time.", icon: CircleX },
+  { value: "give_it_a_go", label: "Give it a go", icon: Rocket, color: "text-blue-400 bg-blue-400/10 border-blue-400/30" },
+  { value: "one_time_watch", label: "One-time watch", icon: Timer, color: "text-amber-400 bg-amber-400/10 border-amber-400/30" },
+  { value: "must_watch", label: "Must Watch", icon: Medal, color: "text-emerald-400 bg-emerald-400/10 border-emerald-400/30" },
+  { value: "skip", label: "Skip", icon: CircleX, color: "text-rose-400 bg-rose-400/10 border-rose-400/30" },
 ];
-
-const EMPTY_COUNTS: Record<mongoClient.FeedbackType, number> = {
-  give_it_a_go: 0,
-  one_time_watch: 0,
-  must_watch: 0,
-  skip: 0,
-};
 
 function formatTimestamp(value: string) {
   const date = new Date(value);
@@ -123,12 +113,18 @@ function StarRating({ value, onChange, max = 10, interactive = false, sizeClass 
   );
 }
 
-const TABS: { id: TabId; label: string; icon: typeof MessageSquare }[] = [
-  { id: "write", label: "Write Review", icon: Pencil },
-  { id: "community", label: "Community", icon: MessageSquare },
-  { id: "reviews", label: "Public Reviews", icon: Globe },
-  { id: "feedback", label: "Feedback", icon: ThumbsUp },
-];
+function FeedbackTag({ feedbackType }: { feedbackType: mongoClient.FeedbackType }) {
+  const option = FEEDBACK_OPTIONS.find((o) => o.value === feedbackType);
+  if (!option) return null;
+  const Icon = option.icon;
+
+  return (
+    <span className={cn("inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border", option.color)}>
+      <Icon className="w-2.5 h-2.5" />
+      {option.label}
+    </span>
+  );
+}
 
 export default function CommentsSection({
   contentId,
@@ -138,9 +134,9 @@ export default function CommentsSection({
   genres,
   language,
 }: CommentsSectionProps) {
-  const [activeTab, setActiveTab] = useState<TabId>("write");
   const [commentText, setCommentText] = useState("");
   const [commentRating, setCommentRating] = useState(8);
+  const [selectedFeedback, setSelectedFeedback] = useState<mongoClient.FeedbackType | null>(null);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [editRating, setEditRating] = useState(8);
@@ -156,13 +152,15 @@ export default function CommentsSection({
     setVisiblePublicReviews(INITIAL_PUBLIC_REVIEWS_VISIBLE);
     setExpandedPublicReviews({});
     setEditingCommentId(null);
-    setActiveTab("write");
+    setCommentText("");
+    setCommentRating(8);
+    // Pre-fill feedback selector with the user's existing feedback for this content
+    setSelectedFeedback(getFeedback(contentId, contentType));
   }, [contentId, contentType]);
 
   const hasValidCommentRating = Number.isInteger(commentRating) && commentRating >= 1 && commentRating <= 10;
 
   const queryKey = useMemo(() => ["content-comments", contentType, contentId], [contentType, contentId]);
-  const feedbackQueryKey = useMemo(() => ["content-feedback", contentType, contentId], [contentType, contentId]);
 
   const { data: comments = [], isLoading: commentsLoading } = useQuery({
     queryKey,
@@ -183,31 +181,39 @@ export default function CommentsSection({
     staleTime: 1000 * 60 * 30,
   });
 
-  const { data: feedbackSummary } = useQuery({
-    queryKey: feedbackQueryKey,
-    queryFn: () => mongoClient.fetchContentFeedbackSummary(contentId, contentType),
-    enabled: !!contentId,
-    staleTime: 60_000,
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
-  });
-
   const postCommentMutation = useMutation({
-    mutationFn: () =>
-      mongoClient.postComment({
+    mutationFn: async () => {
+      const comment = await mongoClient.postComment({
         content_id: contentId,
         content_type: contentType,
         text: commentText.trim(),
         rating: commentRating,
-      }),
+      });
+
+      // Save feedback alongside the comment if one is selected
+      if (selectedFeedback) {
+        await setFeedback({
+          content_id: contentId,
+          content_type: contentType,
+          feedback_type: selectedFeedback,
+          title,
+          poster_path: posterPath,
+          genres,
+          language,
+        });
+      }
+
+      return comment;
+    },
     onSuccess: async (newComment) => {
       setCommentText("");
       setCommentRating(8);
+
       if (newComment) {
         queryClient.setQueryData<mongoClient.CommentItem[]>(queryKey, (prev = []) => [newComment, ...prev]);
       }
+
       await queryClient.invalidateQueries({ queryKey });
-      setActiveTab("community");
     },
     onError: (error) => {
       toast({
@@ -253,24 +259,7 @@ export default function CommentsSection({
     },
   });
 
-  const feedbackMutation = useMutation({
-    mutationFn: async (feedbackType: mongoClient.FeedbackType) => {
-      await setFeedback({
-        content_id: contentId,
-        content_type: contentType,
-        feedback_type: feedbackType,
-        title,
-        poster_path: posterPath,
-        genres,
-        language,
-      });
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: feedbackQueryKey });
-    },
-  });
-
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = (event: { preventDefault(): void }) => {
     event.preventDefault();
     if (!commentText.trim() || !hasValidCommentRating || postCommentMutation.isPending) return;
     postCommentMutation.mutate();
@@ -307,94 +296,79 @@ export default function CommentsSection({
 
   const visibleReviews = publicReviews.slice(0, visiblePublicReviews);
 
-  const selectedFeedback = feedbackSummary?.user_feedback || getFeedback(contentId, contentType);
-  const feedbackCounts = feedbackSummary?.counts || EMPTY_COUNTS;
-  const totalFeedbackVotes = FEEDBACK_OPTIONS.reduce((acc, o) => acc + (feedbackCounts[o.value] || 0), 0);
-
   return (
     <section className="mt-10 max-w-4xl">
-      <div className="mb-5">
-        <h2 className="text-xl font-semibold mb-1">Community</h2>
-        <p className="text-sm text-muted-foreground">Reviews, ratings & community reactions</p>
-      </div>
+      <h2 className="text-xl font-semibold mb-2">Comments & Reviews</h2>
+      <p className="text-sm text-muted-foreground mb-4">Community discussions with ratings</p>
 
-      {/* Tab selector */}
-      <div className="flex items-center gap-1 p-1 rounded-xl bg-muted/40 border border-border/50 mb-6 overflow-x-auto scrollbar-hide">
-        {TABS.map(({ id, label, icon: Icon }) => {
-          const isActive = activeTab === id;
-          let badge: number | null = null;
-          if (id === "community") badge = comments.length;
-          if (id === "reviews") badge = publicReviews.length;
-          if (id === "feedback") badge = totalFeedbackVotes;
+      {/* Write Review Form */}
+      <form onSubmit={handleSubmit} className="space-y-3 mb-6 rounded-xl border border-border bg-card/50 p-4">
+        {/* Feedback selector */}
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground">Your Reaction (optional)</p>
+          <div className="flex flex-wrap gap-2">
+            {FEEDBACK_OPTIONS.map((option) => {
+              const Icon = option.icon;
+              const isSelected = selectedFeedback === option.value;
 
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setActiveTab(id)}
-              className={cn(
-                "flex-1 min-w-fit flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap",
-                isActive
-                  ? "bg-card text-foreground shadow-sm border border-border/60"
-                  : "text-muted-foreground hover:text-foreground hover:bg-card/50",
-              )}
-            >
-              <Icon className="w-3.5 h-3.5 shrink-0" />
-              {label}
-              {badge !== null && badge > 0 && (
-                <span
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setSelectedFeedback(isSelected ? null : option.value)}
                   className={cn(
-                    "text-[10px] font-semibold px-1.5 py-0.5 rounded-full leading-none",
-                    isActive ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground",
+                    "inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition-all duration-200",
+                    isSelected
+                      ? cn(option.color, "shadow-sm scale-[1.04]")
+                      : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground bg-card/40",
                   )}
                 >
-                  {badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+                  <Icon className="w-3 h-3" />
+                  {option.label}
+                  {isSelected && <CheckCircle2 className="w-3 h-3 ml-0.5" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-      {/* Tab: Write Review */}
-      {activeTab === "write" && (
-        <form onSubmit={handleSubmit} className="space-y-3 rounded-xl border border-border bg-card/50 p-4">
-          <Textarea
-            value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
-            placeholder="Share your thoughts..."
-            maxLength={1000}
-            className="min-h-[96px] w-full max-w-full bg-card"
-          />
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div className="space-y-1 min-w-[220px]">
-              <p className="text-xs text-muted-foreground">Your Rating (1-10)</p>
-              <div className="flex items-center gap-2">
-                <StarRating value={commentRating} onChange={setCommentRating} interactive />
-                <span className="text-sm font-medium text-foreground/90">{commentRating}/10</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 ml-auto">
-              <p className="text-xs text-muted-foreground">{commentText.length}/1000</p>
-              <Button
-                type="submit"
-                disabled={!commentText.trim() || !hasValidCommentRating || postCommentMutation.isPending}
-                className="bg-primary hover:bg-primary/90"
-              >
-                {postCommentMutation.isPending ? "Posting..." : "Post Comment"}
-              </Button>
+        <Textarea
+          value={commentText}
+          onChange={(e) => setCommentText(e.target.value)}
+          placeholder="Share your thoughts..."
+          maxLength={1000}
+          className="min-h-24 w-full max-w-full bg-card"
+        />
+
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="space-y-1 min-w-55">
+            <p className="text-xs text-muted-foreground">Your Rating (1-10)</p>
+            <div className="flex items-center gap-2">
+              <StarRating value={commentRating} onChange={setCommentRating} interactive />
+              <span className="text-sm font-medium text-foreground/90">{commentRating}/10</span>
             </div>
           </div>
-        </form>
-      )}
 
-      {/* Tab: Community Comments */}
-      {activeTab === "community" && (
+          <div className="flex items-center gap-3 ml-auto">
+            <p className="text-xs text-muted-foreground">{commentText.length}/1000</p>
+            <Button
+              type="submit"
+              disabled={!commentText.trim() || !hasValidCommentRating || postCommentMutation.isPending}
+              className="bg-primary hover:bg-primary/90"
+            >
+              {postCommentMutation.isPending ? "Posting..." : "Post Comment"}
+            </Button>
+          </div>
+        </div>
+      </form>
+
+      <div className="space-y-7">
+        {/* Community Comments */}
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+          <h3 className="text-base font-semibold mb-3 flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-primary" />
-              {comments.length} {comments.length === 1 ? "comment" : "comments"}
+              Community Comments
             </span>
             {communityAverageRating !== null && (
               <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-primary/15 text-primary whitespace-nowrap">
@@ -402,7 +376,7 @@ export default function CommentsSection({
                 Avg {communityAverageRating.toFixed(1)} / 10
               </span>
             )}
-          </div>
+          </h3>
 
           {commentsLoading ? (
             <div className="space-y-3">
@@ -415,16 +389,8 @@ export default function CommentsSection({
               ))}
             </div>
           ) : comments.length === 0 ? (
-            <div className="rounded-lg bg-card border border-border p-8 text-center">
-              <MessageSquare className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" />
-              <p className="text-muted-foreground text-sm">No comments yet.</p>
-              <button
-                type="button"
-                onClick={() => setActiveTab("write")}
-                className="mt-2 text-xs text-primary hover:underline"
-              >
-                Be the first to share your review
-              </button>
+            <div className="rounded-lg bg-card border border-border p-6 text-center">
+              <p className="text-muted-foreground">No comments yet. Be the first to share your review.</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -432,6 +398,8 @@ export default function CommentsSection({
                 const isOwner = !!user && comment.user_id === user.id;
                 const isEditing = editingCommentId === comment.id;
                 const hasRating = typeof comment.rating === "number" && comment.rating >= 1 && comment.rating <= 10;
+                // Show feedback tag on the current user's own comments
+                const userFeedback = isOwner ? getFeedback(contentId, contentType) : null;
 
                 return (
                   <article key={comment.id} className="rounded-lg bg-card border border-border p-4">
@@ -441,7 +409,10 @@ export default function CommentsSection({
                           {comment.username?.charAt(0)?.toUpperCase() || "U"}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{comment.username || "User"}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-medium truncate">{comment.username || "User"}</p>
+                            {userFeedback && <FeedbackTag feedbackType={userFeedback} />}
+                          </div>
                           <p className="text-[11px] text-muted-foreground">{formatTimestamp(comment.created_at)}</p>
                         </div>
                       </div>
@@ -533,7 +504,7 @@ export default function CommentsSection({
                         </div>
                       </div>
                     ) : (
-                      <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words">{comment.text}</p>
+                      <p className="text-sm text-foreground/90 whitespace-pre-wrap wrap-break-word">{comment.text}</p>
                     )}
                   </article>
                 );
@@ -541,15 +512,13 @@ export default function CommentsSection({
             </div>
           )}
         </div>
-      )}
 
-      {/* Tab: Public Reviews */}
-      {activeTab === "reviews" && (
+        {/* Public Reviews */}
         <div>
-          <div className="flex items-center gap-2 mb-3">
+          <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
             <Globe className="w-4 h-4 text-secondary" />
-            <span className="text-sm font-medium text-muted-foreground">{publicReviews.length} public {publicReviews.length === 1 ? "review" : "reviews"} from TMDB</span>
-          </div>
+            Public Reviews
+          </h3>
 
           {reviewsLoading ? (
             <div className="space-y-3">
@@ -562,9 +531,8 @@ export default function CommentsSection({
               ))}
             </div>
           ) : publicReviews.length === 0 ? (
-            <div className="rounded-lg bg-card border border-border p-8 text-center">
-              <Globe className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" />
-              <p className="text-muted-foreground text-sm">No public reviews found for this title.</p>
+            <div className="rounded-lg bg-card border border-border p-6 text-center">
+              <p className="text-muted-foreground">No public reviews found for this title.</p>
             </div>
           ) : (
             <>
@@ -600,7 +568,7 @@ export default function CommentsSection({
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-foreground/85 whitespace-pre-wrap break-words">{displayText}</p>
+                      <p className="text-sm text-foreground/85 whitespace-pre-wrap wrap-break-word">{displayText}</p>
                       {shouldTruncate && (
                         <button
                           type="button"
@@ -614,6 +582,7 @@ export default function CommentsSection({
                   );
                 })}
               </div>
+
               {publicReviews.length > visiblePublicReviews && (
                 <div className="mt-3 flex justify-center">
                   <Button
@@ -621,59 +590,14 @@ export default function CommentsSection({
                     variant="outline"
                     onClick={() => setVisiblePublicReviews((prev) => prev + PUBLIC_REVIEWS_LOAD_STEP)}
                   >
-                    Load more reviews
+                    Load more public reviews
                   </Button>
                 </div>
               )}
             </>
           )}
         </div>
-      )}
-
-      {/* Tab: Community Feedback */}
-      {activeTab === "feedback" && (
-        <div>
-          <p className="text-sm text-muted-foreground mb-4">
-            Your reaction helps improve recommendations for everyone.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {FEEDBACK_OPTIONS.map((option) => {
-              const Icon = option.icon;
-              const isSelected = selectedFeedback === option.value;
-              const count = feedbackCounts[option.value] || 0;
-              const voteShare = totalFeedbackVotes > 0 ? Math.round((count / totalFeedbackVotes) * 100) : 0;
-
-              return (
-                <Button
-                  key={option.value}
-                  type="button"
-                  variant="outline"
-                  onClick={() => feedbackMutation.mutate(option.value)}
-                  disabled={feedbackMutation.isPending}
-                  className={cn(
-                    "h-auto min-h-[110px] p-4 rounded-xl whitespace-normal text-left flex-col items-start gap-2 transition-all duration-300 ease-out",
-                    isSelected
-                      ? "border-primary/70 bg-primary/10 shadow-md shadow-primary/15"
-                      : "border-border/70 bg-card/40 hover:border-primary/40 hover:bg-card/70",
-                  )}
-                >
-                  <div className="w-full flex items-start justify-between gap-2">
-                    <span className="inline-flex items-center gap-2 text-sm font-semibold leading-tight">
-                      <Icon className={cn("w-4 h-4", isSelected ? "text-primary" : "text-muted-foreground")} />
-                      {option.label}
-                    </span>
-                    {isSelected && <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />}
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-snug">{option.hint}</p>
-                  <p className="w-full mt-1 text-[11px] text-muted-foreground">
-                    {count} votes{totalFeedbackVotes > 0 ? ` (${voteShare}%)` : ""}
-                  </p>
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      </div>
     </section>
   );
 }
