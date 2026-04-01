@@ -56,7 +56,6 @@ import {
 import { cn } from "@/shared/lib/utils";
 
 const MemoizedCarousel = memo(ContentCarousel);
-const LazyFeedbackButtons = lazy(() => import("@/frontend/components/FeedbackButtons"));
 const LazyCommentsSection = lazy(() => import("@/frontend/components/CommentsSection"));
 const PREVIEW_AUTOPLAY_TIMEOUT_MS = 12000;
 const BACKGROUND_VIDEO_BOOT_DELAY_MS = 900;
@@ -123,10 +122,11 @@ export default function TVDetail() {
   }, [tvId]);
 
   // Fetch TV show details
-  const { data: tvShow, isLoading: tvLoading } = useQuery({
+  const { data: tvShow, isLoading: tvLoading, isError: tvError } = useQuery({
     queryKey: ["tv", tvId],
     queryFn: () => getTVShowDetails(tvId),
     enabled: !!tvId,
+    retry: 2,
   });
 
   // Fetch credits
@@ -586,11 +586,16 @@ export default function TVDetail() {
     );
   }
 
-  if (!tvShow) {
+  if (tvError || !tvShow) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <p className="text-xl text-muted-foreground mb-4">TV Show not found</p>
+          <p className="text-xl text-muted-foreground mb-2">
+            {tvError ? "Failed to load TV show" : "TV Show not found"}
+          </p>
+          {tvError && (
+            <p className="text-sm text-muted-foreground mb-4">Check your connection and try again.</p>
+          )}
           <Button onClick={() => navigate(-1)} className="bg-primary hover:bg-primary/90">
             Go Back
           </Button>
@@ -1066,7 +1071,7 @@ export default function TVDetail() {
                   </div>
                 }
               >
-                <LazyFeedbackButtons
+                <LazyCommentsSection
                   contentId={tvShow.id}
                   contentType="tv"
                   title={tvShow.name}
@@ -1074,7 +1079,6 @@ export default function TVDetail() {
                   genres={tvShow.genres.map((genre) => genre.id)}
                   language={tvShow.original_language}
                 />
-                <LazyCommentsSection contentId={tvShow.id} contentType="tv" />
               </Suspense>
             ) : (
               <div className="mb-8 mt-4 rounded-xl border border-border/70 bg-card/35 p-4 animate-pulse">

@@ -212,6 +212,7 @@ export default function Upcoming() {
   const {
     data: upcomingData,
     isLoading,
+    isError: upcomingError,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -729,6 +730,18 @@ export default function Upcoming() {
 
           {isLoading ? (
             <UpcomingTimelineSkeleton />
+          ) : upcomingError ? (
+            <div className="rounded-xl border border-border/80 bg-card/45 p-8 text-center">
+              <p className="text-base font-medium text-foreground mb-1">Failed to load upcoming releases</p>
+              <p className="text-sm text-muted-foreground mb-4">Check your connection and try again.</p>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="text-sm text-primary hover:underline"
+              >
+                Retry
+              </button>
+            </div>
           ) : (
             <div className="space-y-4">
               <div className="rounded-xl border border-border/80 bg-card/45 px-4 py-3">

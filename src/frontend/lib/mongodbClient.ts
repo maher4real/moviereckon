@@ -33,6 +33,9 @@ function getBrowserStorage(): Storage | null {
   return window.sessionStorage;
 }
 
+// Deduplication: only one refresh call in-flight at a time
+let refreshPromise: Promise<boolean> | null = null;
+
 // Helper for making authenticated requests with HttpOnly cookie sessions.
 async function fetchWithAuth(endpoint: string, options: RequestInit = {}): Promise<Response> {
   const headers = new Headers(options.headers || {});
@@ -57,9 +60,14 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}): Promi
     credentials: "include",
   });
 
-  // Handle access-cookie refresh if unauthorized
+  // Handle access-cookie refresh if unauthorized — deduplicated
   if (response.status === 401) {
-    const refreshed = await refreshAccessToken();
+    if (!refreshPromise) {
+      refreshPromise = refreshAccessToken().finally(() => {
+        refreshPromise = null;
+      });
+    }
+    const refreshed = await refreshPromise;
     if (refreshed) {
       return fetch(`${MONGODB_API_URL}${endpoint}`, {
         ...options,
