@@ -24,3 +24,6 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# Claude Code skills (local only)
+.claude/skills/
