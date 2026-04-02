@@ -11,7 +11,7 @@ import { ContentCard } from "@/frontend/components/ContentCard";
 import { Button } from "@/frontend/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/frontend/components/ui/select";
 import { Badge } from "@/frontend/components/ui/badge";
-import { Sparkles, ArrowUpDown, RefreshCw, Film, Tv } from "lucide-react";
+import { Sparkles, ArrowUpDown, RefreshCw, Film, Tv, BrainCircuit } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 
 type ContentTypeFilter = "all" | "movie" | "tv";
@@ -66,20 +66,51 @@ const ReckonCard = memo(
     type,
     reasons,
     seedTitle,
+    aiExplanation,
   }: {
     item: Movie | TVShow;
     type: "movie" | "tv" | "mixed";
     reasons?: Array<{ label: string; evidence?: string }>;
     seedTitle?: string | null;
+    aiExplanation?: { label: string; text: string };
   }) => {
+    const [showAITooltip, setShowAITooltip] = useState(false);
+
     return (
-      <ContentCard
-        item={item}
-        type={type}
-        showActions={true}
-        recommendationReasons={reasons}
-        recommendationSeedTitle={seedTitle}
-      />
+      <div className="relative group/card">
+        <ContentCard
+          item={item}
+          type={type}
+          showActions={true}
+          recommendationReasons={reasons}
+          recommendationSeedTitle={seedTitle}
+        />
+        {aiExplanation && (
+          <div className="absolute top-2 left-2 z-20">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAITooltip((v) => !v);
+              }}
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-violet-500/90 text-white backdrop-blur-sm shadow-sm hover:bg-violet-500 transition-colors"
+              title={aiExplanation.text}
+            >
+              <BrainCircuit className="w-2.5 h-2.5" />
+              AI Pick
+            </button>
+            {showAITooltip && (
+              <div className="absolute left-0 top-6 z-30 w-48 rounded-lg bg-popover border border-border/80 shadow-lg p-2.5 text-[11px] text-foreground/90 leading-snug">
+                {aiExplanation.text}
+                <div
+                  className="absolute inset-0 -z-10"
+                  onClick={() => setShowAITooltip(false)}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     );
   },
 );
@@ -94,7 +125,9 @@ export default function Reckon() {
     isLoading: reckonLoading,
     isRefreshing,
     isPersonalized,
+    isAIRanked,
     explanationById,
+    aiExplanationById,
     refreshRecommendations,
   } = useRecommendations();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -246,6 +279,12 @@ export default function Reckon() {
                   Personalized
                 </Badge>
               )}
+              {isAIRanked && (
+                <Badge className="bg-violet-500/20 text-violet-400 ml-1 gap-1">
+                  <BrainCircuit className="w-3 h-3" />
+                  AI
+                </Badge>
+              )}
             </div>
 
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -362,6 +401,7 @@ export default function Reckon() {
                 {visibleItems.map((item) => {
                   const itemType = getRecommendationItemType(item);
                   const explanation = explanationById[`${itemType}_${item.id}`];
+                  const aiExplanation = aiExplanationById[`${itemType}:${item.id}`];
                   return (
                     <ReckonCard
                       key={`${item.id}-${itemType}`}
@@ -369,6 +409,7 @@ export default function Reckon() {
                       type="mixed"
                       reasons={explanation?.reasons}
                       seedTitle={explanation?.seedTitle}
+                      aiExplanation={aiExplanation}
                     />
                   );
                 })}
