@@ -1,17 +1,18 @@
 /**
  * GET /api/user/ai-recommendations
  *
- * AI-powered recommendation layer using OpenAI embeddings + GPT-4o-mini.
- * Pipeline:
- *  1. Load user signals (watch history, likes, feedback) from MongoDB.
- *  2. Fetch candidate pool from TMDB (trending + top-rated + genre-matched).
- *  3. Build user taste text → embed to a single taste vector.
- *  4. Embed each candidate (cached in Redis, 7-day TTL).
- *  5. Cosine similarity ranking.
- *  6. GPT-4o-mini generates a one-sentence explanation for each top result.
- *  7. Return ranked items + explanations.
+ * Smarter AI recommendation pipeline:
  *
- * Falls back gracefully — any step failure returns an empty payload.
+ * Improvements over v1:
+ *  - gpt-4.1-mini (smarter + cheaper than gpt-4o-mini)
+ *  - 3x larger candidate pool (trending day+week, top-rated p1+p2, now-playing,
+ *    Bollywood/Tamil/Telugu for language diversity, similar-to-top-liked)
+ *  - Multi-anchor embedding: separate vectors for liked vs watched items,
+ *    scored independently and blended by weight
+ *  - Quality-adjusted final score: blends semantic similarity + vote confidence
+ *  - Diversity enforcement: balanced language, genre, movie/TV mix
+ *  - Richer taste profile passed to GPT for more specific explanations
+ *  - Smarter cache key: uses latest activity timestamp, not just counts
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase } from "../../lib/mongodb.js";
@@ -24,12 +25,19 @@ import {
   cosineSimilarity,
   averageEmbeddings,
   generateExplanations,
+  type UserTasteProfile,
 } from "../../lib/openai.js";
 import {
   getServerTrendingMovies,
   getServerTrendingTVShows,
   getServerTopRatedMovies,
   getServerPopularTVShows,
+  getServerNowPlayingMovies,
+  getServerBollywoodMovies,
+  getServerTamilMovies,
+  getServerTeluguMovies,
+  getServerSimilarMovies,
+  getServerSimilarTVShows,
 } from "@/backend/services/tmdbServer";
 import type { Movie, TVShow } from "@/shared/lib/tmdb";
 
@@ -41,20 +49,31 @@ const MAX_IP_REQUESTS = 30;
 const MAX_USER_REQUESTS = 15;
 const RATE_WINDOW_MS = 5 * 60 * 1000;
 
-const EMBED_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
-const RESULT_CACHE_TTL_SECONDS = 5 * 60;     // 5 minutes
+const EMBED_TTL_SECONDS = 7 * 24 * 60 * 60;  // 7 days — movie metadata stable
+const RESULT_CACHE_TTL_SECONDS = 8 * 60;       // 8 minutes
 
-const MAX_HISTORY_SEEDS = 20;
-const MAX_LIKED_SEEDS = 15;
-const MAX_CANDIDATES = 120;
-const TOP_N_FOR_EXPLANATIONS = 25;
+const MAX_HISTORY_SEEDS = 50;   // up from 20
+const MAX_LIKED_SEEDS = 30;     // up from 15
+const MAX_FEEDBACK_SEEDS = 30;  // up from 20
+const MAX_CANDIDATES = 300;     // up from 120 — 3x more discovery
+const TOP_N_FOR_EXPLANATIONS = 30; // up from 25
+
+// How many of the user's top-liked items to fetch TMDB-similar content for
+const TOP_SEEDS_FOR_SIMILAR = 3;
+
+// Final score blend: semantic similarity vs content quality
+const SIMILARITY_WEIGHT = 0.72;
+const QUALITY_WEIGHT = 0.28;
+
+// Diversity caps in the final ranked output
+const MAX_PER_LANGUAGE = 8;
+const MAX_PER_GENRE = 12;
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 type ContentType = "movie" | "tv";
-type FeedbackType = "give_it_a_go" | "one_time_watch" | "must_watch" | "skip";
 
 interface UserSignal {
   content_id: number;
@@ -63,19 +82,15 @@ interface UserSignal {
   genres: number[];
   language: string;
   weight: number;
+  source: "liked" | "watched" | "feedback";
+  timestamp: string;
 }
 
 interface AICandidate {
   item: Movie | TVShow;
   type: ContentType;
   embedText: string;
-}
-
-interface AIRecommendation {
-  item: Movie | TVShow;
-  type: ContentType;
-  aiScore: number;
-  explanation: string;
+  qualityScore: number; // 0–1 normalised from vote_average + vote_count
 }
 
 export interface AIRecommendationsPayload {
@@ -91,7 +106,7 @@ const EMPTY_PAYLOAD: AIRecommendationsPayload = {
 };
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Genre / Language maps
 // ---------------------------------------------------------------------------
 
 const GENRE_NAMES: Record<number, string> = {
@@ -99,60 +114,206 @@ const GENRE_NAMES: Record<number, string> = {
   99: "Documentary", 18: "Drama", 10751: "Family", 14: "Fantasy", 36: "History",
   27: "Horror", 10402: "Music", 9648: "Mystery", 10749: "Romance",
   878: "Sci-Fi", 10770: "TV Movie", 53: "Thriller", 10752: "War", 37: "Western",
-  10759: "Action & Adventure", 10762: "Kids", 10763: "News", 10764: "Reality",
-  10765: "Sci-Fi & Fantasy", 10766: "Soap", 10767: "Talk", 10768: "War & Politics",
+  10759: "Action & Adventure", 10762: "Kids", 10765: "Sci-Fi & Fantasy",
+  10766: "Soap", 10768: "War & Politics",
+};
+
+const LANGUAGE_LABELS: Record<string, string> = {
+  en: "English", hi: "Hindi", ta: "Tamil", te: "Telugu", gu: "Gujarati",
+  ko: "Korean", ja: "Japanese", es: "Spanish", fr: "French", tr: "Turkish",
+  ml: "Malayalam", kn: "Kannada",
 };
 
 function genreNames(ids: number[]): string {
   return ids.map((id) => GENRE_NAMES[id] || "").filter(Boolean).join(", ");
 }
 
+// ---------------------------------------------------------------------------
+// Quality score: combines vote_average and vote_count confidence
+// ---------------------------------------------------------------------------
+
+function qualityScore(item: Movie | TVShow): number {
+  const avg = item.vote_average || 0;
+  const count = item.vote_count || 0;
+  // Bayesian confidence: weight towards 6.0 mean for low vote counts
+  const confidence = count / (count + 200);
+  const bayesian = confidence * avg + (1 - confidence) * 6.0;
+  return Math.min(bayesian / 10, 1); // normalise 0–1
+}
+
+// ---------------------------------------------------------------------------
+// Rich embed text — more context means better vector representation
+// ---------------------------------------------------------------------------
+
 function candidateEmbedText(item: Movie | TVShow, type: ContentType): string {
   const title = type === "movie" ? (item as Movie).title : (item as TVShow).name;
-  const overview = item.overview?.slice(0, 200) || "";
+  const overview = item.overview?.slice(0, 250) || "";
   const genres = genreNames(item.genre_ids || []);
   const year = (type === "movie"
     ? (item as Movie).release_date
     : (item as TVShow).first_air_date
   )?.slice(0, 4) || "";
-  const lang = item.original_language || "";
+  const lang = LANGUAGE_LABELS[item.original_language || ""] || item.original_language || "";
+  const rating = item.vote_average ? `Rating: ${item.vote_average.toFixed(1)}/10.` : "";
+  const popularity = item.popularity > 50 ? "Popular." : item.popularity < 10 ? "Hidden gem." : "";
 
-  return `${title}. ${overview}. Genres: ${genres}. Year: ${year}. Language: ${lang}`.trim();
-}
-
-function buildTasteProfile(signals: UserSignal[]): string {
-  if (!signals.length) return "Enjoys popular movies and TV shows";
-
-  const top = signals.slice(0, 12);
-  const titles = top.map((s) => s.title).join(", ");
-  const allGenreIds = signals.flatMap((s) => s.genres);
-  const genreCount = new Map<number, number>();
-  for (const id of allGenreIds) genreCount.set(id, (genreCount.get(id) || 0) + 1);
-  const topGenres = [...genreCount.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map(([id]) => GENRE_NAMES[id])
-    .filter(Boolean)
-    .join(", ");
-
-  const langs = [...new Set(signals.map((s) => s.language))].slice(0, 3).join(", ");
-
-  return `Watches and enjoys: ${titles}. Favourite genres: ${topGenres || "various"}. Preferred languages: ${langs || "various"}.`;
+  return `${title} (${year}). ${overview} Genres: ${genres}. Language: ${lang}. ${rating} ${popularity}`.trim();
 }
 
 // ---------------------------------------------------------------------------
-// Redis embedding cache helpers
+// Multi-anchor taste profile builder
+// ---------------------------------------------------------------------------
+
+interface TasteAnchors {
+  likedVector: number[] | null;
+  watchedVector: number[] | null;
+  blendedVector: number[] | null;
+  profile: UserTasteProfile;
+}
+
+async function buildTasteAnchors(signals: UserSignal[]): Promise<TasteAnchors> {
+  const liked = signals.filter((s) => s.source === "liked");
+  const watched = signals.filter((s) => s.source === "watched");
+  const feedback = signals.filter((s) => s.source === "feedback");
+
+  // Build genre frequency map across all signals
+  const allSignals = [...liked, ...watched, ...feedback];
+  const genreCount = new Map<number, number>();
+  for (const s of allSignals) {
+    for (const g of s.genres) {
+      genreCount.set(g, (genreCount.get(g) || 0) + s.weight);
+    }
+  }
+  const topGenres = [...genreCount.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([id]) => GENRE_NAMES[id])
+    .filter(Boolean);
+
+  // Language frequency
+  const langCount = new Map<string, number>();
+  for (const s of allSignals) {
+    langCount.set(s.language, (langCount.get(s.language) || 0) + s.weight);
+  }
+  const topLanguages = [...langCount.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([lang]) => LANGUAGE_LABELS[lang] || lang);
+
+  const likedTitles = liked.map((s) => s.title);
+  const watchedTitles = watched.map((s) => s.title);
+  const feedbackTitles = feedback.map((s) => s.title);
+
+  // Build taste summary for GPT — more informative than the old version
+  let tasteSummary = "";
+  if (likedTitles.length) {
+    tasteSummary += `Strong affinity for: ${likedTitles.slice(0, 5).join(", ")}. `;
+  }
+  if (topGenres.length) {
+    tasteSummary += `Leans towards ${topGenres.slice(0, 3).join(", ")} content. `;
+  }
+  if (topLanguages.length > 1) {
+    tasteSummary += `Watches in multiple languages: ${topLanguages.join(", ")}. `;
+  }
+  if (feedbackTitles.length) {
+    tasteSummary += `Also rated positively: ${feedbackTitles.slice(0, 3).join(", ")}.`;
+  }
+
+  const profile: UserTasteProfile = {
+    likedTitles,
+    watchedTitles,
+    positiveFeedbackTitles: feedbackTitles,
+    topGenres,
+    topLanguages,
+    tasteSummary: tasteSummary || "Enjoys popular movies and TV shows",
+  };
+
+  // Build taste text for embedding (rich, covers all signals)
+  const buildEmbedText = (items: UserSignal[]) => {
+    if (!items.length) return null;
+    const titles = items.map((s) => s.title).join(", ");
+    const genres = topGenres.slice(0, 4).join(", ");
+    const langs = topLanguages.slice(0, 3).join(", ");
+    return `Viewer who enjoys: ${titles}. Favourite genres: ${genres}. Languages: ${langs}.`;
+  };
+
+  const textsToEmbed: string[] = [];
+  const likedText = buildEmbedText(liked);
+  const watchedText = buildEmbedText(watched);
+
+  if (likedText) textsToEmbed.push(likedText);
+  if (watchedText) textsToEmbed.push(watchedText);
+
+  // Fallback: if no liked/watched, use all signals
+  if (!textsToEmbed.length) {
+    const fallback = buildEmbedText(allSignals);
+    if (fallback) textsToEmbed.push(fallback);
+  }
+
+  if (!textsToEmbed.length) {
+    return { likedVector: null, watchedVector: null, blendedVector: null, profile };
+  }
+
+  const embeddings = await embedTexts(textsToEmbed);
+  let idx = 0;
+  const likedVector = likedText ? (embeddings[idx++] ?? null) : null;
+  const watchedVector = watchedText ? (embeddings[idx++] ?? null) : null;
+
+  // Blended vector: liked gets 2x weight vs watched
+  const vectorsToBlend: number[][] = [];
+  const blendWeights: number[] = [];
+  if (likedVector) { vectorsToBlend.push(likedVector); blendWeights.push(2.0); }
+  if (watchedVector) { vectorsToBlend.push(watchedVector); blendWeights.push(1.0); }
+
+  const blendedVector = vectorsToBlend.length
+    ? averageEmbeddings(vectorsToBlend, blendWeights)
+    : null;
+
+  return { likedVector, watchedVector, blendedVector, profile };
+}
+
+// ---------------------------------------------------------------------------
+// Score a candidate against taste anchors (multi-anchor)
+// ---------------------------------------------------------------------------
+
+function scoreCandidate(
+  candidateVector: number[],
+  anchors: TasteAnchors,
+  candidate: AICandidate,
+): number {
+  const scores: number[] = [];
+
+  // Blended vector is the primary anchor
+  if (anchors.blendedVector) {
+    scores.push(cosineSimilarity(candidateVector, anchors.blendedVector) * 1.0);
+  }
+  // Liked vector gets a bonus pass (if different from blended)
+  if (anchors.likedVector) {
+    scores.push(cosineSimilarity(candidateVector, anchors.likedVector) * 1.2);
+  }
+
+  if (!scores.length) return 0;
+
+  // Take the best of the anchor scores (max, not average) — rewards candidates
+  // that strongly match ANY of the user's taste anchors
+  const semanticScore = Math.max(...scores);
+
+  // Blend semantic score with content quality
+  const finalScore =
+    semanticScore * SIMILARITY_WEIGHT + candidate.qualityScore * QUALITY_WEIGHT;
+
+  return finalScore;
+}
+
+// ---------------------------------------------------------------------------
+// Redis helpers
 // ---------------------------------------------------------------------------
 
 async function getCachedEmbedding(key: string): Promise<number[] | null> {
   if (!isRedisConfigured()) return null;
   const result = await runRedisCommand<string>(["GET", getRedisKey(key)]);
   if (!result.ok || !result.result) return null;
-  try {
-    return JSON.parse(result.result) as number[];
-  } catch {
-    return null;
-  }
+  try { return JSON.parse(result.result) as number[]; } catch { return null; }
 }
 
 async function setCachedEmbedding(key: string, vector: number[]): Promise<void> {
@@ -164,11 +325,7 @@ async function getCachedResult(key: string): Promise<AIRecommendationsPayload | 
   if (!isRedisConfigured()) return null;
   const result = await runRedisCommand<string>(["GET", getRedisKey(key)]);
   if (!result.ok || !result.result) return null;
-  try {
-    return JSON.parse(result.result) as AIRecommendationsPayload;
-  } catch {
-    return null;
-  }
+  try { return JSON.parse(result.result) as AIRecommendationsPayload; } catch { return null; }
 }
 
 async function setCachedResult(key: string, payload: AIRecommendationsPayload): Promise<void> {
@@ -177,21 +334,75 @@ async function setCachedResult(key: string, payload: AIRecommendationsPayload): 
 }
 
 // ---------------------------------------------------------------------------
+// Diversity filter — enforce language + genre caps in final output
+// ---------------------------------------------------------------------------
+
+function applyDiversity(
+  scored: Array<{ candidate: AICandidate; score: number }>,
+  limit: number,
+): Array<{ candidate: AICandidate; score: number }> {
+  const langCount = new Map<string, number>();
+  const genreCount = new Map<number, number>();
+  const result: Array<{ candidate: AICandidate; score: number }> = [];
+
+  for (const entry of scored) {
+    if (result.length >= limit) break;
+    const item = entry.candidate.item;
+    const lang = item.original_language || "en";
+    const genres = item.genre_ids || [];
+
+    const langOk = (langCount.get(lang) || 0) < MAX_PER_LANGUAGE;
+    const genreOk = genres.length === 0 || genres.some(
+      (g) => (genreCount.get(g) || 0) < MAX_PER_GENRE,
+    );
+
+    if (langOk && genreOk) {
+      langCount.set(lang, (langCount.get(lang) || 0) + 1);
+      for (const g of genres) genreCount.set(g, (genreCount.get(g) || 0) + 1);
+      result.push(entry);
+    }
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Core pipeline
 // ---------------------------------------------------------------------------
 
 async function buildAIRecommendations(
-  userId: string,
   signals: UserSignal[],
   seenIds: Set<string>,
+  topLikedIds: Array<{ id: number; type: ContentType }>,
 ): Promise<AIRecommendationsPayload> {
 
-  // 1. Fetch candidate pool from TMDB in parallel
-  const [trendingMovies, trendingTV, topRated, popularTV] = await Promise.allSettled([
+  // 1. Fetch a much larger, more diverse candidate pool in parallel
+  const [
+    trendingMoviesDay, trendingMoviesWeek,
+    trendingTVDay, trendingTVWeek,
+    topRatedP1, topRatedP2,
+    nowPlaying,
+    popularTV,
+    bollywood,
+    tamil,
+    telugu,
+    ...similarResults
+  ] = await Promise.allSettled([
+    getServerTrendingMovies("day"),
     getServerTrendingMovies("week"),
+    getServerTrendingTVShows("day"),
     getServerTrendingTVShows("week"),
     getServerTopRatedMovies(1),
+    getServerTopRatedMovies(2),
+    getServerNowPlayingMovies(1),
     getServerPopularTVShows(1),
+    getServerBollywoodMovies(1),
+    getServerTamilMovies(1),
+    getServerTeluguMovies(1),
+    // Fetch similar content for top 3 liked/watched items — most personalised candidates
+    ...topLikedIds.slice(0, TOP_SEEDS_FOR_SIMILAR).map(({ id, type }) =>
+      type === "movie" ? getServerSimilarMovies(id) : getServerSimilarTVShows(id),
+    ),
   ]);
 
   const movieCandidates: AICandidate[] = [];
@@ -199,32 +410,63 @@ async function buildAIRecommendations(
 
   const addMovies = (movies: Movie[]) => {
     for (const m of movies) {
-      if (!seenIds.has(`movie:${m.id}`) && m.overview) {
-        movieCandidates.push({ item: m, type: "movie", embedText: candidateEmbedText(m, "movie") });
+      if (!seenIds.has(`movie:${m.id}`) && m.overview && m.vote_count > 10) {
+        movieCandidates.push({
+          item: m,
+          type: "movie",
+          embedText: candidateEmbedText(m, "movie"),
+          qualityScore: qualityScore(m),
+        });
       }
     }
   };
 
   const addTV = (shows: TVShow[]) => {
     for (const s of shows) {
-      if (!seenIds.has(`tv:${s.id}`) && s.overview) {
-        tvCandidates.push({ item: s, type: "tv", embedText: candidateEmbedText(s, "tv") });
+      if (!seenIds.has(`tv:${s.id}`) && s.overview && s.vote_count > 10) {
+        tvCandidates.push({
+          item: s,
+          type: "tv",
+          embedText: candidateEmbedText(s, "tv"),
+          qualityScore: qualityScore(s),
+        });
       }
     }
   };
 
-  // trendingMovies / trendingTV return arrays directly
-  // topRated / popularTV return TMDBResponse objects with .results
-  if (trendingMovies.status === "fulfilled") addMovies(trendingMovies.value || []);
-  if (topRated.status === "fulfilled") addMovies(topRated.value.results || []);
-  if (trendingTV.status === "fulfilled") addTV(trendingTV.value || []);
-  if (popularTV.status === "fulfilled") addTV(popularTV.value.results || []);
+  // Arrays returned directly
+  if (trendingMoviesDay.status === "fulfilled") addMovies(trendingMoviesDay.value || []);
+  if (trendingMoviesWeek.status === "fulfilled") addMovies(trendingMoviesWeek.value || []);
+  if (trendingTVDay.status === "fulfilled") addTV(trendingTVDay.value || []);
+  if (trendingTVWeek.status === "fulfilled") addTV(trendingTVWeek.value || []);
 
-  // Deduplicate candidates by id
+  // TMDBResponse objects — need .results
+  if (topRatedP1.status === "fulfilled") addMovies(topRatedP1.value.results || []);
+  if (topRatedP2.status === "fulfilled") addMovies(topRatedP2.value.results || []);
+  if (nowPlaying.status === "fulfilled") addMovies(nowPlaying.value.results || []);
+  if (popularTV.status === "fulfilled") addTV(popularTV.value.results || []);
+  if (bollywood.status === "fulfilled") addMovies(bollywood.value.results || []);
+  if (tamil.status === "fulfilled") addMovies(tamil.value.results || []);
+  if (telugu.status === "fulfilled") addMovies(telugu.value.results || []);
+
+  // Similar-to-top-liked results (mixed movie/tv based on topLikedIds order)
+  for (let i = 0; i < similarResults.length; i++) {
+    const res = similarResults[i];
+    if (res.status !== "fulfilled") continue;
+    const seedType = topLikedIds[i]?.type;
+    if (seedType === "movie") {
+      addMovies((res.value as { results?: Movie[] }).results || []);
+    } else {
+      addTV((res.value as { results?: TVShow[] }).results || []);
+    }
+  }
+
+  // Deduplicate
   const seenCandidateIds = new Set<string>();
   const allCandidates: AICandidate[] = [];
   for (const c of [...movieCandidates, ...tvCandidates]) {
-    const key = `${c.type}:${(c.item as Movie).id ?? (c.item as TVShow).id}`;
+    const id = (c.item as Movie).id ?? (c.item as TVShow).id;
+    const key = `${c.type}:${id}`;
     if (!seenCandidateIds.has(key)) {
       seenCandidateIds.add(key);
       allCandidates.push(c);
@@ -234,28 +476,26 @@ async function buildAIRecommendations(
   const candidates = allCandidates.slice(0, MAX_CANDIDATES);
   if (!candidates.length) return EMPTY_PAYLOAD;
 
-  // 2. Build user taste profile and embed it
-  const tasteProfile = buildTasteProfile(signals);
-  const tasteEmbedding = await embedTexts([tasteProfile]).then((r) => r[0]);
-  if (!tasteEmbedding) return EMPTY_PAYLOAD;
+  // 2. Build multi-anchor taste vectors
+  const anchors = await buildTasteAnchors(signals);
+  if (!anchors.blendedVector && !anchors.likedVector) return EMPTY_PAYLOAD;
 
-  // 3. Embed candidates (with Redis cache)
+  // 3. Embed candidates (Redis-cached per item, 7-day TTL)
   const vectorsById = new Map<string, number[]>();
-  const toEmbed: { key: string; text: string; index: number }[] = [];
+  const toEmbed: { key: string; text: string }[] = [];
 
-  for (let i = 0; i < candidates.length; i++) {
-    const c = candidates[i];
+  for (const c of candidates) {
     const id = (c.item as Movie).id ?? (c.item as TVShow).id;
-    const cacheKey = `ai:embed:${c.type}:${id}`;
+    const cacheKey = `ai:embed:v2:${c.type}:${id}`;
     const cached = await getCachedEmbedding(cacheKey);
     if (cached) {
       vectorsById.set(cacheKey, cached);
     } else {
-      toEmbed.push({ key: cacheKey, text: c.embedText, index: i });
+      toEmbed.push({ key: cacheKey, text: c.embedText });
     }
   }
 
-  // Batch embed uncached candidates (max 2048 per call)
+  // Batch embed in chunks of 512
   if (toEmbed.length > 0) {
     const BATCH_SIZE = 512;
     for (let i = 0; i < toEmbed.length; i += BATCH_SIZE) {
@@ -271,45 +511,54 @@ async function buildAIRecommendations(
     }
   }
 
-  // 4. Cosine similarity ranking
+  // 4. Score all candidates with multi-anchor + quality blend
   const scored: Array<{ candidate: AICandidate; score: number }> = [];
   for (const c of candidates) {
     const id = (c.item as Movie).id ?? (c.item as TVShow).id;
-    const cacheKey = `ai:embed:${c.type}:${id}`;
+    const cacheKey = `ai:embed:v2:${c.type}:${id}`;
     const vector = vectorsById.get(cacheKey);
     if (!vector) continue;
-    const score = cosineSimilarity(tasteEmbedding, vector);
+    const score = scoreCandidate(vector, anchors, c);
     scored.push({ candidate: c, score });
   }
 
   scored.sort((a, b) => b.score - a.score);
-  const top = scored.slice(0, TOP_N_FOR_EXPLANATIONS);
 
-  // 5. GPT-4o-mini explanations for top results
-  const explanationInputs = top.map((s) => {
-    const id = (s.candidate.item as Movie).id ?? (s.candidate.item as TVShow).id;
-    const title = s.candidate.type === "movie"
-      ? (s.candidate.item as Movie).title
-      : (s.candidate.item as TVShow).name;
+  // 5. Apply diversity enforcement
+  const diverse = applyDiversity(scored, MAX_CANDIDATES);
+  const top = diverse.slice(0, TOP_N_FOR_EXPLANATIONS);
+
+  // 6. gpt-4.1-mini explanations with rich taste profile
+  const explanationInputs = top.map(({ candidate }) => {
+    const id = (candidate.item as Movie).id ?? (candidate.item as TVShow).id;
+    const title = candidate.type === "movie"
+      ? (candidate.item as Movie).title
+      : (candidate.item as TVShow).name;
+    const year = (candidate.type === "movie"
+      ? (candidate.item as Movie).release_date
+      : (candidate.item as TVShow).first_air_date
+    )?.slice(0, 4) || "";
     return {
       id,
-      type: s.candidate.type,
+      type: candidate.type,
       title,
-      overview: s.candidate.item.overview?.slice(0, 150) || "",
+      overview: candidate.item.overview?.slice(0, 120) || "",
+      genres: genreNames(candidate.item.genre_ids || []),
+      year,
     };
   });
 
-  const rawExplanations = await generateExplanations(tasteProfile, explanationInputs).catch(() => ({}));
+  const rawExplanations = await generateExplanations(anchors.profile, explanationInputs).catch(() => ({}));
 
-  // 6. Build final payload
+  // 7. Build final payload
   const explanationById: Record<string, { label: string; text: string }> = {};
   const rankedItems: (Movie | TVShow)[] = [];
 
-  for (const { candidate, score } of top) {
+  for (const { candidate } of top) {
     const id = (candidate.item as Movie).id ?? (candidate.item as TVShow).id;
-    const key = `${id}:${candidate.type}`;
+    const rawKey = `${id}:${candidate.type}`;
     const clientKey = `${candidate.type}:${id}`;
-    const rawText = rawExplanations[key] || "";
+    const rawText = rawExplanations[rawKey] || "";
 
     rankedItems.push(candidate.item);
     explanationById[clientKey] = {
@@ -318,8 +567,8 @@ async function buildAIRecommendations(
     };
   }
 
-  // Pad with remaining scored items (no explanation)
-  for (const { candidate } of scored.slice(TOP_N_FOR_EXPLANATIONS)) {
+  // Pad with remaining diverse items (no explanation badge)
+  for (const { candidate } of diverse.slice(TOP_N_FOR_EXPLANATIONS)) {
     rankedItems.push(candidate.item);
   }
 
@@ -342,16 +591,13 @@ export default async function aiRecommendationsHandler(
     return res.status(503).json({ error: "AI recommendations not configured" });
   }
 
-  // Rate limiting
   const ip = getClientIp(req);
   const ipLimit = await consumeRateLimit(`ai-recs:ip:${ip}`, MAX_IP_REQUESTS, RATE_WINDOW_MS);
-
   if (!ipLimit.allowed) {
     res.setHeader("Retry-After", String(Math.max(ipLimit.retryAfterSeconds, 30)));
     return res.status(429).json({ error: "Too many requests. Try again shortly." });
   }
 
-  // Auth — getUserFromRequest takes only the request, returns UserPayload | null
   const { db } = await connectToDatabase();
   const userPayload = await getUserFromRequest(req);
   if (!userPayload) {
@@ -360,7 +606,6 @@ export default async function aiRecommendationsHandler(
 
   const userId = String(userPayload.id);
 
-  // User-level rate limit check now that we have userId
   const userRateLimit = await consumeRateLimit(
     `ai-recs:user:${userId}`,
     MAX_USER_REQUESTS,
@@ -372,7 +617,6 @@ export default async function aiRecommendationsHandler(
   }
 
   try {
-    // Load user signals from MongoDB
     const [historyDocs, likedDocs, feedbackDocs] = await Promise.all([
       db.collection("watch_history")
         .find({ user_id: userId })
@@ -387,68 +631,89 @@ export default async function aiRecommendationsHandler(
       db.collection("feedback_items")
         .find({ user_id: userId, feedback_type: { $ne: "skip" } })
         .sort({ updated_at: -1 })
-        .limit(20)
+        .limit(MAX_FEEDBACK_SEEDS)
         .toArray(),
     ]);
 
-    // Build weighted signals
+    // Build weighted signals — liked > feedback > watched
     const signals: UserSignal[] = [];
     const seenIds = new Set<string>();
 
+    // Recency decay for watched items (more recent = higher weight)
+    const now = Date.now();
     for (const doc of historyDocs) {
       const key = `${doc.content_type}:${doc.content_id}`;
       seenIds.add(key);
+      const daysAgo = (now - new Date(doc.watched_at || 0).getTime()) / 86_400_000;
+      const recency = Math.max(0.7, 1 - daysAgo / 90); // decay over 90 days
       signals.push({
         content_id: doc.content_id,
         content_type: doc.content_type,
         title: doc.title || "",
         genres: Array.isArray(doc.genres) ? doc.genres : [],
         language: doc.language || "en",
-        weight: 1.0,
+        weight: recency,
+        source: "watched",
+        timestamp: doc.watched_at || "",
       });
     }
 
     for (const doc of likedDocs) {
       const key = `${doc.content_type}:${doc.content_id}`;
-      if (!seenIds.has(key)) {
-        signals.push({
-          content_id: doc.content_id,
-          content_type: doc.content_type,
-          title: doc.title || "",
-          genres: [],
-          language: "en",
-          weight: 1.5,
-        });
-      }
+      if (!seenIds.has(key)) seenIds.add(key);
+      signals.push({
+        content_id: doc.content_id,
+        content_type: doc.content_type,
+        title: doc.title || "",
+        genres: Array.isArray(doc.genres) ? doc.genres : [],
+        language: doc.language || "en",
+        weight: 1.8, // liked = strongest signal
+        source: "liked",
+        timestamp: doc.liked_at || "",
+      });
     }
 
     for (const doc of feedbackDocs) {
       const key = `${doc.content_type}:${doc.content_id}`;
-      if (!seenIds.has(key)) {
-        const weight = doc.feedback_type === "must_watch" ? 1.35 : 1.1;
-        signals.push({
-          content_id: doc.content_id,
-          content_type: doc.content_type,
-          title: doc.title || "",
-          genres: Array.isArray(doc.genres) ? doc.genres : [],
-          language: doc.language || "en",
-          weight,
-        });
-      }
+      if (!seenIds.has(key)) seenIds.add(key);
+      const weight = doc.feedback_type === "must_watch" ? 1.5
+        : doc.feedback_type === "give_it_a_go" ? 1.2
+        : 1.0;
+      signals.push({
+        content_id: doc.content_id,
+        content_type: doc.content_type,
+        title: doc.title || "",
+        genres: Array.isArray(doc.genres) ? doc.genres : [],
+        language: doc.language || "en",
+        weight,
+        source: "feedback",
+        timestamp: doc.updated_at || "",
+      });
     }
 
-    // Check result cache
-    const revisionHash = `${historyDocs.length}:${likedDocs.length}:${feedbackDocs.length}`;
-    const resultCacheKey = `ai:recs:${userId}:${revisionHash}`;
+    // Top liked/watched IDs to fetch TMDB-similar content for
+    const topLikedIds = [
+      ...likedDocs.slice(0, 2).map((d) => ({
+        id: d.content_id as number,
+        type: d.content_type as ContentType,
+      })),
+      ...historyDocs.slice(0, 1).map((d) => ({
+        id: d.content_id as number,
+        type: d.content_type as ContentType,
+      })),
+    ];
+
+    // Smarter cache key: include latest timestamps, not just counts
+    const latestWatch = historyDocs[0]?.watched_at || "";
+    const latestLike = likedDocs[0]?.liked_at || "";
+    const resultCacheKey = `ai:recs:v2:${userId}:${historyDocs.length}:${likedDocs.length}:${latestWatch}:${latestLike}`;
+
     const cached = await getCachedResult(resultCacheKey);
     if (cached) {
       return res.status(200).json({ data: cached });
     }
 
-    // Run AI pipeline
-    const payload = await buildAIRecommendations(userId, signals, seenIds);
-
-    // Cache result
+    const payload = await buildAIRecommendations(signals, seenIds, topLikedIds);
     await setCachedResult(resultCacheKey, payload);
 
     return res.status(200).json({ data: payload });

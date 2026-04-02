@@ -13,7 +13,10 @@ export function isOpenAIConfigured(): boolean {
 
 const OPENAI_API = "https://api.openai.com/v1";
 const EMBEDDING_MODEL = "text-embedding-3-small";
-const CHAT_MODEL = "gpt-4o-mini";
+
+// gpt-4.1-mini — smarter, faster, cheaper than gpt-4o-mini.
+// If OpenAI releases gpt-5-mini, swap this string.
+const CHAT_MODEL = "gpt-4.1-mini";
 
 async function openAIFetch(path: string, body: unknown): Promise<Response> {
   return fetch(`${OPENAI_API}${path}`, {
@@ -29,7 +32,6 @@ async function openAIFetch(path: string, body: unknown): Promise<Response> {
 /**
  * Generate embeddings for a batch of texts.
  * Returns float32 vectors in the same order as input.
- * Max 2048 inputs per call.
  */
 export async function embedTexts(texts: string[]): Promise<number[][]> {
   if (!texts.length) return [];
@@ -49,7 +51,6 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
     data: { index: number; embedding: number[] }[];
   };
 
-  // Re-order by index to guarantee order matches input
   return data.data
     .sort((a, b) => a.index - b.index)
     .map((item) => item.embedding);
@@ -74,8 +75,7 @@ export function cosineSimilarity(a: number[], b: number[]): number {
 }
 
 /**
- * Average a list of embedding vectors into a single centroid vector.
- * Weights are optional; defaults to equal weight.
+ * Weighted average of embedding vectors into a centroid.
  */
 export function averageEmbeddings(
   embeddings: number[][],
@@ -99,41 +99,72 @@ export function averageEmbeddings(
   return result;
 }
 
+export interface UserTasteProfile {
+  // Titles the user explicitly liked (highest signal)
+  likedTitles: string[];
+  // Titles the user watched (medium signal)
+  watchedTitles: string[];
+  // Titles marked must_watch or give_it_a_go feedback
+  positiveFeedbackTitles: string[];
+  // Top genre names
+  topGenres: string[];
+  // Top languages
+  topLanguages: string[];
+  // Inferred taste summary for prompt context
+  tasteSummary: string;
+}
+
 /**
- * Generate short one-sentence explanations for a list of movies
- * based on the user's taste profile description.
+ * Generate rich, specific, personalised explanations for each recommendation.
+ * Uses gpt-4.1-mini with a structured prompt that references the user's
+ * actual liked titles, genres, and languages for maximum specificity.
  */
 export async function generateExplanations(
-  tasteProfile: string,
-  movies: { id: number; type: "movie" | "tv"; title: string; overview: string }[],
+  profile: UserTasteProfile,
+  movies: { id: number; type: "movie" | "tv"; title: string; overview: string; genres: string; year: string }[],
 ): Promise<Record<string, string>> {
   if (!movies.length) return {};
 
+  const likedContext = profile.likedTitles.slice(0, 8).join(", ") || "none yet";
+  const watchedContext = profile.watchedTitles.slice(0, 6).join(", ") || "none yet";
+  const genreContext = profile.topGenres.slice(0, 5).join(", ") || "various";
+  const langContext = profile.topLanguages.slice(0, 3).join(", ") || "various";
+
   const movieList = movies
-    .map((m, i) => `${i + 1}. [${m.id}:${m.type}] "${m.title}": ${m.overview.slice(0, 120)}`)
+    .map((m) => `[${m.id}:${m.type}] "${m.title}" (${m.year}) — ${m.genres} — ${m.overview.slice(0, 100)}`)
     .join("\n");
 
-  const prompt = `You are a movie recommendation assistant. Based on the viewer's taste, write one short sentence (max 12 words) explaining why each title fits them. Be specific and personal, not generic.
+  const systemPrompt = `You are a deeply personal movie recommendation assistant. You know this viewer intimately:
+- Liked titles: ${likedContext}
+- Recently watched: ${watchedContext}
+- Favourite genres: ${genreContext}
+- Preferred languages: ${langContext}
+- Taste summary: ${profile.tasteSummary}
 
-Viewer taste: ${tasteProfile}
+Your job: write ONE sentence (max 14 words) per title explaining WHY it fits THIS specific viewer.
+Rules:
+- Reference their actual liked titles or genres when relevant ("Like Inception, this...")
+- Be specific about the emotional/thematic connection, not just genre labels
+- Never say "based on your preferences" or "you might like" — just state the connection directly
+- If it's a language match, mention it ("Another gripping Hindi thriller like...")
+- Vary your sentence structures`;
 
-Titles:
-${movieList}
+  const userPrompt = `For each title below, write the explanation. Respond as JSON mapping "[id:type]" → explanation string.
 
-Respond with a JSON object mapping each "[id:type]" key to the explanation string. Example:
-{"123:movie": "Matches your love of slow-burn sci-fi thrillers.", "456:tv": "Same dark humour as your top picks."}`;
+${movieList}`;
 
   const response = await openAIFetch("/chat/completions", {
     model: CHAT_MODEL,
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.4,
-    max_tokens: 1200,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    temperature: 0.5,
+    max_tokens: 1800,
     response_format: { type: "json_object" },
   });
 
-  if (!response.ok) {
-    return {};
-  }
+  if (!response.ok) return {};
 
   try {
     const data = await response.json() as {
