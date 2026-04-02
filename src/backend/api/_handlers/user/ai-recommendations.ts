@@ -34,6 +34,7 @@ import {
   getServerPopularTVShows,
   getServerNowPlayingMovies,
   getServerBollywoodMovies,
+  getServerGujaratiMovies,
   getServerTamilMovies,
   getServerTeluguMovies,
   getServerSimilarMovies,
@@ -52,22 +53,23 @@ const RATE_WINDOW_MS = 5 * 60 * 1000;
 const EMBED_TTL_SECONDS = 7 * 24 * 60 * 60;  // 7 days — movie metadata stable
 const RESULT_CACHE_TTL_SECONDS = 8 * 60;       // 8 minutes
 
-const MAX_HISTORY_SEEDS = 50;   // up from 20
-const MAX_LIKED_SEEDS = 30;     // up from 15
-const MAX_FEEDBACK_SEEDS = 30;  // up from 20
-const MAX_CANDIDATES = 300;     // up from 120 — 3x more discovery
-const TOP_N_FOR_EXPLANATIONS = 30; // up from 25
+const MAX_HISTORY_SEEDS = 50;
+const MAX_LIKED_SEEDS = 30;
+const MAX_FEEDBACK_SEEDS = 30;
+const MAX_CANDIDATES = 500;          // larger pool = more discovery
+const TOP_N_FOR_EXPLANATIONS = 50;   // AI explanations for top 50
+const FINAL_OUTPUT_LIMIT = 80;       // total items returned to the client
 
 // How many of the user's top-liked items to fetch TMDB-similar content for
-const TOP_SEEDS_FOR_SIMILAR = 3;
+const TOP_SEEDS_FOR_SIMILAR = 5;     // up from 3
 
 // Final score blend: semantic similarity vs content quality
 const SIMILARITY_WEIGHT = 0.72;
 const QUALITY_WEIGHT = 0.28;
 
 // Diversity caps in the final ranked output
-const MAX_PER_LANGUAGE = 8;
-const MAX_PER_GENRE = 12;
+const MAX_PER_LANGUAGE = 14;
+const MAX_PER_GENRE = 18;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -380,10 +382,11 @@ async function buildAIRecommendations(
   const [
     trendingMoviesDay, trendingMoviesWeek,
     trendingTVDay, trendingTVWeek,
-    topRatedP1, topRatedP2,
-    nowPlaying,
-    popularTV,
+    topRatedP1, topRatedP2, topRatedP3,
+    nowPlayingP1, nowPlayingP2,
+    popularTVP1, popularTVP2,
     bollywood,
+    gujarati,
     tamil,
     telugu,
     ...similarResults
@@ -394,12 +397,16 @@ async function buildAIRecommendations(
     getServerTrendingTVShows("week"),
     getServerTopRatedMovies(1),
     getServerTopRatedMovies(2),
+    getServerTopRatedMovies(3),
     getServerNowPlayingMovies(1),
+    getServerNowPlayingMovies(2),
     getServerPopularTVShows(1),
+    getServerPopularTVShows(2),
     getServerBollywoodMovies(1),
+    getServerGujaratiMovies(1),
     getServerTamilMovies(1),
     getServerTeluguMovies(1),
-    // Fetch similar content for top 3 liked/watched items — most personalised candidates
+    // Fetch similar content for top liked/watched items — most personalised candidates
     ...topLikedIds.slice(0, TOP_SEEDS_FOR_SIMILAR).map(({ id, type }) =>
       type === "movie" ? getServerSimilarMovies(id) : getServerSimilarTVShows(id),
     ),
@@ -443,9 +450,13 @@ async function buildAIRecommendations(
   // TMDBResponse objects — need .results
   if (topRatedP1.status === "fulfilled") addMovies(topRatedP1.value.results || []);
   if (topRatedP2.status === "fulfilled") addMovies(topRatedP2.value.results || []);
-  if (nowPlaying.status === "fulfilled") addMovies(nowPlaying.value.results || []);
-  if (popularTV.status === "fulfilled") addTV(popularTV.value.results || []);
+  if (topRatedP3.status === "fulfilled") addMovies(topRatedP3.value.results || []);
+  if (nowPlayingP1.status === "fulfilled") addMovies(nowPlayingP1.value.results || []);
+  if (nowPlayingP2.status === "fulfilled") addMovies(nowPlayingP2.value.results || []);
+  if (popularTVP1.status === "fulfilled") addTV(popularTVP1.value.results || []);
+  if (popularTVP2.status === "fulfilled") addTV(popularTVP2.value.results || []);
   if (bollywood.status === "fulfilled") addMovies(bollywood.value.results || []);
+  if (gujarati.status === "fulfilled") addMovies(gujarati.value.results || []);
   if (tamil.status === "fulfilled") addMovies(tamil.value.results || []);
   if (telugu.status === "fulfilled") addMovies(telugu.value.results || []);
 
@@ -525,7 +536,7 @@ async function buildAIRecommendations(
   scored.sort((a, b) => b.score - a.score);
 
   // 5. Apply diversity enforcement
-  const diverse = applyDiversity(scored, MAX_CANDIDATES);
+  const diverse = applyDiversity(scored, FINAL_OUTPUT_LIMIT);
   const top = diverse.slice(0, TOP_N_FOR_EXPLANATIONS);
 
   // 6. gpt-4.1-mini explanations with rich taste profile

@@ -376,14 +376,11 @@ export default function Reckon() {
             <button
               type="button"
               onClick={() => setMainTab("ai")}
-              disabled={!isAIRanked}
               className={cn(
                 "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
                 isAITab
                   ? "bg-violet-600 text-white shadow-sm shadow-violet-500/30"
-                  : isAIRanked
-                    ? "text-violet-400 hover:text-violet-300 hover:bg-violet-500/10"
-                    : "text-muted-foreground/40 cursor-not-allowed",
+                  : "text-violet-400 hover:text-violet-300 hover:bg-violet-500/10",
               )}
             >
               {isAITab ? <AIOrb /> : <BrainCircuit className="w-4 h-4" />}
@@ -396,11 +393,6 @@ export default function Reckon() {
                   isAITab ? "bg-white/20 text-white" : "bg-violet-500/20 text-violet-400"
                 )}>
                   {aiItems.length}
-                </span>
-              )}
-              {!isAIRanked && (
-                <span className="text-[10px] text-muted-foreground/50">
-                  needs history
                 </span>
               )}
             </button>
@@ -518,7 +510,7 @@ export default function Reckon() {
           </div>
 
           {/* Grid */}
-          {reckonLoading ? (
+          {reckonLoading || (isAITab && !isAIRanked) ? (
             <PosterGridSkeleton count={INITIAL_VISIBLE_ITEMS} />
           ) : visibleItems.length > 0 ? (
             <>
@@ -554,17 +546,6 @@ export default function Reckon() {
                 </div>
               )}
             </>
-          ) : isAITab && aiItems.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="relative mx-auto mb-4 w-20 h-20 flex items-center justify-center rounded-full border border-violet-500/20 bg-violet-500/5">
-                <AIParticles />
-                <BrainCircuit className="relative w-9 h-9 text-violet-400/60" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">AI Picks not ready yet</h3>
-              <p className="text-muted-foreground">
-                Watch or like at least 3 titles so the AI can build your taste profile.
-              </p>
-            </div>
           ) : (
             <div className="text-center py-16">
               <Sparkles className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
