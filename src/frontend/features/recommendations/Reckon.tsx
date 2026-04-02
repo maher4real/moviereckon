@@ -14,6 +14,7 @@ import { Badge } from "@/frontend/components/ui/badge";
 import { Sparkles, ArrowUpDown, RefreshCw, Film, Tv, BrainCircuit } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 
+type MainTab = "all" | "ai";
 type ContentTypeFilter = "all" | "movie" | "tv";
 type SortField = "relevance" | "popularity" | "rating" | "release_date";
 type SortOrder = "asc" | "desc";
@@ -60,6 +61,37 @@ const LANGUAGE_MAP: Record<string, string> = {
 const getRecommendationItemType = (item: Movie | TVShow): "movie" | "tv" =>
   "title" in item ? "movie" : "tv";
 
+// Animated neural network dots for the AI Picks tab
+function AIOrb() {
+  return (
+    <div className="relative flex items-center justify-center w-6 h-6">
+      <span className="absolute inline-flex h-full w-full rounded-full bg-violet-500 opacity-30 animate-ping" />
+      <BrainCircuit className="relative w-3.5 h-3.5 text-violet-400" />
+    </div>
+  );
+}
+
+// Floating particle animation for the AI Picks empty/loading header
+function AIParticles() {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
+      {Array.from({ length: 12 }).map((_, i) => (
+        <span
+          key={i}
+          className="absolute rounded-full bg-violet-500/20"
+          style={{
+            width: `${4 + (i % 4) * 3}px`,
+            height: `${4 + (i % 4) * 3}px`,
+            left: `${8 + (i * 7.5) % 84}%`,
+            top: `${10 + (i * 13) % 80}%`,
+            animation: `float-particle ${3 + (i % 4)}s ease-in-out ${(i * 0.4) % 2}s infinite alternate`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 const ReckonCard = memo(
   ({
     item,
@@ -67,12 +99,14 @@ const ReckonCard = memo(
     reasons,
     seedTitle,
     aiExplanation,
+    highlightAI,
   }: {
     item: Movie | TVShow;
     type: "movie" | "tv" | "mixed";
     reasons?: Array<{ label: string; evidence?: string }>;
     seedTitle?: string | null;
     aiExplanation?: { label: string; text: string };
+    highlightAI?: boolean;
   }) => {
     const [showAITooltip, setShowAITooltip] = useState(false);
 
@@ -93,7 +127,12 @@ const ReckonCard = memo(
                 e.stopPropagation();
                 setShowAITooltip((v) => !v);
               }}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-violet-500/90 text-white backdrop-blur-sm shadow-sm hover:bg-violet-500 transition-colors"
+              className={cn(
+                "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold backdrop-blur-sm shadow-sm transition-colors",
+                highlightAI
+                  ? "bg-violet-600/95 text-white hover:bg-violet-500 ring-1 ring-violet-400/40"
+                  : "bg-violet-500/90 text-white hover:bg-violet-500"
+              )}
               title={aiExplanation.text}
             >
               <BrainCircuit className="w-2.5 h-2.5" />
@@ -122,6 +161,7 @@ export default function Reckon() {
   const navigate = useNavigate();
   const {
     items: recommendations,
+    aiItems,
     isLoading: reckonLoading,
     isRefreshing,
     isPersonalized,
@@ -132,6 +172,7 @@ export default function Reckon() {
   } = useRecommendations();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
+  const [mainTab, setMainTab] = useState<MainTab>("all");
   const [contentTypeFilter, setContentTypeFilter] = useState<ContentTypeFilter>("all");
   const [sortField, setSortField] = useState<SortField>("relevance");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
@@ -145,32 +186,31 @@ export default function Reckon() {
     }
   }, [user, authLoading, navigate]);
 
+  // Source items depend on which main tab is active
+  const sourceItems = mainTab === "ai" ? aiItems : recommendations;
+
   const availableGenres = useMemo(() => {
     const genres = new Set<number>();
-    recommendations.forEach((item) => {
+    sourceItems.forEach((item) => {
       item.genre_ids?.forEach((g) => genres.add(g));
     });
-
     return Array.from(genres)
       .filter((g) => GENRE_MAP[g])
       .sort((a, b) => GENRE_MAP[a].localeCompare(GENRE_MAP[b]));
-  }, [recommendations]);
+  }, [sourceItems]);
 
   const availableLanguages = useMemo(() => {
     const langs = new Set<string>();
-    recommendations.forEach((item) => {
-      if (item.original_language) {
-        langs.add(item.original_language);
-      }
+    sourceItems.forEach((item) => {
+      if (item.original_language) langs.add(item.original_language);
     });
-
     return Array.from(langs)
       .filter((l) => LANGUAGE_MAP[l])
       .sort((a, b) => LANGUAGE_MAP[a].localeCompare(LANGUAGE_MAP[b]));
-  }, [recommendations]);
+  }, [sourceItems]);
 
   const processedItems = useMemo(() => {
-    let filtered = [...recommendations];
+    let filtered = [...sourceItems];
 
     if (contentTypeFilter === "movie") {
       filtered = filtered.filter((item) => "title" in item);
@@ -189,7 +229,6 @@ export default function Reckon() {
 
     filtered.sort((a, b) => {
       let comparison = 0;
-
       switch (sortField) {
         case "popularity":
           comparison = (a.popularity || 0) - (b.popularity || 0);
@@ -207,12 +246,11 @@ export default function Reckon() {
         default:
           return 0;
       }
-
       return sortOrder === "desc" ? -comparison : comparison;
     });
 
     return filtered;
-  }, [recommendations, contentTypeFilter, selectedGenre, selectedLanguage, sortField, sortOrder]);
+  }, [sourceItems, contentTypeFilter, selectedGenre, selectedLanguage, sortField, sortOrder]);
 
   const visibleItems = useMemo(
     () => processedItems.slice(0, visibleCount),
@@ -223,12 +261,11 @@ export default function Reckon() {
 
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_ITEMS);
-  }, [contentTypeFilter, selectedGenre, selectedLanguage, sortField, sortOrder]);
+  }, [mainTab, contentTypeFilter, selectedGenre, selectedLanguage, sortField, sortOrder]);
 
   useEffect(() => {
     const node = loadMoreRef.current;
     if (!node || !hasMore) return;
-
     const observer = new IntersectionObserver(
       (entries) => {
         if (!entries[0]?.isIntersecting) return;
@@ -236,14 +273,11 @@ export default function Reckon() {
       },
       { rootMargin: "500px 0px" }
     );
-
     observer.observe(node);
     return () => observer.disconnect();
   }, [hasMore, processedItems.length, visibleItems.length]);
 
-  const toggleSortOrder = () => {
-    setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
-  };
+  const toggleSortOrder = () => setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
 
   const clearFilters = () => {
     setContentTypeFilter("all");
@@ -257,12 +291,35 @@ export default function Reckon() {
     return <AppPageSkeleton cardCount={18} />;
   }
 
+  const isAITab = mainTab === "ai";
+
   return (
     <div className="min-h-screen bg-background flex flex-col pb-20 md:pb-0">
+      <style>{`
+        @keyframes float-particle {
+          from { transform: translateY(0px) scale(1); opacity: 0.2; }
+          to   { transform: translateY(-14px) scale(1.4); opacity: 0.5; }
+        }
+        @keyframes shimmer-ai {
+          0%   { background-position: -200% center; }
+          100% { background-position: 200% center; }
+        }
+        .ai-shimmer-text {
+          background: linear-gradient(90deg, #a78bfa, #e879f9, #818cf8, #a78bfa);
+          background-size: 200% auto;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          animation: shimmer-ai 3s linear infinite;
+        }
+      `}</style>
+
       <Header />
 
       <main className="flex-1 pt-20 pb-12">
         <div className="container mx-auto px-4">
+
+          {/* Top header row */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-3">
               <Sparkles className="w-8 h-8 text-primary" />
@@ -275,9 +332,7 @@ export default function Reckon() {
                 </p>
               </div>
               {isPersonalized && (
-                <Badge className="bg-primary/20 text-primary ml-2">
-                  Personalized
-                </Badge>
+                <Badge className="bg-primary/20 text-primary ml-2">Personalized</Badge>
               )}
               {isAIRanked && (
                 <Badge className="bg-violet-500/20 text-violet-400 ml-1 gap-1">
@@ -291,9 +346,7 @@ export default function Reckon() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  void refreshRecommendations();
-                }}
+                onClick={() => { void refreshRecommendations(); }}
                 disabled={isRefreshing}
                 className="gap-2"
               >
@@ -304,6 +357,76 @@ export default function Reckon() {
             </div>
           </div>
 
+          {/* Main tab switcher: All Picks | AI Picks */}
+          <div className="flex gap-2 mb-4 bg-card/50 p-1.5 rounded-xl border border-border w-fit">
+            <button
+              type="button"
+              onClick={() => setMainTab("all")}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                !isAITab
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Sparkles className="w-4 h-4" />
+              All Picks
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMainTab("ai")}
+              disabled={!isAIRanked}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                isAITab
+                  ? "bg-violet-600 text-white shadow-sm shadow-violet-500/30"
+                  : isAIRanked
+                    ? "text-violet-400 hover:text-violet-300 hover:bg-violet-500/10"
+                    : "text-muted-foreground/40 cursor-not-allowed",
+              )}
+            >
+              {isAITab ? <AIOrb /> : <BrainCircuit className="w-4 h-4" />}
+              <span className={isAITab ? "ai-shimmer-text font-semibold" : ""}>
+                AI Picks
+              </span>
+              {isAIRanked && (
+                <span className={cn(
+                  "text-[10px] px-1.5 py-0.5 rounded-full font-semibold",
+                  isAITab ? "bg-white/20 text-white" : "bg-violet-500/20 text-violet-400"
+                )}>
+                  {aiItems.length}
+                </span>
+              )}
+              {!isAIRanked && (
+                <span className="text-[10px] text-muted-foreground/50">
+                  needs history
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* AI Picks banner */}
+          {isAITab && (
+            <div className="relative mb-6 rounded-xl border border-violet-500/20 bg-violet-500/5 px-5 py-4 overflow-hidden">
+              <AIParticles />
+              <div className="relative flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-violet-500/15 border border-violet-500/25 shrink-0">
+                  <BrainCircuit className="w-5 h-5 text-violet-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-violet-300">
+                    Picked for you by AI
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Ranked using semantic embeddings from your watch history and liked titles via OpenAI
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Content type sub-filter */}
           <div className="flex gap-2 mb-6 bg-card/50 p-3 rounded-lg border border-border">
             <Button
               variant={contentTypeFilter === "all" ? "default" : "ghost"}
@@ -334,6 +457,7 @@ export default function Reckon() {
             </Button>
           </div>
 
+          {/* Sort / filter bar */}
           <div className="flex flex-col sm:flex-row gap-3 mb-6 flex-wrap">
             <Select value={selectedGenre} onValueChange={setSelectedGenre}>
               <SelectTrigger className="w-full sm:w-[170px] bg-card">
@@ -393,6 +517,7 @@ export default function Reckon() {
             )}
           </div>
 
+          {/* Grid */}
           {reckonLoading ? (
             <PosterGridSkeleton count={INITIAL_VISIBLE_ITEMS} />
           ) : visibleItems.length > 0 ? (
@@ -410,6 +535,7 @@ export default function Reckon() {
                       reasons={explanation?.reasons}
                       seedTitle={explanation?.seedTitle}
                       aiExplanation={aiExplanation}
+                      highlightAI={isAITab}
                     />
                   );
                 })}
@@ -428,6 +554,17 @@ export default function Reckon() {
                 </div>
               )}
             </>
+          ) : isAITab && aiItems.length === 0 ? (
+            <div className="text-center py-16">
+              <div className="relative mx-auto mb-4 w-20 h-20 flex items-center justify-center rounded-full border border-violet-500/20 bg-violet-500/5">
+                <AIParticles />
+                <BrainCircuit className="relative w-9 h-9 text-violet-400/60" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">AI Picks not ready yet</h3>
+              <p className="text-muted-foreground">
+                Watch or like at least 3 titles so the AI can build your taste profile.
+              </p>
+            </div>
           ) : (
             <div className="text-center py-16">
               <Sparkles className="w-16 h-16 text-muted-foreground mx-auto mb-4" />

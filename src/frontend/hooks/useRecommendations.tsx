@@ -17,6 +17,7 @@ const RECOMMENDATION_REFETCH_INTERVAL_MS = 3 * 60 * 1000;
 
 interface RecommendationResult {
   items: (Movie | TVShow)[];
+  aiItems: (Movie | TVShow)[];
   isLoading: boolean;
   isRefreshing: boolean;
   isPersonalized: boolean;
@@ -173,6 +174,7 @@ export function useRecommendations(): RecommendationResult {
   if (!user) {
     return {
       items: [],
+      aiItems: [],
       isLoading: false,
       isRefreshing: false,
       isPersonalized: false,
@@ -185,6 +187,7 @@ export function useRecommendations(): RecommendationResult {
 
   return {
     items: mergedItems,
+    aiItems: aiData?.items || [],
     isLoading:
       userDataLoading ||
       (!hasResolvedItems && (isLoading || fetchStatus === "fetching")),
