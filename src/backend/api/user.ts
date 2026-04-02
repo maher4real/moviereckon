@@ -16,6 +16,7 @@ import clearHistoryHandler from "./_handlers/user/clear-history.js";
 import commentsHandler from "./_handlers/user/comments.js";
 import feedbackHandler from "./_handlers/user/feedback.js";
 import recommendationsHandler from "./_handlers/user/recommendations.js";
+import aiRecommendationsHandler from "./_handlers/user/ai-recommendations.js";
 import {
   applyApiCors,
   applyDefaultSecurityHeaders,
@@ -145,6 +146,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return feedbackHandler(req, res);
       case "recommendations":
         return recommendationsHandler(req, res);
+      case "ai-recommendations":
+        return aiRecommendationsHandler(req, res);
       default:
         return res.status(404).json({ error: `User route not found: ${route}` });
     }

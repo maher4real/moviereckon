@@ -1081,6 +1081,34 @@ export async function updateProfile(updates: {
   }
 }
 
+// ========== AI Recommendations ==========
+
+export interface AIRecommendationsPayload {
+  items: import("@/shared/lib/tmdb").Movie[] | import("@/shared/lib/tmdb").TVShow[];
+  explanationById: Record<string, { label: string; text: string }>;
+  isAIRanked: true;
+}
+
+export async function fetchAIRecommendations(): Promise<AIRecommendationsPayload> {
+  const empty: AIRecommendationsPayload = { items: [], explanationById: {}, isAIRanked: true };
+  try {
+    const response = await fetchWithAuth("/api/user/ai-recommendations");
+    if (!response.ok) return empty;
+    const data = await response.json();
+    const payload = data?.data as Partial<AIRecommendationsPayload> | undefined;
+    if (!payload || !Array.isArray(payload.items)) return empty;
+    return {
+      items: payload.items,
+      explanationById: payload.explanationById && typeof payload.explanationById === "object"
+        ? payload.explanationById
+        : {},
+      isAIRanked: true,
+    };
+  } catch {
+    return empty;
+  }
+}
+
 // ========== Health Check ==========
 
 export async function checkMongoDBHealth(): Promise<{ healthy: boolean; latency?: number; error?: string }> {
