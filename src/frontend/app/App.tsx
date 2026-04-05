@@ -22,6 +22,7 @@ import { CenteredAppSkeleton } from "@/frontend/components/AppSkeletons";
 import type { MongoUser } from "@/frontend/lib/mongodbClient";
 import Auth from "@/frontend/features/auth/Auth";
 import Home from "@/frontend/features/browse/Home";
+import ProtectedRoute from "@/frontend/components/ProtectedRoute";
 
 const Upcoming = lazy(() => import("@/frontend/features/browse/Upcoming"));
 const Search = lazy(() => import("@/frontend/features/browse/Search"));
@@ -93,27 +94,32 @@ const App = ({
                   <AuthTransitionOverlay />
                   <Suspense fallback={<CenteredAppSkeleton />}>
                     <Routes>
+                      {/* Public routes */}
                       <Route path="/" element={<Auth />} />
                       <Route path="/auth" element={<Auth />} />
                       <Route path="/verify-email" element={<VerifyEmail />} />
                       <Route path="/forgot-password" element={<ForgotPassword />} />
                       <Route path="/reset-password" element={<ResetPassword />} />
-                      <Route path="/home" element={<Home />} />
-                      <Route path="/upcoming" element={<Upcoming />} />
+
+                      {/* Redirect aliases */}
                       <Route path="/browse" element={<Navigate to="/upcoming" replace />} />
                       <Route path="/browse/movies" element={<Navigate to="/upcoming?section=movies" replace />} />
                       <Route path="/browse/bollywood" element={<Navigate to="/upcoming?section=movies&movieType=bollywood" replace />} />
                       <Route path="/browse/hollywood" element={<Navigate to="/upcoming?section=movies&movieType=hollywood" replace />} />
                       <Route path="/browse/tv" element={<Navigate to="/upcoming?section=series" replace />} />
-                      <Route path="/search" element={<Search />} />
-                      <Route path="/movie/:id" element={<MovieDetail />} />
-                      <Route path="/tv/:id" element={<TVDetail />} />
-                      <Route path="/person/:id" element={<PersonDetail />} />
-                      <Route path="/profile" element={<Profile />} />
-                      <Route path="/profile/edit" element={<ProfileEdit />} />
-                      <Route path="/reckon" element={<Reckon />} />
-                      <Route path="/movies" element={<Movies />} />
-                      <Route path="/series" element={<Series />} />
+
+                      {/* Protected routes */}
+                      <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+                      <Route path="/upcoming" element={<ProtectedRoute><Upcoming /></ProtectedRoute>} />
+                      <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
+                      <Route path="/movie/:id" element={<ProtectedRoute><MovieDetail /></ProtectedRoute>} />
+                      <Route path="/tv/:id" element={<ProtectedRoute><TVDetail /></ProtectedRoute>} />
+                      <Route path="/person/:id" element={<ProtectedRoute><PersonDetail /></ProtectedRoute>} />
+                      <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                      <Route path="/profile/edit" element={<ProtectedRoute><ProfileEdit /></ProtectedRoute>} />
+                      <Route path="/reckon" element={<ProtectedRoute><Reckon /></ProtectedRoute>} />
+                      <Route path="/movies" element={<ProtectedRoute><Movies /></ProtectedRoute>} />
+                      <Route path="/series" element={<ProtectedRoute><Series /></ProtectedRoute>} />
                       <Route path="/about" element={<InfoPage page="about" />} />
                       <Route path="/feedback" element={<InfoPage page="feedback" />} />
                       <Route path="/contact" element={<InfoPage page="contact" />} />

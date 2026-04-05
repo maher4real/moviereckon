@@ -26,7 +26,7 @@ import {
 import MediaImage from "@/frontend/components/MediaImage";
 import { Button } from "@/frontend/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/frontend/components/ui/select";
-import { cn } from "@/shared/lib/utils";
+import { cn, formatLocalDate, isAnimeLike } from "@/shared/lib/utils";
 import { Film } from "lucide-react";
 
 type MovieCategory = "all" | "now_playing" | "trending" | "bollywood" | "hollywood";
@@ -59,15 +59,6 @@ const BOLLYWOOD_LANGUAGE_OPTIONS = [
 const BOLLYWOOD_LANGUAGE_CODES = ["hi", "gu", "ta", "te", "kn"] as const;
 const BOLLYWOOD_LANGUAGE_SET: ReadonlySet<string> = new Set(BOLLYWOOD_LANGUAGE_CODES);
 
-const isAnimeLikeMovie = (movie: Movie) =>
-  movie.original_language === "ja" && movie.genre_ids?.includes(16);
-
-const formatLocalDate = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
 
 const PosterCard = memo(({ item, onClick }: { item: Movie; onClick: () => void }) => (
   <div onClick={onClick} className="cursor-pointer group">
@@ -103,7 +94,7 @@ const PosterCard = memo(({ item, onClick }: { item: Movie; onClick: () => void }
 PosterCard.displayName = "PosterCard";
 
 export default function Movies() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
@@ -121,12 +112,6 @@ export default function Movies() {
   );
 
   const effectiveBollywoodLanguage = category === "bollywood" ? bollywoodLanguage : "all";
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/");
-    }
-  }, [user, authLoading, navigate]);
 
   const { data: genres } = useQuery({
     queryKey: ["movie-genres"],
@@ -245,11 +230,11 @@ export default function Movies() {
       return lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined;
     },
     staleTime: 1000 * 60 * 5,
-    enabled: !authLoading && !!user,
+    enabled: !!user,
   });
 
   useEffect(() => {
-    if (authLoading || !user) return;
+    if (!user) return;
 
     void queryClient.prefetchInfiniteQuery({
       queryKey: ["movies-infinite", "hollywood", "", "all", "popularity.desc"],
@@ -272,7 +257,7 @@ export default function Movies() {
       },
       staleTime: 1000 * 60 * 10,
     });
-  }, [authLoading, user, queryClient]);
+  }, [user, queryClient]);
 
   const allMovies = useMemo(() => {
     if (!contentData?.pages) return [];
@@ -302,7 +287,7 @@ export default function Movies() {
         ) {
           return;
         }
-        if (isAnimeLikeMovie(movie)) return;
+        if (isAnimeLike(movie)) return;
 
         dedupe.add(movie.id);
         merged.push(movie);
@@ -340,10 +325,6 @@ export default function Movies() {
   }, [fetchNextPage, hasNextPage, isFetchingNextPage, allMovies.length]);
 
   const isSpecialCategory = ["now_playing", "trending"].includes(category);
-
-  if (authLoading) {
-    return <AppPageSkeleton cardCount={18} />;
-  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col pb-20 md:pb-0">

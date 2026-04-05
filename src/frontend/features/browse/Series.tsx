@@ -25,7 +25,7 @@ import {
 import MediaImage from "@/frontend/components/MediaImage";
 import { Button } from "@/frontend/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/frontend/components/ui/select";
-import { cn } from "@/shared/lib/utils";
+import { cn, formatLocalDate, isAnimeLike } from "@/shared/lib/utils";
 import { Tv } from "lucide-react";
 
 type SeriesCategory =
@@ -79,15 +79,6 @@ const LANGUAGE_OPTIONS = [
   { value: "fr", label: "French" },
 ];
 
-const isAnimeLikeSeries = (item: TVShow) =>
-  item.original_language === "ja" && item.genre_ids?.includes(16);
-
-const formatLocalDate = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
 
 const PosterCard = memo(
   ({ item, onClick, ottLabel }: { item: TVShow; onClick: () => void; ottLabel?: string }) => (
@@ -132,7 +123,7 @@ const PosterCard = memo(
 PosterCard.displayName = "PosterCard";
 
 export default function Series() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -148,12 +139,6 @@ export default function Series() {
   );
   const [ottFilter, setOttFilter] = useState<string>(searchParams.get("platform") || "all");
   const [selectedLanguage, setSelectedLanguage] = useState<string>(searchParams.get("lang") || "all");
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/");
-    }
-  }, [user, authLoading, navigate]);
 
   const { data: genres } = useQuery({
     queryKey: ["tv-genres"],
@@ -244,7 +229,7 @@ export default function Series() {
       return lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined;
     },
     staleTime: 1000 * 60 * 5,
-    enabled: !authLoading && !!user,
+    enabled: !!user,
   });
 
   const filteredSeries = useMemo(() => {
@@ -260,7 +245,7 @@ export default function Series() {
       (page.results || []).forEach((item) => {
         if (dedupe.has(item.id)) return;
 
-        const animeLike = isAnimeLikeSeries(item);
+        const animeLike = isAnimeLike(item);
         if (category === "anime" && !animeLike) return;
         if (category !== "anime" && animeLike) return;
         if (category === "upcoming" && item.first_air_date < tomorrowStr) return;
@@ -317,10 +302,6 @@ export default function Series() {
     if (category === "indian") return "Indian OTT";
     return "OTT Mix";
   }, [ottFilter, ottLabel, category]);
-
-  if (authLoading) {
-    return <AppPageSkeleton cardCount={18} />;
-  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col pb-20 md:pb-0">

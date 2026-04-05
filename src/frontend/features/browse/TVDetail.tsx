@@ -77,7 +77,7 @@ export default function TVDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isLoading: authLoading } = useAuth();
+  const { user } = useAuth();
   const { addToWatchHistory, isWatched, toggleLike, isLiked } = useUserData();
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
   const [expandedEpisode, setExpandedEpisode] = useState<number | null>(null);
@@ -95,13 +95,6 @@ export default function TVDetail() {
   const communitySectionRef = useRef<HTMLDivElement>(null);
 
   const tvId = Number(id);
-
-  // Redirect if no user
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/");
-    }
-  }, [user, authLoading, navigate]);
 
   const handleBack = () => {
     const from = (location.state as { from?: string } | null)?.from;
@@ -565,7 +558,7 @@ export default function TVDetail() {
     setIsTrailerModalOpen(true);
   };
 
-  if (authLoading || tvLoading) {
+  if (tvLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Header />

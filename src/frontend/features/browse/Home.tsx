@@ -27,23 +27,15 @@ import Footer from "@/frontend/components/Footer";
 import { AppPageSkeleton } from "@/frontend/components/AppSkeletons";
 import { Sparkles } from "lucide-react";
 import { announceHomeHeroReady } from "@/frontend/lib/startupSound";
+import { cn, formatLocalDate, isAnimeLike } from "@/shared/lib/utils";
 
 // Memoized carousel for performance
 const MemoizedCarousel = memo(ContentCarousel);
 const HOME_UPCOMING_PAGES = [1, 2, 3] as const;
 const HOME_UPCOMING_TV_PAGES = [1, 2] as const;
-const isAnimeLike = (item: Movie | TVShow) =>
-  item.original_language === "ja" && item.genre_ids?.includes(16);
-
-const formatLocalDate = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
 
 export default function Home() {
-  const { user, isLoading: authLoading, profile } = useAuth();
+  const { user, profile } = useAuth();
   const { watchHistory, isLoading: dataLoading } = useUserData();
   const {
     items: reckonItems,
@@ -56,13 +48,6 @@ export default function Home() {
   const [loadSecondaryShelves, setLoadSecondaryShelves] = useState(false);
   const [isHeroVisualReady, setIsHeroVisualReady] = useState(false);
   const hasAnnouncedHeroReadyRef = useRef(false);
-
-  // Redirect to auth if no user
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/");
-    }
-  }, [user, authLoading, navigate]);
 
   useEffect(() => {
     if (!user) return;
@@ -342,10 +327,6 @@ export default function Home() {
   }, []);
 
   const secondaryShelvesPending = !loadSecondaryShelves;
-
-  if (authLoading) {
-    return <AppPageSkeleton cardCount={10} showFilterRow={false} />;
-  }
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0">

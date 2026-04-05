@@ -157,7 +157,7 @@ const ReckonCard = memo(
 ReckonCard.displayName = "ReckonCard";
 
 export default function Reckon() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const {
     items: recommendations,
@@ -179,12 +179,6 @@ export default function Reckon() {
   const [selectedGenre, setSelectedGenre] = useState<string>("all");
   const [selectedLanguage, setSelectedLanguage] = useState<string>("all");
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_ITEMS);
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/");
-    }
-  }, [user, authLoading, navigate]);
 
   // Source items depend on which main tab is active
   const sourceItems = mainTab === "ai" ? aiItems : recommendations;
@@ -286,10 +280,6 @@ export default function Reckon() {
     setSortField("relevance");
     setSortOrder("desc");
   };
-
-  if (authLoading) {
-    return <AppPageSkeleton cardCount={18} />;
-  }
 
   const isAITab = mainTab === "ai";
 

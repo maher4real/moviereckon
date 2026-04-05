@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, ArrowRight, Sparkles } from "lucide-react";
-import { Movie, TVShow, getPosterUrl } from "@/shared/lib/tmdb";
+import { Movie, TVShow, getPosterUrl, getLanguageBadgeClass } from "@/shared/lib/tmdb";
 import { Button } from "@/frontend/components/ui/button";
 import { cn } from "@/shared/lib/utils";
 import MediaImage from "@/frontend/components/MediaImage";
@@ -98,27 +98,8 @@ export default function ContentCarousel({
   };
 
   const getDefaultViewAllHref = (): string => {
-    const normalized = title.toLowerCase();
-
-    if (normalized.includes("now playing"))
-      return "/movies?category=now_playing";
-    if (normalized.includes("coming soon") || normalized.includes("upcoming")) {
-      return "/upcoming";
-    }
-    if (normalized.includes("continue watching")) return "/profile";
-    if (normalized.includes("bollywood")) return "/movies?category=bollywood";
-    if (normalized.includes("hollywood")) return "/movies?category=hollywood";
-    if (normalized.includes("tamil")) return "/movies?category=bollywood&lang=ta";
-    if (normalized.includes("telugu")) return "/movies?category=bollywood&lang=te";
-    if (normalized.includes("gujarati")) return "/movies?category=bollywood&lang=gu";
-    if (normalized.includes("trending tv")) return "/series?category=popular";
-    if (normalized.includes("top rated"))
-      return "/movies?sort=vote_average.desc";
-    if (normalized.includes("trending")) return "/movies?category=trending";
-    if (normalized.includes("similar"))
-      return type === "tv" ? "/series" : "/movies";
-    if (type === "movie") return "/movies";
     if (type === "tv") return "/series";
+    if (type === "movie") return "/movies";
     return "/reckon";
   };
 
@@ -222,10 +203,11 @@ export default function ContentCarousel({
                 const explanation = recommendationExplanations?.[`${itemType}_${item.id}`];
 
                 return (
-                  <div
+                  <button
                     key={`${itemType}-${item.id}`}
+                    type="button"
                     onClick={() => handleItemClick(item)}
-                    className="flex-shrink-0 snap-start w-[128px] sm:w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/card relative"
+                    className="flex-shrink-0 snap-start w-[128px] sm:w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/card relative text-left bg-transparent border-0 p-0"
                   >
                     <div className="relative aspect-[2/3] rounded-lg overflow-hidden transform-gpu transition-[transform,box-shadow] duration-300 group-hover/card:-translate-y-1.5 group-hover/card:shadow-[0_12px_36px_rgba(0,0,0,0.48)]">
                       <MediaImage
@@ -251,16 +233,10 @@ export default function ContentCarousel({
                       <div
                         className={cn(
                           "absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold",
-                          item.original_language === "hi"
-                            ? "badge-hindi"
-                            : item.original_language === "en"
-                              ? "badge-english"
-                              : "bg-muted",
+                          getLanguageBadgeClass(item.original_language),
                         )}
                       >
-                        {item.original_language === "hi"
-                          ? "HI"
-                          : item.original_language.toUpperCase()}
+                        {item.original_language.toUpperCase()}
                       </div>
                     </div>
 
@@ -318,7 +294,7 @@ export default function ContentCarousel({
                         </Popover>
                       ) : null}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
 

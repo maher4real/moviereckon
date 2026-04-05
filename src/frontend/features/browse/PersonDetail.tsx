@@ -198,17 +198,11 @@ export default function PersonDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isLoading: authLoading } = useAuth();
+  const { user } = useAuth();
   const [mediaFilter, setMediaFilter] = useState<MediaFilter>("all");
 
   const personId = Number(id);
   const currentPath = `${location.pathname}${location.search}${location.hash}`;
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/");
-    }
-  }, [authLoading, navigate, user]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -293,7 +287,7 @@ export default function PersonDetail() {
     navigate("/home");
   };
 
-  if (authLoading || personLoading) {
+  if (personLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Header />

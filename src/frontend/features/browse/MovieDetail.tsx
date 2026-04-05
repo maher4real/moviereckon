@@ -62,7 +62,7 @@ export default function MovieDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isLoading: authLoading } = useAuth();
+  const { user } = useAuth();
   const { addToWatchHistory, isWatched, toggleLike, isLiked } = useUserData();
   const [watchAnimating, setWatchAnimating] = useState(false);
   const [likeAnimating, setLikeAnimating] = useState(false);
@@ -76,15 +76,9 @@ export default function MovieDetail() {
   const heroMediaRef = useRef<HTMLDivElement>(null);
   const bgPlayerRef = useRef<HTMLIFrameElement>(null);
   const communitySectionRef = useRef<HTMLDivElement>(null);
+  const hasAutoPlayedRef = useRef(false);
 
   const movieId = Number(id);
-
-  // Redirect if no user
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/");
-    }
-  }, [user, authLoading, navigate]);
 
   const handleBack = () => {
     const from = (location.state as { from?: string } | null)?.from;
@@ -288,7 +282,17 @@ export default function MovieDetail() {
 
   useEffect(() => {
     setIsTrailerModalOpen(false);
+    hasAutoPlayedRef.current = false;
   }, [movieId]);
+
+  // Auto-open trailer when navigated from hero "Watch Trailer" button
+  const autoPlayTrailer = (location.state as { autoPlayTrailer?: boolean } | null)?.autoPlayTrailer;
+  useEffect(() => {
+    if (!autoPlayTrailer || !trailerModalKey || hasAutoPlayedRef.current) return;
+    hasAutoPlayedRef.current = true;
+    setTrailerSessionId((prev) => prev + 1);
+    setIsTrailerModalOpen(true);
+  }, [autoPlayTrailer, trailerModalKey]);
 
   useEffect(() => {
     setShouldRenderCommunity(false);
@@ -566,7 +570,7 @@ export default function MovieDetail() {
     setIsTrailerModalOpen(true);
   };
 
-  if (authLoading || movieLoading) {
+  if (movieLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Header />

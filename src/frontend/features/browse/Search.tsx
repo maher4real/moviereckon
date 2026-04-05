@@ -124,20 +124,13 @@ const ResultCard = memo(({ item, onClick }: { item: MultiSearchResult; onClick: 
 ResultCard.displayName = "ResultCard";
 
 export default function Search() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
-
-  // Redirect if no user
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/");
-    }
-  }, [user, authLoading, navigate]);
 
   // Load recent searches
   useEffect(() => {
@@ -240,10 +233,6 @@ export default function Search() {
   const handleRecentSearchClick = useCallback((searchTerm: string) => {
     setQuery(searchTerm);
   }, []);
-
-  if (authLoading) {
-    return <AppPageSkeleton cardCount={12} />;
-  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col pb-20 md:pb-0">

@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { Movie, getBackdropUrl } from "@/shared/lib/tmdb";
+import { Movie, getBackdropUrl, getLanguageBadgeClass, getLanguageLabel } from "@/shared/lib/tmdb";
 import { Button } from "@/frontend/components/ui/button";
 import { Play, Info } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
@@ -67,10 +67,10 @@ export default function HeroBanner({
               <span
                 className={cn(
                   "px-2 py-1 rounded text-xs font-semibold",
-                  movie.original_language === "hi" ? "badge-hindi" : "badge-english"
+                  getLanguageBadgeClass(movie.original_language)
                 )}
               >
-                {movie.original_language === "hi" ? "🇮🇳 Hindi" : "🇺🇸 English"}
+                {getLanguageLabel(movie.original_language)}
               </span>
               {year && (
                 <span className="px-2 py-1 rounded bg-muted text-xs font-medium">
@@ -100,7 +100,7 @@ export default function HeroBanner({
                 size="lg"
                 className="bg-primary hover:bg-primary/90 glow-primary font-semibold text-primary-foreground"
                 onClick={() =>
-                  navigate(`/movie/${movie.id}`, { state: { from: fromPath } })
+                  navigate(`/movie/${movie.id}`, { state: { from: fromPath, autoPlayTrailer: true } })
                 }
               >
                 <Play className="w-5 h-5 mr-2 fill-current" />

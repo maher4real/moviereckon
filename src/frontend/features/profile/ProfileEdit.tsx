@@ -31,7 +31,6 @@ export default function ProfileEdit() {
   const {
     user,
     profile,
-    isLoading: authLoading,
     updateProfile,
   } = useAuth();
   const { toast } = useToast();
@@ -45,12 +44,6 @@ export default function ProfileEdit() {
     Record<string, string>
   >({});
   const avatarFileInputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/");
-    }
-  }, [authLoading, navigate, user]);
 
   useEffect(() => {
     setUsernameInput(profile?.username || user?.username || "");
@@ -288,10 +281,6 @@ export default function ProfileEdit() {
       setIsProcessingAvatar(false);
     }
   };
-
-  if (authLoading) {
-    return <AppPageSkeleton cardCount={12} showFilterRow={false} />;
-  }
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0">

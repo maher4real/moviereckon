@@ -118,7 +118,6 @@ export default function Profile() {
   const {
     user,
     profile,
-    isLoading: authLoading,
     signOut,
   } = useAuth();
   const {
@@ -130,12 +129,6 @@ export default function Profile() {
   } = useUserData();
   const navigate = useNavigate();
   const location = useLocation();
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/");
-    }
-  }, [authLoading, navigate, user]);
 
   const displayName = profile?.username || user?.username || "User";
   const avatarUrl = normalizeAvatarValue(profile?.avatar_url || "") || null;
@@ -192,7 +185,7 @@ export default function Profile() {
     [likedItems],
   );
 
-  if (authLoading || dataLoading) {
+  if (dataLoading) {
     return <AppPageSkeleton cardCount={16} showFilterRow={false} />;
   }
 

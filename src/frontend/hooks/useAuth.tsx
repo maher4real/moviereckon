@@ -51,6 +51,17 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function mapUserToProfile(user: mongoClient.MongoUser): Profile {
+  return {
+    id: user.id,
+    user_id: user.id,
+    username: user.username,
+    avatar_url: user.avatar_url,
+    created_at: user.created_at,
+    updated_at: user.updated_at,
+  };
+}
+
 type AuthProviderProps = {
   children: ReactNode;
   initialUser?: mongoClient.MongoUser | null;
@@ -62,14 +73,6 @@ export function AuthProvider({
   initialUser,
   authResolved = false,
 }: AuthProviderProps) {
-  const mapUserToProfile = (user: mongoClient.MongoUser): Profile => ({
-    id: user.id,
-    user_id: user.id,
-    username: user.username,
-    avatar_url: user.avatar_url,
-    created_at: user.created_at,
-    updated_at: user.updated_at,
-  });
 
   const [user, setUser] = useState<mongoClient.MongoUser | null>(
     () => initialUser ?? null,

@@ -27,7 +27,7 @@ import MediaImage from "@/frontend/components/MediaImage";
 import { Button } from "@/frontend/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/frontend/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/frontend/components/ui/card";
-import { cn } from "@/shared/lib/utils";
+import { cn, formatLocalDate, isAnimeLike } from "@/shared/lib/utils";
 
 type UpcomingSection = "all" | "movies" | "series";
 type MovieSectionFilter = "all" | "bollywood" | "hollywood";
@@ -78,15 +78,6 @@ const BOLLYWOOD_LANGUAGE_LIST = ["hi", "gu", "ta", "te", "kn"] as const;
 const BOLLYWOOD_LANGUAGE_CODES = new Set<string>(BOLLYWOOD_LANGUAGE_LIST);
 const CALENDAR_TIMELINE_DAYS = 180;
 
-const isAnimeLike = (item: Movie | TVShow) =>
-  item.original_language === "ja" && item.genre_ids?.includes(16);
-
-const formatLocalDate = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
 
 const isTVShow = (item: Movie | TVShow): item is TVShow => "first_air_date" in item;
 
@@ -168,7 +159,7 @@ const PosterCard = memo(({ item, onClick }: { item: Movie | TVShow; onClick: () 
 PosterCard.displayName = "PosterCard";
 
 export default function Upcoming() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -190,12 +181,6 @@ export default function Upcoming() {
     return isValidDateKey(dateParam) ? dateParam : "all";
   });
   const [calendarGroupLimit, setCalendarGroupLimit] = useState(8);
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/");
-    }
-  }, [user, authLoading, navigate]);
 
   const { data: movieGenres } = useQuery({
     queryKey: ["movie-genres"],
@@ -365,7 +350,7 @@ export default function Upcoming() {
       return lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined;
     },
     staleTime: 1000 * 60 * 5,
-    enabled: !authLoading && !!user,
+    enabled: !!user,
   });
 
   const filteredUpcoming = useMemo(() => {
@@ -588,10 +573,6 @@ export default function Upcoming() {
       state: { from: fromPath },
     });
   };
-
-  if (authLoading) {
-    return <AppPageSkeleton cardCount={18} />;
-  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col pb-20 md:pb-0">
