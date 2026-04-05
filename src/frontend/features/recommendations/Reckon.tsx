@@ -620,6 +620,7 @@ export default function Reckon() {
     setSortOrder("desc");
   };
 
+  const hasResolvedItems = processedItems.length > 0;
   const isAITab = mainTab === "ai";
 
   return (
@@ -809,6 +810,7 @@ export default function Reckon() {
                 <Tv className="w-4 h-4" />
                 TV Series
               </Button>
+            </div>
 
             <div className="flex gap-2 bg-muted/30 p-3 rounded-lg border border-border/50 overflow-x-auto scrollbar-hide">
               {RECOMMENDATION_TYPES.map((t) => (
@@ -840,7 +842,7 @@ export default function Reckon() {
           {/* Sort / filter bar */}
           <div className="flex flex-col sm:flex-row gap-3 mb-6 flex-wrap">
             <Select value={selectedGenre} onValueChange={setSelectedGenre}>
-              <SelectTrigger className="w-full sm:w-[170px] bg-card">
+              <SelectTrigger className="w-full sm:w-42.5 bg-card">
                 <SelectValue placeholder="All Genres" />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border z-50">
@@ -857,7 +859,7 @@ export default function Reckon() {
               value={selectedLanguage}
               onValueChange={setSelectedLanguage}
             >
-              <SelectTrigger className="w-full sm:w-[170px] bg-card">
+              <SelectTrigger className="w-full sm:w-42.5 bg-card">
                 <SelectValue placeholder="All Languages" />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border z-50">
@@ -874,7 +876,7 @@ export default function Reckon() {
               value={sortField}
               onValueChange={(v) => setSortField(v as SortField)}
             >
-              <SelectTrigger className="w-full sm:w-[170px] bg-card">
+              <SelectTrigger className="w-full sm:w-42.5 bg-card">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border z-50">
@@ -980,3 +982,12 @@ export default function Reckon() {
               )}
             </div>
           )}
+        </div>
+      </main>
+
+      <Footer />
+      <BottomNav />
+    </div>
+  );
+}
+
