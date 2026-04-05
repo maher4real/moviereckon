@@ -181,30 +181,8 @@ export function AuthPageSkeleton() {
         <div className="absolute bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-secondary/18 rounded-full blur-[100px]" />
       </div>
 
-      <div className="relative z-10 w-full max-w-md space-y-6">
-        <div className="space-y-3 text-center">
-          <div className="flex items-center justify-center">
-            <BrandLogo size="xl" animated />
-          </div>
-          <Skeleton className="h-4 w-64 mx-auto bg-white/12" />
-        </div>
-
-        <div className="rounded-2xl border border-border bg-card/80 backdrop-blur-md p-8 shadow-2xl">
-          <Skeleton className="h-10 w-full rounded-md" />
-          <div className="space-y-4 mt-6">
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-16" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-20" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-            <Skeleton className="h-12 w-full" />
-          </div>
-        </div>
-
-        <Skeleton className="h-4 w-44 mx-auto" />
+      <div className="relative z-10 flex flex-col items-center justify-center">
+        <BrandLogo size="xl" animated />
       </div>
     </div>
   );
