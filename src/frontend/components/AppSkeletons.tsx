@@ -55,14 +55,20 @@ export function UpcomingTimelineSkeleton({
           <div className="flex w-max items-stretch gap-2">
             <Skeleton className="h-[74px] w-[108px] rounded-xl" />
             {Array.from({ length: dateChipCount }).map((_, index) => (
-              <Skeleton key={`upcoming-date-chip-skeleton-${index}`} className="h-[74px] w-[98px] rounded-xl" />
+              <Skeleton
+                key={`upcoming-date-chip-skeleton-${index}`}
+                className="h-[74px] w-[98px] rounded-xl"
+              />
             ))}
           </div>
         </div>
       </div>
 
       {Array.from({ length: sectionCount }).map((_, sectionIndex) => (
-        <div key={`upcoming-section-skeleton-${sectionIndex}`} className="rounded-xl border border-border/70 bg-card/35 p-4">
+        <div
+          key={`upcoming-section-skeleton-${sectionIndex}`}
+          className="rounded-xl border border-border/70 bg-card/35 p-4"
+        >
           <div className="flex items-center justify-between gap-3">
             <div>
               <Skeleton className="h-5 w-40" />
@@ -72,7 +78,9 @@ export function UpcomingTimelineSkeleton({
           </div>
           <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-3">
             {Array.from({ length: 5 }).map((_, itemIndex) => (
-              <div key={`upcoming-poster-skeleton-${sectionIndex}-${itemIndex}`}>
+              <div
+                key={`upcoming-poster-skeleton-${sectionIndex}-${itemIndex}`}
+              >
                 <Skeleton className="aspect-[2/3] rounded-lg" />
                 <Skeleton className="mt-2 h-4 w-3/4" />
                 <Skeleton className="mt-1 h-3 w-1/2" />
@@ -153,14 +161,16 @@ export function AuthPageSkeleton() {
                 )}
                 style={{ animationDuration: `${34 + rowIndex * 4}s` }}
               >
-                {Array.from({ length: postersPerRow * 2 }).map((_, posterIndex) => (
-                  <div
-                    key={`auth-skeleton-tile-${rowIndex}-${posterIndex}`}
-                    className="auth-poster-tile"
-                  >
-                    <Skeleton className="h-full w-full rounded-none" />
-                  </div>
-                ))}
+                {Array.from({ length: postersPerRow * 2 }).map(
+                  (_, posterIndex) => (
+                    <div
+                      key={`auth-skeleton-tile-${rowIndex}-${posterIndex}`}
+                      className="auth-poster-tile"
+                    >
+                      <Skeleton className="h-full w-full rounded-none" />
+                    </div>
+                  ),
+                )}
               </div>
             ))}
           </div>
@@ -212,7 +222,9 @@ export function InlineLoadMoreSkeleton({
   barClassName,
 }: InlineLoadMoreSkeletonProps) {
   return (
-    <div className={cn("flex items-center justify-center gap-2 py-4", className)}>
+    <div
+      className={cn("flex items-center justify-center gap-2 py-4", className)}
+    >
       {Array.from({ length: count }).map((_, index) => (
         <Skeleton
           key={`inline-skeleton-${index}`}
