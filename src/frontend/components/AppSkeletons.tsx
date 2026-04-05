@@ -127,11 +127,7 @@ export function AppPageSkeleton({
 export function CenteredAppSkeleton() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-card/70 px-6 py-8 text-center shadow-2xl backdrop-blur-md">
-        <BrandLogo size="xl" animated />
-        <Skeleton className="mx-auto mt-5 h-4 w-40 bg-white/12" />
-        <Skeleton className="mx-auto mt-3 h-3 w-56 bg-white/10" />
-      </div>
+      <BrandLogo size="xl" animated />
     </div>
   );
 }
