@@ -980,11 +980,3 @@ export default function Reckon() {
               )}
             </div>
           )}
-        </div>
-      </main>
-
-      <Footer />
-      <BottomNav />
-    </div>
-  );
-}
