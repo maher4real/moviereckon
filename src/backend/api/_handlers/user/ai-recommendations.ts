@@ -51,25 +51,30 @@ const MAX_USER_REQUESTS = 15;
 const RATE_WINDOW_MS = 5 * 60 * 1000;
 
 const EMBED_TTL_SECONDS = 7 * 24 * 60 * 60;  // 7 days — movie metadata stable
-const RESULT_CACHE_TTL_SECONDS = 8 * 60;       // 8 minutes
+const RESULT_CACHE_TTL_SECONDS = 60 * 60;     // 1 hour — longer cache = faster hits, often sufficient
 
-const MAX_HISTORY_SEEDS = 50;
-const MAX_LIKED_SEEDS = 30;
-const MAX_FEEDBACK_SEEDS = 30;
-const MAX_CANDIDATES = 500;          // larger pool = more discovery
-const TOP_N_FOR_EXPLANATIONS = 50;   // AI explanations for top 50
-const FINAL_OUTPUT_LIMIT = 80;       // total items returned to the client
+const MAX_HISTORY_SEEDS = 30;
+const MAX_LIKED_SEEDS = 20;
+const MAX_FEEDBACK_SEEDS = 15;
+const MIN_VOTE_AVERAGE = 5.8;        // stricter pre-filter = fewer embeddings
+const MAX_CANDIDATES = 150;          // reduced pool = faster embedding + better focus
+const TOP_N_FOR_EXPLANATIONS = 10;   // fewer GPT calls = fewer tokens, still personalized
+const FINAL_OUTPUT_LIMIT = 45;       // fewer total items = more curated feel
 
 // How many of the user's top-liked items to fetch TMDB-similar content for
-const TOP_SEEDS_FOR_SIMILAR = 5;     // up from 3
+const TOP_SEEDS_FOR_SIMILAR = 3;
 
 // Final score blend: semantic similarity vs content quality
-const SIMILARITY_WEIGHT = 0.72;
-const QUALITY_WEIGHT = 0.28;
+const SIMILARITY_WEIGHT = 0.70;
+const QUALITY_WEIGHT = 0.30;
+
+// Preference boost multipliers (tuned higher for user preferences)
+const LANG_BOOST = 1.25;
+const GENRE_BOOST = 1.15;
 
 // Diversity caps in the final ranked output
-const MAX_PER_LANGUAGE = 14;
-const MAX_PER_GENRE = 18;
+const MAX_PER_LANGUAGE = 10;
+const MAX_PER_GENRE = 12;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -149,17 +154,17 @@ function qualityScore(item: Movie | TVShow): number {
 
 function candidateEmbedText(item: Movie | TVShow, type: ContentType): string {
   const title = type === "movie" ? (item as Movie).title : (item as TVShow).name;
-  const overview = item.overview?.slice(0, 250) || "";
+  const overview = item.overview?.slice(0, 180) || "";
   const genres = genreNames(item.genre_ids || []);
   const year = (type === "movie"
     ? (item as Movie).release_date
     : (item as TVShow).first_air_date
   )?.slice(0, 4) || "";
-  const lang = LANGUAGE_LABELS[item.original_language || ""] || item.original_language || "";
-  const rating = item.vote_average ? `Rating: ${item.vote_average.toFixed(1)}/10.` : "";
-  const popularity = item.popularity > 50 ? "Popular." : item.popularity < 10 ? "Hidden gem." : "";
+  const lang = LANGUAGE_LABELS[item.original_language || ""] || "";
+  const rating = item.vote_average ? `${item.vote_average.toFixed(1)}/10` : "";
 
-  return `${title} (${year}). ${overview} Genres: ${genres}. Language: ${lang}. ${rating} ${popularity}`.trim();
+  // More concise format: use | separators instead of full sentences
+  return `${title}|${year}|${genres}|${lang}|Rating:${rating}|${overview}`.trim();
 }
 
 // ---------------------------------------------------------------------------
@@ -311,11 +316,23 @@ function scoreCandidate(
 // Redis helpers
 // ---------------------------------------------------------------------------
 
-async function getCachedEmbedding(key: string): Promise<number[] | null> {
-  if (!isRedisConfigured()) return null;
-  const result = await runRedisCommand<string>(["GET", getRedisKey(key)]);
-  if (!result.ok || !result.result) return null;
-  try { return JSON.parse(result.result) as number[]; } catch { return null; }
+/**
+ * Batch-fetch multiple embedding vectors in a single MGET round trip.
+ * Returns a map of key → vector (only populated for cache hits).
+ */
+async function getManyEmbeddings(keys: string[]): Promise<Map<string, number[]>> {
+  const result = new Map<string, number[]>();
+  if (!isRedisConfigured() || !keys.length) return result;
+  const prefixedKeys = keys.map(getRedisKey);
+  const res = await runRedisCommand<(string | null)[]>(["MGET", ...prefixedKeys]);
+  if (!res.ok || !Array.isArray(res.result)) return result;
+  for (let i = 0; i < keys.length; i++) {
+    const raw = res.result[i];
+    if (raw) {
+      try { result.set(keys[i], JSON.parse(raw) as number[]); } catch { /* skip */ }
+    }
+  }
+  return result;
 }
 
 async function setCachedEmbedding(key: string, vector: number[]): Promise<void> {
@@ -376,6 +393,8 @@ async function buildAIRecommendations(
   signals: UserSignal[],
   seenIds: Set<string>,
   topLikedIds: Array<{ id: number; type: ContentType }>,
+  preferredLanguages: string[],
+  preferredGenres: number[],
 ): Promise<AIRecommendationsPayload> {
 
   // 1. Fetch a much larger, more diverse candidate pool in parallel
@@ -484,31 +503,36 @@ async function buildAIRecommendations(
     }
   }
 
-  const candidates = allCandidates.slice(0, MAX_CANDIDATES);
+  // Pre-filter: drop candidates below quality threshold BEFORE embedding
+  // This saves significant API costs and improves speed
+  const preFiltered = allCandidates.filter((c) => c.item.vote_average >= MIN_VOTE_AVERAGE);
+  const candidates = preFiltered.slice(0, MAX_CANDIDATES);
   if (!candidates.length) return EMPTY_PAYLOAD;
 
   // 2. Build multi-anchor taste vectors
   const anchors = await buildTasteAnchors(signals);
   if (!anchors.blendedVector && !anchors.likedVector) return EMPTY_PAYLOAD;
 
-  // 3. Embed candidates (Redis-cached per item, 7-day TTL)
-  const vectorsById = new Map<string, number[]>();
-  const toEmbed: { key: string; text: string }[] = [];
-
-  for (const c of candidates) {
+  // 3. Embed candidates — single MGET round trip for cache hits, then batch embed misses
+  const cacheKeys = candidates.map((c) => {
     const id = (c.item as Movie).id ?? (c.item as TVShow).id;
-    const cacheKey = `ai:embed:v2:${c.type}:${id}`;
-    const cached = await getCachedEmbedding(cacheKey);
-    if (cached) {
-      vectorsById.set(cacheKey, cached);
-    } else {
-      toEmbed.push({ key: cacheKey, text: c.embedText });
+    return `ai:embed:v2:${c.type}:${id}`;
+  });
+
+  const cachedMap = await getManyEmbeddings(cacheKeys);
+  const vectorsById = new Map<string, number[]>(cachedMap);
+
+  const toEmbed: { key: string; text: string }[] = [];
+  for (let i = 0; i < candidates.length; i++) {
+    const key = cacheKeys[i];
+    if (!vectorsById.has(key)) {
+      toEmbed.push({ key, text: candidates[i].embedText });
     }
   }
 
-  // Batch embed in chunks of 512
   if (toEmbed.length > 0) {
-    const BATCH_SIZE = 512;
+    // Optimized batch size: smaller batches = lower latency per request
+    const BATCH_SIZE = 200;
     for (let i = 0; i < toEmbed.length; i += BATCH_SIZE) {
       const batch = toEmbed.slice(i, i + BATCH_SIZE);
       const embeddings = await embedTexts(batch.map((b) => b.text));
@@ -516,27 +540,39 @@ async function buildAIRecommendations(
         const vector = embeddings[j];
         if (vector) {
           vectorsById.set(batch[j].key, vector);
+          // Fire-and-forget: cache embeddings without waiting
           void setCachedEmbedding(batch[j].key, vector);
         }
       }
     }
   }
 
-  // 4. Score all candidates with multi-anchor + quality blend
+  // 4. Score all candidates; apply preference boosts
   const scored: Array<{ candidate: AICandidate; score: number }> = [];
-  for (const c of candidates) {
-    const id = (c.item as Movie).id ?? (c.item as TVShow).id;
-    const cacheKey = `ai:embed:v2:${c.type}:${id}`;
-    const vector = vectorsById.get(cacheKey);
+  for (let i = 0; i < candidates.length; i++) {
+    const c = candidates[i];
+    const vector = vectorsById.get(cacheKeys[i]);
     if (!vector) continue;
-    const score = scoreCandidate(vector, anchors, c);
+    let score = scoreCandidate(vector, anchors, c);
+
+    // Apply preference boosts early for better ranking
+    if (preferredLanguages.length && preferredLanguages.includes(c.item.original_language || "")) {
+      score *= LANG_BOOST;
+    }
+    if (preferredGenres.length && c.item.genre_ids?.some((g) => preferredGenres.includes(g))) {
+      score *= GENRE_BOOST;
+    }
+
     scored.push({ candidate: c, score });
   }
 
+  // Sort by score in descending order
   scored.sort((a, b) => b.score - a.score);
 
-  // 5. Apply diversity enforcement
+  // 5. Apply diversity enforcement to ensure balanced output
   const diverse = applyDiversity(scored, FINAL_OUTPUT_LIMIT);
+  
+  // Only get explanations for top N items (reduces tokens significantly)
   const top = diverse.slice(0, TOP_N_FOR_EXPLANATIONS);
 
   // 6. gpt-4.1-mini explanations with rich taste profile
@@ -628,7 +664,7 @@ export default async function aiRecommendationsHandler(
   }
 
   try {
-    const [historyDocs, likedDocs, feedbackDocs] = await Promise.all([
+    const [historyDocs, likedDocs, feedbackDocs, prefsDoc] = await Promise.all([
       db.collection("watch_history")
         .find({ user_id: userId })
         .sort({ watched_at: -1 })
@@ -644,7 +680,15 @@ export default async function aiRecommendationsHandler(
         .sort({ updated_at: -1 })
         .limit(MAX_FEEDBACK_SEEDS)
         .toArray(),
+      db.collection("user_preferences").findOne({ user_id: userId }),
     ]);
+
+    const preferredLanguages: string[] = Array.isArray(prefsDoc?.preferred_languages)
+      ? (prefsDoc.preferred_languages as string[])
+      : [];
+    const preferredGenres: number[] = Array.isArray(prefsDoc?.preferred_genres)
+      ? (prefsDoc.preferred_genres as number[])
+      : [];
 
     // Build weighted signals — liked > feedback > watched
     const signals: UserSignal[] = [];
@@ -717,14 +761,15 @@ export default async function aiRecommendationsHandler(
     // Smarter cache key: include latest timestamps, not just counts
     const latestWatch = historyDocs[0]?.watched_at || "";
     const latestLike = likedDocs[0]?.liked_at || "";
-    const resultCacheKey = `ai:recs:v2:${userId}:${historyDocs.length}:${likedDocs.length}:${latestWatch}:${latestLike}`;
+    const prefsFingerprint = [...preferredLanguages].sort().join(",") + "|" + [...preferredGenres].sort().join(",");
+    const resultCacheKey = `ai:recs:v3:${userId}:${historyDocs.length}:${likedDocs.length}:${latestWatch}:${latestLike}:${prefsFingerprint}`;
 
     const cached = await getCachedResult(resultCacheKey);
     if (cached) {
       return res.status(200).json({ data: cached });
     }
 
-    const payload = await buildAIRecommendations(signals, seenIds, topLikedIds);
+    const payload = await buildAIRecommendations(signals, seenIds, topLikedIds, preferredLanguages, preferredGenres);
     await setCachedResult(resultCacheKey, payload);
 
     return res.status(200).json({ data: payload });

@@ -1,23 +1,43 @@
-import { useState, useMemo, useEffect, memo, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/frontend/hooks/useAuth";
+import { useState, useMemo, useEffect, memo, useRef, useCallback } from "react";
 import { useRecommendations } from "@/frontend/hooks/useRecommendations";
+import { useUserData } from "@/frontend/hooks/useUserData";
 import { Movie, TVShow } from "@/shared/lib/tmdb";
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
 import BottomNav from "@/frontend/components/BottomNav";
-import { AppPageSkeleton, PosterGridSkeleton } from "@/frontend/components/AppSkeletons";
+import { PosterGridSkeleton } from "@/frontend/components/AppSkeletons";
 import { ContentCard } from "@/frontend/components/ContentCard";
 import { Button } from "@/frontend/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/frontend/components/ui/select";
 import { Badge } from "@/frontend/components/ui/badge";
-import { Sparkles, ArrowUpDown, RefreshCw, Film, Tv, BrainCircuit } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/frontend/components/ui/sheet";
+import { Sparkles, ArrowUpDown, RefreshCw, Film, Tv, BrainCircuit, Settings2, Check } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
+import * as mongoClient from "@/frontend/lib/mongodbClient";
 
 type MainTab = "all" | "ai";
 type ContentTypeFilter = "all" | "movie" | "tv";
+type IndustryFilter = "all" | "hollywood" | "bollywood" | "southindian" | "korean" | "japanese";
+type RecommendationTypeFilter = "all" | "trending" | "highrated" | "popular" | "newreleases";
 type SortField = "relevance" | "popularity" | "rating" | "release_date";
 type SortOrder = "asc" | "desc";
+
+const INDUSTRY_FILTERS: { id: IndustryFilter; label: string; emoji: string; langs?: string[]; langs_exclude?: string[] }[] = [
+  { id: "all",        label: "All",        emoji: "🌍" },
+  { id: "hollywood",  label: "Hollywood",  emoji: "🎬", langs: ["en"] },
+  { id: "bollywood",  label: "Bollywood",  emoji: "🇮🇳", langs: ["hi", "gu"] },
+  { id: "southindian",label: "South Indian",emoji: "🎭", langs: ["ta", "te", "ml", "kn"] },
+  { id: "korean",     label: "Korean",     emoji: "🇰🇷", langs: ["ko"] },
+  { id: "japanese",   label: "Japanese",   emoji: "🇯🇵", langs: ["ja"] },
+];
+
+const RECOMMENDATION_TYPES: { id: RecommendationTypeFilter; label: string; emoji: string; description: string }[] = [
+  { id: "all",         label: "All",          emoji: "⭐", description: "All recommendations" },
+  { id: "trending",    label: "Trending",     emoji: "🔥", description: "Hot picks this week" },
+  { id: "highrated",   label: "Highly Rated", emoji: "✨", description: "9.0+ rated" },
+  { id: "popular",     label: "Popular",      emoji: "👑", description: "Most watched" },
+  { id: "newreleases", label: "New Releases", emoji: "🆕", description: "Recently released" },
+];
 
 const INITIAL_VISIBLE_ITEMS = 48;
 const LOAD_MORE_BATCH = 32;
@@ -156,9 +176,148 @@ const ReckonCard = memo(
 
 ReckonCard.displayName = "ReckonCard";
 
+// ---------------------------------------------------------------------------
+// Preferences Sheet
+// ---------------------------------------------------------------------------
+function PreferencesSheet({
+  open,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { preferences, refreshData } = useUserData();
+  const [langs, setLangs] = useState<string[]>([]);
+  const [genres, setGenres] = useState<number[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setLangs(preferences?.preferred_languages ?? []);
+      setGenres(preferences?.preferred_genres ?? []);
+    }
+  }, [open, preferences]);
+
+  const toggleLang = (l: string) =>
+    setLangs((prev) => prev.includes(l) ? prev.filter((x) => x !== l) : [...prev, l]);
+
+  const toggleGenre = (g: number) =>
+    setGenres((prev) => prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]);
+
+  const save = async () => {
+    setSaving(true);
+    await mongoClient.updateUserPreferences({ preferred_languages: langs, preferred_genres: genres });
+    await refreshData();
+    setSaving(false);
+    onSaved();
+    onClose();
+  };
+
+  const PREF_LANGUAGES = [
+    { code: "en", label: "English" }, { code: "hi", label: "Hindi" },
+    { code: "ta", label: "Tamil" },   { code: "te", label: "Telugu" },
+    { code: "gu", label: "Gujarati" },{ code: "ml", label: "Malayalam" },
+    { code: "kn", label: "Kannada" }, { code: "ko", label: "Korean" },
+    { code: "ja", label: "Japanese" },{ code: "es", label: "Spanish" },
+    { code: "fr", label: "French" },  { code: "tr", label: "Turkish" },
+  ];
+
+  const PREF_GENRES = [
+    { id: 28, name: "Action" },    { id: 12, name: "Adventure" },
+    { id: 35, name: "Comedy" },    { id: 18, name: "Drama" },
+    { id: 27, name: "Horror" },    { id: 10749, name: "Romance" },
+    { id: 878, name: "Sci-Fi" },   { id: 53, name: "Thriller" },
+    { id: 9648, name: "Mystery" }, { id: 14, name: "Fantasy" },
+    { id: 99, name: "Documentary"},{ id: 80, name: "Crime" },
+    { id: 10402, name: "Music" },  { id: 37, name: "Western" },
+  ];
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+        <SheetHeader className="mb-5">
+          <SheetTitle className="flex items-center gap-2">
+            <BrainCircuit className="w-5 h-5 text-violet-400" />
+            AI Pick Preferences
+          </SheetTitle>
+          <p className="text-xs text-muted-foreground">
+            Help the AI understand your taste. These are used to boost relevance.
+          </p>
+        </SheetHeader>
+
+        <div className="space-y-6">
+          {/* Languages */}
+          <div>
+            <p className="text-sm font-semibold mb-3 text-foreground">Preferred Languages</p>
+            <div className="flex flex-wrap gap-2">
+              {PREF_LANGUAGES.map(({ code, label }) => {
+                const active = langs.includes(code);
+                return (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => toggleLang(code)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all",
+                      active
+                        ? "bg-violet-600 border-violet-500 text-white"
+                        : "bg-card border-border text-muted-foreground hover:border-violet-500/50 hover:text-foreground"
+                    )}
+                  >
+                    {active && <Check className="w-3 h-3" />}
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Genres */}
+          <div>
+            <p className="text-sm font-semibold mb-3 text-foreground">Favorite Genres</p>
+            <div className="flex flex-wrap gap-2">
+              {PREF_GENRES.map(({ id, name }) => {
+                const active = genres.includes(id);
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => toggleGenre(id)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all",
+                      active
+                        ? "bg-primary border-primary text-primary-foreground"
+                        : "bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                    )}
+                  >
+                    {active && <Check className="w-3 h-3" />}
+                    {name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-8 flex gap-3">
+          <Button onClick={save} disabled={saving} className="flex-1 bg-violet-600 hover:bg-violet-500 text-white">
+            {saving ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
+            Save Preferences
+          </Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main page
+// ---------------------------------------------------------------------------
+
 export default function Reckon() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
   const {
     items: recommendations,
     aiItems,
@@ -174,11 +333,18 @@ export default function Reckon() {
 
   const [mainTab, setMainTab] = useState<MainTab>("all");
   const [contentTypeFilter, setContentTypeFilter] = useState<ContentTypeFilter>("all");
+  const [industryFilter, setIndustryFilter] = useState<IndustryFilter>("all");
+  const [recTypeFilter, setRecTypeFilter] = useState<RecommendationTypeFilter>("all");
   const [sortField, setSortField] = useState<SortField>("relevance");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [selectedGenre, setSelectedGenre] = useState<string>("all");
   const [selectedLanguage, setSelectedLanguage] = useState<string>("all");
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_ITEMS);
+  const [prefsOpen, setPrefsOpen] = useState(false);
+
+  const handlePreferencesSaved = useCallback(() => {
+    void refreshRecommendations();
+  }, [refreshRecommendations]);
 
   // Source items depend on which main tab is active
   const sourceItems = mainTab === "ai" ? aiItems : recommendations;
@@ -210,6 +376,43 @@ export default function Reckon() {
       filtered = filtered.filter((item) => "title" in item);
     } else if (contentTypeFilter === "tv") {
       filtered = filtered.filter((item) => "first_air_date" in item && !("title" in item));
+    }
+
+    // Industry filter
+    const industryDef = INDUSTRY_FILTERS.find((f) => f.id === industryFilter);
+    if (industryDef?.langs) {
+      filtered = filtered.filter((item) => industryDef.langs!.includes(item.original_language || ""));
+    }
+
+    // Recommendation type filter: trending, highly rated, popular, new releases
+    if (recTypeFilter !== "all") {
+      const now = new Date().getTime();
+      const oneMonthAgo = now - 30 * 24 * 60 * 60 * 1000;
+      
+      switch (recTypeFilter) {
+        case "trending":
+          // High popularity and recent activity
+          filtered = filtered.filter((item) => (item.popularity || 0) > 50);
+          break;
+        case "highrated":
+          // Rating >= 8.0
+          filtered = filtered.filter((item) => (item.vote_average || 0) >= 8.0);
+          break;
+        case "popular":
+          // Popularity >= 100
+          filtered = filtered.filter((item) => (item.popularity || 0) >= 100);
+          break;
+        case "newreleases":
+          // Released within last 30 days
+          filtered = filtered.filter((item) => {
+            const releaseDate = "release_date" in item
+              ? (item as Movie).release_date
+              : (item as TVShow).first_air_date;
+            const itemDate = releaseDate ? new Date(releaseDate).getTime() : 0;
+            return itemDate > oneMonthAgo;
+          });
+          break;
+      }
     }
 
     if (selectedGenre !== "all") {
@@ -244,7 +447,7 @@ export default function Reckon() {
     });
 
     return filtered;
-  }, [sourceItems, contentTypeFilter, selectedGenre, selectedLanguage, sortField, sortOrder]);
+  }, [sourceItems, contentTypeFilter, industryFilter, recTypeFilter, selectedGenre, selectedLanguage, sortField, sortOrder]);
 
   const visibleItems = useMemo(
     () => processedItems.slice(0, visibleCount),
@@ -255,7 +458,7 @@ export default function Reckon() {
 
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_ITEMS);
-  }, [mainTab, contentTypeFilter, selectedGenre, selectedLanguage, sortField, sortOrder]);
+  }, [mainTab, contentTypeFilter, industryFilter, recTypeFilter, selectedGenre, selectedLanguage, sortField, sortOrder]);
 
   useEffect(() => {
     const node = loadMoreRef.current;
@@ -275,6 +478,8 @@ export default function Reckon() {
 
   const clearFilters = () => {
     setContentTypeFilter("all");
+    setIndustryFilter("all");
+    setRecTypeFilter("all");
     setSelectedGenre("all");
     setSelectedLanguage("all");
     setSortField("relevance");
@@ -396,48 +601,101 @@ export default function Reckon() {
                 <div className="flex items-center justify-center w-10 h-10 rounded-full bg-violet-500/15 border border-violet-500/25 shrink-0">
                   <BrainCircuit className="w-5 h-5 text-violet-400" />
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-violet-300">
-                    Picked for you by AI
-                  </p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-violet-300">Picked for you by AI</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Ranked using semantic embeddings from your watch history and liked titles via OpenAI
+                    Ranked using semantic embeddings + your preferences via OpenAI
                   </p>
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPrefsOpen(true)}
+                  className="gap-1.5 border-violet-500/30 text-violet-300 hover:bg-violet-500/10 hover:border-violet-400 shrink-0"
+                >
+                  <Settings2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Preferences</span>
+                </Button>
               </div>
             </div>
           )}
 
-          {/* Content type sub-filter */}
-          <div className="flex gap-2 mb-6 bg-card/50 p-3 rounded-lg border border-border">
-            <Button
-              variant={contentTypeFilter === "all" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setContentTypeFilter("all")}
-              className="gap-2"
-            >
-              <Sparkles className="w-4 h-4" />
-              All
-            </Button>
-            <Button
-              variant={contentTypeFilter === "movie" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setContentTypeFilter("movie")}
-              className="gap-2"
-            >
-              <Film className="w-4 h-4" />
-              Movies
-            </Button>
-            <Button
-              variant={contentTypeFilter === "tv" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setContentTypeFilter("tv")}
-              className="gap-2"
-            >
-              <Tv className="w-4 h-4" />
-              TV Series
-            </Button>
+          {/* Content type + industry filter row */}
+          <div className="flex flex-col gap-3 mb-6">
+            <div className="flex gap-2 bg-card/50 p-3 rounded-lg border border-border overflow-x-auto scrollbar-hide">
+              <Button
+                variant={contentTypeFilter === "all" && industryFilter === "all" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => { setContentTypeFilter("all"); setIndustryFilter("all"); }}
+                className="gap-2 shrink-0"
+              >
+                <Sparkles className="w-4 h-4" />
+                All
+              </Button>
+              <Button
+                variant={contentTypeFilter === "movie" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => { setContentTypeFilter("movie"); setIndustryFilter("all"); }}
+                className="gap-2 shrink-0"
+              >
+                <Film className="w-4 h-4" />
+                Movies
+              </Button>
+              <Button
+                variant={contentTypeFilter === "tv" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => { setContentTypeFilter("tv"); setIndustryFilter("all"); }}
+                className="gap-2 shrink-0"
+              >
+                <Tv className="w-4 h-4" />
+                TV Series
+              </Button>
+              <div className="w-px bg-border mx-1 shrink-0" />
+              {INDUSTRY_FILTERS.filter((f) => f.id !== "all").map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => { setIndustryFilter(f.id); setContentTypeFilter("all"); }}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all shrink-0",
+                    industryFilter === f.id
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  )}
+                >
+                  <span>{f.emoji}</span>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Recommendation type filter row */}
+            <div className="flex gap-2 bg-muted/30 p-3 rounded-lg border border-border/50 overflow-x-auto scrollbar-hide">
+              {RECOMMENDATION_TYPES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setRecTypeFilter(t.id)}
+                  title={t.description}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all shrink-0",
+                    recTypeFilter === t.id
+                      ? "bg-amber-600/80 text-white shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  )}
+                >
+                  <span>{t.emoji}</span>
+                  {t.label}
+                </button>
+              ))}
+            </div>
           </div>
+
+          <PreferencesSheet
+            open={prefsOpen}
+            onClose={() => setPrefsOpen(false)}
+            onSaved={handlePreferencesSaved}
+          />
 
           {/* Sort / filter bar */}
           <div className="flex flex-col sm:flex-row gap-3 mb-6 flex-wrap">
@@ -491,7 +749,7 @@ export default function Reckon() {
               <ArrowUpDown className={cn("w-4 h-4", sortOrder === "asc" && "rotate-180")} />
             </Button>
 
-            {(selectedGenre !== "all" || selectedLanguage !== "all" || sortField !== "relevance") && (
+            {(contentTypeFilter !== "all" || industryFilter !== "all" || recTypeFilter !== "all" || selectedGenre !== "all" || selectedLanguage !== "all" || sortField !== "relevance") && (
               <Button variant="ghost" onClick={clearFilters} className="text-muted-foreground">
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Clear
@@ -541,11 +799,11 @@ export default function Reckon() {
               <Sparkles className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-xl font-semibold mb-2">No recommendations found</h3>
               <p className="text-muted-foreground mb-4">
-                {selectedGenre !== "all" || selectedLanguage !== "all"
-                  ? "Try adjusting your filters"
+                {contentTypeFilter !== "all" || industryFilter !== "all" || recTypeFilter !== "all" || selectedGenre !== "all" || selectedLanguage !== "all"
+                  ? "Try adjusting your filters or clearing them"
                   : "Start watching and liking content to unlock stronger recommendations."}
               </p>
-              {(selectedGenre !== "all" || selectedLanguage !== "all") && (
+              {(contentTypeFilter !== "all" || industryFilter !== "all" || recTypeFilter !== "all" || selectedGenre !== "all" || selectedLanguage !== "all") && (
                 <Button onClick={clearFilters}>Clear Filters</Button>
               )}
             </div>

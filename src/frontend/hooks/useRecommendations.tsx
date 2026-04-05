@@ -104,15 +104,15 @@ export function useRecommendations(): RecommendationResult {
     placeholderData: (previousData) => previousData,
   });
 
-  // AI recommendations (OpenAI embeddings + GPT-4o-mini re-ranking)
+  // AI recommendations (OpenAI embeddings + GPT-4.1-mini re-ranking)
   // Only fires when the user has some history (>=3 items) to form a taste profile.
   const hasEnoughHistory = watchHistory.length >= 3 || likedItems.length >= 3;
   const { data: aiData } = useQuery({
     queryKey: ["ai-recommendations", personalizationRevision],
     queryFn: () => mongoClient.fetchAIRecommendations(),
     enabled: Boolean(user) && !userDataLoading && hasEnoughHistory,
-    staleTime: 1000 * 60 * 5,
-    gcTime: 1000 * 60 * 30,
+    staleTime: 1000 * 60 * 30, // 30 mins: reduced refetch frequency, better cache hit rate
+    gcTime: 1000 * 60 * 60,    // 1 hour: keep in memory longer for faster re-access
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     retry: 1,

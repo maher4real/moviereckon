@@ -115,9 +115,9 @@ export interface UserTasteProfile {
 }
 
 /**
- * Generate rich, specific, personalised explanations for each recommendation.
- * Uses gpt-4.1-mini with a structured prompt that references the user's
- * actual liked titles, genres, and languages for maximum specificity.
+ * Generate concise, personalised explanations for each recommendation.
+ * Ultra-optimized for speed: reduced context, fewer tokens, simpler format.
+ * Uses gpt-4.1-mini with a minimal prompt.
  */
 export async function generateExplanations(
   profile: UserTasteProfile,
@@ -125,42 +125,27 @@ export async function generateExplanations(
 ): Promise<Record<string, string>> {
   if (!movies.length) return {};
 
-  const likedContext = profile.likedTitles.slice(0, 8).join(", ") || "none yet";
-  const watchedContext = profile.watchedTitles.slice(0, 6).join(", ") || "none yet";
-  const genreContext = profile.topGenres.slice(0, 5).join(", ") || "various";
-  const langContext = profile.topLanguages.slice(0, 3).join(", ") || "various";
+  // Minimize context: top 3 liked titles, top 3 genres only
+  const likedContext = profile.likedTitles.slice(0, 3).join(", ") || "top picks";
+  const genreContext = profile.topGenres.slice(0, 3).join(", ") || "mixed";
 
+  // Compact movie list: only title, year, genre
   const movieList = movies
-    .map((m) => `[${m.id}:${m.type}] "${m.title}" (${m.year}) — ${m.genres} — ${m.overview.slice(0, 100)}`)
+    .map((m) => `[${m.id}:${m.type}] ${m.title} (${m.year}) — ${m.genres}`)
     .join("\n");
 
-  const systemPrompt = `You are a deeply personal movie recommendation assistant. You know this viewer intimately:
-- Liked titles: ${likedContext}
-- Recently watched: ${watchedContext}
-- Favourite genres: ${genreContext}
-- Preferred languages: ${langContext}
-- Taste summary: ${profile.tasteSummary}
-
-Your job: write ONE sentence (max 14 words) per title explaining WHY it fits THIS specific viewer.
-Rules:
-- Reference their actual liked titles or genres when relevant ("Like Inception, this...")
-- Be specific about the emotional/thematic connection, not just genre labels
-- Never say "based on your preferences" or "you might like" — just state the connection directly
-- If it's a language match, mention it ("Another gripping Hindi thriller like...")
-- Vary your sentence structures`;
-
-  const userPrompt = `For each title below, write the explanation. Respond as JSON mapping "[id:type]" → explanation string.
-
-${movieList}`;
+  // Ultra-compact system prompt: only essential info
+  const systemPrompt = `You match movies to viewers. Liked: ${likedContext}. Genres: ${genreContext}. 
+For each title, write ONE short reason (max 10 words). Format: "[id:type]": "reason"`;
 
   const response = await openAIFetch("/chat/completions", {
     model: CHAT_MODEL,
     messages: [
       { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
+      { role: "user", content: movieList },
     ],
-    temperature: 0.5,
-    max_tokens: 1800,
+    temperature: 0.2,
+    max_tokens: 300,
     response_format: { type: "json_object" },
   });
 
