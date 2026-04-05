@@ -7,8 +7,6 @@ const LOCAL_AVATAR_PATH_REGEX =
   /^\/avatars\/[a-z0-9-_]+\.(?:svg|png|jpe?g|webp|gif)$/i;
 const MAX_AVATAR_DIMENSION = 320;
 const MIN_AVATAR_DIMENSION = 128;
-const PRESET_AVATAR_SIZE = 320;
-const PRESET_AVATAR_CACHE = new Map<string, string>();
 
 export const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
 export const PROFILE_MAX_AVATAR_FILE_SIZE_BYTES = MAX_AVATAR_FILE_SIZE_BYTES;
@@ -16,179 +14,31 @@ export const PROFILE_MAX_AVATAR_FILE_SIZE_BYTES = MAX_AVATAR_FILE_SIZE_BYTES;
 export type DefaultAvatarOption = {
   id: string;
   label: string;
-  colors: readonly [string, string, string];
-  glow: string;
-  accent: string;
-  surface: string;
+  path: string;
 };
 
 export const DEFAULT_AVATAR_OPTIONS: readonly DefaultAvatarOption[] = [
-  {
-    id: "aurora",
-    label: "Aurora Lead",
-    colors: ["#1d4ed8", "#7c3aed", "#ec4899"],
-    glow: "rgba(250, 204, 21, 0.38)",
-    accent: "#fef08a",
-    surface: "rgba(8, 12, 24, 0.34)",
-  },
-  {
-    id: "noir",
-    label: "Noir Cut",
-    colors: ["#111827", "#334155", "#ef4444"],
-    glow: "rgba(248, 113, 113, 0.28)",
-    accent: "#fca5a5",
-    surface: "rgba(15, 23, 42, 0.54)",
-  },
-  {
-    id: "sunset",
-    label: "Sunset Frame",
-    colors: ["#ea580c", "#ef4444", "#facc15"],
-    glow: "rgba(253, 186, 116, 0.34)",
-    accent: "#fde68a",
-    surface: "rgba(49, 18, 7, 0.34)",
-  },
-  {
-    id: "forest",
-    label: "Forest Reel",
-    colors: ["#14532d", "#15803d", "#84cc16"],
-    glow: "rgba(190, 242, 100, 0.28)",
-    accent: "#d9f99d",
-    surface: "rgba(10, 28, 18, 0.34)",
-  },
-  {
-    id: "ocean",
-    label: "Ocean Cast",
-    colors: ["#0f766e", "#0284c7", "#38bdf8"],
-    glow: "rgba(125, 211, 252, 0.34)",
-    accent: "#bae6fd",
-    surface: "rgba(8, 32, 49, 0.32)",
-  },
-  {
-    id: "rose",
-    label: "Rose Spotlight",
-    colors: ["#881337", "#db2777", "#fb7185"],
-    glow: "rgba(251, 191, 203, 0.32)",
-    accent: "#fecdd3",
-    surface: "rgba(59, 10, 32, 0.34)",
-  },
+  { id: "cinema-aurora", label: "Aurora", path: "/avatars/cinema-aurora.svg" },
+  { id: "cinema-noir", label: "Noir", path: "/avatars/cinema-noir.svg" },
+  { id: "cinema-sunset", label: "Sunset", path: "/avatars/cinema-sunset.svg" },
+  { id: "cinema-forest", label: "Forest", path: "/avatars/cinema-forest.svg" },
+  { id: "cinema-ocean", label: "Ocean", path: "/avatars/cinema-ocean.svg" },
+  { id: "cinema-rose", label: "Rose", path: "/avatars/cinema-rose.svg" },
+  { id: "net-ember", label: "Ember", path: "/avatars/net-ember.svg" },
+  { id: "net-mint", label: "Mint", path: "/avatars/net-mint.svg" },
+  { id: "net-red", label: "Red", path: "/avatars/net-red.svg" },
+  { id: "net-shadow", label: "Shadow", path: "/avatars/net-shadow.svg" },
+  { id: "net-sky", label: "Sky", path: "/avatars/net-sky.svg" },
+  { id: "net-violet", label: "Violet", path: "/avatars/net-violet.svg" },
 ] as const;
-
-const drawRoundedRect = (
-  context: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number,
-) => {
-  const safeRadius = Math.min(radius, width / 2, height / 2);
-  context.beginPath();
-  context.moveTo(x + safeRadius, y);
-  context.lineTo(x + width - safeRadius, y);
-  context.quadraticCurveTo(x + width, y, x + width, y + safeRadius);
-  context.lineTo(x + width, y + height - safeRadius);
-  context.quadraticCurveTo(
-    x + width,
-    y + height,
-    x + width - safeRadius,
-    y + height,
-  );
-  context.lineTo(x + safeRadius, y + height);
-  context.quadraticCurveTo(x, y + height, x, y + height - safeRadius);
-  context.lineTo(x, y + safeRadius);
-  context.quadraticCurveTo(x, y, x + safeRadius, y);
-  context.closePath();
-};
 
 export const createDefaultAvatarDataUrl = (
   optionId: DefaultAvatarOption["id"],
 ) => {
-  const cached = PRESET_AVATAR_CACHE.get(optionId);
-  if (cached) return cached;
-  if (typeof document === "undefined") return "";
-
   const option = DEFAULT_AVATAR_OPTIONS.find(
     (candidate) => candidate.id === optionId,
   );
-  if (!option) return "";
-
-  const canvas = document.createElement("canvas");
-  canvas.width = PRESET_AVATAR_SIZE;
-  canvas.height = PRESET_AVATAR_SIZE;
-
-  const context = canvas.getContext("2d");
-  if (!context) return "";
-
-  const backgroundGradient = context.createLinearGradient(
-    0,
-    0,
-    PRESET_AVATAR_SIZE,
-    PRESET_AVATAR_SIZE,
-  );
-  option.colors.forEach((color, index) => {
-    backgroundGradient.addColorStop(index / (option.colors.length - 1), color);
-  });
-  context.fillStyle = backgroundGradient;
-  context.fillRect(0, 0, PRESET_AVATAR_SIZE, PRESET_AVATAR_SIZE);
-
-  const glowGradient = context.createRadialGradient(
-    PRESET_AVATAR_SIZE * 0.78,
-    PRESET_AVATAR_SIZE * 0.16,
-    PRESET_AVATAR_SIZE * 0.03,
-    PRESET_AVATAR_SIZE * 0.78,
-    PRESET_AVATAR_SIZE * 0.16,
-    PRESET_AVATAR_SIZE * 0.34,
-  );
-  glowGradient.addColorStop(0, option.glow);
-  glowGradient.addColorStop(1, "rgba(255,255,255,0)");
-  context.fillStyle = glowGradient;
-  context.fillRect(0, 0, PRESET_AVATAR_SIZE, PRESET_AVATAR_SIZE);
-
-  context.save();
-  context.translate(PRESET_AVATAR_SIZE * 0.16, PRESET_AVATAR_SIZE * 0.18);
-  context.rotate(-0.26);
-  context.fillStyle = "rgba(255,255,255,0.08)";
-  context.fillRect(0, 0, PRESET_AVATAR_SIZE * 0.9, PRESET_AVATAR_SIZE * 0.16);
-  context.restore();
-
-  drawRoundedRect(context, 28, 28, 84, 30, 15);
-  context.fillStyle = "rgba(255,255,255,0.16)";
-  context.fill();
-  context.strokeStyle = "rgba(255,255,255,0.2)";
-  context.lineWidth = 1.5;
-  context.stroke();
-
-  drawRoundedRect(context, 28, 176, 264, 108, 30);
-  context.fillStyle = option.surface;
-  context.fill();
-  context.strokeStyle = "rgba(255,255,255,0.16)";
-  context.lineWidth = 2;
-  context.stroke();
-
-  drawRoundedRect(context, 48, 196, 52, 52, 18);
-  context.fillStyle = "rgba(255,255,255,0.12)";
-  context.fill();
-
-  drawRoundedRect(context, 114, 198, 126, 14, 7);
-  context.fillStyle = option.accent;
-  context.fill();
-
-  drawRoundedRect(context, 114, 220, 114, 12, 6);
-  context.fillStyle = "rgba(255,255,255,0.24)";
-  context.fill();
-
-  drawRoundedRect(context, 114, 240, 86, 12, 6);
-  context.fillStyle = "rgba(255,255,255,0.16)";
-  context.fill();
-
-  context.beginPath();
-  context.arc(82, 222, 9, 0, Math.PI * 2);
-  context.fillStyle = option.accent;
-  context.fill();
-
-  const dataUrl = canvas.toDataURL("image/png");
-  PRESET_AVATAR_CACHE.set(optionId, dataUrl);
-  return dataUrl;
+  return option?.path ?? "";
 };
 
 const isValidHttpUrl = (value: string) => {

@@ -40,28 +40,12 @@ export default function ProfileEdit() {
   const [isProcessingAvatar, setIsProcessingAvatar] = useState(false);
   const [usernameInput, setUsernameInput] = useState("");
   const [avatarInput, setAvatarInput] = useState("");
-  const [defaultAvatarValues, setDefaultAvatarValues] = useState<
-    Record<string, string>
-  >({});
   const avatarFileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setUsernameInput(profile?.username || user?.username || "");
     setAvatarInput(normalizeAvatarValue(profile?.avatar_url || ""));
   }, [profile?.avatar_url, profile?.username, user?.avatar_url, user?.username]);
-
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-
-    setDefaultAvatarValues(
-      Object.fromEntries(
-        DEFAULT_AVATAR_OPTIONS.map((candidate) => [
-          candidate.id,
-          createDefaultAvatarDataUrl(candidate.id),
-        ]),
-      ),
-    );
-  }, []);
 
   const displayName = profile?.username || user?.username || "User";
   const currentAvatar = profile?.avatar_url || user?.avatar_url || null;
@@ -70,8 +54,7 @@ export default function ProfileEdit() {
     DEFAULT_AVATAR_OPTIONS.find((candidate) =>
       isDefaultAvatarSelected(
         normalizedAvatarInput,
-        defaultAvatarValues[candidate.id] ||
-          createDefaultAvatarDataUrl(candidate.id),
+        createDefaultAvatarDataUrl(candidate.id),
       ),
     ) || null;
   const selectedAvatarValue = normalizedAvatarInput || currentAvatar || "";
@@ -479,11 +462,9 @@ export default function ProfileEdit() {
                   ) : null}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+                <div className="grid grid-cols-3 gap-3 md:grid-cols-4 xl:grid-cols-6">
                   {DEFAULT_AVATAR_OPTIONS.map((candidate) => {
-                    const candidateValue =
-                      defaultAvatarValues[candidate.id] ||
-                      createDefaultAvatarDataUrl(candidate.id);
+                    const candidateValue = createDefaultAvatarDataUrl(candidate.id);
                     const isSelected = isDefaultAvatarSelected(
                       normalizedAvatarInput,
                       candidateValue,
@@ -495,47 +476,23 @@ export default function ProfileEdit() {
                         type="button"
                         onClick={() => setAvatarInput(candidateValue)}
                         className={cn(
-                          "group rounded-3xl border border-border bg-background/70 p-3 text-left transition-all hover:-translate-y-0.5 hover:border-primary hover:bg-background",
+                          "group rounded-3xl border border-border bg-background/70 p-2 text-left transition-all hover:-translate-y-0.5 hover:border-primary hover:bg-background",
                           isSelected && "border-primary ring-2 ring-primary/25",
                         )}
                       >
-                        <div className="relative mb-3 overflow-hidden rounded-2xl border border-border/60 bg-muted/40">
+                        <div className="relative mb-2 overflow-hidden rounded-2xl border border-border/60 bg-muted/40">
                           {isSelected ? (
-                            <span className="absolute right-2 top-2 z-10 rounded-full bg-background/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
-                              Selected
+                            <span className="absolute right-1.5 top-1.5 z-10 rounded-full bg-background/90 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-primary">
+                              ✓
                             </span>
                           ) : null}
-                          <div
-                            aria-hidden="true"
-                            className="relative h-32 w-full overflow-hidden transition-transform duration-300 group-hover:scale-[1.03]"
-                            style={{
-                              backgroundImage: `linear-gradient(135deg, ${candidate.colors[0]} 0%, ${candidate.colors[1]} 55%, ${candidate.colors[2]} 100%)`,
-                            }}
-                          >
-                            <div
-                              className="absolute -right-5 -top-5 h-20 w-20 rounded-full blur-2xl"
-                              style={{ backgroundColor: candidate.glow }}
-                            />
-                            <div className="absolute left-3 top-3 h-7 w-16 rounded-full border border-white/20 bg-white/14" />
-                            <div
-                              className="absolute inset-x-4 bottom-4 rounded-[22px] border border-white/16 p-3 backdrop-blur-sm"
-                              style={{ backgroundColor: candidate.surface }}
-                            >
-                              <div
-                                className="h-2.5 w-16 rounded-full"
-                                style={{ backgroundColor: candidate.accent }}
-                              />
-                              <div className="mt-2 flex items-center gap-2">
-                                <div className="h-9 w-9 rounded-2xl bg-white/14" />
-                                <div className="min-w-0 flex-1 space-y-1.5">
-                                  <div className="h-2.5 rounded-full bg-white/24" />
-                                  <div className="h-2.5 w-2/3 rounded-full bg-white/16" />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
+                          <img
+                            src={candidate.path}
+                            alt={candidate.label}
+                            className="h-24 w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                          />
                         </div>
-                        <p className="text-sm font-medium">{candidate.label}</p>
+                        <p className="truncate text-xs font-medium">{candidate.label}</p>
                       </button>
                     );
                   })}
