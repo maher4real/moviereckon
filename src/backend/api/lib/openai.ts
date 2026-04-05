@@ -47,7 +47,7 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
     throw new Error(`OpenAI embeddings failed: ${response.status} ${err}`);
   }
 
-  const data = await response.json() as {
+  const data = (await response.json()) as {
     data: { index: number; embedding: number[] }[];
   };
 
@@ -121,12 +121,20 @@ export interface UserTasteProfile {
  */
 export async function generateExplanations(
   profile: UserTasteProfile,
-  movies: { id: number; type: "movie" | "tv"; title: string; overview: string; genres: string; year: string }[],
+  movies: {
+    id: number;
+    type: "movie" | "tv";
+    title: string;
+    overview: string;
+    genres: string;
+    year: string;
+  }[],
 ): Promise<Record<string, string>> {
   if (!movies.length) return {};
 
   // Minimize context: top 3 liked titles, top 3 genres only
-  const likedContext = profile.likedTitles.slice(0, 3).join(", ") || "top picks";
+  const likedContext =
+    profile.likedTitles.slice(0, 3).join(", ") || "top picks";
   const genreContext = profile.topGenres.slice(0, 3).join(", ") || "mixed";
 
   // Compact movie list: only title, year, genre
@@ -152,7 +160,7 @@ For each title, write ONE short reason (max 10 words). Format: "[id:type]": "rea
   if (!response.ok) return {};
 
   try {
-    const data = await response.json() as {
+    const data = (await response.json()) as {
       choices: { message: { content: string } }[];
     };
     const content = data.choices[0]?.message?.content || "{}";

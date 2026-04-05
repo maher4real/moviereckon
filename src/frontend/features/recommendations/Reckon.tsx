@@ -8,35 +8,97 @@ import BottomNav from "@/frontend/components/BottomNav";
 import { PosterGridSkeleton } from "@/frontend/components/AppSkeletons";
 import { ContentCard } from "@/frontend/components/ContentCard";
 import { Button } from "@/frontend/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/frontend/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/frontend/components/ui/select";
 import { Badge } from "@/frontend/components/ui/badge";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/frontend/components/ui/sheet";
-import { Sparkles, ArrowUpDown, RefreshCw, Film, Tv, BrainCircuit, Settings2, Check } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/frontend/components/ui/sheet";
+import {
+  Sparkles,
+  ArrowUpDown,
+  RefreshCw,
+  Film,
+  Tv,
+  BrainCircuit,
+  Settings2,
+  Check,
+} from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import * as mongoClient from "@/frontend/lib/mongodbClient";
 
 type MainTab = "all" | "ai";
 type ContentTypeFilter = "all" | "movie" | "tv";
-type IndustryFilter = "all" | "hollywood" | "bollywood" | "southindian" | "korean" | "japanese";
-type RecommendationTypeFilter = "all" | "trending" | "highrated" | "popular" | "newreleases";
+type IndustryFilter =
+  | "all"
+  | "hollywood"
+  | "bollywood"
+  | "southindian"
+  | "korean"
+  | "japanese";
+type RecommendationTypeFilter =
+  | "all"
+  | "trending"
+  | "highrated"
+  | "popular"
+  | "newreleases";
 type SortField = "relevance" | "popularity" | "rating" | "release_date";
 type SortOrder = "asc" | "desc";
 
-const INDUSTRY_FILTERS: { id: IndustryFilter; label: string; emoji: string; langs?: string[]; langs_exclude?: string[] }[] = [
-  { id: "all",        label: "All",        emoji: "🌍" },
-  { id: "hollywood",  label: "Hollywood",  emoji: "🎬", langs: ["en"] },
-  { id: "bollywood",  label: "Bollywood",  emoji: "🇮🇳", langs: ["hi", "gu"] },
-  { id: "southindian",label: "South Indian",emoji: "🎭", langs: ["ta", "te", "ml", "kn"] },
-  { id: "korean",     label: "Korean",     emoji: "🇰🇷", langs: ["ko"] },
-  { id: "japanese",   label: "Japanese",   emoji: "🇯🇵", langs: ["ja"] },
+const INDUSTRY_FILTERS: {
+  id: IndustryFilter;
+  label: string;
+  emoji: string;
+  langs?: string[];
+  langs_exclude?: string[];
+}[] = [
+  { id: "all", label: "All", emoji: "🌍" },
+  { id: "hollywood", label: "Hollywood", emoji: "🎬", langs: ["en"] },
+  { id: "bollywood", label: "Bollywood", emoji: "🇮🇳", langs: ["hi", "gu"] },
+  {
+    id: "southindian",
+    label: "South Indian",
+    emoji: "🎭",
+    langs: ["ta", "te", "ml", "kn"],
+  },
+  { id: "korean", label: "Korean", emoji: "🇰🇷", langs: ["ko"] },
+  { id: "japanese", label: "Japanese", emoji: "🇯🇵", langs: ["ja"] },
 ];
 
-const RECOMMENDATION_TYPES: { id: RecommendationTypeFilter; label: string; emoji: string; description: string }[] = [
-  { id: "all",         label: "All",          emoji: "⭐", description: "All recommendations" },
-  { id: "trending",    label: "Trending",     emoji: "🔥", description: "Hot picks this week" },
-  { id: "highrated",   label: "Highly Rated", emoji: "✨", description: "9.0+ rated" },
-  { id: "popular",     label: "Popular",      emoji: "👑", description: "Most watched" },
-  { id: "newreleases", label: "New Releases", emoji: "🆕", description: "Recently released" },
+const RECOMMENDATION_TYPES: {
+  id: RecommendationTypeFilter;
+  label: string;
+  emoji: string;
+  description: string;
+}[] = [
+  { id: "all", label: "All", emoji: "⭐", description: "All recommendations" },
+  {
+    id: "trending",
+    label: "Trending",
+    emoji: "🔥",
+    description: "Hot picks this week",
+  },
+  {
+    id: "highrated",
+    label: "Highly Rated",
+    emoji: "✨",
+    description: "9.0+ rated",
+  },
+  { id: "popular", label: "Popular", emoji: "👑", description: "Most watched" },
+  {
+    id: "newreleases",
+    label: "New Releases",
+    emoji: "🆕",
+    description: "Recently released",
+  },
 ];
 
 const INITIAL_VISIBLE_ITEMS = 48;
@@ -102,8 +164,8 @@ function AIParticles() {
           style={{
             width: `${4 + (i % 4) * 3}px`,
             height: `${4 + (i % 4) * 3}px`,
-            left: `${8 + (i * 7.5) % 84}%`,
-            top: `${10 + (i * 13) % 80}%`,
+            left: `${8 + ((i * 7.5) % 84)}%`,
+            top: `${10 + ((i * 13) % 80)}%`,
             animation: `float-particle ${3 + (i % 4)}s ease-in-out ${(i * 0.4) % 2}s infinite alternate`,
           }}
         />
@@ -151,7 +213,7 @@ const ReckonCard = memo(
                 "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold backdrop-blur-sm shadow-sm transition-colors",
                 highlightAI
                   ? "bg-violet-600/95 text-white hover:bg-violet-500 ring-1 ring-violet-400/40"
-                  : "bg-violet-500/90 text-white hover:bg-violet-500"
+                  : "bg-violet-500/90 text-white hover:bg-violet-500",
               )}
               title={aiExplanation.text}
             >
@@ -201,14 +263,21 @@ function PreferencesSheet({
   }, [open, preferences]);
 
   const toggleLang = (l: string) =>
-    setLangs((prev) => prev.includes(l) ? prev.filter((x) => x !== l) : [...prev, l]);
+    setLangs((prev) =>
+      prev.includes(l) ? prev.filter((x) => x !== l) : [...prev, l],
+    );
 
   const toggleGenre = (g: number) =>
-    setGenres((prev) => prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]);
+    setGenres((prev) =>
+      prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g],
+    );
 
   const save = async () => {
     setSaving(true);
-    await mongoClient.updateUserPreferences({ preferred_languages: langs, preferred_genres: genres });
+    await mongoClient.updateUserPreferences({
+      preferred_languages: langs,
+      preferred_genres: genres,
+    });
     await refreshData();
     setSaving(false);
     onSaved();
@@ -216,26 +285,44 @@ function PreferencesSheet({
   };
 
   const PREF_LANGUAGES = [
-    { code: "en", label: "English" }, { code: "hi", label: "Hindi" },
-    { code: "ta", label: "Tamil" },   { code: "te", label: "Telugu" },
-    { code: "gu", label: "Gujarati" },{ code: "ml", label: "Malayalam" },
-    { code: "kn", label: "Kannada" }, { code: "ko", label: "Korean" },
-    { code: "ja", label: "Japanese" },{ code: "es", label: "Spanish" },
-    { code: "fr", label: "French" },  { code: "tr", label: "Turkish" },
+    { code: "en", label: "English" },
+    { code: "hi", label: "Hindi" },
+    { code: "ta", label: "Tamil" },
+    { code: "te", label: "Telugu" },
+    { code: "gu", label: "Gujarati" },
+    { code: "ml", label: "Malayalam" },
+    { code: "kn", label: "Kannada" },
+    { code: "ko", label: "Korean" },
+    { code: "ja", label: "Japanese" },
+    { code: "es", label: "Spanish" },
+    { code: "fr", label: "French" },
+    { code: "tr", label: "Turkish" },
   ];
 
   const PREF_GENRES = [
-    { id: 28, name: "Action" },    { id: 12, name: "Adventure" },
-    { id: 35, name: "Comedy" },    { id: 18, name: "Drama" },
-    { id: 27, name: "Horror" },    { id: 10749, name: "Romance" },
-    { id: 878, name: "Sci-Fi" },   { id: 53, name: "Thriller" },
-    { id: 9648, name: "Mystery" }, { id: 14, name: "Fantasy" },
-    { id: 99, name: "Documentary"},{ id: 80, name: "Crime" },
-    { id: 10402, name: "Music" },  { id: 37, name: "Western" },
+    { id: 28, name: "Action" },
+    { id: 12, name: "Adventure" },
+    { id: 35, name: "Comedy" },
+    { id: 18, name: "Drama" },
+    { id: 27, name: "Horror" },
+    { id: 10749, name: "Romance" },
+    { id: 878, name: "Sci-Fi" },
+    { id: 53, name: "Thriller" },
+    { id: 9648, name: "Mystery" },
+    { id: 14, name: "Fantasy" },
+    { id: 99, name: "Documentary" },
+    { id: 80, name: "Crime" },
+    { id: 10402, name: "Music" },
+    { id: 37, name: "Western" },
   ];
 
   return (
-    <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Sheet
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
         <SheetHeader className="mb-5">
           <SheetTitle className="flex items-center gap-2">
@@ -243,14 +330,17 @@ function PreferencesSheet({
             AI Pick Preferences
           </SheetTitle>
           <p className="text-xs text-muted-foreground">
-            Help the AI understand your taste. These are used to boost relevance.
+            Help the AI understand your taste. These are used to boost
+            relevance.
           </p>
         </SheetHeader>
 
         <div className="space-y-6">
           {/* Languages */}
           <div>
-            <p className="text-sm font-semibold mb-3 text-foreground">Preferred Languages</p>
+            <p className="text-sm font-semibold mb-3 text-foreground">
+              Preferred Languages
+            </p>
             <div className="flex flex-wrap gap-2">
               {PREF_LANGUAGES.map(({ code, label }) => {
                 const active = langs.includes(code);
@@ -263,7 +353,7 @@ function PreferencesSheet({
                       "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all",
                       active
                         ? "bg-violet-600 border-violet-500 text-white"
-                        : "bg-card border-border text-muted-foreground hover:border-violet-500/50 hover:text-foreground"
+                        : "bg-card border-border text-muted-foreground hover:border-violet-500/50 hover:text-foreground",
                     )}
                   >
                     {active && <Check className="w-3 h-3" />}
@@ -276,7 +366,9 @@ function PreferencesSheet({
 
           {/* Genres */}
           <div>
-            <p className="text-sm font-semibold mb-3 text-foreground">Favorite Genres</p>
+            <p className="text-sm font-semibold mb-3 text-foreground">
+              Favorite Genres
+            </p>
             <div className="flex flex-wrap gap-2">
               {PREF_GENRES.map(({ id, name }) => {
                 const active = genres.includes(id);
@@ -289,7 +381,7 @@ function PreferencesSheet({
                       "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all",
                       active
                         ? "bg-primary border-primary text-primary-foreground"
-                        : "bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                        : "bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground",
                     )}
                   >
                     {active && <Check className="w-3 h-3" />}
@@ -302,11 +394,21 @@ function PreferencesSheet({
         </div>
 
         <div className="mt-8 flex gap-3">
-          <Button onClick={save} disabled={saving} className="flex-1 bg-violet-600 hover:bg-violet-500 text-white">
-            {saving ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
+          <Button
+            onClick={save}
+            disabled={saving}
+            className="flex-1 bg-violet-600 hover:bg-violet-500 text-white"
+          >
+            {saving ? (
+              <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+            ) : (
+              <Check className="w-4 h-4 mr-2" />
+            )}
             Save Preferences
           </Button>
-          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
         </div>
       </SheetContent>
     </Sheet>
@@ -332,9 +434,11 @@ export default function Reckon() {
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const [mainTab, setMainTab] = useState<MainTab>("all");
-  const [contentTypeFilter, setContentTypeFilter] = useState<ContentTypeFilter>("all");
+  const [contentTypeFilter, setContentTypeFilter] =
+    useState<ContentTypeFilter>("all");
   const [industryFilter, setIndustryFilter] = useState<IndustryFilter>("all");
-  const [recTypeFilter, setRecTypeFilter] = useState<RecommendationTypeFilter>("all");
+  const [recTypeFilter, setRecTypeFilter] =
+    useState<RecommendationTypeFilter>("all");
   const [sortField, setSortField] = useState<SortField>("relevance");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [selectedGenre, setSelectedGenre] = useState<string>("all");
@@ -375,20 +479,24 @@ export default function Reckon() {
     if (contentTypeFilter === "movie") {
       filtered = filtered.filter((item) => "title" in item);
     } else if (contentTypeFilter === "tv") {
-      filtered = filtered.filter((item) => "first_air_date" in item && !("title" in item));
+      filtered = filtered.filter(
+        (item) => "first_air_date" in item && !("title" in item),
+      );
     }
 
     // Industry filter
     const industryDef = INDUSTRY_FILTERS.find((f) => f.id === industryFilter);
     if (industryDef?.langs) {
-      filtered = filtered.filter((item) => industryDef.langs!.includes(item.original_language || ""));
+      filtered = filtered.filter((item) =>
+        industryDef.langs!.includes(item.original_language || ""),
+      );
     }
 
     // Recommendation type filter: trending, highly rated, popular, new releases
     if (recTypeFilter !== "all") {
       const now = new Date().getTime();
       const oneMonthAgo = now - 30 * 24 * 60 * 60 * 1000;
-      
+
       switch (recTypeFilter) {
         case "trending":
           // High popularity and recent activity
@@ -405,9 +513,10 @@ export default function Reckon() {
         case "newreleases":
           // Released within last 30 days
           filtered = filtered.filter((item) => {
-            const releaseDate = "release_date" in item
-              ? (item as Movie).release_date
-              : (item as TVShow).first_air_date;
+            const releaseDate =
+              "release_date" in item
+                ? (item as Movie).release_date
+                : (item as TVShow).first_air_date;
             const itemDate = releaseDate ? new Date(releaseDate).getTime() : 0;
             return itemDate > oneMonthAgo;
           });
@@ -421,7 +530,9 @@ export default function Reckon() {
     }
 
     if (selectedLanguage !== "all") {
-      filtered = filtered.filter((item) => item.original_language === selectedLanguage);
+      filtered = filtered.filter(
+        (item) => item.original_language === selectedLanguage,
+      );
     }
 
     filtered.sort((a, b) => {
@@ -434,8 +545,10 @@ export default function Reckon() {
           comparison = (a.vote_average || 0) - (b.vote_average || 0);
           break;
         case "release_date": {
-          const dateA = "release_date" in a ? a.release_date : a.first_air_date || "";
-          const dateB = "release_date" in b ? b.release_date : b.first_air_date || "";
+          const dateA =
+            "release_date" in a ? a.release_date : a.first_air_date || "";
+          const dateB =
+            "release_date" in b ? b.release_date : b.first_air_date || "";
           comparison = dateA.localeCompare(dateB);
           break;
         }
@@ -447,18 +560,36 @@ export default function Reckon() {
     });
 
     return filtered;
-  }, [sourceItems, contentTypeFilter, industryFilter, recTypeFilter, selectedGenre, selectedLanguage, sortField, sortOrder]);
+  }, [
+    sourceItems,
+    contentTypeFilter,
+    industryFilter,
+    recTypeFilter,
+    selectedGenre,
+    selectedLanguage,
+    sortField,
+    sortOrder,
+  ]);
 
   const visibleItems = useMemo(
     () => processedItems.slice(0, visibleCount),
-    [processedItems, visibleCount]
+    [processedItems, visibleCount],
   );
 
   const hasMore = visibleCount < processedItems.length;
 
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_ITEMS);
-  }, [mainTab, contentTypeFilter, industryFilter, recTypeFilter, selectedGenre, selectedLanguage, sortField, sortOrder]);
+  }, [
+    mainTab,
+    contentTypeFilter,
+    industryFilter,
+    recTypeFilter,
+    selectedGenre,
+    selectedLanguage,
+    sortField,
+    sortOrder,
+  ]);
 
   useEffect(() => {
     const node = loadMoreRef.current;
@@ -466,15 +597,18 @@ export default function Reckon() {
     const observer = new IntersectionObserver(
       (entries) => {
         if (!entries[0]?.isIntersecting) return;
-        setVisibleCount((prev) => Math.min(prev + LOAD_MORE_BATCH, processedItems.length));
+        setVisibleCount((prev) =>
+          Math.min(prev + LOAD_MORE_BATCH, processedItems.length),
+        );
       },
-      { rootMargin: "500px 0px" }
+      { rootMargin: "500px 0px" },
     );
     observer.observe(node);
     return () => observer.disconnect();
   }, [hasMore, processedItems.length, visibleItems.length]);
 
-  const toggleSortOrder = () => setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+  const toggleSortOrder = () =>
+    setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
 
   const clearFilters = () => {
     setContentTypeFilter("all");
@@ -513,7 +647,6 @@ export default function Reckon() {
 
       <main className="flex-1 pt-20 pb-12">
         <div className="container mx-auto px-4">
-
           {/* Top header row */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-3">
@@ -527,7 +660,9 @@ export default function Reckon() {
                 </p>
               </div>
               {isPersonalized && (
-                <Badge className="bg-primary/20 text-primary ml-2">Personalized</Badge>
+                <Badge className="bg-primary/20 text-primary ml-2">
+                  Personalized
+                </Badge>
               )}
               {isAIRanked && (
                 <Badge className="bg-violet-500/20 text-violet-400 ml-1 gap-1">
@@ -541,11 +676,15 @@ export default function Reckon() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => { void refreshRecommendations(); }}
+                onClick={() => {
+                  void refreshRecommendations();
+                }}
                 disabled={isRefreshing}
                 className="gap-2"
               >
-                <RefreshCw className={cn("w-4 h-4", isRefreshing && "animate-spin")} />
+                <RefreshCw
+                  className={cn("w-4 h-4", isRefreshing && "animate-spin")}
+                />
                 Refresh Picks
               </Button>
               <span>{processedItems.length} recommendations</span>
@@ -561,7 +700,7 @@ export default function Reckon() {
                 "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
                 !isAITab
                   ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               <Sparkles className="w-4 h-4" />
@@ -583,10 +722,14 @@ export default function Reckon() {
                 AI Picks
               </span>
               {isAIRanked && (
-                <span className={cn(
-                  "text-[10px] px-1.5 py-0.5 rounded-full font-semibold",
-                  isAITab ? "bg-white/20 text-white" : "bg-violet-500/20 text-violet-400"
-                )}>
+                <span
+                  className={cn(
+                    "text-[10px] px-1.5 py-0.5 rounded-full font-semibold",
+                    isAITab
+                      ? "bg-white/20 text-white"
+                      : "bg-violet-500/20 text-violet-400",
+                  )}
+                >
                   {aiItems.length}
                 </span>
               )}
@@ -602,9 +745,12 @@ export default function Reckon() {
                   <BrainCircuit className="w-5 h-5 text-violet-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-violet-300">Picked for you by AI</p>
+                  <p className="text-sm font-semibold text-violet-300">
+                    Picked for you by AI
+                  </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Ranked using semantic embeddings + your preferences via OpenAI
+                    Ranked using semantic embeddings + your preferences via
+                    OpenAI
                   </p>
                 </div>
                 <Button
@@ -624,9 +770,16 @@ export default function Reckon() {
           <div className="flex flex-col gap-3 mb-6">
             <div className="flex gap-2 bg-card/50 p-3 rounded-lg border border-border overflow-x-auto scrollbar-hide">
               <Button
-                variant={contentTypeFilter === "all" && industryFilter === "all" ? "default" : "ghost"}
+                variant={
+                  contentTypeFilter === "all" && industryFilter === "all"
+                    ? "default"
+                    : "ghost"
+                }
                 size="sm"
-                onClick={() => { setContentTypeFilter("all"); setIndustryFilter("all"); }}
+                onClick={() => {
+                  setContentTypeFilter("all");
+                  setIndustryFilter("all");
+                }}
                 className="gap-2 shrink-0"
               >
                 <Sparkles className="w-4 h-4" />
@@ -635,7 +788,10 @@ export default function Reckon() {
               <Button
                 variant={contentTypeFilter === "movie" ? "default" : "ghost"}
                 size="sm"
-                onClick={() => { setContentTypeFilter("movie"); setIndustryFilter("all"); }}
+                onClick={() => {
+                  setContentTypeFilter("movie");
+                  setIndustryFilter("all");
+                }}
                 className="gap-2 shrink-0"
               >
                 <Film className="w-4 h-4" />
@@ -644,7 +800,10 @@ export default function Reckon() {
               <Button
                 variant={contentTypeFilter === "tv" ? "default" : "ghost"}
                 size="sm"
-                onClick={() => { setContentTypeFilter("tv"); setIndustryFilter("all"); }}
+                onClick={() => {
+                  setContentTypeFilter("tv");
+                  setIndustryFilter("all");
+                }}
                 className="gap-2 shrink-0"
               >
                 <Tv className="w-4 h-4" />
@@ -655,12 +814,15 @@ export default function Reckon() {
                 <button
                   key={f.id}
                   type="button"
-                  onClick={() => { setIndustryFilter(f.id); setContentTypeFilter("all"); }}
+                  onClick={() => {
+                    setIndustryFilter(f.id);
+                    setContentTypeFilter("all");
+                  }}
                   className={cn(
                     "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all shrink-0",
                     industryFilter === f.id
                       ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted",
                   )}
                 >
                   <span>{f.emoji}</span>
@@ -681,7 +843,7 @@ export default function Reckon() {
                     "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all shrink-0",
                     recTypeFilter === t.id
                       ? "bg-amber-600/80 text-white shadow-sm"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted",
                   )}
                 >
                   <span>{t.emoji}</span>
@@ -713,7 +875,10 @@ export default function Reckon() {
               </SelectContent>
             </Select>
 
-            <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+            <Select
+              value={selectedLanguage}
+              onValueChange={setSelectedLanguage}
+            >
               <SelectTrigger className="w-full sm:w-[170px] bg-card">
                 <SelectValue placeholder="All Languages" />
               </SelectTrigger>
@@ -727,7 +892,10 @@ export default function Reckon() {
               </SelectContent>
             </Select>
 
-            <Select value={sortField} onValueChange={(v) => setSortField(v as SortField)}>
+            <Select
+              value={sortField}
+              onValueChange={(v) => setSortField(v as SortField)}
+            >
               <SelectTrigger className="w-full sm:w-[170px] bg-card">
                 <SelectValue />
               </SelectTrigger>
@@ -746,11 +914,22 @@ export default function Reckon() {
               className="bg-card shrink-0"
               title={sortOrder === "desc" ? "Descending" : "Ascending"}
             >
-              <ArrowUpDown className={cn("w-4 h-4", sortOrder === "asc" && "rotate-180")} />
+              <ArrowUpDown
+                className={cn("w-4 h-4", sortOrder === "asc" && "rotate-180")}
+              />
             </Button>
 
-            {(contentTypeFilter !== "all" || industryFilter !== "all" || recTypeFilter !== "all" || selectedGenre !== "all" || selectedLanguage !== "all" || sortField !== "relevance") && (
-              <Button variant="ghost" onClick={clearFilters} className="text-muted-foreground">
+            {(contentTypeFilter !== "all" ||
+              industryFilter !== "all" ||
+              recTypeFilter !== "all" ||
+              selectedGenre !== "all" ||
+              selectedLanguage !== "all" ||
+              sortField !== "relevance") && (
+              <Button
+                variant="ghost"
+                onClick={clearFilters}
+                className="text-muted-foreground"
+              >
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Clear
               </Button>
@@ -766,7 +945,8 @@ export default function Reckon() {
                 {visibleItems.map((item) => {
                   const itemType = getRecommendationItemType(item);
                   const explanation = explanationById[`${itemType}_${item.id}`];
-                  const aiExplanation = aiExplanationById[`${itemType}:${item.id}`];
+                  const aiExplanation =
+                    aiExplanationById[`${itemType}:${item.id}`];
                   return (
                     <ReckonCard
                       key={`${item.id}-${itemType}`}
@@ -787,7 +967,11 @@ export default function Reckon() {
                 <div className="flex justify-center py-3">
                   <Button
                     variant="outline"
-                    onClick={() => setVisibleCount((prev) => Math.min(prev + LOAD_MORE_BATCH, processedItems.length))}
+                    onClick={() =>
+                      setVisibleCount((prev) =>
+                        Math.min(prev + LOAD_MORE_BATCH, processedItems.length),
+                      )
+                    }
                   >
                     Load More
                   </Button>
@@ -797,13 +981,23 @@ export default function Reckon() {
           ) : (
             <div className="text-center py-16">
               <Sparkles className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2">No recommendations found</h3>
+              <h3 className="text-xl font-semibold mb-2">
+                No recommendations found
+              </h3>
               <p className="text-muted-foreground mb-4">
-                {contentTypeFilter !== "all" || industryFilter !== "all" || recTypeFilter !== "all" || selectedGenre !== "all" || selectedLanguage !== "all"
+                {contentTypeFilter !== "all" ||
+                industryFilter !== "all" ||
+                recTypeFilter !== "all" ||
+                selectedGenre !== "all" ||
+                selectedLanguage !== "all"
                   ? "Try adjusting your filters or clearing them"
                   : "Start watching and liking content to unlock stronger recommendations."}
               </p>
-              {(contentTypeFilter !== "all" || industryFilter !== "all" || recTypeFilter !== "all" || selectedGenre !== "all" || selectedLanguage !== "all") && (
+              {(contentTypeFilter !== "all" ||
+                industryFilter !== "all" ||
+                recTypeFilter !== "all" ||
+                selectedGenre !== "all" ||
+                selectedLanguage !== "all") && (
                 <Button onClick={clearFilters}>Clear Filters</Button>
               )}
             </div>

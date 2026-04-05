@@ -18,7 +18,11 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
-import { getRedisKey, isRedisConfigured, runRedisCommand } from "../../lib/redis-rest.js";
+import {
+  getRedisKey,
+  isRedisConfigured,
+  runRedisCommand,
+} from "../../lib/redis-rest.js";
 import {
   isOpenAIConfigured,
   embedTexts,
@@ -50,23 +54,23 @@ const MAX_IP_REQUESTS = 30;
 const MAX_USER_REQUESTS = 15;
 const RATE_WINDOW_MS = 5 * 60 * 1000;
 
-const EMBED_TTL_SECONDS = 7 * 24 * 60 * 60;  // 7 days — movie metadata stable
-const RESULT_CACHE_TTL_SECONDS = 60 * 60;     // 1 hour — longer cache = faster hits, often sufficient
+const EMBED_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days — movie metadata stable
+const RESULT_CACHE_TTL_SECONDS = 60 * 60; // 1 hour — longer cache = faster hits, often sufficient
 
 const MAX_HISTORY_SEEDS = 30;
 const MAX_LIKED_SEEDS = 20;
 const MAX_FEEDBACK_SEEDS = 15;
-const MIN_VOTE_AVERAGE = 5.8;        // stricter pre-filter = fewer embeddings
-const MAX_CANDIDATES = 150;          // reduced pool = faster embedding + better focus
-const TOP_N_FOR_EXPLANATIONS = 10;   // fewer GPT calls = fewer tokens, still personalized
-const FINAL_OUTPUT_LIMIT = 45;       // fewer total items = more curated feel
+const MIN_VOTE_AVERAGE = 5.8; // stricter pre-filter = fewer embeddings
+const MAX_CANDIDATES = 150; // reduced pool = faster embedding + better focus
+const TOP_N_FOR_EXPLANATIONS = 10; // fewer GPT calls = fewer tokens, still personalized
+const FINAL_OUTPUT_LIMIT = 45; // fewer total items = more curated feel
 
 // How many of the user's top-liked items to fetch TMDB-similar content for
 const TOP_SEEDS_FOR_SIMILAR = 3;
 
 // Final score blend: semantic similarity vs content quality
-const SIMILARITY_WEIGHT = 0.70;
-const QUALITY_WEIGHT = 0.30;
+const SIMILARITY_WEIGHT = 0.7;
+const QUALITY_WEIGHT = 0.3;
 
 // Preference boost multipliers (tuned higher for user preferences)
 const LANG_BOOST = 1.25;
@@ -117,22 +121,52 @@ const EMPTY_PAYLOAD: AIRecommendationsPayload = {
 // ---------------------------------------------------------------------------
 
 const GENRE_NAMES: Record<number, string> = {
-  28: "Action", 12: "Adventure", 16: "Animation", 35: "Comedy", 80: "Crime",
-  99: "Documentary", 18: "Drama", 10751: "Family", 14: "Fantasy", 36: "History",
-  27: "Horror", 10402: "Music", 9648: "Mystery", 10749: "Romance",
-  878: "Sci-Fi", 10770: "TV Movie", 53: "Thriller", 10752: "War", 37: "Western",
-  10759: "Action & Adventure", 10762: "Kids", 10765: "Sci-Fi & Fantasy",
-  10766: "Soap", 10768: "War & Politics",
+  28: "Action",
+  12: "Adventure",
+  16: "Animation",
+  35: "Comedy",
+  80: "Crime",
+  99: "Documentary",
+  18: "Drama",
+  10751: "Family",
+  14: "Fantasy",
+  36: "History",
+  27: "Horror",
+  10402: "Music",
+  9648: "Mystery",
+  10749: "Romance",
+  878: "Sci-Fi",
+  10770: "TV Movie",
+  53: "Thriller",
+  10752: "War",
+  37: "Western",
+  10759: "Action & Adventure",
+  10762: "Kids",
+  10765: "Sci-Fi & Fantasy",
+  10766: "Soap",
+  10768: "War & Politics",
 };
 
 const LANGUAGE_LABELS: Record<string, string> = {
-  en: "English", hi: "Hindi", ta: "Tamil", te: "Telugu", gu: "Gujarati",
-  ko: "Korean", ja: "Japanese", es: "Spanish", fr: "French", tr: "Turkish",
-  ml: "Malayalam", kn: "Kannada",
+  en: "English",
+  hi: "Hindi",
+  ta: "Tamil",
+  te: "Telugu",
+  gu: "Gujarati",
+  ko: "Korean",
+  ja: "Japanese",
+  es: "Spanish",
+  fr: "French",
+  tr: "Turkish",
+  ml: "Malayalam",
+  kn: "Kannada",
 };
 
 function genreNames(ids: number[]): string {
-  return ids.map((id) => GENRE_NAMES[id] || "").filter(Boolean).join(", ");
+  return ids
+    .map((id) => GENRE_NAMES[id] || "")
+    .filter(Boolean)
+    .join(", ");
 }
 
 // ---------------------------------------------------------------------------
@@ -153,13 +187,15 @@ function qualityScore(item: Movie | TVShow): number {
 // ---------------------------------------------------------------------------
 
 function candidateEmbedText(item: Movie | TVShow, type: ContentType): string {
-  const title = type === "movie" ? (item as Movie).title : (item as TVShow).name;
+  const title =
+    type === "movie" ? (item as Movie).title : (item as TVShow).name;
   const overview = item.overview?.slice(0, 180) || "";
   const genres = genreNames(item.genre_ids || []);
-  const year = (type === "movie"
-    ? (item as Movie).release_date
-    : (item as TVShow).first_air_date
-  )?.slice(0, 4) || "";
+  const year =
+    (type === "movie"
+      ? (item as Movie).release_date
+      : (item as TVShow).first_air_date
+    )?.slice(0, 4) || "";
   const lang = LANGUAGE_LABELS[item.original_language || ""] || "";
   const rating = item.vote_average ? `${item.vote_average.toFixed(1)}/10` : "";
 
@@ -258,7 +294,12 @@ async function buildTasteAnchors(signals: UserSignal[]): Promise<TasteAnchors> {
   }
 
   if (!textsToEmbed.length) {
-    return { likedVector: null, watchedVector: null, blendedVector: null, profile };
+    return {
+      likedVector: null,
+      watchedVector: null,
+      blendedVector: null,
+      profile,
+    };
   }
 
   const embeddings = await embedTexts(textsToEmbed);
@@ -269,8 +310,14 @@ async function buildTasteAnchors(signals: UserSignal[]): Promise<TasteAnchors> {
   // Blended vector: liked gets 2x weight vs watched
   const vectorsToBlend: number[][] = [];
   const blendWeights: number[] = [];
-  if (likedVector) { vectorsToBlend.push(likedVector); blendWeights.push(2.0); }
-  if (watchedVector) { vectorsToBlend.push(watchedVector); blendWeights.push(1.0); }
+  if (likedVector) {
+    vectorsToBlend.push(likedVector);
+    blendWeights.push(2.0);
+  }
+  if (watchedVector) {
+    vectorsToBlend.push(watchedVector);
+    blendWeights.push(1.0);
+  }
 
   const blendedVector = vectorsToBlend.length
     ? averageEmbeddings(vectorsToBlend, blendWeights)
@@ -320,36 +367,69 @@ function scoreCandidate(
  * Batch-fetch multiple embedding vectors in a single MGET round trip.
  * Returns a map of key → vector (only populated for cache hits).
  */
-async function getManyEmbeddings(keys: string[]): Promise<Map<string, number[]>> {
+async function getManyEmbeddings(
+  keys: string[],
+): Promise<Map<string, number[]>> {
   const result = new Map<string, number[]>();
   if (!isRedisConfigured() || !keys.length) return result;
   const prefixedKeys = keys.map(getRedisKey);
-  const res = await runRedisCommand<(string | null)[]>(["MGET", ...prefixedKeys]);
+  const res = await runRedisCommand<(string | null)[]>([
+    "MGET",
+    ...prefixedKeys,
+  ]);
   if (!res.ok || !Array.isArray(res.result)) return result;
   for (let i = 0; i < keys.length; i++) {
     const raw = res.result[i];
     if (raw) {
-      try { result.set(keys[i], JSON.parse(raw) as number[]); } catch { /* skip */ }
+      try {
+        result.set(keys[i], JSON.parse(raw) as number[]);
+      } catch {
+        /* skip */
+      }
     }
   }
   return result;
 }
 
-async function setCachedEmbedding(key: string, vector: number[]): Promise<void> {
+async function setCachedEmbedding(
+  key: string,
+  vector: number[],
+): Promise<void> {
   if (!isRedisConfigured()) return;
-  await runRedisCommand(["SET", getRedisKey(key), JSON.stringify(vector), "EX", EMBED_TTL_SECONDS]);
+  await runRedisCommand([
+    "SET",
+    getRedisKey(key),
+    JSON.stringify(vector),
+    "EX",
+    EMBED_TTL_SECONDS,
+  ]);
 }
 
-async function getCachedResult(key: string): Promise<AIRecommendationsPayload | null> {
+async function getCachedResult(
+  key: string,
+): Promise<AIRecommendationsPayload | null> {
   if (!isRedisConfigured()) return null;
   const result = await runRedisCommand<string>(["GET", getRedisKey(key)]);
   if (!result.ok || !result.result) return null;
-  try { return JSON.parse(result.result) as AIRecommendationsPayload; } catch { return null; }
+  try {
+    return JSON.parse(result.result) as AIRecommendationsPayload;
+  } catch {
+    return null;
+  }
 }
 
-async function setCachedResult(key: string, payload: AIRecommendationsPayload): Promise<void> {
+async function setCachedResult(
+  key: string,
+  payload: AIRecommendationsPayload,
+): Promise<void> {
   if (!isRedisConfigured()) return;
-  await runRedisCommand(["SET", getRedisKey(key), JSON.stringify(payload), "EX", RESULT_CACHE_TTL_SECONDS]);
+  await runRedisCommand([
+    "SET",
+    getRedisKey(key),
+    JSON.stringify(payload),
+    "EX",
+    RESULT_CACHE_TTL_SECONDS,
+  ]);
 }
 
 // ---------------------------------------------------------------------------
@@ -371,9 +451,9 @@ function applyDiversity(
     const genres = item.genre_ids || [];
 
     const langOk = (langCount.get(lang) || 0) < MAX_PER_LANGUAGE;
-    const genreOk = genres.length === 0 || genres.some(
-      (g) => (genreCount.get(g) || 0) < MAX_PER_GENRE,
-    );
+    const genreOk =
+      genres.length === 0 ||
+      genres.some((g) => (genreCount.get(g) || 0) < MAX_PER_GENRE);
 
     if (langOk && genreOk) {
       langCount.set(lang, (langCount.get(lang) || 0) + 1);
@@ -396,14 +476,19 @@ async function buildAIRecommendations(
   preferredLanguages: string[],
   preferredGenres: number[],
 ): Promise<AIRecommendationsPayload> {
-
   // 1. Fetch a much larger, more diverse candidate pool in parallel
   const [
-    trendingMoviesDay, trendingMoviesWeek,
-    trendingTVDay, trendingTVWeek,
-    topRatedP1, topRatedP2, topRatedP3,
-    nowPlayingP1, nowPlayingP2,
-    popularTVP1, popularTVP2,
+    trendingMoviesDay,
+    trendingMoviesWeek,
+    trendingTVDay,
+    trendingTVWeek,
+    topRatedP1,
+    topRatedP2,
+    topRatedP3,
+    nowPlayingP1,
+    nowPlayingP2,
+    popularTVP1,
+    popularTVP2,
     bollywood,
     gujarati,
     tamil,
@@ -426,9 +511,13 @@ async function buildAIRecommendations(
     getServerTamilMovies(1),
     getServerTeluguMovies(1),
     // Fetch similar content for top liked/watched items — most personalised candidates
-    ...topLikedIds.slice(0, TOP_SEEDS_FOR_SIMILAR).map(({ id, type }) =>
-      type === "movie" ? getServerSimilarMovies(id) : getServerSimilarTVShows(id),
-    ),
+    ...topLikedIds
+      .slice(0, TOP_SEEDS_FOR_SIMILAR)
+      .map(({ id, type }) =>
+        type === "movie"
+          ? getServerSimilarMovies(id)
+          : getServerSimilarTVShows(id),
+      ),
   ]);
 
   const movieCandidates: AICandidate[] = [];
@@ -461,20 +550,30 @@ async function buildAIRecommendations(
   };
 
   // Arrays returned directly
-  if (trendingMoviesDay.status === "fulfilled") addMovies(trendingMoviesDay.value || []);
-  if (trendingMoviesWeek.status === "fulfilled") addMovies(trendingMoviesWeek.value || []);
+  if (trendingMoviesDay.status === "fulfilled")
+    addMovies(trendingMoviesDay.value || []);
+  if (trendingMoviesWeek.status === "fulfilled")
+    addMovies(trendingMoviesWeek.value || []);
   if (trendingTVDay.status === "fulfilled") addTV(trendingTVDay.value || []);
   if (trendingTVWeek.status === "fulfilled") addTV(trendingTVWeek.value || []);
 
   // TMDBResponse objects — need .results
-  if (topRatedP1.status === "fulfilled") addMovies(topRatedP1.value.results || []);
-  if (topRatedP2.status === "fulfilled") addMovies(topRatedP2.value.results || []);
-  if (topRatedP3.status === "fulfilled") addMovies(topRatedP3.value.results || []);
-  if (nowPlayingP1.status === "fulfilled") addMovies(nowPlayingP1.value.results || []);
-  if (nowPlayingP2.status === "fulfilled") addMovies(nowPlayingP2.value.results || []);
-  if (popularTVP1.status === "fulfilled") addTV(popularTVP1.value.results || []);
-  if (popularTVP2.status === "fulfilled") addTV(popularTVP2.value.results || []);
-  if (bollywood.status === "fulfilled") addMovies(bollywood.value.results || []);
+  if (topRatedP1.status === "fulfilled")
+    addMovies(topRatedP1.value.results || []);
+  if (topRatedP2.status === "fulfilled")
+    addMovies(topRatedP2.value.results || []);
+  if (topRatedP3.status === "fulfilled")
+    addMovies(topRatedP3.value.results || []);
+  if (nowPlayingP1.status === "fulfilled")
+    addMovies(nowPlayingP1.value.results || []);
+  if (nowPlayingP2.status === "fulfilled")
+    addMovies(nowPlayingP2.value.results || []);
+  if (popularTVP1.status === "fulfilled")
+    addTV(popularTVP1.value.results || []);
+  if (popularTVP2.status === "fulfilled")
+    addTV(popularTVP2.value.results || []);
+  if (bollywood.status === "fulfilled")
+    addMovies(bollywood.value.results || []);
   if (gujarati.status === "fulfilled") addMovies(gujarati.value.results || []);
   if (tamil.status === "fulfilled") addMovies(tamil.value.results || []);
   if (telugu.status === "fulfilled") addMovies(telugu.value.results || []);
@@ -505,7 +604,9 @@ async function buildAIRecommendations(
 
   // Pre-filter: drop candidates below quality threshold BEFORE embedding
   // This saves significant API costs and improves speed
-  const preFiltered = allCandidates.filter((c) => c.item.vote_average >= MIN_VOTE_AVERAGE);
+  const preFiltered = allCandidates.filter(
+    (c) => c.item.vote_average >= MIN_VOTE_AVERAGE,
+  );
   const candidates = preFiltered.slice(0, MAX_CANDIDATES);
   if (!candidates.length) return EMPTY_PAYLOAD;
 
@@ -556,10 +657,16 @@ async function buildAIRecommendations(
     let score = scoreCandidate(vector, anchors, c);
 
     // Apply preference boosts early for better ranking
-    if (preferredLanguages.length && preferredLanguages.includes(c.item.original_language || "")) {
+    if (
+      preferredLanguages.length &&
+      preferredLanguages.includes(c.item.original_language || "")
+    ) {
       score *= LANG_BOOST;
     }
-    if (preferredGenres.length && c.item.genre_ids?.some((g) => preferredGenres.includes(g))) {
+    if (
+      preferredGenres.length &&
+      c.item.genre_ids?.some((g) => preferredGenres.includes(g))
+    ) {
       score *= GENRE_BOOST;
     }
 
@@ -571,20 +678,22 @@ async function buildAIRecommendations(
 
   // 5. Apply diversity enforcement to ensure balanced output
   const diverse = applyDiversity(scored, FINAL_OUTPUT_LIMIT);
-  
+
   // Only get explanations for top N items (reduces tokens significantly)
   const top = diverse.slice(0, TOP_N_FOR_EXPLANATIONS);
 
   // 6. gpt-4.1-mini explanations with rich taste profile
   const explanationInputs = top.map(({ candidate }) => {
     const id = (candidate.item as Movie).id ?? (candidate.item as TVShow).id;
-    const title = candidate.type === "movie"
-      ? (candidate.item as Movie).title
-      : (candidate.item as TVShow).name;
-    const year = (candidate.type === "movie"
-      ? (candidate.item as Movie).release_date
-      : (candidate.item as TVShow).first_air_date
-    )?.slice(0, 4) || "";
+    const title =
+      candidate.type === "movie"
+        ? (candidate.item as Movie).title
+        : (candidate.item as TVShow).name;
+    const year =
+      (candidate.type === "movie"
+        ? (candidate.item as Movie).release_date
+        : (candidate.item as TVShow).first_air_date
+      )?.slice(0, 4) || "";
     return {
       id,
       type: candidate.type,
@@ -595,7 +704,10 @@ async function buildAIRecommendations(
     };
   });
 
-  const rawExplanations = await generateExplanations(anchors.profile, explanationInputs).catch(() => ({}));
+  const rawExplanations = await generateExplanations(
+    anchors.profile,
+    explanationInputs,
+  ).catch(() => ({}));
 
   // 7. Build final payload
   const explanationById: Record<string, { label: string; text: string }> = {};
@@ -639,10 +751,19 @@ export default async function aiRecommendationsHandler(
   }
 
   const ip = getClientIp(req);
-  const ipLimit = await consumeRateLimit(`ai-recs:ip:${ip}`, MAX_IP_REQUESTS, RATE_WINDOW_MS);
+  const ipLimit = await consumeRateLimit(
+    `ai-recs:ip:${ip}`,
+    MAX_IP_REQUESTS,
+    RATE_WINDOW_MS,
+  );
   if (!ipLimit.allowed) {
-    res.setHeader("Retry-After", String(Math.max(ipLimit.retryAfterSeconds, 30)));
-    return res.status(429).json({ error: "Too many requests. Try again shortly." });
+    res.setHeader(
+      "Retry-After",
+      String(Math.max(ipLimit.retryAfterSeconds, 30)),
+    );
+    return res
+      .status(429)
+      .json({ error: "Too many requests. Try again shortly." });
   }
 
   const { db } = await connectToDatabase();
@@ -659,23 +780,31 @@ export default async function aiRecommendationsHandler(
     RATE_WINDOW_MS,
   );
   if (!userRateLimit.allowed) {
-    res.setHeader("Retry-After", String(Math.max(userRateLimit.retryAfterSeconds, 30)));
-    return res.status(429).json({ error: "Too many requests. Try again shortly." });
+    res.setHeader(
+      "Retry-After",
+      String(Math.max(userRateLimit.retryAfterSeconds, 30)),
+    );
+    return res
+      .status(429)
+      .json({ error: "Too many requests. Try again shortly." });
   }
 
   try {
     const [historyDocs, likedDocs, feedbackDocs, prefsDoc] = await Promise.all([
-      db.collection("watch_history")
+      db
+        .collection("watch_history")
         .find({ user_id: userId })
         .sort({ watched_at: -1 })
         .limit(MAX_HISTORY_SEEDS)
         .toArray(),
-      db.collection("liked_items")
+      db
+        .collection("liked_items")
         .find({ user_id: userId })
         .sort({ liked_at: -1 })
         .limit(MAX_LIKED_SEEDS)
         .toArray(),
-      db.collection("feedback_items")
+      db
+        .collection("feedback_items")
         .find({ user_id: userId, feedback_type: { $ne: "skip" } })
         .sort({ updated_at: -1 })
         .limit(MAX_FEEDBACK_SEEDS)
@@ -683,7 +812,9 @@ export default async function aiRecommendationsHandler(
       db.collection("user_preferences").findOne({ user_id: userId }),
     ]);
 
-    const preferredLanguages: string[] = Array.isArray(prefsDoc?.preferred_languages)
+    const preferredLanguages: string[] = Array.isArray(
+      prefsDoc?.preferred_languages,
+    )
       ? (prefsDoc.preferred_languages as string[])
       : [];
     const preferredGenres: number[] = Array.isArray(prefsDoc?.preferred_genres)
@@ -699,7 +830,8 @@ export default async function aiRecommendationsHandler(
     for (const doc of historyDocs) {
       const key = `${doc.content_type}:${doc.content_id}`;
       seenIds.add(key);
-      const daysAgo = (now - new Date(doc.watched_at || 0).getTime()) / 86_400_000;
+      const daysAgo =
+        (now - new Date(doc.watched_at || 0).getTime()) / 86_400_000;
       const recency = Math.max(0.7, 1 - daysAgo / 90); // decay over 90 days
       signals.push({
         content_id: doc.content_id,
@@ -731,9 +863,12 @@ export default async function aiRecommendationsHandler(
     for (const doc of feedbackDocs) {
       const key = `${doc.content_type}:${doc.content_id}`;
       if (!seenIds.has(key)) seenIds.add(key);
-      const weight = doc.feedback_type === "must_watch" ? 1.5
-        : doc.feedback_type === "give_it_a_go" ? 1.2
-        : 1.0;
+      const weight =
+        doc.feedback_type === "must_watch"
+          ? 1.5
+          : doc.feedback_type === "give_it_a_go"
+            ? 1.2
+            : 1.0;
       signals.push({
         content_id: doc.content_id,
         content_type: doc.content_type,
@@ -761,7 +896,10 @@ export default async function aiRecommendationsHandler(
     // Smarter cache key: include latest timestamps, not just counts
     const latestWatch = historyDocs[0]?.watched_at || "";
     const latestLike = likedDocs[0]?.liked_at || "";
-    const prefsFingerprint = [...preferredLanguages].sort().join(",") + "|" + [...preferredGenres].sort().join(",");
+    const prefsFingerprint =
+      [...preferredLanguages].sort().join(",") +
+      "|" +
+      [...preferredGenres].sort().join(",");
     const resultCacheKey = `ai:recs:v3:${userId}:${historyDocs.length}:${likedDocs.length}:${latestWatch}:${latestLike}:${prefsFingerprint}`;
 
     const cached = await getCachedResult(resultCacheKey);
@@ -769,7 +907,13 @@ export default async function aiRecommendationsHandler(
       return res.status(200).json({ data: cached });
     }
 
-    const payload = await buildAIRecommendations(signals, seenIds, topLikedIds, preferredLanguages, preferredGenres);
+    const payload = await buildAIRecommendations(
+      signals,
+      seenIds,
+      topLikedIds,
+      preferredLanguages,
+      preferredGenres,
+    );
     await setCachedResult(resultCacheKey, payload);
 
     return res.status(200).json({ data: payload });

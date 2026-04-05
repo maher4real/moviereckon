@@ -53,7 +53,9 @@ export function useRecommendations(): RecommendationResult {
   const preferenceFingerprint = useMemo(
     () =>
       [
-        [...(preferences?.preferred_genres || [])].sort((a, b) => a - b).join(","),
+        [...(preferences?.preferred_genres || [])]
+          .sort((a, b) => a - b)
+          .join(","),
         [...(preferences?.preferred_languages || [])].sort().join(","),
       ].join("|"),
     [preferences],
@@ -77,7 +79,10 @@ export function useRecommendations(): RecommendationResult {
     };
 
     syncRotationBucket();
-    const timer = window.setInterval(syncRotationBucket, RECOMMENDATION_ROTATION_POLL_MS);
+    const timer = window.setInterval(
+      syncRotationBucket,
+      RECOMMENDATION_ROTATION_POLL_MS,
+    );
     return () => window.clearInterval(timer);
   }, []);
 
@@ -94,7 +99,8 @@ export function useRecommendations(): RecommendationResult {
       rotationBucket,
       manualRotationSeed,
     ],
-    queryFn: () => mongoClient.fetchRecommendationsFeed({ variant: rotationKey }),
+    queryFn: () =>
+      mongoClient.fetchRecommendationsFeed({ variant: rotationKey }),
     enabled: Boolean(user) && !userDataLoading,
     staleTime: 1000 * 60,
     gcTime: 1000 * 60 * 30,
@@ -112,7 +118,7 @@ export function useRecommendations(): RecommendationResult {
     queryFn: () => mongoClient.fetchAIRecommendations(),
     enabled: Boolean(user) && !userDataLoading && hasEnoughHistory,
     staleTime: 1000 * 60 * 30, // 30 mins: reduced refetch frequency, better cache hit rate
-    gcTime: 1000 * 60 * 60,    // 1 hour: keep in memory longer for faster re-access
+    gcTime: 1000 * 60 * 60, // 1 hour: keep in memory longer for faster re-access
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     retry: 1,
