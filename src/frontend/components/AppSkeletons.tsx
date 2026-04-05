@@ -134,7 +134,7 @@ export function AppPageSkeleton({
 
 export function CenteredAppSkeleton() {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+    <div className="hidden md:min-h-screen bg-background md:flex items-center justify-center px-4">
       <BrandLogo size="xl" animated />
     </div>
   );
