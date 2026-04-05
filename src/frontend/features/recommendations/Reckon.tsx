@@ -809,29 +809,7 @@ export default function Reckon() {
                 <Tv className="w-4 h-4" />
                 TV Series
               </Button>
-              <div className="w-px bg-border mx-1 shrink-0" />
-              {INDUSTRY_FILTERS.filter((f) => f.id !== "all").map((f) => (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => {
-                    setIndustryFilter(f.id);
-                    setContentTypeFilter("all");
-                  }}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all shrink-0",
-                    industryFilter === f.id
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted",
-                  )}
-                >
-                  <span>{f.emoji}</span>
-                  {f.label}
-                </button>
-              ))}
-            </div>
 
-            {/* Recommendation type filter row */}
             <div className="flex gap-2 bg-muted/30 p-3 rounded-lg border border-border/50 overflow-x-auto scrollbar-hide">
               {RECOMMENDATION_TYPES.map((t) => (
                 <button
@@ -937,7 +915,7 @@ export default function Reckon() {
           </div>
 
           {/* Grid */}
-          {reckonLoading || (isAITab && !isAIRanked) ? (
+          {reckonLoading && !hasResolvedItems ? (
             <PosterGridSkeleton count={INITIAL_VISIBLE_ITEMS} />
           ) : visibleItems.length > 0 ? (
             <>
