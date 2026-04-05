@@ -37,13 +37,6 @@ import * as mongoClient from "@/frontend/lib/mongodbClient";
 
 type MainTab = "all" | "ai";
 type ContentTypeFilter = "all" | "movie" | "tv";
-type IndustryFilter =
-  | "all"
-  | "hollywood"
-  | "bollywood"
-  | "southindian"
-  | "korean"
-  | "japanese";
 type RecommendationTypeFilter =
   | "all"
   | "trending"
@@ -52,26 +45,6 @@ type RecommendationTypeFilter =
   | "newreleases";
 type SortField = "relevance" | "popularity" | "rating" | "release_date";
 type SortOrder = "asc" | "desc";
-
-const INDUSTRY_FILTERS: {
-  id: IndustryFilter;
-  label: string;
-  emoji: string;
-  langs?: string[];
-  langs_exclude?: string[];
-}[] = [
-  { id: "all", label: "All", emoji: "🌍" },
-  { id: "hollywood", label: "Hollywood", emoji: "🎬", langs: ["en"] },
-  { id: "bollywood", label: "Bollywood", emoji: "🇮🇳", langs: ["hi", "gu"] },
-  {
-    id: "southindian",
-    label: "South Indian",
-    emoji: "🎭",
-    langs: ["ta", "te", "ml", "kn"],
-  },
-  { id: "korean", label: "Korean", emoji: "🇰🇷", langs: ["ko"] },
-  { id: "japanese", label: "Japanese", emoji: "🇯🇵", langs: ["ja"] },
-];
 
 const RECOMMENDATION_TYPES: {
   id: RecommendationTypeFilter;
@@ -436,7 +409,6 @@ export default function Reckon() {
   const [mainTab, setMainTab] = useState<MainTab>("all");
   const [contentTypeFilter, setContentTypeFilter] =
     useState<ContentTypeFilter>("all");
-  const [industryFilter, setIndustryFilter] = useState<IndustryFilter>("all");
   const [recTypeFilter, setRecTypeFilter] =
     useState<RecommendationTypeFilter>("all");
   const [sortField, setSortField] = useState<SortField>("relevance");
@@ -481,14 +453,6 @@ export default function Reckon() {
     } else if (contentTypeFilter === "tv") {
       filtered = filtered.filter(
         (item) => "first_air_date" in item && !("title" in item),
-      );
-    }
-
-    // Industry filter
-    const industryDef = INDUSTRY_FILTERS.find((f) => f.id === industryFilter);
-    if (industryDef?.langs) {
-      filtered = filtered.filter((item) =>
-        industryDef.langs!.includes(item.original_language || ""),
       );
     }
 
@@ -563,7 +527,6 @@ export default function Reckon() {
   }, [
     sourceItems,
     contentTypeFilter,
-    industryFilter,
     recTypeFilter,
     selectedGenre,
     selectedLanguage,
@@ -583,7 +546,6 @@ export default function Reckon() {
   }, [
     mainTab,
     contentTypeFilter,
-    industryFilter,
     recTypeFilter,
     selectedGenre,
     selectedLanguage,
@@ -612,7 +574,6 @@ export default function Reckon() {
 
   const clearFilters = () => {
     setContentTypeFilter("all");
-    setIndustryFilter("all");
     setRecTypeFilter("all");
     setSelectedGenre("all");
     setSelectedLanguage("all");
@@ -767,20 +728,13 @@ export default function Reckon() {
             </div>
           )}
 
-          {/* Content type + industry filter row */}
+          {/* Content type + rec type filter rows */}
           <div className="flex flex-col gap-3 mb-6">
             <div className="flex gap-2 bg-card/50 p-3 rounded-lg border border-border overflow-x-auto scrollbar-hide">
               <Button
-                variant={
-                  contentTypeFilter === "all" && industryFilter === "all"
-                    ? "default"
-                    : "ghost"
-                }
+                variant={contentTypeFilter === "all" ? "default" : "ghost"}
                 size="sm"
-                onClick={() => {
-                  setContentTypeFilter("all");
-                  setIndustryFilter("all");
-                }}
+                onClick={() => setContentTypeFilter("all")}
                 className="gap-2 shrink-0"
               >
                 <Sparkles className="w-4 h-4" />
@@ -789,10 +743,7 @@ export default function Reckon() {
               <Button
                 variant={contentTypeFilter === "movie" ? "default" : "ghost"}
                 size="sm"
-                onClick={() => {
-                  setContentTypeFilter("movie");
-                  setIndustryFilter("all");
-                }}
+                onClick={() => setContentTypeFilter("movie")}
                 className="gap-2 shrink-0"
               >
                 <Film className="w-4 h-4" />
@@ -801,35 +752,12 @@ export default function Reckon() {
               <Button
                 variant={contentTypeFilter === "tv" ? "default" : "ghost"}
                 size="sm"
-                onClick={() => {
-                  setContentTypeFilter("tv");
-                  setIndustryFilter("all");
-                }}
+                onClick={() => setContentTypeFilter("tv")}
                 className="gap-2 shrink-0"
               >
                 <Tv className="w-4 h-4" />
                 TV Series
               </Button>
-              <div className="w-px bg-border mx-1 shrink-0" />
-              {INDUSTRY_FILTERS.filter((f) => f.id !== "all").map((f) => (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => {
-                    setIndustryFilter(f.id);
-                    setContentTypeFilter("all");
-                  }}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all shrink-0",
-                    industryFilter === f.id
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted",
-                  )}
-                >
-                  <span>{f.emoji}</span>
-                  {f.label}
-                </button>
-              ))}
             </div>
 
             <div className="flex gap-2 bg-muted/30 p-3 rounded-lg border border-border/50 overflow-x-auto scrollbar-hide">
@@ -920,7 +848,6 @@ export default function Reckon() {
             </Button>
 
             {(contentTypeFilter !== "all" ||
-              industryFilter !== "all" ||
               recTypeFilter !== "all" ||
               selectedGenre !== "all" ||
               selectedLanguage !== "all" ||
@@ -986,7 +913,6 @@ export default function Reckon() {
               </h3>
               <p className="text-muted-foreground mb-4">
                 {contentTypeFilter !== "all" ||
-                industryFilter !== "all" ||
                 recTypeFilter !== "all" ||
                 selectedGenre !== "all" ||
                 selectedLanguage !== "all"
@@ -994,7 +920,6 @@ export default function Reckon() {
                   : "Start watching and liking content to unlock stronger recommendations."}
               </p>
               {(contentTypeFilter !== "all" ||
-                industryFilter !== "all" ||
                 recTypeFilter !== "all" ||
                 selectedGenre !== "all" ||
                 selectedLanguage !== "all") && (

@@ -60,13 +60,13 @@ const RESULT_CACHE_TTL_SECONDS = 60 * 60; // 1 hour — longer cache = faster hi
 const MAX_HISTORY_SEEDS = 30;
 const MAX_LIKED_SEEDS = 20;
 const MAX_FEEDBACK_SEEDS = 15;
-const MIN_VOTE_AVERAGE = 5.8; // stricter pre-filter = fewer embeddings
-const MAX_CANDIDATES = 150; // reduced pool = faster embedding + better focus
-const TOP_N_FOR_EXPLANATIONS = 10; // fewer GPT calls = fewer tokens, still personalized
-const FINAL_OUTPUT_LIMIT = 45; // fewer total items = more curated feel
+const MIN_VOTE_AVERAGE = 5.5;        // slightly looser = more candidates
+const MAX_CANDIDATES = 300;          // bigger pool = more diverse picks
+const TOP_N_FOR_EXPLANATIONS = 15;   // explanations for top 15
+const FINAL_OUTPUT_LIMIT = 120;      // return up to 120 AI picks
 
 // How many of the user's top-liked items to fetch TMDB-similar content for
-const TOP_SEEDS_FOR_SIMILAR = 3;
+const TOP_SEEDS_FOR_SIMILAR = 5;
 
 // Final score blend: semantic similarity vs content quality
 const SIMILARITY_WEIGHT = 0.7;
@@ -77,8 +77,8 @@ const LANG_BOOST = 1.25;
 const GENRE_BOOST = 1.15;
 
 // Diversity caps in the final ranked output
-const MAX_PER_LANGUAGE = 10;
-const MAX_PER_GENRE = 12;
+const MAX_PER_LANGUAGE = 25;
+const MAX_PER_GENRE = 30;
 
 // ---------------------------------------------------------------------------
 // Types
