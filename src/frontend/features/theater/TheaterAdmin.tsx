@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Header from "@/frontend/components/Header";
@@ -6,10 +6,10 @@ import Footer from "@/frontend/components/Footer";
 import BottomNav from "@/frontend/components/BottomNav";
 import { Button } from "@/frontend/components/ui/button";
 import { Input } from "@/frontend/components/ui/input";
-import { useAuth } from "@/frontend/hooks/useAuth";
-import { ArrowLeft, Plus, Pencil, Trash2, X, Check, Star, AlertCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, X, Check, Star, Loader2, LogOut } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { toast } from "sonner";
+import { getAdminToken, clearAdminToken } from "@/frontend/features/admin/AdminLogin";
 
 interface TheaterCastMember {
   name: string;
@@ -44,51 +44,65 @@ const EMPTY_FORM = {
 
 type FormState = typeof EMPTY_FORM;
 
-async function apiFetch(path: string, options?: RequestInit) {
-  const res = await fetch(path, {
+function apiFetch(path: string, token: string, options?: RequestInit) {
+  return fetch(path, {
+    ...options,
     headers: {
       "Content-Type": "application/json",
       "x-requested-with": "XMLHttpRequest",
+      Authorization: `Bearer ${token}`,
       ...(options?.headers || {}),
     },
     credentials: "include",
-    ...options,
+  }).then(async (res) => {
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Request failed" }));
+      throw new Error(err.error || "Request failed");
+    }
+    return res.json();
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: "Request failed" }));
-    throw new Error(err.error || "Request failed");
-  }
-  return res.json();
 }
 
 async function fetchMovies(): Promise<TheaterMovie[]> {
-  const data = await apiFetch("/api/theater");
-  return data.movies;
+  const res = await fetch("/api/theater", {
+    headers: { "x-requested-with": "XMLHttpRequest" },
+  });
+  if (!res.ok) throw new Error("Failed to fetch movies");
+  return (await res.json()).movies;
 }
 
 export default function TheaterAdmin() {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const qc = useQueryClient();
-
+  const [token, setToken] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
+  // Guard: redirect to admin login if no token
+  useEffect(() => {
+    const t = getAdminToken();
+    if (!t) {
+      navigate("/admin", { replace: true });
+    } else {
+      setToken(t);
+    }
+  }, [navigate]);
+
   const { data: movies = [], isLoading } = useQuery({
     queryKey: ["theater-movies"],
     queryFn: fetchMovies,
     staleTime: 1000 * 60 * 2,
+    enabled: !!token,
   });
 
   const saveMutation = useMutation({
     mutationFn: async (data: FormState & { id?: string }) => {
       const { id, ...body } = data;
-      if (id) {
-        return apiFetch(`/api/theater/${id}`, { method: "PUT", body: JSON.stringify(body) });
-      }
-      return apiFetch("/api/theater", { method: "POST", body: JSON.stringify(body) });
+      if (!token) throw new Error("Not authenticated");
+      if (id) return apiFetch(`/api/theater/${id}`, token, { method: "PUT", body: JSON.stringify(body) });
+      return apiFetch("/api/theater", token, { method: "POST", body: JSON.stringify(body) });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["theater-movies"] });
@@ -101,7 +115,10 @@ export default function TheaterAdmin() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiFetch(`/api/theater/${id}`, { method: "DELETE" }),
+    mutationFn: (id: string) => {
+      if (!token) throw new Error("Not authenticated");
+      return apiFetch(`/api/theater/${id}`, token, { method: "DELETE" });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["theater-movies"] });
       setDeleteConfirm(null);
@@ -110,17 +127,10 @@ export default function TheaterAdmin() {
     onError: (err: Error) => toast.error(err.message),
   });
 
-  if (user?.role !== "admin") {
-    return (
-      <div className="min-h-screen bg-background text-foreground">
-        <Header />
-        <main className="pt-20 container mx-auto px-4 text-center">
-          <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
-          <p className="text-muted-foreground">Admin access required.</p>
-        </main>
-      </div>
-    );
-  }
+  const handleLogout = () => {
+    clearAdminToken();
+    navigate("/admin", { replace: true });
+  };
 
   const openAdd = () => {
     setEditingId(null);
@@ -164,6 +174,8 @@ export default function TheaterAdmin() {
     setForm((f) => ({ ...f, cast: f.cast.filter((_, idx) => idx !== i) }));
   };
 
+  if (!token) return null; // redirecting
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Header />
@@ -177,10 +189,15 @@ export default function TheaterAdmin() {
               </Button>
               <h1 className="text-xl font-bold">Manage Cinema</h1>
             </div>
-            <Button onClick={openAdd} className="gap-2 btn-primary">
-              <Plus className="w-4 h-4" />
-              Add Movie
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button onClick={openAdd} className="gap-2 btn-primary">
+                <Plus className="w-4 h-4" />
+                Add Movie
+              </Button>
+              <Button variant="ghost" size="icon" onClick={handleLogout} className="text-muted-foreground hover:text-destructive" title="Sign out">
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
 
           {isLoading ? (
@@ -198,11 +215,7 @@ export default function TheaterAdmin() {
               {movies.map((movie) => (
                 <div key={movie._id} className="flex items-center gap-4 p-4 rounded-lg bg-card border border-border">
                   {movie.thumbnail && (
-                    <img
-                      src={movie.thumbnail}
-                      alt={movie.title}
-                      className="w-12 h-16 rounded object-cover flex-shrink-0 bg-muted"
-                    />
+                    <img src={movie.thumbnail} alt={movie.title} className="w-12 h-16 rounded object-cover flex-shrink-0 bg-muted" />
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{movie.title}</p>

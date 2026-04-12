@@ -8,7 +8,23 @@
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
-import { getUserFromRequest } from "../../lib/auth.js";
+import jwt from "jsonwebtoken";
+
+const JWT_SECRET = process.env.JWT_SECRET!;
+
+function isAdminRequest(req: VercelRequest): boolean {
+  // Check regular user JWT (role === "admin")
+  // Also accept the dedicated admin session token (iss === "moviereckon-admin")
+  const authHeader = (req.headers["authorization"] as string) || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!token) return false;
+  try {
+    const payload = jwt.verify(token, JWT_SECRET) as Record<string, unknown>;
+    return payload.role === "admin";
+  } catch {
+    return false;
+  }
+}
 
 export interface TheaterCastMember {
   name: string;
@@ -103,10 +119,8 @@ export default async function theaterHandler(req: VercelRequest, res: VercelResp
     return res.status(200).json({ movie });
   }
 
-  // All write operations require admin
-  const user = await getUserFromRequest(req);
-  if (!user) return res.status(401).json({ error: "Unauthorized" });
-  if (user.role !== "admin") return res.status(403).json({ error: "Admin only" });
+  // All write operations require admin token
+  if (!isAdminRequest(req)) return res.status(403).json({ error: "Admin access required" });
 
   // ── POST /api/theater ─────────────────────────────────────────────────────
   if (method === "POST" && !movieId) {

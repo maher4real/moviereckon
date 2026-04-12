@@ -40,6 +40,7 @@ const TheaterHome = lazy(() => import("@/frontend/features/theater/TheaterHome")
 const TheaterDetail = lazy(() => import("@/frontend/features/theater/TheaterDetail"));
 const TheaterPlayer = lazy(() => import("@/frontend/features/theater/TheaterPlayer"));
 const TheaterAdmin = lazy(() => import("@/frontend/features/theater/TheaterAdmin"));
+const AdminLogin = lazy(() => import("@/frontend/features/admin/AdminLogin"));
 const VerifyEmail = lazy(() => import("@/frontend/features/auth/VerifyEmail"));
 const ForgotPassword = lazy(() => import("@/frontend/features/auth/ForgotPassword"));
 const ResetPassword = lazy(() => import("@/frontend/features/auth/ResetPassword"));
@@ -130,6 +131,8 @@ const App = ({
                       <Route path="/faq" element={<InfoPage page="faq" />} />
                       <Route path="/terms" element={<InfoPage page="terms" />} />
                       <Route path="/privacy" element={<InfoPage page="privacy" />} />
+                      {/* Admin login - public, no auth required */}
+                      <Route path="/admin" element={<AdminLogin />} />
                       {/* Theater Mode routes */}
                       <Route path="/theater" element={<ProtectedRoute><TheaterHome /></ProtectedRoute>} />
                       <Route path="/theater/admin" element={<ProtectedRoute><TheaterAdmin /></ProtectedRoute>} />
