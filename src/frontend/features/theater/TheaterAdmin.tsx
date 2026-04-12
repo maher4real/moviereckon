@@ -161,16 +161,7 @@ export default function TheaterAdmin() {
                 <div className="lg:col-span-1 space-y-4">
                   {/* Poster card */}
                   <div className="rounded-xl border border-border bg-card overflow-hidden">
-                    <div className="aspect-[2/3] relative bg-muted flex items-center justify-center">
-                      {form.thumbnail ? (
-                        <img src={form.thumbnail} alt="Poster" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="flex flex-col items-center gap-3 text-muted-foreground/40">
-                          <Film className="w-12 h-12" />
-                          <span className="text-xs">Poster preview</span>
-                        </div>
-                      )}
-                    </div>
+                    <PosterPreview src={form.thumbnail} />
                     <div className="p-4 space-y-3">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Poster Image</p>
                       <ImageUploadField
@@ -427,6 +418,35 @@ export default function TheaterAdmin() {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+function PosterPreview({ src }: { src: string }) {
+  const [broken, setBroken] = useState(false);
+
+  // reset broken state when src changes
+  const prevSrc = useRef(src);
+  if (prevSrc.current !== src) {
+    prevSrc.current = src;
+    broken && setBroken(false);
+  }
+
+  return (
+    <div className="aspect-[2/3] relative bg-muted flex items-center justify-center overflow-hidden">
+      {src && !broken ? (
+        <img
+          src={src}
+          alt="Poster"
+          className="w-full h-full object-cover"
+          onError={() => setBroken(true)}
+        />
+      ) : (
+        <div className="flex flex-col items-center gap-3 text-muted-foreground/40">
+          <Film className="w-12 h-12" />
+          <span className="text-xs">{broken ? "Image failed to load" : "Poster preview"}</span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function detectSource(url: string): "youtube" | "gdrive" | null {
   if (!url) return null;
