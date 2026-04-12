@@ -36,6 +36,10 @@ const NotFound = lazy(() => import("@/frontend/features/system/NotFound"));
 const Movies = lazy(() => import("@/frontend/features/browse/Movies"));
 const Series = lazy(() => import("@/frontend/features/browse/Series"));
 const InfoPage = lazy(() => import("@/frontend/features/info/InfoPage"));
+const TheaterHome = lazy(() => import("@/frontend/features/theater/TheaterHome"));
+const TheaterDetail = lazy(() => import("@/frontend/features/theater/TheaterDetail"));
+const TheaterPlayer = lazy(() => import("@/frontend/features/theater/TheaterPlayer"));
+const TheaterAdmin = lazy(() => import("@/frontend/features/theater/TheaterAdmin"));
 const VerifyEmail = lazy(() => import("@/frontend/features/auth/VerifyEmail"));
 const ForgotPassword = lazy(() => import("@/frontend/features/auth/ForgotPassword"));
 const ResetPassword = lazy(() => import("@/frontend/features/auth/ResetPassword"));
@@ -126,6 +130,11 @@ const App = ({
                       <Route path="/faq" element={<InfoPage page="faq" />} />
                       <Route path="/terms" element={<InfoPage page="terms" />} />
                       <Route path="/privacy" element={<InfoPage page="privacy" />} />
+                      {/* Theater Mode routes */}
+                      <Route path="/theater" element={<ProtectedRoute><TheaterHome /></ProtectedRoute>} />
+                      <Route path="/theater/admin" element={<ProtectedRoute><TheaterAdmin /></ProtectedRoute>} />
+                      <Route path="/theater/:id" element={<ProtectedRoute><TheaterDetail /></ProtectedRoute>} />
+                      <Route path="/theater/:id/play" element={<ProtectedRoute><TheaterPlayer /></ProtectedRoute>} />
                       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                       <Route path="*" element={<NotFound />} />
                     </Routes>

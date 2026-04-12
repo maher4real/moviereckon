@@ -12,6 +12,7 @@ import {
   LogOut,
   Sparkles,
   CalendarDays,
+  Film,
 } from "lucide-react";
 import BrandLogo from "@/frontend/components/BrandLogo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/frontend/components/ui/avatar";
@@ -50,6 +51,7 @@ export default function Header() {
     { href: "/movies", label: "Movies", icon: Clapperboard },
     { href: "/series", label: "Series", icon: Tv },
     { href: "/upcoming", label: "Upcoming", icon: CalendarDays },
+    { href: "/theater", label: "Cinema", icon: Film },
   ];
 
   const isActive = (path: string) => {

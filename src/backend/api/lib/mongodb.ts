@@ -158,6 +158,13 @@ async function ensureMongoIndexes(db: Db): Promise<void> {
       expireAfterSeconds: Number(process.env.SECURITY_EVENTS_TTL_SECONDS || 14 * 24 * 60 * 60),
       name: "security_events_ttl_created_at",
     });
+
+    await createIndexSafe(db, "theater_movies", { createdAt: -1 }, {
+      name: "theater_movies_created_desc",
+    });
+    await createIndexSafe(db, "theater_movies", { genre: 1 }, {
+      name: "theater_movies_genre",
+    });
   })();
 
   return globalThis.mongoIndexBootstrapPromise;
