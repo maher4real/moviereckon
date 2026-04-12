@@ -6,7 +6,6 @@ import BottomNav from "@/frontend/components/BottomNav";
 import MediaImage from "@/frontend/components/MediaImage";
 import { Button } from "@/frontend/components/ui/button";
 import { ArrowLeft, Play, Star, Calendar, Tag, Users } from "lucide-react";
-import { cn } from "@/shared/lib/utils";
 
 interface TheaterCastMember {
   name: string;
@@ -126,7 +125,6 @@ export default function TheaterDetail() {
                   src={movie.thumbnail}
                   alt={movie.title}
                   className="w-full h-full object-cover"
-                  fallbackClassName="w-full h-full"
                 />
               </div>
             </div>
@@ -207,7 +205,6 @@ function CastCard({ member }: { member: TheaterCastMember }) {
           src={member.photo}
           alt={member.name}
           className="w-full h-full object-cover"
-          fallbackClassName="w-full h-full"
         />
       </div>
       <div>

@@ -139,7 +139,6 @@ function TheaterCard({ movie }: { movie: TheaterMovie }) {
           src={movie.thumbnail}
           alt={movie.title}
           className="w-full h-full object-cover transition-transform duration-300 group-hover/card:scale-105"
-          fallbackClassName="w-full h-full"
         />
         {/* hover overlay */}
         <div className={cn(
