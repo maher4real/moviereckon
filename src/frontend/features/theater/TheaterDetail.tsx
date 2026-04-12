@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import Header from "@/frontend/components/Header";
@@ -5,7 +6,21 @@ import Footer from "@/frontend/components/Footer";
 import BottomNav from "@/frontend/components/BottomNav";
 import MediaImage from "@/frontend/components/MediaImage";
 import { Button } from "@/frontend/components/ui/button";
-import { ArrowLeft, Play, Star, Calendar, Tag, Users, Film } from "lucide-react";
+import { ArrowLeft, Play, Star, Calendar, Tag, Users, Film, User } from "lucide-react";
+
+const BLOB_HOST = "public.blob.vercel-storage.com";
+const FONT_URL = "https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap";
+
+function isVercelBlob(url: string) {
+  try { return new URL(url).hostname.includes(BLOB_HOST); } catch { return false; }
+}
+
+function proxiedImageUrl(url: string) {
+  if (!url) return "";
+  // Blob URLs load fine directly; everything else goes through the proxy
+  if (isVercelBlob(url)) return url;
+  return `/api/theater/proxy-image?url=${encodeURIComponent(url)}`;
+}
 
 interface TheaterCastMember {
   name: string;
@@ -85,11 +100,14 @@ export default function TheaterDetail() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <link rel="stylesheet" href={FONT_URL} />
+      <style>{`.bebas { font-family: 'Bebas Neue', sans-serif; }`}</style>
+
       <Header />
 
       <main className="pb-20 md:pb-0">
         {/* ── Full-width Hero ──────────────────────────────────────────────── */}
-        <section className="relative w-full h-[60vh] md:h-[78vh] overflow-hidden">
+        <section className="relative w-full h-[55vh] sm:h-[60vh] md:h-[78vh] overflow-hidden">
           {/* Backdrop */}
           {movie.thumbnail ? (
             <img
@@ -141,10 +159,10 @@ export default function TheaterDetail() {
                     {movie.genre}
                   </span>
                 )}
-                <h1 className="text-3xl md:text-5xl font-bold leading-tight drop-shadow-lg">
+                <h1 className="bebas text-4xl sm:text-5xl md:text-6xl leading-none tracking-wide drop-shadow-lg" style={{ textShadow: "0 4px 24px hsl(0 0% 0% / 0.5)" }}>
                   {movie.title}
                 </h1>
-                <div className="flex flex-wrap items-center gap-4 text-sm text-white/70">
+                <div className="flex flex-wrap items-center gap-3 text-sm text-white/70">
                   {movie.rating > 0 && (
                     <span className="flex items-center gap-1.5">
                       <Star className="w-4 h-4 text-yellow-400" fill="currentColor" />
@@ -166,8 +184,8 @@ export default function TheaterDetail() {
         {/* ── Below-the-fold content ───────────────────────────────────────── */}
         <div className="container mx-auto px-4 md:px-8 py-8 md:py-10 space-y-10 max-w-5xl">
           {/* On mobile show poster here since it's hidden in hero on mobile */}
-          <div className="flex md:hidden justify-center -mt-4">
-            <div className="w-32 rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10">
+          <div className="flex md:hidden justify-center -mt-8">
+            <div className="w-36 sm:w-40 rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10">
               <div className="aspect-[2/3]">
                 <MediaImage
                   src={movie.thumbnail}
@@ -179,10 +197,10 @@ export default function TheaterDetail() {
           </div>
 
           {/* Play button + description row */}
-          <div className="md:pl-52 space-y-5">
+          <div className="md:pl-52 space-y-4">
             <Button
               size="lg"
-              className="gap-3 btn-primary text-base px-8"
+              className="gap-2 btn-primary text-base px-6 sm:px-8 h-11 sm:h-12 rounded-full"
               onClick={() =>
                 navigate(`/theater/${movie._id}/play`, {
                   state: { from: location.pathname },
@@ -224,14 +242,22 @@ export default function TheaterDetail() {
 }
 
 function CastCard({ member }: { member: TheaterCastMember }) {
+  const [failed, setFailed] = useState(false);
+  const src = member.photo ? proxiedImageUrl(member.photo) : "";
+
   return (
     <div className="flex-shrink-0 w-24 text-center space-y-2">
-      <div className="w-16 h-16 mx-auto rounded-full overflow-hidden bg-muted ring-2 ring-white/10">
-        <MediaImage
-          src={member.photo}
-          alt={member.name}
-          className="w-full h-full object-cover"
-        />
+      <div className="w-16 h-16 mx-auto rounded-full overflow-hidden bg-muted ring-2 ring-white/10 flex items-center justify-center">
+        {src && !failed ? (
+          <img
+            src={src}
+            alt={member.name}
+            className="w-full h-full object-cover"
+            onError={() => setFailed(true)}
+          />
+        ) : (
+          <User className="w-7 h-7 text-muted-foreground/40" />
+        )}
       </div>
       <div className="px-1">
         <p className="text-xs font-medium truncate">{member.name}</p>

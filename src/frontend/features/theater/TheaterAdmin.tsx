@@ -263,10 +263,14 @@ export default function TheaterAdmin() {
                             {/* Photo preview */}
                             <div className="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden bg-muted border border-border flex items-center justify-center">
                               {member.photo ? (
-                                <img src={member.photo} alt={member.name} className="w-full h-full object-cover" />
-                              ) : (
-                                <User className="w-4 h-4 text-muted-foreground/40" />
-                              )}
+                                <img
+                                  src={`/api/theater/proxy-image?url=${encodeURIComponent(member.photo)}`}
+                                  alt={member.name}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextElementSibling as HTMLElement | null)?.removeAttribute("style"); }}
+                                />
+                              ) : null}
+                              <User className="w-4 h-4 text-muted-foreground/40" style={member.photo ? { display: "none" } : undefined} />
                             </div>
                             <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
                               <Input value={member.name} onChange={(e) => updateCast(i, "name", e.target.value)} placeholder="Name" className="text-sm h-9" />
