@@ -5,7 +5,7 @@ import Footer from "@/frontend/components/Footer";
 import BottomNav from "@/frontend/components/BottomNav";
 import MediaImage from "@/frontend/components/MediaImage";
 import { Button } from "@/frontend/components/ui/button";
-import { ArrowLeft, Play, Star, Calendar, Tag, Users } from "lucide-react";
+import { ArrowLeft, Play, Star, Calendar, Tag, Users, Film } from "lucide-react";
 
 interface TheaterCastMember {
   name: string;
@@ -32,8 +32,7 @@ async function fetchTheaterMovie(id: string): Promise<TheaterMovie> {
     headers: { "x-requested-with": "XMLHttpRequest" },
   });
   if (!res.ok) throw new Error("Movie not found");
-  const data = await res.json();
-  return data.movie as TheaterMovie;
+  return (await res.json()).movie as TheaterMovie;
 }
 
 export default function TheaterDetail() {
@@ -58,17 +57,13 @@ export default function TheaterDetail() {
     return (
       <div className="min-h-screen bg-background text-foreground">
         <Header />
-        <main className="pt-16 container mx-auto px-4 py-10">
-          <div className="animate-pulse space-y-6">
-            <div className="h-8 w-48 bg-muted rounded" />
-            <div className="flex gap-6">
-              <div className="w-48 aspect-[2/3] bg-muted rounded-lg flex-shrink-0" />
-              <div className="flex-1 space-y-4">
-                <div className="h-10 w-3/4 bg-muted rounded" />
-                <div className="h-4 w-1/2 bg-muted rounded" />
-                <div className="h-24 bg-muted rounded" />
-              </div>
-            </div>
+        <main className="pt-16">
+          {/* Hero skeleton */}
+          <div className="relative h-[60vh] md:h-[75vh] bg-muted animate-pulse" />
+          <div className="container mx-auto px-4 md:px-8 py-8 space-y-4">
+            <div className="h-8 w-64 bg-muted rounded animate-pulse" />
+            <div className="h-4 w-48 bg-muted rounded animate-pulse" />
+            <div className="h-20 bg-muted rounded animate-pulse" />
           </div>
         </main>
       </div>
@@ -79,8 +74,9 @@ export default function TheaterDetail() {
     return (
       <div className="min-h-screen bg-background text-foreground">
         <Header />
-        <main className="pt-16 container mx-auto px-4 py-10 text-center">
-          <p className="text-muted-foreground mb-4">Movie not found.</p>
+        <main className="pt-16 flex flex-col items-center justify-center min-h-[60vh] gap-4">
+          <Film className="w-16 h-16 text-muted-foreground/30" />
+          <p className="text-muted-foreground">Movie not found.</p>
           <Button onClick={() => navigate("/theater")}>Back to Cinema</Button>
         </main>
       </div>
@@ -91,36 +87,88 @@ export default function TheaterDetail() {
     <div className="min-h-screen bg-background text-foreground">
       <Header />
 
-      <main className="pt-16 pb-20 md:pb-0">
-        {/* Backdrop blurred bg */}
-        {movie.thumbnail && (
-          <div className="absolute inset-0 top-16 z-0 pointer-events-none overflow-hidden" style={{ height: "60vh" }}>
+      <main className="pb-20 md:pb-0">
+        {/* ── Full-width Hero ──────────────────────────────────────────────── */}
+        <section className="relative w-full h-[60vh] md:h-[78vh] overflow-hidden">
+          {/* Backdrop */}
+          {movie.thumbnail ? (
             <img
               src={movie.thumbnail}
               alt=""
-              className="w-full h-full object-cover opacity-15 blur-2xl scale-110"
+              className="absolute inset-0 w-full h-full object-cover scale-105"
+              style={{ filter: "brightness(0.45)" }}
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/70 to-background" />
-          </div>
-        )}
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-muted to-background" />
+          )}
 
-        <div className="relative z-10 container mx-auto px-4 md:px-8 py-6 space-y-8">
+          {/* Gradient overlays — bottom fade + left vignette */}
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background/70 via-transparent to-transparent" />
+
           {/* Back button */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleBack}
-            className="gap-2 text-muted-foreground hover:text-foreground -ml-2"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Cinema
-          </Button>
+          <div className="absolute top-20 left-4 md:left-8 z-10">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBack}
+              className="gap-2 text-white/80 hover:text-white hover:bg-white/10 backdrop-blur-sm"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Cinema
+            </Button>
+          </div>
 
-          {/* Hero */}
-          <div className="flex flex-col md:flex-row gap-6 md:gap-10">
-            {/* Poster */}
-            <div className="flex-shrink-0 w-40 md:w-56 mx-auto md:mx-0">
-              <div className="aspect-[2/3] rounded-xl overflow-hidden bg-muted shadow-2xl ring-1 ring-white/10">
+          {/* Hero content anchored to bottom-left */}
+          <div className="absolute bottom-0 left-0 right-0 z-10 px-4 md:px-8 pb-8 md:pb-12">
+            <div className="flex items-end gap-6 max-w-5xl">
+              {/* Poster */}
+              <div className="hidden md:block flex-shrink-0 w-44 -mb-16 shadow-2xl rounded-xl overflow-hidden ring-1 ring-white/10">
+                <div className="aspect-[2/3]">
+                  <MediaImage
+                    src={movie.thumbnail}
+                    alt={movie.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+
+              {/* Title + meta */}
+              <div className="flex-1 space-y-3 pb-2">
+                {movie.genre && (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium tracking-widest uppercase text-primary">
+                    <Tag className="w-3 h-3" />
+                    {movie.genre}
+                  </span>
+                )}
+                <h1 className="text-3xl md:text-5xl font-bold leading-tight drop-shadow-lg">
+                  {movie.title}
+                </h1>
+                <div className="flex flex-wrap items-center gap-4 text-sm text-white/70">
+                  {movie.rating > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <Star className="w-4 h-4 text-yellow-400" fill="currentColor" />
+                      <span className="text-white font-semibold">{movie.rating.toFixed(1)}</span>
+                    </span>
+                  )}
+                  {movie.year > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="w-4 h-4" />
+                      {movie.year}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Below-the-fold content ───────────────────────────────────────── */}
+        <div className="container mx-auto px-4 md:px-8 py-8 md:py-10 space-y-10 max-w-5xl">
+          {/* On mobile show poster here since it's hidden in hero on mobile */}
+          <div className="flex md:hidden justify-center -mt-4">
+            <div className="w-32 rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10">
+              <div className="aspect-[2/3]">
                 <MediaImage
                   src={movie.thumbnail}
                   alt={movie.title}
@@ -128,60 +176,38 @@ export default function TheaterDetail() {
                 />
               </div>
             </div>
+          </div>
 
-            {/* Info */}
-            <div className="flex-1 space-y-4">
-              <h1 className="text-2xl md:text-4xl font-bold">{movie.title}</h1>
+          {/* Play button + description row */}
+          <div className="md:pl-52 space-y-5">
+            <Button
+              size="lg"
+              className="gap-3 btn-primary text-base px-8"
+              onClick={() =>
+                navigate(`/theater/${movie._id}/play`, {
+                  state: { from: location.pathname },
+                })
+              }
+            >
+              <Play className="w-5 h-5" fill="currentColor" />
+              Play Now
+            </Button>
 
-              {/* Metadata row */}
-              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                {movie.rating > 0 && (
-                  <span className="flex items-center gap-1">
-                    <Star className="w-4 h-4 text-yellow-400" fill="currentColor" />
-                    <span className="text-foreground font-semibold">{movie.rating.toFixed(1)}</span>
-                  </span>
-                )}
-                {movie.year > 0 && (
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-4 h-4" />
-                    {movie.year}
-                  </span>
-                )}
-                {movie.genre && (
-                  <span className="flex items-center gap-1">
-                    <Tag className="w-4 h-4" />
-                    {movie.genre}
-                  </span>
-                )}
-              </div>
-
-              {/* Description */}
-              {movie.description && (
-                <p className="text-sm md:text-base text-muted-foreground leading-relaxed max-w-2xl">
-                  {movie.description}
-                </p>
-              )}
-
-              {/* Play button */}
-              <Button
-                size="lg"
-                className="gap-2 btn-primary mt-2"
-                onClick={() => navigate(`/theater/${movie._id}/play`, { state: { from: location.pathname } })}
-              >
-                <Play className="w-5 h-5" fill="currentColor" />
-                Play Now
-              </Button>
-            </div>
+            {movie.description && (
+              <p className="text-sm md:text-base text-muted-foreground leading-relaxed max-w-2xl">
+                {movie.description}
+              </p>
+            )}
           </div>
 
           {/* Cast & Crew */}
           {movie.cast && movie.cast.length > 0 && (
             <section className="space-y-4">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 border-b border-border pb-3">
                 <Users className="w-5 h-5 text-muted-foreground" />
-                <h2 className="text-lg font-semibold">Cast &amp; Crew</h2>
+                <h2 className="text-base font-semibold tracking-wide">Cast &amp; Crew</h2>
               </div>
-              <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+              <div className="flex gap-5 overflow-x-auto pb-3 scrollbar-hide">
                 {movie.cast.map((member, i) => (
                   <CastCard key={i} member={member} />
                 ))}
@@ -207,7 +233,7 @@ function CastCard({ member }: { member: TheaterCastMember }) {
           className="w-full h-full object-cover"
         />
       </div>
-      <div>
+      <div className="px-1">
         <p className="text-xs font-medium truncate">{member.name}</p>
         <p className="text-xs text-muted-foreground truncate">{member.role}</p>
       </div>

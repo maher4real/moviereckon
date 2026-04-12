@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Header from "@/frontend/components/Header";
@@ -6,7 +6,7 @@ import Footer from "@/frontend/components/Footer";
 import BottomNav from "@/frontend/components/BottomNav";
 import { Button } from "@/frontend/components/ui/button";
 import { Input } from "@/frontend/components/ui/input";
-import { ArrowLeft, Plus, Pencil, Trash2, X, Check, Star, Loader2, LogOut } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, X, Check, Star, Loader2, LogOut, Upload, ImageIcon } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { toast } from "sonner";
 import { getAdminToken, clearAdminToken } from "@/frontend/features/admin/AdminLogin";
@@ -290,9 +290,14 @@ export default function TheaterAdmin() {
                 />
               </Field>
 
-              <Field label="Poster URL">
-                <Input value={form.thumbnail} onChange={(e) => setForm((f) => ({ ...f, thumbnail: e.target.value }))} placeholder="https://..." />
-              </Field>
+              <ImageUploadField
+                label="Poster"
+                value={form.thumbnail}
+                onChange={(url) => setForm((f) => ({ ...f, thumbnail: url }))}
+                token={token}
+                placeholder="https://... or upload from device"
+                filenameHint="poster"
+              />
 
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Genre">
@@ -323,7 +328,15 @@ export default function TheaterAdmin() {
                   <div key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-start">
                     <Input value={member.name} onChange={(e) => updateCastMember(i, "name", e.target.value)} placeholder="Name" className="text-xs" />
                     <Input value={member.role} onChange={(e) => updateCastMember(i, "role", e.target.value)} placeholder="Role" className="text-xs" />
-                    <Input value={member.photo} onChange={(e) => updateCastMember(i, "photo", e.target.value)} placeholder="Photo URL" className="text-xs" />
+                    <ImageUploadField
+                      label=""
+                      value={member.photo}
+                      onChange={(url) => updateCastMember(i, "photo", url)}
+                      token={token}
+                      placeholder="Photo URL"
+                      filenameHint="cast"
+                      compact
+                    />
                     <Button type="button" variant="ghost" size="icon" onClick={() => removeCastMember(i)} className="text-muted-foreground hover:text-destructive h-9 w-9">
                       <X className="w-3 h-3" />
                     </Button>
@@ -357,5 +370,147 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <label className="text-sm font-medium text-foreground/80">{label}</label>
       {children}
     </div>
+  );
+}
+
+interface ImageUploadFieldProps {
+  label: string;
+  value: string;
+  onChange: (url: string) => void;
+  token: string;
+  placeholder?: string;
+  filenameHint?: string;
+  compact?: boolean;
+}
+
+function ImageUploadField({
+  label,
+  value,
+  onChange,
+  token,
+  placeholder = "https://...",
+  filenameHint = "image",
+  compact = false,
+}: ImageUploadFieldProps) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!fileRef.current) fileRef.current = e.target;
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Only image files are supported");
+      return;
+    }
+    if (file.size > 5_000_000) {
+      toast.error("Image must be under 5 MB");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const data_url = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const res = await fetch("/api/theater/upload", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ data_url, filename: filenameHint }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      onChange(data.url);
+      toast.success("Image uploaded");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+      // reset so same file can be picked again
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  if (compact) {
+    // Compact mode: just a small upload icon button (used in cast rows)
+    return (
+      <div className="relative">
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="text-xs pr-8"
+        />
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+          title="Upload from device"
+        >
+          {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+        </button>
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+      </div>
+    );
+  }
+
+  return (
+    <Field label={label}>
+      <div className="space-y-2">
+        <div className="flex gap-2">
+          <Input
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            className="flex-1"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            className="gap-1.5 flex-shrink-0 border-dashed"
+            title="Upload from device"
+          >
+            {uploading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Upload className="w-4 h-4" />
+            )}
+            {uploading ? "Uploading…" : "Upload"}
+          </Button>
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+        </div>
+        {/* Preview */}
+        {value && (
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 rounded border border-border overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center">
+              <img
+                src={value}
+                alt="Preview"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                  (e.currentTarget.nextElementSibling as HTMLElement | null)?.removeAttribute("style");
+                }}
+              />
+              <ImageIcon className="w-4 h-4 text-muted-foreground" style={{ display: "none" }} />
+            </div>
+            <span className="text-xs text-muted-foreground truncate max-w-[200px]">{value}</span>
+          </div>
+        )}
+      </div>
+    </Field>
   );
 }
