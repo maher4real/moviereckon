@@ -31,7 +31,29 @@
   </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Inline loading screen: visible immediately before JS loads, removed by React on mount -->
+      <div id="app-loading" style="
+        position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+        background:hsl(0,0%,4%);gap:10px;
+      ">
+        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24"
+          fill="none" stroke="hsl(0,79%,52%)" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <rect width="20" height="20" x="2" y="2" rx="2.18" ry="2.18"/>
+          <line x1="7" x2="7" y1="2" y2="22"/>
+          <line x1="17" x2="17" y1="2" y2="22"/>
+          <line x1="2" x2="22" y1="7" y2="7"/>
+          <line x1="2" x2="22" y1="12" y2="12"/>
+          <line x1="2" x2="22" y1="17" y2="17"/>
+        </svg>
+        <span style="
+          font-family:system-ui,sans-serif;font-size:2rem;font-weight:700;
+          background:linear-gradient(90deg,hsl(0,79%,52%),hsl(24,95%,60%),hsl(46,96%,66%));
+          -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+        ">MovieReckon</span>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
