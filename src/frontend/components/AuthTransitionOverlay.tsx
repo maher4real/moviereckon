@@ -15,11 +15,10 @@ import { cn } from "@/shared/lib/utils";
 
 type OverlayPhase = "hidden" | "center" | "moving" | "fading";
 
-const MIN_CENTER_DURATION_MS = 1800;
-const MOVE_DURATION_MS = 600;
+const MIN_CENTER_DURATION_MS = 700;
+const MOVE_DURATION_MS = 780;
 const FADE_DURATION_MS = 220;
-const ANCHOR_LOOKUP_TIMEOUT_MS = 800;
-const MAX_AUTH_WAIT_MS = 2800;
+const ANCHOR_LOOKUP_TIMEOUT_MS = 2500;
 
 const INITIAL_TRANSFORM = {
   x: 0,
