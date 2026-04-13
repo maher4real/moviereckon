@@ -15,10 +15,11 @@ import { cn } from "@/shared/lib/utils";
 
 type OverlayPhase = "hidden" | "center" | "moving" | "fading";
 
-const MIN_CENTER_DURATION_MS = 700;
-const MOVE_DURATION_MS = 780;
-const FADE_DURATION_MS = 220;
-const ANCHOR_LOOKUP_TIMEOUT_MS = 2500;
+const MIN_CENTER_DURATION_MS = 250;
+const MOVE_DURATION_MS = 450;
+const FADE_DURATION_MS = 160;
+const ANCHOR_LOOKUP_TIMEOUT_MS = 800;
+const MAX_AUTH_WAIT_MS = 1000;
 
 const INITIAL_TRANSFORM = {
   x: 0,
@@ -225,13 +226,10 @@ export default function AuthTransitionOverlay() {
   useEffect(() => {
     if (phase !== "center") return;
 
-    const authBusy = isLoading || isAuthenticating;
-    if (authBusy) return;
-
     const elapsed = performance.now() - startedAtRef.current;
-    const waitMs = Math.max(0, MIN_CENTER_DURATION_MS - elapsed);
+    const authBusy = isLoading || isAuthenticating;
 
-    timerRef.current = window.setTimeout(() => {
+    const proceed = () => {
       timerRef.current = null;
       if (user) {
         if (isMobile) {
@@ -242,7 +240,17 @@ export default function AuthTransitionOverlay() {
         return;
       }
       setPhase("fading");
-    }, waitMs);
+    };
+
+    if (authBusy) {
+      // Auth still loading — cap the wait so slow networks don't block forever
+      const remaining = Math.max(0, MAX_AUTH_WAIT_MS - elapsed);
+      timerRef.current = window.setTimeout(proceed, remaining);
+    } else {
+      // Auth done — just honour the minimum display time
+      const waitMs = Math.max(0, MIN_CENTER_DURATION_MS - elapsed);
+      timerRef.current = window.setTimeout(proceed, waitMs);
+    }
 
     return () => {
       if (timerRef.current !== null) {

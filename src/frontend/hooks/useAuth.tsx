@@ -74,26 +74,38 @@ export function AuthProvider({
   authResolved = false,
 }: AuthProviderProps) {
 
+  // Stale-while-revalidate: seed from SSR prop first, then from the
+  // sessionStorage cache written by mongodbClient after every login.
+  // This lets returning users see their app instantly without a network
+  // round-trip, while initAuth() validates the session in the background.
   const [user, setUser] = useState<mongoClient.MongoUser | null>(
-    () => initialUser ?? null,
+    () => initialUser ?? mongoClient.getStoredUser() ?? null,
   );
   const [profile, setProfile] = useState<Profile | null>(() => {
-    if (initialUser) return mapUserToProfile(initialUser);
-    return null;
+    const seed = initialUser ?? mongoClient.getStoredUser();
+    return seed ? mapUserToProfile(seed) : null;
   });
-  const [isLoading, setIsLoading] = useState(!authResolved);
+  // Skip the loading gate if we already have a trusted cached user — the UI
+  // renders immediately and initAuth() updates state silently in the background.
+  const [isLoading, setIsLoading] = useState(
+    !authResolved && !initialUser && !mongoClient.getStoredUser(),
+  );
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [authTransitionRunId, setAuthTransitionRunId] = useState(1);
+  // Start at 0 so the overlay doesn't auto-fire on cold start.
+  // It only runs when triggerAuthTransition() is called explicitly (sign-in / sign-out).
+  const [authTransitionRunId, setAuthTransitionRunId] = useState(0);
   const { toast } = useToast();
 
   const triggerAuthTransition = useCallback(() => {
     setAuthTransitionRunId((prev) => prev + 1);
   }, []);
 
-  // Initialize auth from stored tokens
+  // Background session validation (stale-while-revalidate).
+  // If we already have a cached user, this runs silently — the UI doesn't
+  // wait for it. On success: refreshes user data. On failure: clears cache
+  // so ProtectedRoute immediately redirects the user to the auth page.
   const initAuth = useCallback(async () => {
     try {
-      // Try to get current user from cookie-based session first
       const currentUser = await mongoClient.getCurrentUser();
       if (currentUser) {
         setUser(currentUser);
@@ -107,16 +119,21 @@ export function AuthProvider({
             setUser(refreshedUser);
             setProfile(mapUserToProfile(refreshedUser));
           } else {
+            // Refresh succeeded but user fetch failed — treat as expired.
+            mongoClient.clearTokens();
             setUser(null);
             setProfile(null);
           }
         } else {
+          // No valid session — clear any stale cache so the UI reflects this.
+          mongoClient.clearTokens();
           setUser(null);
           setProfile(null);
         }
       }
     } catch (error) {
       console.error("Auth init error:", error);
+      // On network error, keep the cached user rather than logging them out.
     } finally {
       setIsLoading(false);
     }
