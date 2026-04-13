@@ -198,9 +198,12 @@ export default function ContentCarousel({
             ))
           ) : (
             <>
-              {visibleItems.map((item) => {
+              {visibleItems.map((item, index) => {
                 const itemType = getItemType(item);
                 const explanation = recommendationExplanations?.[`${itemType}_${item.id}`];
+                // First 6 items are likely visible on screen — load them eagerly.
+                // The rest load lazily as the user scrolls toward them.
+                const isAboveFold = index < 6;
 
                 return (
                   <button
@@ -214,7 +217,8 @@ export default function ContentCarousel({
                         src={getPosterUrl(item.poster_path, "medium")}
                         alt={getTitle(item)}
                         className="w-full h-full object-cover"
-                        loading="lazy"
+                        loading={isAboveFold ? "eager" : "lazy"}
+                        fetchPriority={isAboveFold ? "high" : "auto"}
                         fallbackSrc="/fallbacks/poster.svg"
                       />
 

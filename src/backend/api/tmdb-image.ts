@@ -11,8 +11,11 @@ import { consumeRateLimit, getClientIp } from "./lib/rate-limit.js";
 
 installGlobalSafeLogging();
 
+// Poster/backdrop images are content-addressed (URL encodes the specific image
+// path) so they never change for a given URL — safe to cache aggressively in
+// the browser as well as at the CDN edge.
 const IMAGE_PROXY_CACHE_CONTROL =
-  "public, max-age=0, s-maxage=86400, stale-while-revalidate=604800";
+  "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800";
 const IMAGE_PROXY_IP_LIMIT_MAX = 320;
 const IMAGE_PROXY_IP_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const IMAGE_PROXY_ASSET_LIMIT_MAX = 45;
