@@ -106,7 +106,7 @@ function sanitizeCast(val: unknown): TheaterCastMember[] {
     .map((m) => ({
       name: sanitizeString((m as Record<string, unknown>).name, 100),
       role: sanitizeString((m as Record<string, unknown>).role, 100),
-      photo: sanitizeString((m as Record<string, unknown>).photo, 500),
+      photo: sanitizeString((m as Record<string, unknown>).photo, 8_000_000),
     }))
     .filter((m) => m.name.length > 0);
 }
@@ -145,7 +145,7 @@ export default async function theaterHandler(req: VercelRequest, res: VercelResp
     const body = req.body as Record<string, unknown>;
     const title = sanitizeString(body.title, 200);
     const description = sanitizeString(body.description, 5000);
-    const thumbnail = sanitizeString(body.thumbnail, 500);
+    const thumbnail = sanitizeString(body.thumbnail, 8_000_000);
     const genre = sanitizeString(body.genre, 100);
     const year = Number(body.year);
     const rating = Math.min(10, Math.max(0, Number(body.rating)));
