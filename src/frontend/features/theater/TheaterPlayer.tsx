@@ -19,13 +19,16 @@ function getEmbedUrl(videoUrl: string, source: "youtube" | "gdrive" | "dailymoti
   }
   if (source === "dailymotion") {
     try {
+      if (videoUrl.includes("geo.dailymotion.com/player.html")) {
+        return videoUrl;
+      }
       if (videoUrl.includes("dai.ly/")) {
         const id = videoUrl.split("dai.ly/")[1]?.split("?")[0];
-        if (id) return `https://www.dailymotion.com/embed/video/${id}?autoplay=1`;
+        if (id) return `https://geo.dailymotion.com/player.html?video=${id}`;
       }
       const url = new URL(videoUrl);
       const pathId = url.pathname.split("/video/")[1]?.split("_")[0];
-      if (pathId) return `https://www.dailymotion.com/embed/video/${pathId}?autoplay=1`;
+      if (pathId) return `https://geo.dailymotion.com/player.html?video=${pathId}`;
     } catch {
       // fall through
     }
@@ -126,11 +129,10 @@ export default function TheaterPlayer() {
           <iframe
             key={embedUrl}
             src={embedUrl}
-            title={movie.title}
+            title="Dailymotion Video Player"
             className="absolute inset-0 w-full h-full"
-            allow="autoplay; fullscreen"
+            allow="web-share"
             allowFullScreen
-            referrerPolicy="no-referrer"
           />
         ) : (
           <iframe

@@ -470,7 +470,7 @@ function detectSource(url: string): "youtube" | "gdrive" | "dailymotion" | null 
   if (!url) return null;
   if (url.includes("youtube.com") || url.includes("youtu.be")) return "youtube";
   if (url.includes("drive.google.com")) return "gdrive";
-  if (url.includes("dailymotion.com") || url.includes("dai.ly")) return "dailymotion";
+  if (url.includes("dailymotion.com") || url.includes("dai.ly") || url.includes("geo.dailymotion.com")) return "dailymotion";
   return null;
 }
 
@@ -478,12 +478,17 @@ function normalizeDailymotionUrl(url: string): string {
   try {
     if (url.includes("dai.ly/")) {
       const id = url.split("dai.ly/")[1]?.split("?")[0];
-      if (id) return `https://www.dailymotion.com/embed/video/${id}`;
+      if (id) return `https://geo.dailymotion.com/player.html?video=${id}`;
     }
     if (url.includes("dailymotion.com/video/")) {
       const parsed = new URL(url);
       const id = parsed.pathname.split("/video/")[1]?.split("_")[0];
-      if (id) return `https://www.dailymotion.com/embed/video/${id}`;
+      if (id) return `https://geo.dailymotion.com/player.html?video=${id}`;
+    }
+    if (url.includes("dailymotion.com/embed/video/")) {
+      const parsed = new URL(url);
+      const id = parsed.pathname.split("/video/")[1]?.split("_")[0];
+      if (id) return `https://geo.dailymotion.com/player.html?video=${id}`;
     }
   } catch {
     // fall through
