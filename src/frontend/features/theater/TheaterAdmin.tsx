@@ -167,9 +167,7 @@ export default function TheaterAdmin() {
                       <ImageUploadField
                         value={form.thumbnail}
                         onChange={(url) => setForm((f) => ({ ...f, thumbnail: url }))}
-                        token={token}
                         placeholder="Paste image URL..."
-                        filenameHint="poster"
                       />
                     </div>
                   </div>
@@ -288,9 +286,7 @@ export default function TheaterAdmin() {
                               <ImageUploadField
                                 value={member.photo}
                                 onChange={(url) => updateCast(i, "photo", url)}
-                                token={token}
                                 placeholder="Photo URL"
-                                filenameHint="cast"
                                 compact
                               />
                             </div>
@@ -510,13 +506,11 @@ function FormField({ label, required, children }: { label: string; required?: bo
 interface ImageUploadFieldProps {
   value: string;
   onChange: (url: string) => void;
-  token: string;
   placeholder?: string;
-  filenameHint?: string;
   compact?: boolean;
 }
 
-function ImageUploadField({ value, onChange, token, placeholder = "https://...", filenameHint = "image", compact = false }: ImageUploadFieldProps) {
+function ImageUploadField({ value, onChange, placeholder = "https://...", compact = false }: ImageUploadFieldProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -534,17 +528,10 @@ function ImageUploadField({ value, onChange, token, placeholder = "https://...",
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
-      const res = await fetch("/api/theater/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ data_url, filename: filenameHint }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Upload failed");
-      onChange(data.url);
-      toast.success("Image uploaded");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Upload failed");
+      onChange(data_url);
+      toast.success("Image loaded");
+    } catch {
+      toast.error("Failed to read image");
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
