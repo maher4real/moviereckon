@@ -8,13 +8,27 @@ interface TheaterMovie {
   title: string;
   thumbnail: string;
   videoUrl: string;
-  source: "youtube" | "gdrive";
+  source: "youtube" | "gdrive" | "dailymotion";
 }
 
-function getEmbedUrl(videoUrl: string, source: "youtube" | "gdrive"): string {
+function getEmbedUrl(videoUrl: string, source: "youtube" | "gdrive" | "dailymotion"): string {
   if (source === "gdrive") {
     const match = videoUrl.match(/\/file\/d\/([^/]+)/);
     if (match) return `https://drive.google.com/file/d/${match[1]}/preview`;
+    return videoUrl;
+  }
+  if (source === "dailymotion") {
+    try {
+      if (videoUrl.includes("dai.ly/")) {
+        const id = videoUrl.split("dai.ly/")[1]?.split("?")[0];
+        if (id) return `https://www.dailymotion.com/embed/video/${id}?autoplay=1`;
+      }
+      const url = new URL(videoUrl);
+      const pathId = url.pathname.split("/video/")[1]?.split("_")[0];
+      if (pathId) return `https://www.dailymotion.com/embed/video/${pathId}?autoplay=1`;
+    } catch {
+      // fall through
+    }
     return videoUrl;
   }
   // YouTube
@@ -107,6 +121,15 @@ export default function TheaterPlayer() {
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
             referrerPolicy="strict-origin-when-cross-origin"
+          />
+        ) : movie.source === "dailymotion" ? (
+          <iframe
+            key={embedUrl}
+            src={embedUrl}
+            title={movie.title}
+            className="absolute inset-0 w-full h-full"
+            allow="autoplay; fullscreen"
+            allowFullScreen
           />
         ) : (
           <iframe

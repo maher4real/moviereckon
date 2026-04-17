@@ -41,24 +41,39 @@ export interface TheaterMovie {
   year: number;
   rating: number;
   videoUrl: string;
-  source: "youtube" | "gdrive";
+  source: "youtube" | "gdrive" | "dailymotion";
   cast: TheaterCastMember[];
   createdAt: string;
   updatedAt: string;
 }
 
-function detectVideoSource(url: string): "youtube" | "gdrive" | null {
+function detectVideoSource(url: string): "youtube" | "gdrive" | "dailymotion" | null {
   if (!url) return null;
   if (url.includes("youtube.com") || url.includes("youtu.be")) return "youtube";
   if (url.includes("drive.google.com")) return "gdrive";
+  if (url.includes("dailymotion.com") || url.includes("dai.ly")) return "dailymotion";
   return null;
 }
 
-function getEmbedUrl(videoUrl: string, source: "youtube" | "gdrive"): string {
+function getEmbedUrl(videoUrl: string, source: "youtube" | "gdrive" | "dailymotion"): string {
   if (source === "gdrive") {
     // https://drive.google.com/file/d/FILE_ID/view → preview
     const match = videoUrl.match(/\/file\/d\/([^/]+)/);
     if (match) return `https://drive.google.com/file/d/${match[1]}/preview`;
+    return videoUrl;
+  }
+  if (source === "dailymotion") {
+    try {
+      if (videoUrl.includes("dai.ly/")) {
+        const id = videoUrl.split("dai.ly/")[1]?.split("?")[0];
+        if (id) return `https://www.dailymotion.com/embed/video/${id}?autoplay=1`;
+      }
+      const url = new URL(videoUrl);
+      const pathId = url.pathname.split("/video/")[1]?.split("_")[0];
+      if (pathId) return `https://www.dailymotion.com/embed/video/${pathId}?autoplay=1`;
+    } catch {
+      // fall through
+    }
     return videoUrl;
   }
   // YouTube: extract video id
@@ -139,7 +154,7 @@ export default async function theaterHandler(req: VercelRequest, res: VercelResp
 
     const source = detectVideoSource(videoUrl);
     if (!source) {
-      return res.status(400).json({ error: "videoUrl must be a YouTube or Google Drive link" });
+      return res.status(400).json({ error: "videoUrl must be a YouTube, Google Drive, or Dailymotion link" });
     }
 
     const now = new Date().toISOString();
@@ -181,7 +196,7 @@ export default async function theaterHandler(req: VercelRequest, res: VercelResp
     if (typeof body.videoUrl === "string") {
       const videoUrl = sanitizeString(body.videoUrl, 500);
       const source = detectVideoSource(videoUrl);
-      if (!source) return res.status(400).json({ error: "videoUrl must be a YouTube or Google Drive link" });
+      if (!source) return res.status(400).json({ error: "videoUrl must be a YouTube, Google Drive, or Dailymotion link" });
       updates.videoUrl = videoUrl;
       updates.source = source;
     }

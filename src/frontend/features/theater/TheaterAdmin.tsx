@@ -26,7 +26,7 @@ interface TheaterMovie {
   year: number;
   rating: number;
   videoUrl: string;
-  source: "youtube" | "gdrive";
+  source: "youtube" | "gdrive" | "dailymotion";
   cast: TheaterCastMember[];
   createdAt: string;
 }
@@ -178,9 +178,15 @@ export default function TheaterAdmin() {
                   {form.videoUrl && (
                     <div className={cn(
                       "rounded-lg border px-4 py-3 flex items-center gap-3",
-                      detectSource(form.videoUrl) === "youtube" ? "border-red-500/30 bg-red-500/5" : "border-blue-500/30 bg-blue-500/5"
+                      detectSource(form.videoUrl) === "youtube" ? "border-red-500/30 bg-red-500/5" :
+                      detectSource(form.videoUrl) === "dailymotion" ? "border-purple-500/30 bg-purple-500/5" :
+                      "border-blue-500/30 bg-blue-500/5"
                     )}>
-                      <div className={cn("w-2 h-2 rounded-full", detectSource(form.videoUrl) === "youtube" ? "bg-red-500" : "bg-blue-400")} />
+                      <div className={cn("w-2 h-2 rounded-full",
+                        detectSource(form.videoUrl) === "youtube" ? "bg-red-500" :
+                        detectSource(form.videoUrl) === "dailymotion" ? "bg-purple-400" :
+                        "bg-blue-400"
+                      )} />
                       <span className="text-sm font-medium capitalize">{detectSource(form.videoUrl) ?? "Unknown"} source detected</span>
                     </div>
                   )}
@@ -233,11 +239,11 @@ export default function TheaterAdmin() {
                       <Input
                         value={form.videoUrl}
                         onChange={(e) => setForm((f) => ({ ...f, videoUrl: e.target.value }))}
-                        placeholder="https://youtube.com/watch?v=... or https://drive.google.com/file/d/..."
+                        placeholder="https://youtube.com/watch?v=... or https://dailymotion.com/video/..."
                         required
                       />
                       <p className="text-xs text-muted-foreground mt-1.5">
-                        Supports YouTube links and Google Drive shareable links. Source is auto-detected.
+                        Supports YouTube, Google Drive, and Dailymotion links. Source is auto-detected.
                       </p>
                     </FormField>
                   </div>
@@ -375,7 +381,11 @@ export default function TheaterAdmin() {
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                       {movie.genre && <span className="text-xs text-muted-foreground">{movie.genre}</span>}
                       {movie.year > 0 && <span className="text-xs text-muted-foreground">· {movie.year}</span>}
-                      <span className={cn("text-xs font-medium uppercase", movie.source === "youtube" ? "text-red-400" : "text-blue-400")}>
+                      <span className={cn("text-xs font-medium uppercase",
+                        movie.source === "youtube" ? "text-red-400" :
+                        movie.source === "dailymotion" ? "text-purple-400" :
+                        "text-blue-400"
+                      )}>
                         · {movie.source}
                       </span>
                     </div>
@@ -452,10 +462,11 @@ function PosterPreview({ src }: { src: string }) {
   );
 }
 
-function detectSource(url: string): "youtube" | "gdrive" | null {
+function detectSource(url: string): "youtube" | "gdrive" | "dailymotion" | null {
   if (!url) return null;
   if (url.includes("youtube.com") || url.includes("youtu.be")) return "youtube";
   if (url.includes("drive.google.com")) return "gdrive";
+  if (url.includes("dailymotion.com") || url.includes("dai.ly")) return "dailymotion";
   return null;
 }
 

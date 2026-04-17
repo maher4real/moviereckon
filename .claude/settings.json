@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "code-review-graph update --quiet",
+            "command": "code-review-graph update",
             "timeout": 5000
           }
         ]
@@ -19,17 +19,6 @@
             "type": "command",
             "command": "code-review-graph status --json",
             "timeout": 3000
-          }
-        ]
-      }
-    ],
-    "PreCommit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "code-review-graph detect-changes --brief",
-            "timeout": 10000
           }
         ]
       }
