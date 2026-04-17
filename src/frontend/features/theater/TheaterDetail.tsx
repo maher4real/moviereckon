@@ -17,7 +17,7 @@ function isVercelBlob(url: string) {
 
 function proxiedImageUrl(url: string) {
   if (!url) return "";
-  // Blob URLs load fine directly; everything else goes through the proxy
+  if (url.startsWith("data:")) return url;
   if (isVercelBlob(url)) return url;
   return `/api/theater/proxy-image?url=${encodeURIComponent(url)}`;
 }
