@@ -130,6 +130,7 @@ export default function TheaterPlayer() {
             className="absolute inset-0 w-full h-full"
             allow="autoplay; fullscreen"
             allowFullScreen
+            referrerPolicy="no-referrer"
           />
         ) : (
           <iframe
