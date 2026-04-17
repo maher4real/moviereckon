@@ -238,7 +238,11 @@ export default function TheaterAdmin() {
                     <FormField label="Video URL" required>
                       <Input
                         value={form.videoUrl}
-                        onChange={(e) => setForm((f) => ({ ...f, videoUrl: e.target.value }))}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          const normalized = detectSource(raw) === "dailymotion" ? normalizeDailymotionUrl(raw) : raw;
+                          setForm((f) => ({ ...f, videoUrl: normalized }));
+                        }}
                         placeholder="https://youtube.com/watch?v=... or https://dailymotion.com/video/..."
                         required
                       />
@@ -468,6 +472,23 @@ function detectSource(url: string): "youtube" | "gdrive" | "dailymotion" | null 
   if (url.includes("drive.google.com")) return "gdrive";
   if (url.includes("dailymotion.com") || url.includes("dai.ly")) return "dailymotion";
   return null;
+}
+
+function normalizeDailymotionUrl(url: string): string {
+  try {
+    if (url.includes("dai.ly/")) {
+      const id = url.split("dai.ly/")[1]?.split("?")[0];
+      if (id) return `https://www.dailymotion.com/embed/video/${id}`;
+    }
+    if (url.includes("dailymotion.com/video/")) {
+      const parsed = new URL(url);
+      const id = parsed.pathname.split("/video/")[1]?.split("_")[0];
+      if (id) return `https://www.dailymotion.com/embed/video/${id}`;
+    }
+  } catch {
+    // fall through
+  }
+  return url;
 }
 
 function FormField({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
