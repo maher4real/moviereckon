@@ -31,6 +31,14 @@ function verifyAdminToken(req: NextApiRequest): boolean {
   }
 }
 
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: "8mb",
+    },
+  },
+};
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
 
