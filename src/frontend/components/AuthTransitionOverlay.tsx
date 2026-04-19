@@ -309,11 +309,10 @@ export default function AuthTransitionOverlay() {
       )}
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute inset-0 bg-background" />
         <div className="absolute inset-0 scale-[1.08] -rotate-2">
           <div
-            className="flex h-full flex-col justify-center gap-3 opacity-58"
-            style={{ filter: "saturate(1.16) contrast(1.06) brightness(0.88)" }}
+            className="flex h-full flex-col justify-center gap-3 opacity-64"
+            style={{ filter: "saturate(1.16) contrast(1.06) brightness(0.9)" }}
           >
             {posterRows.map((row, rowIndex) => (
               <div
@@ -335,8 +334,7 @@ export default function AuthTransitionOverlay() {
                       aria-hidden="true"
                       className="h-full w-full object-cover"
                       fallbackSrc="/fallbacks/poster.svg"
-                      loading="eager"
-                      fadeIn
+                      loading="lazy"
                     />
                   </div>
                 ))}
@@ -345,11 +343,11 @@ export default function AuthTransitionOverlay() {
           </div>
         </div>
 
-        <div className="absolute inset-0 bg-black/32" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_22%,hsl(var(--secondary)/0.18),transparent_42%),radial-gradient(circle_at_84%_74%,hsl(var(--primary)/0.22),transparent_45%)]" />
-        <div className="absolute inset-0 bg-linear-to-br from-background/84 via-background/68 to-background/82" />
-        <div className="absolute top-1/4 -left-1/4 h-1/2 w-1/2 rounded-full bg-primary/14 blur-[120px]" />
-        <div className="absolute bottom-1/4 -right-1/4 h-1/2 w-1/2 rounded-full bg-secondary/16 blur-[120px]" />
+        <div className="absolute inset-0 bg-black/22" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_22%,hsl(var(--secondary)/0.22),transparent_42%),radial-gradient(circle_at_84%_74%,hsl(var(--primary)/0.26),transparent_45%)]" />
+        <div className="absolute inset-0 bg-linear-to-br from-background/68 via-background/44 to-background/62" />
+        <div className="absolute top-1/4 -left-1/4 h-1/2 w-1/2 rounded-full bg-primary/16 blur-[120px]" />
+        <div className="absolute bottom-1/4 -right-1/4 h-1/2 w-1/2 rounded-full bg-secondary/18 blur-[120px]" />
       </div>
 
       <div
