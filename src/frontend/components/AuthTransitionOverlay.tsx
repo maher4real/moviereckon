@@ -16,7 +16,7 @@ import { cn } from "@/shared/lib/utils";
 type OverlayPhase = "hidden" | "center" | "moving" | "fading";
 
 const MAX_AUTH_WAIT_MS = 2000;
-const MIN_CENTER_DURATION_MS = 500;
+const MIN_CENTER_DURATION_MS = 950;
 const MOVE_DURATION_MS = 580;
 const FADE_DURATION_MS = 180;
 const ANCHOR_LOOKUP_TIMEOUT_MS = 800;
