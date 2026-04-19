@@ -15,11 +15,11 @@ import { cn } from "@/shared/lib/utils";
 
 type OverlayPhase = "hidden" | "center" | "moving" | "fading";
 
-const MAX_AUTH_WAIT_MS = 2700;
-const MIN_CENTER_DURATION_MS = 700;
-const MOVE_DURATION_MS = 780;
-const FADE_DURATION_MS = 220;
-const ANCHOR_LOOKUP_TIMEOUT_MS = 2500;
+const MAX_AUTH_WAIT_MS = 2000;
+const MIN_CENTER_DURATION_MS = 500;
+const MOVE_DURATION_MS = 580;
+const FADE_DURATION_MS = 180;
+const ANCHOR_LOOKUP_TIMEOUT_MS = 800;
 
 const INITIAL_TRANSFORM = {
   x: 0,
@@ -335,7 +335,8 @@ export default function AuthTransitionOverlay() {
                       aria-hidden="true"
                       className="h-full w-full object-cover"
                       fallbackSrc="/fallbacks/poster.svg"
-                      loading="lazy"
+                      loading="eager"
+                      fadeIn
                     />
                   </div>
                 ))}

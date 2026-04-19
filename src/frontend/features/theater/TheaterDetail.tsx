@@ -141,12 +141,14 @@ export default function TheaterDetail() {
           <div className="absolute bottom-0 left-0 right-0 z-10 px-4 md:px-8 pb-8 md:pb-12">
             <div className="flex items-end gap-6 max-w-5xl">
               {/* Poster */}
-              <div className="hidden md:block flex-shrink-0 w-44 -mb-16 shadow-2xl rounded-xl overflow-hidden ring-1 ring-white/10">
-                <div className="aspect-[2/3]">
+              <div className="hidden md:block shrink-0 w-44 -mb-16 shadow-2xl rounded-xl overflow-hidden ring-1 ring-white/10 bg-muted">
+                <div className="aspect-2/3 relative">
                   <MediaImage
-                    src={movie.thumbnail}
+                    src={proxiedImageUrl(movie.thumbnail)}
                     alt={movie.title}
-                    className="w-full h-full object-cover"
+                    className="absolute inset-0 w-full h-full object-cover"
+                    priority
+                    fadeIn
                   />
                 </div>
               </div>
@@ -185,12 +187,14 @@ export default function TheaterDetail() {
         <div className="container mx-auto px-4 md:px-8 py-8 md:py-10 space-y-10 max-w-5xl">
           {/* On mobile show poster here since it's hidden in hero on mobile */}
           <div className="flex md:hidden justify-center -mt-8">
-            <div className="w-36 sm:w-40 rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10">
-              <div className="aspect-[2/3]">
+            <div className="w-36 sm:w-40 rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10 bg-muted">
+              <div className="aspect-2/3 relative">
                 <MediaImage
-                  src={movie.thumbnail}
+                  src={proxiedImageUrl(movie.thumbnail)}
                   alt={movie.title}
-                  className="w-full h-full object-cover"
+                  className="absolute inset-0 w-full h-full object-cover"
+                  priority
+                  fadeIn
                 />
               </div>
             </div>
