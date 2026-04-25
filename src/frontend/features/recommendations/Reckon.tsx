@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, memo, useRef, useCallback } from "react";
+import React, { useState, useMemo, useEffect, memo, useRef, useCallback } from "react";
 import { useRecommendations } from "@/frontend/hooks/useRecommendations";
 import { useUserData } from "@/frontend/hooks/useUserData";
 import { Movie, TVShow, discoverMovies, discoverTVShows } from "@/shared/lib/tmdb";
@@ -31,6 +31,11 @@ import {
   Settings2,
   Check,
   SlidersHorizontal,
+  TrendingUp,
+  Star,
+  Crown,
+  CalendarDays,
+  Globe,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import * as mongoClient from "@/frontend/lib/mongodbClient";
@@ -48,29 +53,14 @@ type SortOrder = "asc" | "desc";
 const RECOMMENDATION_TYPES: {
   id: RecommendationTypeFilter;
   label: string;
-  emoji: string;
+  Icon: React.ElementType;
   description: string;
 }[] = [
-  { id: "all", label: "All", emoji: "⭐", description: "All recommendations" },
-  {
-    id: "trending",
-    label: "Trending",
-    emoji: "🔥",
-    description: "Hot picks this week",
-  },
-  {
-    id: "highrated",
-    label: "Highly Rated",
-    emoji: "✨",
-    description: "8.0+ rated",
-  },
-  { id: "popular", label: "Popular", emoji: "👑", description: "Most watched" },
-  {
-    id: "newreleases",
-    label: "New Releases",
-    emoji: "🆕",
-    description: "Recently released",
-  },
+  { id: "all", label: "All", Icon: Sparkles, description: "All recommendations" },
+  { id: "trending", label: "Trending", Icon: TrendingUp, description: "Hot picks this week" },
+  { id: "highrated", label: "Highly Rated", Icon: Star, description: "8.0+ rated" },
+  { id: "popular", label: "Popular", Icon: Crown, description: "Most watched" },
+  { id: "newreleases", label: "New Releases", Icon: CalendarDays, description: "Recently released" },
 ];
 
 const INITIAL_VISIBLE_ITEMS = 48;
@@ -247,30 +237,39 @@ function PreferencesSheet({
         if (!v) onClose();
       }}
     >
-      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
-        <SheetHeader className="mb-5">
-          <SheetTitle className="flex items-center gap-2">
-            <Settings2 className="w-5 h-5 text-primary" />
-            Recommendation Preferences
-          </SheetTitle>
-          <p className="text-xs text-muted-foreground">
-            Set your preferred languages and genres. The recommendation engine
-            strongly prioritizes these — the more you set, the more tailored
-            your feed becomes.
+      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto flex flex-col gap-0 p-0">
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4 border-b border-border">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2.5 text-base">
+              <div className="p-1.5 rounded-lg bg-primary/10 border border-primary/20">
+                <Settings2 className="w-4 h-4 text-primary" />
+              </div>
+              Recommendation Preferences
+            </SheetTitle>
+          </SheetHeader>
+          <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+            The engine strongly weights your selections — the more you set, the more tailored your feed.
           </p>
-        </SheetHeader>
+        </div>
 
-        <div className="space-y-6">
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
           {/* Languages */}
           <div>
-            <p className="text-sm font-semibold mb-1 text-foreground">
-              Preferred Languages
-            </p>
-            <p className="text-xs text-muted-foreground mb-3">
-              {langs.length > 0
-                ? `${langs.length} selected — recommendations strongly favor these`
-                : "Select languages to get more relevant picks"}
-            </p>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-primary" />
+                <span className="text-sm font-semibold text-foreground">Languages</span>
+              </div>
+              <span className={cn(
+                "text-xs font-medium px-2 py-0.5 rounded-full transition-all duration-200",
+                langs.length > 0
+                  ? "bg-primary/15 text-primary"
+                  : "bg-muted text-muted-foreground",
+              )}>
+                {langs.length > 0 ? `${langs.length} selected` : "None"}
+              </span>
+            </div>
             <div className="flex flex-wrap gap-2">
               {PREF_LANGUAGES.map(({ code, label }) => {
                 const active = langs.includes(code);
@@ -280,10 +279,10 @@ function PreferencesSheet({
                     type="button"
                     onClick={() => toggleLang(code)}
                     className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all",
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 cursor-pointer",
                       active
-                        ? "bg-primary border-primary text-primary-foreground"
-                        : "bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground",
+                        ? "bg-primary border-primary text-primary-foreground shadow-sm"
+                        : "bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground hover:bg-primary/5",
                     )}
                   >
                     {active && <Check className="w-3 h-3" />}
@@ -294,16 +293,24 @@ function PreferencesSheet({
             </div>
           </div>
 
+          <div className="border-t border-border/60" />
+
           {/* Genres */}
           <div>
-            <p className="text-sm font-semibold mb-1 text-foreground">
-              Favorite Genres
-            </p>
-            <p className="text-xs text-muted-foreground mb-3">
-              {genres.length > 0
-                ? `${genres.length} selected — engine boosts these heavily`
-                : "Select genres to tune your recommendations"}
-            </p>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Film className="w-4 h-4 text-primary" />
+                <span className="text-sm font-semibold text-foreground">Genres</span>
+              </div>
+              <span className={cn(
+                "text-xs font-medium px-2 py-0.5 rounded-full transition-all duration-200",
+                genres.length > 0
+                  ? "bg-primary/15 text-primary"
+                  : "bg-muted text-muted-foreground",
+              )}>
+                {genres.length > 0 ? `${genres.length} selected` : "None"}
+              </span>
+            </div>
             <div className="flex flex-wrap gap-2">
               {PREF_GENRES.map(({ id, name }) => {
                 const active = genres.includes(id);
@@ -313,10 +320,10 @@ function PreferencesSheet({
                     type="button"
                     onClick={() => toggleGenre(id)}
                     className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all",
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 cursor-pointer",
                       active
-                        ? "bg-primary border-primary text-primary-foreground"
-                        : "bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground",
+                        ? "bg-primary border-primary text-primary-foreground shadow-sm"
+                        : "bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground hover:bg-primary/5",
                     )}
                   >
                     {active && <Check className="w-3 h-3" />}
@@ -328,20 +335,21 @@ function PreferencesSheet({
           </div>
         </div>
 
-        <div className="mt-8 flex gap-3">
+        {/* Footer actions */}
+        <div className="px-6 py-4 border-t border-border bg-card/50 flex gap-3">
           <Button
             onClick={save}
             disabled={saving || !hasChanges}
-            className="flex-1"
+            className="flex-1 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 disabled:opacity-50"
           >
             {saving ? (
               <RefreshCw className="w-4 h-4 animate-spin mr-2" />
             ) : (
               <Check className="w-4 h-4 mr-2" />
             )}
-            {hasChanges ? "Save Preferences" : "No Changes"}
+            {saving ? "Saving…" : hasChanges ? "Save Preferences" : "No Changes"}
           </Button>
-          <Button variant="outline" onClick={onClose} disabled={saving}>
+          <Button variant="outline" onClick={onClose} disabled={saving} className="cursor-pointer">
             Cancel
           </Button>
         </div>
@@ -654,20 +662,27 @@ export default function Reckon() {
           {/* Top header row */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-3">
-              <Sparkles className="w-8 h-8 text-primary" />
+              <div className="relative">
+                <div className="absolute inset-0 rounded-xl bg-primary/20 blur-md" />
+                <div className="relative p-2 rounded-xl bg-primary/10 border border-primary/20">
+                  <Sparkles className="w-6 h-6 text-primary" />
+                </div>
+              </div>
               <div>
-                <h1 className="text-3xl font-bold">Reckon</h1>
-                <p className="text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-3xl font-bold tracking-tight">Reckon</h1>
+                  {isPersonalized && (
+                    <Badge className="bg-primary/15 text-primary border border-primary/25 text-[10px] font-semibold px-2">
+                      Personalized
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground mt-0.5">
                   {isPersonalized
-                    ? "Personalized picks that evolve with your taste"
+                    ? "Picks that evolve with your taste"
                     : "Trending and globally diverse picks"}
                 </p>
               </div>
-              {isPersonalized && (
-                <Badge className="bg-primary/20 text-primary ml-2">
-                  Personalized
-                </Badge>
-              )}
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
@@ -676,15 +691,16 @@ export default function Reckon() {
                 size="sm"
                 onClick={() => setPrefsOpen(true)}
                 className={cn(
-                  "gap-2",
-                  hasPreferences &&
-                    "border-primary/40 text-primary hover:bg-primary/10",
+                  "gap-2 cursor-pointer transition-all duration-200",
+                  hasPreferences
+                    ? "border-primary/40 text-primary hover:bg-primary/10 hover:border-primary/60"
+                    : "hover:border-primary/30 hover:text-primary",
                 )}
               >
                 <SlidersHorizontal className="w-4 h-4" />
                 Preferences
                 {hasPreferences && (
-                  <span className="text-[10px] bg-primary/20 text-primary rounded-full px-1.5 py-0.5 font-semibold">
+                  <span className="text-[10px] bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 font-bold leading-none">
                     {(preferences?.preferred_languages?.length ?? 0) +
                       (preferences?.preferred_genres?.length ?? 0)}
                   </span>
@@ -693,18 +709,16 @@ export default function Reckon() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  void refreshRecommendations();
-                }}
+                onClick={() => void refreshRecommendations()}
                 disabled={isRefreshing}
-                className="gap-2"
+                className="gap-2 cursor-pointer hover:border-primary/30 hover:text-primary transition-all duration-200"
               >
                 <RefreshCw
                   className={cn("w-4 h-4", isRefreshing && "animate-spin")}
                 />
                 Refresh
               </Button>
-              <span className="text-sm text-muted-foreground">
+              <span className="text-sm text-muted-foreground tabular-nums">
                 {processedItems.length} picks
               </span>
             </div>
@@ -712,22 +726,22 @@ export default function Reckon() {
 
           {/* Preferences nudge for new users */}
           {!hasPreferences && !reckonLoading && (
-            <div className="mb-5 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 flex items-center gap-3">
-              <Settings2 className="w-5 h-5 text-primary shrink-0" />
+            <div className="mb-5 rounded-xl border border-primary/25 bg-linear-to-r from-primary/8 to-primary/4 px-4 py-3.5 flex items-center gap-3">
+              <div className="p-1.5 rounded-lg bg-primary/15 border border-primary/20 shrink-0">
+                <Sparkles className="w-4 h-4 text-primary" />
+              </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground">
-                  Set your preferences for better recommendations
+                <p className="text-sm font-semibold text-foreground">
+                  Unlock personalized recommendations
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Tell us your favorite languages and genres — the engine will
-                  prioritize them strongly.
+                  Set your favorite languages and genres — the engine strongly prioritizes them.
                 </p>
               </div>
               <Button
                 size="sm"
-                variant="outline"
                 onClick={() => setPrefsOpen(true)}
-                className="shrink-0 border-primary/30 text-primary hover:bg-primary/10"
+                className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer transition-all duration-200"
               >
                 Set Up
               </Button>
@@ -767,23 +781,26 @@ export default function Reckon() {
             </div>
 
             <div className="flex gap-2 bg-muted/30 p-3 rounded-lg border border-border/50 overflow-x-auto scrollbar-hide">
-              {RECOMMENDATION_TYPES.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setRecTypeFilter(t.id)}
-                  title={t.description}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all shrink-0",
-                    recTypeFilter === t.id
-                      ? "bg-amber-600/80 text-white shadow-sm"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted",
-                  )}
-                >
-                  <span>{t.emoji}</span>
-                  {t.label}
-                </button>
-              ))}
+              {RECOMMENDATION_TYPES.map((t) => {
+                const active = recTypeFilter === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setRecTypeFilter(t.id)}
+                    title={t.description}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all duration-200 shrink-0 cursor-pointer",
+                      active
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                    )}
+                  >
+                    <t.Icon className="w-3.5 h-3.5" />
+                    {t.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
