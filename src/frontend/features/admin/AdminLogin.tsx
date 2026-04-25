@@ -19,7 +19,9 @@ export function getAdminToken(): string | null {
 export function clearAdminToken() {
   try {
     sessionStorage.removeItem(ADMIN_TOKEN_KEY);
-  } catch {}
+  } catch {
+    // storage unavailable — ignore
+  }
 }
 
 export default function AdminLogin() {

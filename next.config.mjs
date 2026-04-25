@@ -3,6 +3,7 @@ const nextConfig = {
   reactStrictMode: false,
   images: {
     formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 86400,
     remotePatterns: [
       { protocol: "https", hostname: "image.tmdb.org" },
       { protocol: "https", hostname: "**.public.blob.vercel-storage.com" },
@@ -10,6 +11,17 @@ const nextConfig = {
       { protocol: "https", hostname: "secure.gravatar.com" },
       { protocol: "https", hostname: "www.gravatar.com" },
       { protocol: "https", hostname: "avatars.githubusercontent.com" },
+    ],
+  },
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-select",
+      "@radix-ui/react-tooltip",
+      "@radix-ui/react-tabs",
+      "@radix-ui/react-popover",
+      "@radix-ui/react-dropdown-menu",
     ],
   },
   webpack: (config) => {

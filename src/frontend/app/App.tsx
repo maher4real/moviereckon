@@ -77,9 +77,11 @@ const App = ({
       new QueryClient({
         defaultOptions: {
           queries: {
-            retry: 2,
-            staleTime: 1000 * 60 * 5, // 5 minutes
+            retry: 1,
+            staleTime: 1000 * 60 * 10, // 10 minutes
+            gcTime: 1000 * 60 * 60,    // 60 minutes — keep data in memory longer
             refetchOnWindowFocus: false,
+            refetchOnReconnect: true,
           },
         },
       }),

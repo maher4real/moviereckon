@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, memo, useRef, useCallback } from "react";
 import { useRecommendations } from "@/frontend/hooks/useRecommendations";
 import { useUserData } from "@/frontend/hooks/useUserData";
-import { Movie, TVShow } from "@/shared/lib/tmdb";
+import { Movie, TVShow, discoverMovies, discoverTVShows } from "@/shared/lib/tmdb";
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
 import BottomNav from "@/frontend/components/BottomNav";
@@ -376,6 +376,98 @@ export default function Reckon() {
   const [selectedLanguage, setSelectedLanguage] = useState<string>("all");
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_ITEMS);
   const [prefsOpen, setPrefsOpen] = useState(false);
+  const [extraItems, setExtraItems] = useState<(Movie | TVShow)[]>([]);
+  const [discoverPage, setDiscoverPage] = useState(1);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+
+  // Reset extra items whenever precision filters change
+  useEffect(() => {
+    setExtraItems([]);
+    setDiscoverPage(1);
+  }, [selectedLanguage, selectedGenre, contentTypeFilter]);
+
+  const canFetchMore = selectedLanguage !== "all" || selectedGenre !== "all";
+
+  const fetchMoreLikeThis = useCallback(async () => {
+    if (isFetchingMore) return;
+    setIsFetchingMore(true);
+
+    const existingIds = new Set(
+      [...recommendations, ...extraItems].map(
+        (item) => `${"title" in item ? "movie" : "tv"}:${item.id}`,
+      ),
+    );
+
+    const genreParam = selectedGenre !== "all" ? selectedGenre : undefined;
+    const langParam = selectedLanguage !== "all" ? selectedLanguage : undefined;
+    const sortBy =
+      sortField === "popularity"
+        ? "popularity.desc"
+        : sortField === "rating"
+          ? "vote_average.desc"
+          : sortField === "release_date"
+            ? "primary_release_date.desc"
+            : "vote_average.desc";
+
+    const nextPage = discoverPage + 1;
+
+    try {
+      const fetches: Promise<(Movie | TVShow)[]>[] = [];
+
+      if (contentTypeFilter !== "tv") {
+        fetches.push(
+          discoverMovies({
+            with_genres: genreParam,
+            with_original_language: langParam,
+            sort_by: sortBy,
+            "vote_count.gte": 80,
+            page: nextPage,
+          }).then((r) => r.results as (Movie | TVShow)[]),
+        );
+      }
+
+      if (contentTypeFilter !== "movie") {
+        fetches.push(
+          discoverTVShows({
+            with_genres: genreParam,
+            with_original_language: langParam,
+            sort_by:
+              sortField === "release_date"
+                ? "first_air_date.desc"
+                : sortBy,
+            "vote_count.gte": 50,
+            page: nextPage,
+          }).then((r) => r.results as (Movie | TVShow)[]),
+        );
+      }
+
+      const results = await Promise.all(fetches);
+      const fresh = results
+        .flat()
+        .filter((item) => {
+          const key = `${"title" in item ? "movie" : "tv"}:${item.id}`;
+          if (existingIds.has(key)) return false;
+          existingIds.add(key);
+          return true;
+        });
+
+      setExtraItems((prev) => [...prev, ...fresh]);
+      setDiscoverPage(nextPage);
+    } catch {
+      // silently fail — button will still be visible for retry
+    } finally {
+      setIsFetchingMore(false);
+    }
+  }, [
+    isFetchingMore,
+    recommendations,
+    extraItems,
+    selectedGenre,
+    selectedLanguage,
+    contentTypeFilter,
+    sortField,
+    discoverPage,
+  ]);
 
   const hasPreferences =
     (preferences?.preferred_languages?.length ?? 0) > 0 ||
@@ -406,7 +498,16 @@ export default function Reckon() {
   }, [recommendations]);
 
   const processedItems = useMemo(() => {
-    let filtered = [...recommendations];
+    // Merge extra discovered items, dedup by id+type
+    const seen = new Set<string>();
+    const merged: (Movie | TVShow)[] = [];
+    for (const item of [...recommendations, ...extraItems]) {
+      const key = `${"title" in item ? "movie" : "tv"}:${item.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(item);
+    }
+    let filtered = merged;
 
     if (contentTypeFilter === "movie") {
       filtered = filtered.filter((item) => "title" in item);
@@ -798,6 +899,29 @@ export default function Reckon() {
                     }
                   >
                     Load More
+                  </Button>
+                </div>
+              )}
+
+              {!hasMore && canFetchMore && (
+                <div className="flex flex-col items-center gap-2 py-6">
+                  <p className="text-xs text-muted-foreground">
+                    {selectedLanguage !== "all" && selectedGenre !== "all"
+                      ? `More ${GENRE_MAP[Number(selectedGenre)] || "content"} in ${LANGUAGE_MAP[selectedLanguage] || selectedLanguage}`
+                      : selectedLanguage !== "all"
+                        ? `More content in ${LANGUAGE_MAP[selectedLanguage] || selectedLanguage}`
+                        : `More ${GENRE_MAP[Number(selectedGenre)] || "content"}`}
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => void fetchMoreLikeThis()}
+                    disabled={isFetchingMore}
+                    className="gap-2 border-primary/30 text-primary hover:bg-primary/10"
+                  >
+                    <RefreshCw
+                      className={cn("w-4 h-4", isFetchingMore && "animate-spin")}
+                    />
+                    {isFetchingMore ? "Fetching…" : "Show More Like This"}
                   </Button>
                 </div>
               )}

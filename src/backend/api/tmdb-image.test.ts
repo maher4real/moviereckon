@@ -163,7 +163,7 @@ describe("tmdb image handler", () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("image/jpeg");
     expect(response.headers.get("Cache-Control")).toBe(
-      "public, max-age=0, s-maxage=86400, stale-while-revalidate=604800",
+      "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800",
     );
     expect(response.body).toBeInstanceOf(Buffer);
   });

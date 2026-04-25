@@ -436,12 +436,9 @@ export default function TheaterAdmin() {
 function PosterPreview({ src }: { src: string }) {
   const [broken, setBroken] = useState(false);
 
-  // reset broken state when src changes
-  const prevSrc = useRef(src);
-  if (prevSrc.current !== src) {
-    prevSrc.current = src;
-    broken && setBroken(false);
-  }
+  useEffect(() => {
+    setBroken(false);
+  }, [src]);
 
   return (
     <div className="aspect-[2/3] relative bg-muted flex items-center justify-center overflow-hidden">

@@ -156,7 +156,7 @@ export default function CommentsSection({
     setCommentRating(8);
     // Pre-fill feedback selector with the user's existing feedback for this content
     setSelectedFeedback(getFeedback(contentId, contentType));
-  }, [contentId, contentType]);
+  }, [contentId, contentType, getFeedback]);
 
   const hasValidCommentRating = Number.isInteger(commentRating) && commentRating >= 1 && commentRating <= 10;
 

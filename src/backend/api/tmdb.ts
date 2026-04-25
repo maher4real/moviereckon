@@ -38,18 +38,23 @@ function isAllowedEndpoint(endpoint: string): boolean {
 }
 
 function getCacheProfile(endpoint: string): { sMaxAge: number; staleWhileRevalidate: number } {
-  // Search changes frequently with query terms, so keep CDN cache short.
+  // Search — short CDN cache, query-specific results change fast.
   if (/^\/search\//.test(endpoint)) {
-    return { sMaxAge: 60, staleWhileRevalidate: 120 };
+    return { sMaxAge: 120, staleWhileRevalidate: 300 };
   }
 
-  // Detailed metadata can be cached longer for better hit rates.
+  // Genre/config lists rarely change — cache aggressively.
+  if (/^\/genre\//.test(endpoint)) {
+    return { sMaxAge: 86400, staleWhileRevalidate: 86400 };
+  }
+
+  // Detailed metadata (credits, keywords, providers) changes infrequently.
   if (/^\/(movie|tv)\/\d+/.test(endpoint)) {
-    return { sMaxAge: 300, staleWhileRevalidate: 900 };
+    return { sMaxAge: 1800, staleWhileRevalidate: 3600 };
   }
 
-  // Trending/discover/list endpoints.
-  return { sMaxAge: 180, staleWhileRevalidate: 600 };
+  // Trending/discover/list endpoints — cache longer, stale-while-revalidate covers freshness.
+  return { sMaxAge: 600, staleWhileRevalidate: 1800 };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

@@ -46,6 +46,7 @@ export default function Home() {
   const navigate = useNavigate();
   const [heroIndex, setHeroIndex] = useState(0);
   const [loadSecondaryShelves, setLoadSecondaryShelves] = useState(false);
+  const [loadTertiaryShelves, setLoadTertiaryShelves] = useState(false);
   const [isHeroVisualReady, setIsHeroVisualReady] = useState(false);
   const hasAnnouncedHeroReadyRef = useRef(false);
 
@@ -53,21 +54,27 @@ export default function Home() {
     if (!user) return;
     hasAnnouncedHeroReadyRef.current = false;
     setLoadSecondaryShelves(false);
+    setLoadTertiaryShelves(false);
     setIsHeroVisualReady(false);
   }, [user]);
 
   useEffect(() => {
     if (!user || loadSecondaryShelves) return;
-    // Start loading secondary shelves immediately while hero loads
-    const timer = window.setTimeout(() => setLoadSecondaryShelves(true), 50);
-    return () => window.clearTimeout(timer);
+    // Wave 1: high-priority visible shelves after hero renders
+    const t1 = window.setTimeout(() => setLoadSecondaryShelves(true), 200);
+    // Wave 2: lower-priority regional + upcoming shelves
+    const t2 = window.setTimeout(() => setLoadTertiaryShelves(true), 700);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
   }, [user, loadSecondaryShelves]);
 
   // Fetch all data with optimized query config
   const queryConfig = useMemo(
     () => ({
       staleTime: 1000 * 60 * 10, // 10 minutes
-      gcTime: 1000 * 60 * 30, // 30 minutes
+      gcTime: 1000 * 60 * 60,    // 60 minutes
     }),
     [],
   );
@@ -96,21 +103,21 @@ export default function Home() {
     queryKey: ["gujarati-movies"],
     queryFn: () => getGujaratiMovies(),
     ...queryConfig,
-    enabled: loadSecondaryShelves,
+    enabled: loadTertiaryShelves,
   });
 
   const { data: tamilData, isLoading: tamilLoading } = useQuery({
     queryKey: ["tamil-movies"],
     queryFn: () => getTamilMovies(),
     ...queryConfig,
-    enabled: loadSecondaryShelves,
+    enabled: loadTertiaryShelves,
   });
 
   const { data: teluguData, isLoading: teluguLoading } = useQuery({
     queryKey: ["telugu-movies"],
     queryFn: () => getTeluguMovies(),
     ...queryConfig,
-    enabled: loadSecondaryShelves,
+    enabled: loadTertiaryShelves,
   });
 
   const { data: tvShowsData, isLoading: tvLoading } = useQuery({
@@ -157,7 +164,7 @@ export default function Home() {
       );
     },
     ...queryConfig,
-    enabled: loadSecondaryShelves,
+    enabled: loadTertiaryShelves,
   });
 
   const { data: upcomingTVShows, isLoading: upcomingTVLoading } = useQuery({
@@ -189,7 +196,7 @@ export default function Home() {
       );
     },
     ...queryConfig,
-    enabled: loadSecondaryShelves,
+    enabled: loadTertiaryShelves,
   });
 
   // Filter Now Playing to only show movies released today or earlier
@@ -327,6 +334,7 @@ export default function Home() {
   }, []);
 
   const secondaryShelvesPending = !loadSecondaryShelves;
+  const tertiaryShelvesPending = !loadTertiaryShelves;
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0">
@@ -384,11 +392,11 @@ export default function Home() {
           )}
 
           {/* Upcoming - Only movies releasing tomorrow or later */}
-          {(secondaryShelvesPending || filteredUpcoming.length > 0 || upcomingLoading || upcomingTVLoading) && (
+          {(tertiaryShelvesPending || filteredUpcoming.length > 0 || upcomingLoading || upcomingTVLoading) && (
             <MemoizedCarousel
               title="🗓️ Upcoming"
               items={filteredUpcoming as (Movie | TVShow)[]}
-              isLoading={secondaryShelvesPending || upcomingLoading || upcomingTVLoading}
+              isLoading={tertiaryShelvesPending || upcomingLoading || upcomingTVLoading}
               type="mixed"
               viewAllHref="/upcoming"
             />

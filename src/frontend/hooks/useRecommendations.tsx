@@ -97,9 +97,9 @@ export function useRecommendations(): RecommendationResult {
     queryFn: () =>
       mongoClient.fetchRecommendationsFeed({ variant: rotationKey }),
     enabled: Boolean(user) && !userDataLoading,
-    staleTime: 1000 * 60,
-    gcTime: 1000 * 60 * 30,
-    refetchOnWindowFocus: true,
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 60,
+    refetchOnWindowFocus: false,
     refetchOnReconnect: true,
     refetchInterval: user ? RECOMMENDATION_REFETCH_INTERVAL_MS : false,
     placeholderData: (previousData) => previousData,

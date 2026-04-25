@@ -187,29 +187,18 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const [history, liked] = await Promise.all([
+      const [history, liked, feedback, prefs] = await Promise.all([
         mongoClient.fetchWatchHistory(),
         mongoClient.fetchLikedItems(),
+        mongoClient.fetchUserFeedback(),
+        mongoClient.fetchUserPreferences(),
       ]);
 
       if (fetchTokenRef.current !== fetchToken) return;
       setWatchHistory(history as WatchedItem[]);
       setLikedItems(liked as LikedItem[]);
-      setIsLoading(false);
-
-      void (async () => {
-        try {
-          const [feedback, prefs] = await Promise.all([
-            mongoClient.fetchUserFeedback(),
-            mongoClient.fetchUserPreferences(),
-          ]);
-          if (fetchTokenRef.current !== fetchToken) return;
-          setFeedbackItems(feedback as FeedbackItem[]);
-          setPreferences(prefs as UserPreferences | null);
-        } catch (error) {
-          console.error("Error fetching secondary user data:", error);
-        }
-      })();
+      setFeedbackItems(feedback as FeedbackItem[]);
+      setPreferences(prefs as UserPreferences | null);
     } catch (error) {
       console.error("Error fetching user data:", error);
       if (fetchTokenRef.current !== fetchToken) return;
