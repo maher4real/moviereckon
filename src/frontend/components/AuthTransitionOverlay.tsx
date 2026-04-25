@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import BrandLogo from "@/frontend/components/BrandLogo";
+import MediaImage from "@/frontend/components/MediaImage";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import { useIsMobile } from "@/frontend/hooks/use-mobile";
 import {
@@ -334,19 +335,14 @@ export default function AuthTransitionOverlay() {
                     key={`${poster.id}-${rowIndex}-${index}`}
                     className="auth-poster-tile"
                   >
-                    <img
+                    <MediaImage
                       src={poster.src}
                       alt=""
                       aria-hidden="true"
                       className="h-full w-full object-cover"
+                      fallbackSrc="/fallbacks/poster.svg"
+                      priority={rowIndex === 0 && index < POSTERS_PER_ROW}
                       loading={rowIndex === 0 ? "eager" : "lazy"}
-                      decoding="async"
-                      fetchPriority={rowIndex === 0 && index < POSTERS_PER_ROW ? "high" : "auto"}
-                      onError={(event) => {
-                        const target = event.currentTarget;
-                        if (target.src.endsWith("/fallbacks/poster.svg")) return;
-                        target.src = "/fallbacks/poster.svg";
-                      }}
                     />
                   </div>
                 ))}

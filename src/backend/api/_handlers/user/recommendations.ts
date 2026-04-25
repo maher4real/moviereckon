@@ -88,9 +88,9 @@ interface TMDBListPayload {
   results?: unknown[];
 }
 
-const MAX_SEEDS = 6;
-const MAX_CANDIDATES = 650;
-const DIVERSIFICATION_TOP_N = 160;
+const MAX_SEEDS = 10;
+const MAX_CANDIDATES = 900;
+const DIVERSIFICATION_TOP_N = 220;
 const TIME_DECAY_THRESHOLD_DAYS = 7;
 const CACHE_TTL_MS = 90 * 1000;
 const CACHE_STALE_TTL_MS = 10 * 60 * 1000;
@@ -698,7 +698,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .toArray(),
         db.collection("user_preferences").findOne(
           { user_id: user.id },
-          { projection: { preferred_genres: 1 } },
+          { projection: { preferred_genres: 1, preferred_languages: 1 } },
         ),
       ]),
       DB_TIMEOUT_MS,
@@ -758,25 +758,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
         feedbackItems.forEach((item) => {
-          if (!item.genres?.length || item.feedback_type === "skip") return;
+          if (!item.genres?.length) return;
+          if (item.feedback_type === "skip") {
+            // Skipped items slightly suppress those genres
+            item.genres.forEach((genreId) => {
+              genreScores[genreId] = (genreScores[genreId] || 0) - 0.4;
+            });
+            return;
+          }
           const feedbackWeight = getFeedbackWeight(item.feedback_type);
-
           item.genres.forEach((genreId) => {
             genreScores[genreId] = (genreScores[genreId] || 0) + feedbackWeight;
           });
         });
 
-        preferences.preferred_genres.forEach((genreId) => {
-          genreScores[genreId] = (genreScores[genreId] || 0) + 0.85;
+        // Explicit preferences get strong boosts — user set these intentionally
+        preferences.preferred_genres.forEach((genreId, index) => {
+          const boost = Math.max(1.2, 2.5 - index * 0.15);
+          genreScores[genreId] = (genreScores[genreId] || 0) + boost;
         });
 
         preferences.preferred_languages.forEach((language, index) => {
-          addLanguageWeight(languageScores, language, Math.max(0.55, 1.05 - index * 0.12));
+          addLanguageWeight(languageScores, language, Math.max(1.2, 2.8 - index * 0.2));
         });
 
         const topGenres = Object.entries(genreScores)
           .sort(([, a], [, b]) => b - a)
-          .slice(0, 4)
+          .slice(0, 6)
           .map(([genreId]) => Number(genreId));
 
         const seedMap = new Map<string, SeedSignal>();
@@ -829,27 +837,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ]);
 
     const genreMovieResults = await Promise.all(
-      topGenres.slice(0, 3).map((genreId, index) =>
-        safe(
-          discoverServerMovies({
-            with_genres: genreId.toString(),
-            sort_by: index === 0 ? "popularity.desc" : "vote_average.desc",
-            "vote_count.gte": index === 0 ? 120 : 220,
-            page: 1,
-          }),
+      topGenres.slice(0, 5).flatMap((genreId, index) =>
+        [1, 2].map((page) =>
+          safe(
+            discoverServerMovies({
+              with_genres: genreId.toString(),
+              sort_by: index === 0 ? "popularity.desc" : "vote_average.desc",
+              "vote_count.gte": index === 0 ? 100 : 180,
+              page,
+            }),
+          ),
         ),
       ),
     );
 
     const genreTVResults = await Promise.all(
-      topGenres.slice(0, 3).map((genreId, index) =>
-        safe(
-          discoverServerTVShows({
-            with_genres: genreId.toString(),
-            sort_by: index === 0 ? "popularity.desc" : "vote_average.desc",
-            "vote_count.gte": index === 0 ? 80 : 150,
-            page: 1,
-          }),
+      topGenres.slice(0, 5).flatMap((genreId, index) =>
+        [1, 2].map((page) =>
+          safe(
+            discoverServerTVShows({
+              with_genres: genreId.toString(),
+              sort_by: index === 0 ? "popularity.desc" : "vote_average.desc",
+              "vote_count.gte": index === 0 ? 60 : 120,
+              page,
+            }),
+          ),
         ),
       ),
     );
@@ -1057,12 +1069,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           typeHint: "tv" as const,
         },
         ...genreMovieResults.map((result, index) => ({
-          source: `discover:movie:genre:${topGenres[index] || "none"}`,
+          source: `discover:movie:genre:${topGenres[Math.floor(index / 2)] || "none"}:p${(index % 2) + 1}`,
           items: result?.results,
           typeHint: "movie" as const,
         })),
         ...genreTVResults.map((result, index) => ({
-          source: `discover:tv:genre:${topGenres[index] || "none"}`,
+          source: `discover:tv:genre:${topGenres[Math.floor(index / 2)] || "none"}:p${(index % 2) + 1}`,
           items: result?.results,
           typeHint: "tv" as const,
         })),
@@ -1125,7 +1137,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     );
 
-        const targetCount = hasStrongSignals ? 180 : hasPersonalizationData ? 150 : 130;
+        const targetCount = hasStrongSignals ? 220 : hasPersonalizationData ? 180 : 150;
         const cappedRecommendations = rankedRecommendations.slice(0, targetCount);
 
     const items = cappedRecommendations.map((entry) => toDisplayItem(entry.item));
