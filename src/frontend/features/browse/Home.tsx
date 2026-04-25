@@ -25,7 +25,18 @@ import HeroBanner from "@/frontend/components/HeroBanner";
 import ContentCarousel from "@/frontend/components/ContentCarousel";
 import Footer from "@/frontend/components/Footer";
 import { AppPageSkeleton } from "@/frontend/components/AppSkeletons";
-import { Sparkles } from "lucide-react";
+import {
+  Sparkles,
+  TrendingUp,
+  Star,
+  Film,
+  Tv,
+  CalendarDays,
+  History,
+  Clapperboard,
+  Award,
+  Globe,
+} from "lucide-react";
 import { announceHomeHeroReady } from "@/frontend/lib/startupSound";
 import { cn, formatLocalDate, isAnimeLike } from "@/shared/lib/utils";
 
@@ -352,22 +363,40 @@ export default function Home() {
 
       {/* Content Sections */}
       <main className="relative z-10 -mt-20 md:-mt-24 pt-6 md:pt-8 pb-20">
-        <div className="space-y-8">
+        <div className="space-y-10">
+
           {/* Reckon - Personalized Recommendations */}
           {reckonItems.length > 0 && (
-            <section className="px-4 md:px-8 py-6 bg-gradient-to-b from-card/50 to-transparent rounded-xl mx-2 md:mx-4 border border-border/30">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-6 h-6 text-primary" />
-                  <h2 className="text-xl md:text-2xl font-bold">
-                    {isPersonalized ? "Reckon For You" : "Reckon - Top Picks"}
+            <section className="mx-2 md:mx-4 rounded-2xl border border-primary/20 bg-linear-to-b from-primary/6 via-card/40 to-transparent overflow-hidden">
+              <div className="px-4 md:px-6 pt-5 pb-2 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="relative">
+                    <div className="absolute inset-0 rounded-lg bg-primary/20 blur-sm" />
+                    <div className="relative p-1.5 rounded-lg bg-primary/10 border border-primary/20">
+                      <Sparkles className="w-4 h-4 text-primary" />
+                    </div>
+                  </div>
+                  <h2 className="text-lg md:text-xl font-bold tracking-tight">
+                    {isPersonalized ? "Reckon For You" : "Top Picks"}
                   </h2>
                   {isPersonalized && (
-                    <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-xs font-medium">
+                    <span className="px-2 py-0.5 rounded-full bg-primary/15 border border-primary/25 text-primary text-[10px] font-semibold">
                       Personalized
                     </span>
                   )}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => navigate("/reckon")}
+                  className={cn(
+                    "flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors duration-200 cursor-pointer"
+                  )}
+                >
+                  View All
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
               </div>
               <MemoizedCarousel
                 title=""
@@ -375,15 +404,17 @@ export default function Home() {
                 isLoading={reckonLoading}
                 type="mixed"
                 viewAllHref="/reckon"
+                showViewAllCard={false}
                 recommendationExplanations={explanationById}
               />
             </section>
           )}
 
-          {/* Now Playing - Only movies released today or earlier */}
+          {/* Now Playing */}
           {(secondaryShelvesPending || filteredNowPlaying.length > 0 || nowPlayingLoading) && (
             <MemoizedCarousel
-              title="🎬 Now Playing in Theaters"
+              title="Now Playing"
+              icon={Clapperboard}
               items={filteredNowPlaying as (Movie | TVShow)[]}
               isLoading={secondaryShelvesPending || nowPlayingLoading}
               type="movie"
@@ -391,10 +422,11 @@ export default function Home() {
             />
           )}
 
-          {/* Upcoming - Only movies releasing tomorrow or later */}
+          {/* Upcoming */}
           {(tertiaryShelvesPending || filteredUpcoming.length > 0 || upcomingLoading || upcomingTVLoading) && (
             <MemoizedCarousel
-              title="🗓️ Upcoming"
+              title="Upcoming"
+              icon={CalendarDays}
               items={filteredUpcoming as (Movie | TVShow)[]}
               isLoading={tertiaryShelvesPending || upcomingLoading || upcomingTVLoading}
               type="mixed"
@@ -404,17 +436,19 @@ export default function Home() {
 
           {/* Trending Now */}
           <MemoizedCarousel
-            title="🔥 Trending Now"
+            title="Trending Now"
+            icon={TrendingUp}
             items={filteredTrendingMovies as (Movie | TVShow)[]}
             isLoading={trendingLoading}
             type="movie"
             viewAllHref="/movies?category=trending"
           />
 
-          {/* Recently Watched (if any) */}
+          {/* Continue Watching */}
           {recentlyWatched.length > 0 && (
             <MemoizedCarousel
-              title="⏪ Continue Watching"
+              title="Continue Watching"
+              icon={History}
               items={recentlyWatched as (Movie | TVShow)[]}
               isLoading={false}
               type="mixed"
@@ -424,7 +458,8 @@ export default function Home() {
 
           {/* Bollywood Hits */}
           <MemoizedCarousel
-            title="🇮🇳 Bollywood Hits"
+            title="Bollywood Hits"
+            icon={Film}
             items={bollywoodData?.results as (Movie | TVShow)[]}
             isLoading={secondaryShelvesPending || bollywoodLoading}
             type="movie"
@@ -433,7 +468,8 @@ export default function Home() {
 
           {/* Hollywood Blockbusters */}
           <MemoizedCarousel
-            title="🎬 Hollywood Blockbusters"
+            title="Hollywood Blockbusters"
+            icon={Globe}
             items={hollywoodData?.results as (Movie | TVShow)[]}
             isLoading={secondaryShelvesPending || hollywoodLoading}
             type="movie"
@@ -443,7 +479,8 @@ export default function Home() {
           {/* Tamil Cinema */}
           {tamilData?.results && tamilData.results.length > 0 && (
             <MemoizedCarousel
-              title="🎭 Tamil Cinema"
+              title="Tamil Cinema"
+              icon={Film}
               items={tamilData.results as (Movie | TVShow)[]}
               isLoading={tamilLoading}
               type="movie"
@@ -454,7 +491,8 @@ export default function Home() {
           {/* Telugu Cinema */}
           {teluguData?.results && teluguData.results.length > 0 && (
             <MemoizedCarousel
-              title="🌟 Telugu Cinema"
+              title="Telugu Cinema"
+              icon={Film}
               items={teluguData.results as (Movie | TVShow)[]}
               isLoading={teluguLoading}
               type="movie"
@@ -465,7 +503,8 @@ export default function Home() {
           {/* Gujarati Cinema */}
           {gujaratiData?.results && gujaratiData.results.length > 0 && (
             <MemoizedCarousel
-              title="🎪 Gujarati Cinema"
+              title="Gujarati Cinema"
+              icon={Film}
               items={gujaratiData.results as (Movie | TVShow)[]}
               isLoading={gujaratiLoading}
               type="movie"
@@ -475,7 +514,8 @@ export default function Home() {
 
           {/* Trending TV Series */}
           <MemoizedCarousel
-            title="📺 Trending TV Series"
+            title="Trending TV Series"
+            icon={Tv}
             items={filteredTvShows as (Movie | TVShow)[]}
             isLoading={secondaryShelvesPending || tvLoading}
             type="tv"
@@ -484,12 +524,14 @@ export default function Home() {
 
           {/* Top Rated */}
           <MemoizedCarousel
-            title="⭐ Top Rated"
+            title="Top Rated"
+            icon={Award}
             items={filteredTopRatedMovies as (Movie | TVShow)[]}
             isLoading={secondaryShelvesPending || topRatedLoading}
             type="movie"
             viewAllHref="/movies?sort=vote_average.desc"
           />
+
         </div>
       </main>
 

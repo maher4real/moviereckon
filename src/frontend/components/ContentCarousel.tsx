@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ElementType, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ChevronLeft, ChevronRight, ArrowRight, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowRight, Sparkles, Star } from "lucide-react";
 import { Movie, TVShow, getPosterUrl, getLanguageBadgeClass } from "@/shared/lib/tmdb";
 import { Button } from "@/frontend/components/ui/button";
 import { cn } from "@/shared/lib/utils";
@@ -13,6 +13,7 @@ interface ContentItem extends Movie, TVShow {
 
 interface ContentCarouselProps {
   title: string;
+  icon?: ElementType;
   items: (Movie | TVShow | ContentItem)[] | undefined;
   isLoading: boolean;
   type: "movie" | "tv" | "mixed";
@@ -44,6 +45,7 @@ function getLoadStep(): number {
 
 export default function ContentCarousel({
   title,
+  icon: Icon,
   items,
   isLoading,
   type,
@@ -157,9 +159,23 @@ export default function ContentCarousel({
   return (
     <section className="px-4 md:px-6 lg:px-8">
       {title && (
-        <h2 className="text-xl md:text-2xl font-bold tracking-tight mb-3 md:mb-4">
-          {title}
-        </h2>
+        <div className="flex items-center justify-between mb-3 md:mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-1 h-6 rounded-full bg-primary shrink-0" />
+            {Icon && <Icon className="w-5 h-5 text-primary shrink-0" />}
+            <h2 className="text-lg md:text-xl font-bold tracking-tight">{title}</h2>
+          </div>
+          {resolvedViewAllHref && (
+            <button
+              type="button"
+              onClick={() => navigate(resolvedViewAllHref)}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors duration-200 cursor-pointer shrink-0"
+            >
+              View All
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       )}
 
       <div className="relative group">
@@ -229,8 +245,9 @@ export default function ContentCarousel({
                       </div>
 
                       {item.vote_average > 0 && (
-                        <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
-                          ⭐ {item.vote_average.toFixed(1)}
+                        <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
+                          <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                          {item.vote_average.toFixed(1)}
                         </div>
                       )}
 
