@@ -24,7 +24,6 @@ import BottomNav from "@/frontend/components/BottomNav";
 import HeroBanner from "@/frontend/components/HeroBanner";
 import ContentCarousel from "@/frontend/components/ContentCarousel";
 import Footer from "@/frontend/components/Footer";
-import { AppPageSkeleton } from "@/frontend/components/AppSkeletons";
 import {
   Sparkles,
   TrendingUp,
@@ -44,6 +43,31 @@ import { cn, formatLocalDate, isAnimeLike } from "@/shared/lib/utils";
 const MemoizedCarousel = memo(ContentCarousel);
 const HOME_UPCOMING_PAGES = [1, 2, 3] as const;
 const HOME_UPCOMING_TV_PAGES = [1, 2] as const;
+const HOME_UPCOMING_TIMEOUT_MS = 8000;
+
+type HomeUpcomingData = {
+  movies: Movie[];
+  tvShows: TVShow[];
+};
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      reject(new Error(`Request timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    promise.then(
+      (value) => {
+        window.clearTimeout(timeoutId);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timeoutId);
+        reject(error);
+      },
+    );
+  });
+}
 
 export default function Home() {
   const { user, profile } = useAuth();
@@ -70,16 +94,14 @@ export default function Home() {
   }, [user]);
 
   useEffect(() => {
-    if (!user || loadSecondaryShelves) return;
-    // Wave 1: high-priority visible shelves after hero renders
+    if (!user) return;
     const t1 = window.setTimeout(() => setLoadSecondaryShelves(true), 200);
-    // Wave 2: lower-priority regional + upcoming shelves
     const t2 = window.setTimeout(() => setLoadTertiaryShelves(true), 700);
     return () => {
       window.clearTimeout(t1);
       window.clearTimeout(t2);
     };
-  }, [user, loadSecondaryShelves]);
+  }, [user]);
 
   // Fetch all data with optimized query config
   const queryConfig = useMemo(
@@ -152,63 +174,69 @@ export default function Home() {
     enabled: loadSecondaryShelves,
   });
 
-  const { data: upcomingMovies, isLoading: upcomingLoading } = useQuery({
-    queryKey: ["upcoming-movies-home"],
-    queryFn: async () => {
-      const responses = await Promise.all(
-        HOME_UPCOMING_PAGES.map((page) => getUpcomingMovies(page).catch(() => null)),
-      );
-
-      const deduped = new Map<number, Movie>();
-      responses.forEach((response) => {
-        response?.results?.forEach((movie) => {
-          if (!deduped.has(movie.id)) {
-            deduped.set(movie.id, movie);
-          }
-        });
-      });
-
-      return Array.from(deduped.values()).sort((a, b) =>
-        (a.release_date || "9999-12-31").localeCompare(
-          b.release_date || "9999-12-31",
-        ),
-      );
-    },
-    ...queryConfig,
-    enabled: loadTertiaryShelves,
-  });
-
-  const { data: upcomingTVShows, isLoading: upcomingTVLoading } = useQuery({
-    queryKey: ["upcoming-tv-home"],
+  const { data: upcomingHomeData, isLoading: upcomingLoading } = useQuery({
+    queryKey: ["upcoming-home"],
     queryFn: async () => {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       const tomorrowStr = formatLocalDate(tomorrow);
 
-      const responses = await Promise.all(
-        HOME_UPCOMING_TV_PAGES.map((page) =>
-          getUpcomingTVShows(page, tomorrowStr).catch(() => null),
+      const [movieResponses, tvResponses] = await Promise.all([
+        Promise.allSettled(
+          HOME_UPCOMING_PAGES.map((page) =>
+            withTimeout(getUpcomingMovies(page), HOME_UPCOMING_TIMEOUT_MS),
+          ),
         ),
-      );
+        Promise.allSettled(
+          HOME_UPCOMING_TV_PAGES.map((page) =>
+            withTimeout(
+              getUpcomingTVShows(page, tomorrowStr),
+              HOME_UPCOMING_TIMEOUT_MS,
+            ),
+          ),
+        ),
+      ]);
 
-      const deduped = new Map<number, TVShow>();
-      responses.forEach((response) => {
-        response?.results?.forEach((show) => {
-          if (!deduped.has(show.id)) {
-            deduped.set(show.id, show);
+      const dedupedMovies = new Map<number, Movie>();
+      movieResponses.forEach((response) => {
+        if (response.status !== "fulfilled") return;
+        response.value.results?.forEach((movie) => {
+          if (!dedupedMovies.has(movie.id)) {
+            dedupedMovies.set(movie.id, movie);
           }
         });
       });
 
-      return Array.from(deduped.values()).sort((a, b) =>
-        (a.first_air_date || "9999-12-31").localeCompare(
-          b.first_air_date || "9999-12-31",
+      const dedupedTVShows = new Map<number, TVShow>();
+      tvResponses.forEach((response) => {
+        if (response.status !== "fulfilled") return;
+        response.value.results?.forEach((show) => {
+          if (!dedupedTVShows.has(show.id)) {
+            dedupedTVShows.set(show.id, show);
+          }
+        });
+      });
+
+      return {
+        movies: Array.from(dedupedMovies.values()).sort((a, b) =>
+          (a.release_date || "9999-12-31").localeCompare(
+            b.release_date || "9999-12-31",
+          ),
         ),
-      );
+        tvShows: Array.from(dedupedTVShows.values()).sort((a, b) =>
+          (a.first_air_date || "9999-12-31").localeCompare(
+            b.first_air_date || "9999-12-31",
+          ),
+        ),
+      } satisfies HomeUpcomingData;
     },
     ...queryConfig,
     enabled: loadTertiaryShelves,
+    retry: false,
   });
+
+  const upcomingMovies = upcomingHomeData?.movies;
+  const upcomingTVShows = upcomingHomeData?.tvShows;
 
   // Filter Now Playing to only show movies released today or earlier
   const filteredNowPlaying = useMemo(() => {
@@ -423,12 +451,12 @@ export default function Home() {
           )}
 
           {/* Upcoming */}
-          {(tertiaryShelvesPending || filteredUpcoming.length > 0 || upcomingLoading || upcomingTVLoading) && (
+          {(tertiaryShelvesPending || filteredUpcoming.length > 0 || upcomingLoading) && (
             <MemoizedCarousel
               title="Upcoming"
               icon={CalendarDays}
               items={filteredUpcoming as (Movie | TVShow)[]}
-              isLoading={tertiaryShelvesPending || upcomingLoading || upcomingTVLoading}
+              isLoading={tertiaryShelvesPending || upcomingLoading}
               type="mixed"
               viewAllHref="/upcoming"
             />
