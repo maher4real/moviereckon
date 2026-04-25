@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import BrandLogo from "@/frontend/components/BrandLogo";
-import MediaImage from "@/frontend/components/MediaImage";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import { useIsMobile } from "@/frontend/hooks/use-mobile";
 import {
@@ -300,6 +299,9 @@ export default function AuthTransitionOverlay() {
   if (phase === "hidden") return null;
 
   const isCenter = phase === "center";
+  const hasRemotePosterArt = backgroundPosters.some(
+    (poster) => poster.src !== "/fallbacks/poster.svg",
+  );
 
   return (
     <div
@@ -311,8 +313,12 @@ export default function AuthTransitionOverlay() {
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 scale-[1.08] -rotate-2">
           <div
-            className="flex h-full flex-col justify-center gap-3 opacity-64"
-            style={{ filter: "saturate(1.16) contrast(1.06) brightness(0.9)" }}
+            className="flex h-full flex-col justify-center gap-3 opacity-84"
+            style={{
+              filter: hasRemotePosterArt
+                ? "saturate(1.18) contrast(1.08) brightness(1.02)"
+                : "saturate(1.08) contrast(1.04) brightness(0.96)",
+            }}
           >
             {posterRows.map((row, rowIndex) => (
               <div
@@ -328,13 +334,19 @@ export default function AuthTransitionOverlay() {
                     key={`${poster.id}-${rowIndex}-${index}`}
                     className="auth-poster-tile"
                   >
-                    <MediaImage
+                    <img
                       src={poster.src}
                       alt=""
                       aria-hidden="true"
                       className="h-full w-full object-cover"
-                      fallbackSrc="/fallbacks/poster.svg"
-                      loading="eager"
+                      loading={rowIndex === 0 ? "eager" : "lazy"}
+                      decoding="async"
+                      fetchPriority={rowIndex === 0 && index < POSTERS_PER_ROW ? "high" : "auto"}
+                      onError={(event) => {
+                        const target = event.currentTarget;
+                        if (target.src.endsWith("/fallbacks/poster.svg")) return;
+                        target.src = "/fallbacks/poster.svg";
+                      }}
                     />
                   </div>
                 ))}
@@ -343,9 +355,9 @@ export default function AuthTransitionOverlay() {
           </div>
         </div>
 
-        <div className="absolute inset-0 bg-black/22" />
+        <div className="absolute inset-0 bg-black/14" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_22%,hsl(var(--secondary)/0.22),transparent_42%),radial-gradient(circle_at_84%_74%,hsl(var(--primary)/0.26),transparent_45%)]" />
-        <div className="absolute inset-0 bg-linear-to-br from-background/68 via-background/44 to-background/62" />
+        <div className="absolute inset-0 bg-linear-to-br from-background/56 via-background/28 to-background/48" />
         <div className="absolute top-1/4 -left-1/4 h-1/2 w-1/2 rounded-full bg-primary/16 blur-[120px]" />
         <div className="absolute bottom-1/4 -right-1/4 h-1/2 w-1/2 rounded-full bg-secondary/18 blur-[120px]" />
       </div>
