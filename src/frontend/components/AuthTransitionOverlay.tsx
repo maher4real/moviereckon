@@ -334,7 +334,7 @@ export default function AuthTransitionOverlay() {
                       aria-hidden="true"
                       className="h-full w-full object-cover"
                       fallbackSrc="/fallbacks/poster.svg"
-                      loading="lazy"
+                      loading="eager"
                     />
                   </div>
                 ))}
