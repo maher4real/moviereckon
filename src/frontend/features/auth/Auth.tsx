@@ -9,7 +9,6 @@ import {
   getBollywoodMovies,
   getPosterUrl,
 } from "@/shared/lib/tmdb";
-import { AuthPageSkeleton } from "@/frontend/components/AppSkeletons";
 import BrandLogo from "@/frontend/components/BrandLogo";
 import TurnstileCaptcha from "@/frontend/components/TurnstileCaptcha";
 import { Alert, AlertDescription, AlertTitle } from "@/frontend/components/ui/alert";
@@ -184,15 +183,14 @@ export default function Auth() {
   }, [bollywoodData, trendingMovies, trendingTV]);
 
   const posterRows = useMemo(() => {
-    if (!backgroundPosters.length) return [];
-
-    const rowCount = 3;
-    const postersPerRow = 8;
+    const rowCount = 4;
+    const postersPerRow = 9;
+    const total = backgroundPosters.length || 1;
 
     return Array.from({ length: rowCount }, (_, rowIndex) => {
-      const start = (rowIndex * 6) % backgroundPosters.length;
+      const start = (rowIndex * 7) % total;
       return Array.from({ length: postersPerRow }, (_, offset) => {
-        return backgroundPosters[(start + offset) % backgroundPosters.length];
+        return backgroundPosters[(start + offset) % total];
       });
     });
   }, [backgroundPosters]);
@@ -635,17 +633,11 @@ export default function Auth() {
   const resendVerificationHint = "We limit resend requests to one email per minute.";
   const combinedGoogleErrorMessage = googlePromptError || oauthErrorMessage;
 
-  if (user) {
-    // Avoid blank first paint while the redirect effect navigates to /home.
-    return <AuthPageSkeleton />;
-  }
-
-  if (isLoading) {
-    return <AuthPageSkeleton />;
-  }
+  const showCard = !isLoading && !user;
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background p-4">
+    <div className="relative min-h-screen overflow-hidden bg-background">
+      {/* Poster carousel — always rendered so queries fire immediately */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 scale-[1.08] -rotate-2">
           <div
@@ -687,18 +679,19 @@ export default function Auth() {
         <div className="absolute bottom-1/4 -right-1/4 h-1/2 w-1/2 rounded-full bg-secondary/18 blur-[120px]" />
       </div>
 
-      <div className="relative z-10 flex min-h-screen w-full items-center justify-center">
-        <div className="w-full max-w-md animate-fade-in">
-          <div className="mb-8 flex flex-col items-center">
-            <div className="mb-4 flex justify-center">
-              <BrandLogo size="xl" animated={isSubmitting || isGoogleSubmitting || isAuthenticating || isLoading} />
+      <div className="relative z-10 flex min-h-screen w-full items-center justify-center p-4">
+        {showCard ? (
+          <div className="w-full max-w-md animate-fade-in">
+            <div className="mb-8 flex flex-col items-center">
+              <div className="mb-4 flex justify-center">
+                <BrandLogo size="xl" animated={isSubmitting || isGoogleSubmitting || isAuthenticating} />
+              </div>
+              <p className="text-center text-muted-foreground">
+                Your personalized gateway to Bollywood & Hollywood
+              </p>
             </div>
-            <p className="text-center text-muted-foreground">
-              Your personalized gateway to Bollywood & Hollywood
-            </p>
-          </div>
 
-          <section className="rounded-3xl border border-white/11 bg-card/85 px-8 py-9 shadow-2xl shadow-black/50 backdrop-blur-2xl ring-1 ring-inset ring-white/6">
+            <section className="rounded-3xl border border-white/11 bg-card/85 px-8 py-9 shadow-2xl shadow-black/50 backdrop-blur-2xl ring-1 ring-inset ring-white/6">
             {emailVerificationStatus ? (
               <Alert
                 className={cn(
@@ -1083,6 +1076,14 @@ export default function Auth() {
             Discover movies from Bollywood, Hollywood & more
           </p>
         </div>
+        ) : (
+          <div className="flex flex-col items-center gap-6 animate-fade-in">
+            <BrandLogo size="xl" animated />
+            <p className="text-center text-muted-foreground text-sm">
+              Your personalized gateway to Bollywood & Hollywood
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -26,8 +26,8 @@ const INITIAL_TRANSFORM = {
   y: 0,
   scale: 1,
 };
-const ROW_COUNT = 3;
-const POSTERS_PER_ROW = 8;
+const ROW_COUNT = 4;
+const POSTERS_PER_ROW = 9;
 const isAuthRoute = (pathname: string) =>
   pathname === "/" || pathname.startsWith("/auth");
 
@@ -139,12 +139,12 @@ export default function AuthTransitionOverlay() {
   }, [bollywoodData, trendingMovies, trendingTV]);
 
   const posterRows = useMemo(() => {
-    if (!backgroundPosters.length) return [];
+    const total = backgroundPosters.length || 1;
 
     return Array.from({ length: ROW_COUNT }, (_, rowIndex) => {
-      const start = (rowIndex * 6) % backgroundPosters.length;
+      const start = (rowIndex * 7) % total;
       return Array.from({ length: POSTERS_PER_ROW }, (_, offset) => {
-        return backgroundPosters[(start + offset) % backgroundPosters.length];
+        return backgroundPosters[(start + offset) % total];
       });
     });
   }, [backgroundPosters]);

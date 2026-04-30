@@ -205,9 +205,9 @@ export default function ContentCarousel({
             Array.from({ length: 8 }).map((_, i) => (
               <div
                 key={i}
-                className="flex-shrink-0 snap-start w-[128px] sm:w-[140px] md:w-[180px] lg:w-[200px]"
+                className="shrink-0 snap-start w-32 sm:w-35 md:w-45 lg:w-50"
               >
-                <div className="aspect-[2/3] rounded-lg bg-muted animate-pulse" />
+                <div className="aspect-2/3 rounded-lg bg-muted animate-pulse" />
                 <div className="mt-2 h-4 bg-muted rounded animate-pulse w-3/4" />
                 <div className="mt-1 h-3 bg-muted rounded animate-pulse w-1/2" />
               </div>
@@ -226,9 +226,9 @@ export default function ContentCarousel({
                     key={`${itemType}-${item.id}`}
                     type="button"
                     onClick={() => handleItemClick(item)}
-                    className="flex-shrink-0 snap-start w-[128px] sm:w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/card relative text-left bg-transparent border-0 p-0"
+                    className="shrink-0 snap-start w-32 sm:w-35 md:w-45 lg:w-50 cursor-pointer group/card relative text-left bg-transparent border-0 p-0"
                   >
-                    <div className="relative aspect-[2/3] rounded-lg overflow-hidden transform-gpu transition-[transform,box-shadow] duration-300 group-hover/card:-translate-y-1.5 group-hover/card:shadow-[0_12px_36px_rgba(0,0,0,0.48)]">
+                    <div className="relative aspect-2/3 rounded-lg overflow-hidden transform-gpu transition-[transform,box-shadow] duration-300 group-hover/card:-translate-y-1.5 group-hover/card:shadow-[0_12px_36px_rgba(0,0,0,0.48)]">
                       <MediaImage
                         src={getPosterUrl(item.poster_path, "medium")}
                         alt={getTitle(item)}
@@ -320,11 +320,12 @@ export default function ContentCarousel({
               })}
 
               {shouldRenderViewAllCard && (
-                <div
+                <button
+                  type="button"
                   onClick={() => navigate(resolvedViewAllHref)}
-                  className="flex-shrink-0 snap-start w-[128px] sm:w-[140px] md:w-[180px] lg:w-[200px] cursor-pointer group/viewall"
+                  className="shrink-0 snap-start w-32 sm:w-35 md:w-45 lg:w-50 cursor-pointer group/viewall bg-transparent border-0 p-0 text-left"
                 >
-                  <div className="relative aspect-[2/3] rounded-lg overflow-hidden border border-border bg-linear-to-br from-card to-muted/40 transition-all duration-300 group-hover/viewall:border-primary/40 group-hover/viewall:shadow-[0_10px_30px_rgba(0,0,0,0.35)] flex items-center justify-center">
+                  <div className="relative aspect-2/3 rounded-lg overflow-hidden border border-border bg-linear-to-br from-card to-muted/40 transition-all duration-300 group-hover/viewall:border-primary/40 group-hover/viewall:shadow-[0_10px_30px_rgba(0,0,0,0.35)] flex items-center justify-center">
                     <div className="flex flex-col items-center justify-center gap-3 px-4 text-center">
                       <div className="w-12 h-12 rounded-full bg-primary/20 text-primary flex items-center justify-center group-hover/viewall:bg-primary group-hover/viewall:text-primary-foreground transition-all duration-300">
                         <ArrowRight className="w-6 h-6" />
@@ -341,7 +342,7 @@ export default function ContentCarousel({
                   {title && (
                     <p className="text-xs text-muted-foreground">{title}</p>
                   )}
-                </div>
+                </button>
               )}
             </>
           )}
