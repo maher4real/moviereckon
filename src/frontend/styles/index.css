@@ -93,11 +93,14 @@
 
   html {
     @apply scroll-smooth;
+    min-height: 100%;
+    background: hsl(var(--background));
     scrollbar-gutter: stable;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
+    min-height: 100dvh;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
     text-rendering: optimizeLegibility;

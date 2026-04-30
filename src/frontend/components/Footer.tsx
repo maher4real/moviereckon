@@ -58,7 +58,7 @@ export default function Footer() {
   ];
 
   return (
-    <footer className="relative mt-auto border-t border-border/70 bg-background/95">
+    <footer className="sticky top-[100dvh] mt-auto border-t border-border/70 bg-background">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_18%,hsl(var(--primary)/0.18),transparent_40%),radial-gradient(circle_at_88%_90%,hsl(var(--accent)/0.2),transparent_35%)]" />
 
       <div className="container relative mx-auto px-4 py-10 md:py-12">
