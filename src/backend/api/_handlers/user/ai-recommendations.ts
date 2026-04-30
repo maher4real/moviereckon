@@ -707,7 +707,7 @@ async function buildAIRecommendations(
   const rawExplanations = await generateExplanations(
     anchors.profile,
     explanationInputs,
-  ).catch(() => ({}));
+  ).catch((): Record<string, string> => ({}));
 
   // 7. Build final payload
   const explanationById: Record<string, { label: string; text: string }> = {};

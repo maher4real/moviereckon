@@ -190,7 +190,7 @@ function getHeaderValue(headers: RequestLike["headers"], headerName: string): st
   }
 
   const normalizedHeaderName = headerName.toLowerCase();
-  const direct = headers[normalizedHeaderName];
+  const direct = (headers as Record<string, string | string[] | undefined>)[normalizedHeaderName];
   if (typeof direct === "string") return direct;
   if (Array.isArray(direct) && direct.length > 0) return direct[0] ?? null;
 

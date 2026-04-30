@@ -79,7 +79,7 @@ export default function TVDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  useAuth();
   const { addToWatchHistory, isWatched, toggleLike, isLiked } = useUserData();
   const { isInWatchlist, toggleItem: toggleWatchlist } = useWatchlist();
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
@@ -427,7 +427,7 @@ export default function TVDetail() {
       if (!frame?.contentWindow) return;
       frame.contentWindow.postMessage(
         JSON.stringify({ event: "command", func, args }),
-        "*",
+        "https://www.youtube.com",
       );
     },
     [],

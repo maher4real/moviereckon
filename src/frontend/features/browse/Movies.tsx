@@ -15,6 +15,7 @@ import {
   getLanguageBadgeClass,
   DiscoverFilters,
 } from "@/shared/lib/tmdb";
+import type { TMDBResponse } from "@/shared/lib/tmdb";
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
 import BottomNav from "@/frontend/components/BottomNav";
@@ -244,7 +245,7 @@ export default function Movies() {
       queryKey: ["movies-infinite", "hollywood", "", "all", "popularity.desc"],
       initialPageParam: 1,
       queryFn: async ({ pageParam }) => getHollywoodMovies(Number(pageParam) || 1),
-      getNextPageParam: (lastPage) => {
+      getNextPageParam: (lastPage: TMDBResponse<Movie>) => {
         if (!lastPage?.page || !lastPage?.total_pages) return undefined;
         return lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined;
       },
@@ -255,7 +256,7 @@ export default function Movies() {
       queryKey: ["movies-infinite", "bollywood", "", "hi", "popularity.desc"],
       initialPageParam: 1,
       queryFn: async ({ pageParam }) => getBollywoodMovies(Number(pageParam) || 1),
-      getNextPageParam: (lastPage) => {
+      getNextPageParam: (lastPage: TMDBResponse<Movie>) => {
         if (!lastPage?.page || !lastPage?.total_pages) return undefined;
         return lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined;
       },

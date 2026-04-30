@@ -64,7 +64,7 @@ export default function MovieDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  useAuth();
   const { addToWatchHistory, isWatched, toggleLike, isLiked } = useUserData();
   const { isInWatchlist, toggleItem: toggleWatchlist } = useWatchlist();
   const [watchAnimating, setWatchAnimating] = useState(false);
@@ -439,7 +439,7 @@ export default function MovieDetail() {
       if (!frame?.contentWindow) return;
       frame.contentWindow.postMessage(
         JSON.stringify({ event: "command", func, args }),
-        "*",
+        "https://www.youtube.com",
       );
     },
     [],

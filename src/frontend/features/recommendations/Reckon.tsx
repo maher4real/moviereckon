@@ -38,7 +38,6 @@ import {
   Globe,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
-import * as mongoClient from "@/frontend/lib/mongodbClient";
 
 type ContentTypeFilter = "all" | "movie" | "tv";
 type RecommendationTypeFilter =
@@ -112,6 +111,48 @@ const LANGUAGE_MAP: Record<string, string> = {
 const getRecommendationItemType = (item: Movie | TVShow): "movie" | "tv" =>
   "title" in item ? "movie" : "tv";
 
+const PREF_LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "hi", label: "Hindi" },
+  { code: "ta", label: "Tamil" },
+  { code: "te", label: "Telugu" },
+  { code: "gu", label: "Gujarati" },
+  { code: "ml", label: "Malayalam" },
+  { code: "kn", label: "Kannada" },
+  { code: "ko", label: "Korean" },
+  { code: "ja", label: "Japanese" },
+  { code: "es", label: "Spanish" },
+  { code: "fr", label: "French" },
+  { code: "tr", label: "Turkish" },
+  { code: "pt", label: "Portuguese" },
+  { code: "zh", label: "Chinese" },
+  { code: "ar", label: "Arabic" },
+  { code: "it", label: "Italian" },
+  { code: "de", label: "German" },
+  { code: "ru", label: "Russian" },
+];
+
+const PREF_GENRES = [
+  { id: 28, name: "Action" },
+  { id: 12, name: "Adventure" },
+  { id: 16, name: "Animation" },
+  { id: 35, name: "Comedy" },
+  { id: 80, name: "Crime" },
+  { id: 99, name: "Documentary" },
+  { id: 18, name: "Drama" },
+  { id: 10751, name: "Family" },
+  { id: 14, name: "Fantasy" },
+  { id: 36, name: "History" },
+  { id: 27, name: "Horror" },
+  { id: 10402, name: "Music" },
+  { id: 9648, name: "Mystery" },
+  { id: 10749, name: "Romance" },
+  { id: 878, name: "Sci-Fi" },
+  { id: 53, name: "Thriller" },
+  { id: 10752, name: "War" },
+  { id: 37, name: "Western" },
+];
+
 const ReckonCard = memo(
   ({
     item,
@@ -137,8 +178,158 @@ const ReckonCard = memo(
 ReckonCard.displayName = "ReckonCard";
 
 // ---------------------------------------------------------------------------
-// Preferences Sheet
+// First Time Setup Card
 // ---------------------------------------------------------------------------
+function FirstTimeSetup({
+  langs,
+  genres,
+  onToggleLang,
+  onToggleGenre,
+  onSave,
+  onSkip,
+  saving,
+}: {
+  langs: string[];
+  genres: number[];
+  onToggleLang: (lang: string) => void;
+  onToggleGenre: (genre: number) => void;
+  onSave: () => void;
+  onSkip: () => void;
+  saving: boolean;
+}) {
+
+  return (
+    <div className="mb-6 rounded-xl border border-primary/30 bg-linear-to-br from-primary/5 via-primary/3 to-primary/8 px-6 py-8">
+      <div className="max-w-2xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <div className="inline-flex p-3 rounded-xl bg-primary/10 border border-primary/20 mb-4">
+            <Sparkles className="w-8 h-8 text-primary" />
+          </div>
+          <h2 className="text-2xl font-bold text-foreground mb-2">
+            Welcome to Reckon!
+          </h2>
+          <p className="text-muted-foreground">
+            Set your preferences to unlock personalized movie and TV recommendations tailored just for you.
+          </p>
+        </div>
+
+        {/* Languages */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Globe className="w-5 h-5 text-primary" />
+              <span className="text-base font-semibold text-foreground">Preferred Languages</span>
+            </div>
+            <span className={cn(
+              "text-sm font-medium px-3 py-1 rounded-full transition-all duration-200",
+              langs.length > 0
+                ? "bg-primary/15 text-primary"
+                : "bg-muted text-muted-foreground",
+            )}>
+              {langs.length > 0 ? `${langs.length} selected` : "None selected"}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {PREF_LANGUAGES.map(({ code, label }) => {
+              const active = langs.includes(code);
+              return (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => onToggleLang(code)}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border transition-all duration-200 cursor-pointer",
+                    active
+                      ? "bg-primary border-primary text-primary-foreground shadow-sm"
+                      : "bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground hover:bg-primary/5",
+                  )}
+                >
+                  {active && <Check className="w-4 h-4" />}
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Genres */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Film className="w-5 h-5 text-primary" />
+              <span className="text-base font-semibold text-foreground">Favorite Genres</span>
+            </div>
+            <span className={cn(
+              "text-sm font-medium px-3 py-1 rounded-full transition-all duration-200",
+              genres.length > 0
+                ? "bg-primary/15 text-primary"
+                : "bg-muted text-muted-foreground",
+            )}>
+              {genres.length > 0 ? `${genres.length} selected` : "None selected"}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {PREF_GENRES.map(({ id, name }) => {
+              const active = genres.includes(id);
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => onToggleGenre(id)}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border transition-all duration-200 cursor-pointer",
+                    active
+                      ? "bg-primary border-primary text-primary-foreground shadow-sm"
+                      : "bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground hover:bg-primary/5",
+                  )}
+                >
+                  {active && <Check className="w-4 h-4" />}
+                  {name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Button
+            onClick={onSave}
+            disabled={saving || (langs.length === 0 && genres.length === 0)}
+            size="lg"
+            className="flex-1 sm:flex-none bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 disabled:opacity-50 cursor-pointer"
+          >
+            {saving ? (
+              <>
+                <RefreshCw className="w-5 h-5 animate-spin mr-2" />
+                Saving Preferences…
+              </>
+            ) : (
+              <>
+                <Check className="w-5 h-5 mr-2" />
+                Get My Recommendations
+              </>
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={onSkip}
+            disabled={saving}
+            size="lg"
+            className="flex-1 sm:flex-none cursor-pointer"
+          >
+            Skip for Now
+          </Button>
+        </div>
+
+        <p className="text-xs text-muted-foreground text-center mt-4">
+          You can always change these preferences later from the settings button.
+        </p>
+      </div>
+    </div>
+  );
+}
 function PreferencesSheet({
   open,
   onClose,
@@ -148,7 +339,7 @@ function PreferencesSheet({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { preferences, refreshData } = useUserData();
+  const { preferences, updatePreferences } = useUserData();
   const [langs, setLangs] = useState<string[]>([]);
   const [genres, setGenres] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
@@ -172,57 +363,11 @@ function PreferencesSheet({
 
   const save = async () => {
     setSaving(true);
-    await mongoClient.updateUserPreferences({
-      preferred_languages: langs,
-      preferred_genres: genres,
-    });
-    await refreshData();
+    await updatePreferences({ preferred_languages: langs, preferred_genres: genres });
     setSaving(false);
     onSaved();
     onClose();
   };
-
-  const PREF_LANGUAGES = [
-    { code: "en", label: "English" },
-    { code: "hi", label: "Hindi" },
-    { code: "ta", label: "Tamil" },
-    { code: "te", label: "Telugu" },
-    { code: "gu", label: "Gujarati" },
-    { code: "ml", label: "Malayalam" },
-    { code: "kn", label: "Kannada" },
-    { code: "ko", label: "Korean" },
-    { code: "ja", label: "Japanese" },
-    { code: "es", label: "Spanish" },
-    { code: "fr", label: "French" },
-    { code: "tr", label: "Turkish" },
-    { code: "pt", label: "Portuguese" },
-    { code: "zh", label: "Chinese" },
-    { code: "ar", label: "Arabic" },
-    { code: "it", label: "Italian" },
-    { code: "de", label: "German" },
-    { code: "ru", label: "Russian" },
-  ];
-
-  const PREF_GENRES = [
-    { id: 28, name: "Action" },
-    { id: 12, name: "Adventure" },
-    { id: 16, name: "Animation" },
-    { id: 35, name: "Comedy" },
-    { id: 80, name: "Crime" },
-    { id: 99, name: "Documentary" },
-    { id: 18, name: "Drama" },
-    { id: 10751, name: "Family" },
-    { id: 14, name: "Fantasy" },
-    { id: 36, name: "History" },
-    { id: 27, name: "Horror" },
-    { id: 10402, name: "Music" },
-    { id: 9648, name: "Mystery" },
-    { id: 10749, name: "Romance" },
-    { id: 878, name: "Sci-Fi" },
-    { id: 53, name: "Thriller" },
-    { id: 10752, name: "War" },
-    { id: 37, name: "Western" },
-  ];
 
   const hasChanges =
     JSON.stringify([...langs].sort()) !==
@@ -371,7 +516,7 @@ export default function Reckon() {
     explanationById,
     refreshRecommendations,
   } = useRecommendations();
-  const { preferences } = useUserData();
+  const { preferences, updatePreferences } = useUserData();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const [contentTypeFilter, setContentTypeFilter] =
@@ -384,6 +529,26 @@ export default function Reckon() {
   const [selectedLanguage, setSelectedLanguage] = useState<string>("all");
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_ITEMS);
   const [prefsOpen, setPrefsOpen] = useState(false);
+  const [skippedSetup, setSkippedSetup] = useState(false);
+  const [setupLangs, setSetupLangs] = useState<string[]>([]);
+  const [setupGenres, setSetupGenres] = useState<number[]>([]);
+  const [setupSaving, setSetupSaving] = useState(false);
+  const toggleSetupLang = (l: string) =>
+    setSetupLangs((prev) =>
+      prev.includes(l) ? prev.filter((x) => x !== l) : [...prev, l],
+    );
+
+  const toggleSetupGenre = (g: number) =>
+    setSetupGenres((prev) =>
+      prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g],
+    );
+
+  const saveSetup = useCallback(async () => {
+    setSetupSaving(true);
+    await updatePreferences({ preferred_languages: setupLangs, preferred_genres: setupGenres });
+    await refreshRecommendations();
+    setSetupSaving(false);
+  }, [updatePreferences, setupLangs, setupGenres, refreshRecommendations]);
   const [extraItems, setExtraItems] = useState<(Movie | TVShow)[]>([]);
   const [discoverPage, setDiscoverPage] = useState(1);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
@@ -484,6 +649,9 @@ export default function Reckon() {
   const handlePreferencesSaved = useCallback(() => {
     void refreshRecommendations();
   }, [refreshRecommendations]);
+
+  const showFirstTimeSetup =
+    !hasPreferences && !reckonLoading && preferences !== null && !skippedSetup;
 
   const availableGenres = useMemo(() => {
     const genres = new Set<number>();
@@ -724,8 +892,18 @@ export default function Reckon() {
             </div>
           </div>
 
-          {/* Preferences nudge for new users */}
-          {!hasPreferences && !reckonLoading && (
+          {/* First Time Setup or Preferences Nudge */}
+          {showFirstTimeSetup ? (
+            <FirstTimeSetup
+              langs={setupLangs}
+              genres={setupGenres}
+              onToggleLang={toggleSetupLang}
+              onToggleGenre={toggleSetupGenre}
+              onSave={saveSetup}
+              onSkip={() => setSkippedSetup(true)}
+              saving={setupSaving}
+            />
+          ) : !hasPreferences && !reckonLoading ? (
             <div className="mb-5 rounded-xl border border-primary/25 bg-linear-to-r from-primary/8 to-primary/4 px-4 py-3.5 flex items-center gap-3">
               <div className="p-1.5 rounded-lg bg-primary/15 border border-primary/20 shrink-0">
                 <Sparkles className="w-4 h-4 text-primary" />
@@ -746,7 +924,7 @@ export default function Reckon() {
                 Set Up
               </Button>
             </div>
-          )}
+          ) : null}
 
           {/* Content type + rec type filter rows */}
           <div className="flex flex-col gap-3 mb-6">

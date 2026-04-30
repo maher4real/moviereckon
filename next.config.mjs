@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: false,
+  reactStrictMode: true,
   images: {
     formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 86400,
@@ -23,6 +23,13 @@ const nextConfig = {
       "@radix-ui/react-popover",
       "@radix-ui/react-dropdown-menu",
     ],
+  },
+  turbopack: {
+    resolveExtensionAlias: {
+      ".js": [".ts", ".tsx", ".js"],
+      ".mjs": [".mts", ".mjs"],
+      ".cjs": [".cts", ".cjs"],
+    },
   },
   webpack: (config) => {
     config.resolve.extensionAlias = {

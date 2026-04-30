@@ -316,7 +316,7 @@ export interface TMDBReview {
   };
 }
 
-interface TMDBResponse<T> {
+export interface TMDBResponse<T> {
   page: number;
   results: T[];
   total_pages: number;

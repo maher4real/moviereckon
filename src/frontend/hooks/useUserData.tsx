@@ -86,6 +86,7 @@ interface UserDataContextType {
   getTopGenres: (limit?: number) => number[];
   clearHistory: () => Promise<void>;
   refreshData: () => Promise<void>;
+  updatePreferences: (prefs: { preferred_languages?: string[]; preferred_genres?: number[] }) => Promise<void>;
 }
 
 const UserDataContext = createContext<UserDataContextType | undefined>(undefined);
@@ -519,6 +520,28 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     await fetchUserData();
   }, [fetchUserData]);
 
+  // Update Preferences
+  const updatePreferences = useCallback(
+    async (prefs: { preferred_languages?: string[]; preferred_genres?: number[] }) => {
+      const userId = getUserId();
+      if (!userId) return;
+      try {
+        const result = await mongoClient.updateUserPreferences(prefs);
+        if (result) {
+          setPreferences(result as UserPreferences);
+        }
+      } catch (error) {
+        console.error("Error updating preferences:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to save preferences",
+        });
+      }
+    },
+    [getUserId, toast],
+  );
+
   return (
     <UserDataContext.Provider
       value={{
@@ -538,6 +561,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
         getTopGenres,
         clearHistory,
         refreshData,
+        updatePreferences,
       }}
     >
       {children}

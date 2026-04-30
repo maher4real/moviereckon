@@ -1,3 +1,4 @@
+import { describe, expect, it } from "vitest";
 import { containsBlockedTerms, findBlockedTerms } from "./profanity";
 
 describe("profanity filter", () => {

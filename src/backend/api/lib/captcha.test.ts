@@ -10,7 +10,7 @@ function createRequest(host = "moviereckon.vercel.app"): VercelRequest {
       host,
       "x-forwarded-for": "203.0.113.5",
     },
-  } as VercelRequest;
+  } as unknown as VercelRequest;
 }
 
 describe("verifyCaptchaToken", () => {

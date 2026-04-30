@@ -7,7 +7,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import jwt from "jsonwebtoken";
 import { put } from "@vercel/blob";
 
-const JWT_SECRET = process.env.JWT_SECRET!;
+const JWT_SECRET = process.env.JWT_SECRET ?? "";
 const MAX_BYTES = 5_000_000; // 5 MB
 const ALLOWED_TYPES: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -20,11 +20,14 @@ const DATA_URL_RE =
   /^data:(image\/(?:png|jpe?g|webp|gif));base64,([A-Za-z0-9+/=]+)$/i;
 
 function verifyAdminToken(req: NextApiRequest): boolean {
+  if (JWT_SECRET.length < 32) return false;
   const auth = req.headers["authorization"] || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
   if (!token) return false;
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as Record<string, unknown>;
+    const payload = jwt.verify(token, JWT_SECRET, {
+      issuer: "moviereckon-admin",
+    }) as Record<string, unknown>;
     return payload.role === "admin";
   } catch {
     return false;

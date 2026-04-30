@@ -44,7 +44,7 @@ describe("verifyGoogleIdToken", () => {
         audience: "google-client-id",
         issuer: "https://accounts.google.com",
         expiresIn: "5m",
-        header: { kid: "test-kid" },
+        header: { alg: "RS256", kid: "test-kid" },
       },
     );
 
@@ -80,7 +80,7 @@ describe("verifyGoogleIdToken", () => {
         audience: "google-client-id",
         issuer: "https://accounts.google.com",
         expiresIn: "5m",
-        header: { kid: "test-kid" },
+        header: { alg: "RS256", kid: "test-kid" },
       },
     );
 
@@ -111,7 +111,7 @@ describe("verifyGoogleIdToken", () => {
         audience: "google-client-id",
         issuer: "https://accounts.google.com",
         expiresIn: "5m",
-        header: { kid: "test-kid" },
+        header: { alg: "RS256", kid: "test-kid" },
       },
     );
 
