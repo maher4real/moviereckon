@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Eye, Heart, Sparkles, Bookmark } from "lucide-react";
 import { Movie, TVShow, getPosterUrl, getLanguageLabel } from "@/shared/lib/tmdb";
@@ -9,6 +9,14 @@ import { cn } from "@/shared/lib/utils";
 import MediaImage from "@/frontend/components/MediaImage";
 import { Popover, PopoverContent, PopoverTrigger } from "@/frontend/components/ui/popover";
 import { RecommendationReason } from "@/shared/lib/recommendation";
+
+export interface WatchlistFlyEventDetail {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  posterUrl: string;
+}
 
 interface ContentCardProps {
   item: Movie | TVShow;
@@ -30,6 +38,7 @@ function ContentCardComponent({
   const { isWatched, isLiked, addToWatchHistory, toggleLike } = useUserData();
   const { isInWatchlist, toggleItem: toggleWatchlist } = useWatchlist();
   const isMobile = useIsMobile();
+  const posterRef = useRef<HTMLDivElement>(null);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [watchAnimating, setWatchAnimating] = useState(false);
   const [bookmarkAnimating, setBookmarkAnimating] = useState(false);
@@ -80,6 +89,20 @@ function ContentCardComponent({
 
   const handleBookmark = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    
+    if (!bookmarked && posterRef.current) {
+      // Trigger fly animation before actual state update
+      const rect = posterRef.current.getBoundingClientRect();
+      const eventDetail: WatchlistFlyEventDetail = {
+        x: rect.left,
+        y: rect.top,
+        width: rect.width,
+        height: rect.height,
+        posterUrl: getPosterUrl(item.poster_path, "medium"),
+      };
+      window.dispatchEvent(new CustomEvent("watchlist-fly-anim", { detail: eventDetail }));
+    }
+
     setBookmarkAnimating(true);
     setTimeout(() => setBookmarkAnimating(false), 300);
     await toggleWatchlist({
@@ -133,7 +156,7 @@ function ContentCardComponent({
       className="min-w-0 w-full cursor-pointer group/card"
     >
       {/* Poster */}
-      <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
+      <div ref={posterRef} className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
         <MediaImage
           src={getPosterUrl(item.poster_path, "medium")}
           alt={title}

@@ -112,7 +112,7 @@ export default function Auth() {
   });
 
   const backgroundPosters = useMemo(() => {
-    const maxItems = 24;
+    const maxItems = 36;
 
     const moviePosters = (trendingMovies || [])
       .filter((item) => item.poster_path)
@@ -137,9 +137,9 @@ export default function Auth() {
 
     // Keep background balanced: movies + series dominant, limited Bollywood accent.
     const curatedPools = {
-      movie: moviePosters.slice(0, 14),
-      tv: tvPosters.slice(0, 14),
-      bollywood: bollywoodPosters.slice(0, 8),
+      movie: moviePosters.slice(0, 16),
+      tv: tvPosters.slice(0, 16),
+      bollywood: bollywoodPosters.slice(0, 10),
     };
 
     const orderedKeys: (keyof typeof curatedPools)[] = [
@@ -164,9 +164,9 @@ export default function Auth() {
 
     if (mixed.length < maxItems) {
       const extraPool = [
-        ...moviePosters.slice(14),
-        ...tvPosters.slice(14),
-        ...bollywoodPosters.slice(8),
+        ...moviePosters.slice(16),
+        ...tvPosters.slice(16),
+        ...bollywoodPosters.slice(10),
       ];
       for (const item of extraPool) {
         if (mixed.length >= maxItems) break;
@@ -174,9 +174,12 @@ export default function Auth() {
       }
     }
 
-    if (mixed.length > 0) return mixed;
+    if (mixed.length > 0) {
+      // Shuffle the final list to prevent noticeable patterns
+      return [...mixed].sort(() => Math.random() - 0.5);
+    }
 
-    return Array.from({ length: 24 }, (_, index) => ({
+    return Array.from({ length: 36 }, (_, index) => ({
       id: `fallback-${index}`,
       src: "/fallbacks/poster.svg",
     }));
@@ -188,7 +191,8 @@ export default function Auth() {
     const total = backgroundPosters.length || 1;
 
     return Array.from({ length: rowCount }, (_, rowIndex) => {
-      const start = (rowIndex * 7) % total;
+      // Ensure each row gets a completely distinct slice of posters
+      const start = (rowIndex * postersPerRow) % total;
       return Array.from({ length: postersPerRow }, (_, offset) => {
         return backgroundPosters[(start + offset) % total];
       });

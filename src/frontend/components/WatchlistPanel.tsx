@@ -20,11 +20,10 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Bookmark, GripVertical, Check, Trash2, BookMarked, ExternalLink } from "lucide-react";
+import { Bookmark, GripVertical, Check, Trash2, BookMarked, ExternalLink, ListVideo } from "lucide-react";
 import { Button } from "@/frontend/components/ui/button";
 import { ScrollArea } from "@/frontend/components/ui/scroll-area";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/frontend/components/ui/sheet";
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/frontend/components/ui/drawer";
+import { Popover, PopoverContent, PopoverTrigger } from "@/frontend/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/frontend/components/ui/tooltip";
 import { useWatchlist, type WatchlistItem } from "@/frontend/hooks/useWatchlist";
 import { useIsMobile } from "@/frontend/hooks/use-mobile";
@@ -260,11 +259,45 @@ function WatchlistContent() {
 
 // ─── FAB + Panel ─────────────────────────────────────────────────────────────
 
+import { useEffect, useRef } from "react";
+import type { WatchlistFlyEventDetail } from "./ContentCard";
+
 export default function WatchlistPanel() {
   const { user } = useAuth();
   const { items, isOpen, openPanel, closePanel, toggleItem } = useWatchlist();
   const isMobile = useIsMobile();
   const [isDragOver, setIsDragOver] = useState(false);
+  const fabRef = useRef<HTMLButtonElement>(null);
+
+  const [flyingPoster, setFlyingPoster] = useState<{ url: string; x: number; y: number; w: number; h: number } | null>(null);
+  const [isSwallowing, setIsSwallowing] = useState(false);
+
+  useEffect(() => {
+    const handleFlyAnim = (e: Event) => {
+      const customEvent = e as CustomEvent<WatchlistFlyEventDetail>;
+      const { x, y, width, height, posterUrl } = customEvent.detail;
+      
+      setFlyingPoster({ url: posterUrl, x, y, w: width, h: height });
+      
+      if (fabRef.current) {
+        const fabRect = fabRef.current.getBoundingClientRect();
+        const targetX = fabRect.left + fabRect.width / 2 - width / 2;
+        const targetY = fabRect.top + fabRect.height / 2 - height / 2;
+        
+        document.documentElement.style.setProperty('--fly-x', `${targetX - x}px`);
+        document.documentElement.style.setProperty('--fly-y', `${targetY - y}px`);
+      }
+
+      setTimeout(() => {
+        setFlyingPoster(null);
+        setIsSwallowing(true);
+        setTimeout(() => setIsSwallowing(false), 400);
+      }, 600);
+    };
+
+    window.addEventListener("watchlist-fly-anim", handleFlyAnim);
+    return () => window.removeEventListener("watchlist-fly-anim", handleFlyAnim);
+  }, []);
 
   if (!user) return null;
 
@@ -286,6 +319,8 @@ export default function WatchlistPanel() {
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
+    setIsSwallowing(true);
+    setTimeout(() => setIsSwallowing(false), 400);
     try {
       const raw = e.dataTransfer.getData("application/x-watchlist-item");
       if (!raw) return;
@@ -296,27 +331,30 @@ export default function WatchlistPanel() {
         poster_path: string | null;
       };
       await toggleItem(data);
-      openPanel();
+      // Let it swallow the item first before opening the panel maybe, but for now just open it
+      setTimeout(() => openPanel(), 300);
     } catch {
       // malformed drag data — ignore
     }
   };
 
   const panelHeader = (
-    <div className="flex items-center gap-2">
-      <BookMarked className="h-4 w-4 text-primary shrink-0" />
-      <span className="font-semibold text-base">Watchlist</span>
+    <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-border">
+      <div className="flex items-center gap-2">
+        <ListVideo className="h-4 w-4 text-primary shrink-0" />
+        <span className="font-semibold text-base">Watchlist</span>
+      </div>
       {items.length > 0 && (
-        <span className="ml-1 text-xs text-muted-foreground">
-          · {items.length} {items.length === 1 ? "title" : "titles"}
+        <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-md">
+          {items.length} {items.length === 1 ? "title" : "titles"}
         </span>
       )}
     </div>
   );
 
   const panelBody = (
-    <ScrollArea className="h-full">
-      <div className="px-1 pb-6">
+    <ScrollArea className="h-96 md:h-110 w-full">
+      <div className="px-2 pt-2 pb-6">
         <WatchlistContent />
       </div>
     </ScrollArea>
@@ -324,83 +362,87 @@ export default function WatchlistPanel() {
 
   return (
     <>
-      {/* FAB — also a drop target on desktop */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            onClick={openPanel}
-            onDragOver={isMobile ? undefined : handleDragOver}
-            onDragLeave={isMobile ? undefined : handleDragLeave}
-            onDrop={isMobile ? undefined : handleDrop}
-            size="icon"
-            className={cn(
-              "fixed z-40 shadow-xl rounded-full cursor-pointer",
-              // Mobile: above bottom nav (h-16) + gap
-              "bottom-20 right-4 h-14 w-14",
-              // Desktop
-              "md:bottom-6 md:right-6 md:h-12 md:w-12",
-              "bg-primary text-primary-foreground",
-              "motion-safe:transition-all motion-safe:duration-200",
-              "hover:scale-105 active:scale-95",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-              isDragOver
-                ? "scale-110 shadow-2xl shadow-primary/50 ring-4 ring-primary/60 ring-offset-2 ring-offset-background bg-primary/90"
-                : "hover:bg-primary/90 hover:shadow-primary/25",
-            )}
-            aria-label="Open Watchlist"
-          >
-            <Bookmark className={cn("md:h-5 md:w-5", isDragOver ? "h-7 w-7" : "h-6 w-6")} />
-            {unwatchedCount > 0 && (
-              <span
-                aria-label={`${unwatchedCount} unwatched items`}
-                className={cn(
-                  "absolute -top-1.5 -right-1.5",
-                  "h-5 w-5 rounded-full",
-                  "bg-destructive text-destructive-foreground",
-                  "text-[10px] font-bold",
-                  "flex items-center justify-center",
-                  "ring-2 ring-background",
-                )}
-              >
-                {unwatchedCount > 99 ? "99+" : unwatchedCount}
-              </span>
-            )}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="left" className="hidden md:block">
-          {isDragOver ? "Drop to add to Watchlist" : "Watchlist"}
-        </TooltipContent>
-      </Tooltip>
-
-      {/* Panel — Drawer on mobile, Sheet on desktop */}
-      {isMobile ? (
-        <Drawer open={isOpen} onOpenChange={(open) => !open && closePanel()}>
-          <DrawerContent className="max-h-[88dvh] flex flex-col outline-none">
-            <DrawerHeader className="pb-3 pt-4 px-5 border-b border-border shrink-0">
-              <DrawerTitle asChild>
-                <div>{panelHeader}</div>
-              </DrawerTitle>
-            </DrawerHeader>
-            <div className="flex-1 overflow-hidden px-4 pb-[calc(env(safe-area-inset-bottom,0px)+5rem)]">
-              {panelBody}
-            </div>
-          </DrawerContent>
-        </Drawer>
-      ) : (
-        <Sheet open={isOpen} onOpenChange={(open) => !open && closePanel()}>
-          <SheetContent
-            side="right"
-            className="w-100 sm:w-110 flex flex-col p-0 gap-0"
-          >
-            <SheetHeader className="px-6 pt-6 pb-4 border-b border-border shrink-0">
-              <SheetTitle asChild>
-                <div>{panelHeader}</div>
-              </SheetTitle>
-            </SheetHeader>
-            <div className="flex-1 overflow-hidden px-5 py-4">{panelBody}</div>
-          </SheetContent>
-        </Sheet>
+      {/* Floating Animation Overlay */}
+      {flyingPoster && (
+        <div
+          style={{
+            position: 'fixed',
+            top: flyingPoster.y,
+            left: flyingPoster.x,
+            width: flyingPoster.w,
+            height: flyingPoster.h,
+            backgroundImage: `url(${flyingPoster.url})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            borderRadius: '0.5rem',
+            zIndex: 9999,
+            pointerEvents: 'none',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+          }}
+          className="animate-fly-to-bucket"
+        />
       )}
+
+      {/* FAB + Popover */}
+      <Popover open={isOpen} onOpenChange={setOpen => setOpen ? openPanel() : closePanel()}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <Button
+                ref={fabRef}
+                onDragOver={isMobile ? undefined : handleDragOver}
+                onDragLeave={isMobile ? undefined : handleDragLeave}
+                onDrop={isMobile ? undefined : handleDrop}
+                size="icon"
+                className={cn(
+                  "fixed z-40 shadow-xl rounded-full cursor-pointer",
+                  "bottom-20 right-4 h-14 w-14",
+                  "md:bottom-6 md:right-6 md:h-14 md:w-14",
+                  "bg-primary text-primary-foreground",
+                  "motion-safe:transition-all motion-safe:duration-200",
+                  "hover:scale-105 active:scale-95",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                  isDragOver
+                    ? "scale-110 shadow-2xl shadow-primary/50 ring-4 ring-primary/60 ring-offset-2 ring-offset-background bg-primary/90"
+                    : "hover:bg-primary/90 hover:shadow-primary/25",
+                  isSwallowing && "animate-bucket-swallow"
+                )}
+                aria-label="Open Watchlist"
+              >
+                <ListVideo className={cn("md:h-6 md:w-6 transition-transform", isDragOver ? "h-8 w-8 scale-110" : "h-6 w-6")} />
+                {unwatchedCount > 0 && !isDragOver && (
+                  <span
+                    aria-label={`${unwatchedCount} unwatched items`}
+                    className={cn(
+                      "absolute -top-1.5 -right-1.5",
+                      "h-5 w-5 rounded-full",
+                      "bg-destructive text-destructive-foreground",
+                      "text-[10px] font-bold",
+                      "flex items-center justify-center",
+                      "ring-2 ring-background",
+                    )}
+                  >
+                    {unwatchedCount > 99 ? "99+" : unwatchedCount}
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="left" className="hidden md:block">
+            {isDragOver ? "Drop to add to Watchlist" : "Watchlist"}
+          </TooltipContent>
+        </Tooltip>
+
+        <PopoverContent 
+          side="top" 
+          align="end" 
+          sideOffset={20}
+          className="w-[calc(100vw-2rem)] sm:w-96 md:w-100 p-0 rounded-2xl shadow-2xl border-border bg-card/95 backdrop-blur-md overflow-hidden"
+        >
+          {panelHeader}
+          {panelBody}
+        </PopoverContent>
+      </Popover>
     </>
   );
 }
