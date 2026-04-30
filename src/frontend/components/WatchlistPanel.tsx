@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import {
   DndContext,
@@ -339,13 +340,13 @@ export default function WatchlistPanel() {
   };
 
   const panelHeader = (
-    <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-border">
-      <div className="flex items-center gap-2">
-        <ListVideo className="h-4 w-4 text-primary shrink-0" />
+    <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-border">
+      <div className="flex items-center gap-2.5">
+        <ListVideo className="h-5 w-5 text-primary shrink-0" />
         <span className="font-semibold text-base">Watchlist</span>
       </div>
       {items.length > 0 && (
-        <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-md">
+        <span className="text-xs font-medium text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-md">
           {items.length} {items.length === 1 ? "title" : "titles"}
         </span>
       )}
@@ -354,7 +355,7 @@ export default function WatchlistPanel() {
 
   const panelBody = (
     <ScrollArea className="h-96 md:h-110 w-full">
-      <div className="px-2 pt-2 pb-6">
+      <div className="px-5 pt-4 pb-6">
         <WatchlistContent />
       </div>
     </ScrollArea>
@@ -363,7 +364,7 @@ export default function WatchlistPanel() {
   return (
     <>
       {/* Floating Animation Overlay */}
-      {flyingPoster && (
+      {flyingPoster && createPortal(
         <div
           style={{
             position: 'fixed',
@@ -371,16 +372,17 @@ export default function WatchlistPanel() {
             left: flyingPoster.x,
             width: flyingPoster.w,
             height: flyingPoster.h,
-            backgroundImage: `url(${flyingPoster.url})`,
+            backgroundImage: `url("${flyingPoster.url}")`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             borderRadius: '0.5rem',
-            zIndex: 9999,
+            zIndex: 99999,
             pointerEvents: 'none',
             boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
           }}
           className="animate-fly-to-bucket"
-        />
+        />,
+        document.body
       )}
 
       {/* FAB + Popover */}

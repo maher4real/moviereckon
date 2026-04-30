@@ -33,7 +33,7 @@ const INITIAL_VISIBLE_MOBILE = 10;
 const INITIAL_VISIBLE_DESKTOP = 18;
 const LOAD_STEP_MOBILE = 8;
 const LOAD_STEP_DESKTOP = 12;
-const POSTER_CARD_WIDTH_CLASS = "w-[38vw] max-w-38 min-w-30 sm:w-36 md:w-44 lg:w-48";
+const POSTER_CARD_WIDTH_CLASS = "w-[29vw] min-w-[105px] max-w-[140px] sm:w-[130px] md:w-[150px] lg:w-[170px] xl:w-[190px]";
 
 function getInitialVisibleCount(): number {
   if (typeof window === "undefined") return INITIAL_VISIBLE_DESKTOP;
