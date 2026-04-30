@@ -1,7 +1,19 @@
-import React, { useState, useMemo, useEffect, memo, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useMemo,
+  useEffect,
+  memo,
+  useRef,
+  useCallback,
+} from "react";
 import { useRecommendations } from "@/frontend/hooks/useRecommendations";
 import { useUserData } from "@/frontend/hooks/useUserData";
-import { Movie, TVShow, discoverMovies, discoverTVShows } from "@/shared/lib/tmdb";
+import {
+  Movie,
+  TVShow,
+  discoverMovies,
+  discoverTVShows,
+} from "@/shared/lib/tmdb";
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
 import BottomNav from "@/frontend/components/BottomNav";
@@ -55,11 +67,31 @@ const RECOMMENDATION_TYPES: {
   Icon: React.ElementType;
   description: string;
 }[] = [
-  { id: "all", label: "All", Icon: Sparkles, description: "All recommendations" },
-  { id: "trending", label: "Trending", Icon: TrendingUp, description: "Hot picks this week" },
-  { id: "highrated", label: "Highly Rated", Icon: Star, description: "8.0+ rated" },
+  {
+    id: "all",
+    label: "All",
+    Icon: Sparkles,
+    description: "All recommendations",
+  },
+  {
+    id: "trending",
+    label: "Trending",
+    Icon: TrendingUp,
+    description: "Hot picks this week",
+  },
+  {
+    id: "highrated",
+    label: "Highly Rated",
+    Icon: Star,
+    description: "8.0+ rated",
+  },
   { id: "popular", label: "Popular", Icon: Crown, description: "Most watched" },
-  { id: "newreleases", label: "New Releases", Icon: CalendarDays, description: "Recently released" },
+  {
+    id: "newreleases",
+    label: "New Releases",
+    Icon: CalendarDays,
+    description: "Recently released",
+  },
 ];
 
 const INITIAL_VISIBLE_ITEMS = 48;
@@ -197,7 +229,6 @@ function FirstTimeSetup({
   onSkip: () => void;
   saving: boolean;
 }) {
-
   return (
     <div className="mb-6 rounded-xl border border-primary/30 bg-linear-to-br from-primary/5 via-primary/3 to-primary/8 px-6 py-8">
       <div className="max-w-2xl mx-auto">
@@ -210,7 +241,8 @@ function FirstTimeSetup({
             Welcome to Reckon!
           </h2>
           <p className="text-muted-foreground">
-            Set your preferences to unlock personalized movie and TV recommendations tailored just for you.
+            Set your preferences to unlock personalized movie and TV
+            recommendations tailored just for you.
           </p>
         </div>
 
@@ -219,14 +251,18 @@ function FirstTimeSetup({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Globe className="w-5 h-5 text-primary" />
-              <span className="text-base font-semibold text-foreground">Preferred Languages</span>
+              <span className="text-base font-semibold text-foreground">
+                Preferred Languages
+              </span>
             </div>
-            <span className={cn(
-              "text-sm font-medium px-3 py-1 rounded-full transition-all duration-200",
-              langs.length > 0
-                ? "bg-primary/15 text-primary"
-                : "bg-muted text-muted-foreground",
-            )}>
+            <span
+              className={cn(
+                "text-sm font-medium px-3 py-1 rounded-full transition-all duration-200",
+                langs.length > 0
+                  ? "bg-primary/15 text-primary"
+                  : "bg-muted text-muted-foreground",
+              )}
+            >
               {langs.length > 0 ? `${langs.length} selected` : "None selected"}
             </span>
           </div>
@@ -258,15 +294,21 @@ function FirstTimeSetup({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Film className="w-5 h-5 text-primary" />
-              <span className="text-base font-semibold text-foreground">Favorite Genres</span>
+              <span className="text-base font-semibold text-foreground">
+                Favorite Genres
+              </span>
             </div>
-            <span className={cn(
-              "text-sm font-medium px-3 py-1 rounded-full transition-all duration-200",
-              genres.length > 0
-                ? "bg-primary/15 text-primary"
-                : "bg-muted text-muted-foreground",
-            )}>
-              {genres.length > 0 ? `${genres.length} selected` : "None selected"}
+            <span
+              className={cn(
+                "text-sm font-medium px-3 py-1 rounded-full transition-all duration-200",
+                genres.length > 0
+                  ? "bg-primary/15 text-primary"
+                  : "bg-muted text-muted-foreground",
+              )}
+            >
+              {genres.length > 0
+                ? `${genres.length} selected`
+                : "None selected"}
             </span>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -324,7 +366,8 @@ function FirstTimeSetup({
         </div>
 
         <p className="text-xs text-muted-foreground text-center mt-4">
-          You can always change these preferences later from the settings button.
+          You can always change these preferences later from the settings
+          button.
         </p>
       </div>
     </div>
@@ -363,7 +406,10 @@ function PreferencesSheet({
 
   const save = async () => {
     setSaving(true);
-    await updatePreferences({ preferred_languages: langs, preferred_genres: genres });
+    await updatePreferences({
+      preferred_languages: langs,
+      preferred_genres: genres,
+    });
     setSaving(false);
     onSaved();
     onClose();
@@ -373,7 +419,9 @@ function PreferencesSheet({
     JSON.stringify([...langs].sort()) !==
       JSON.stringify([...(preferences?.preferred_languages ?? [])].sort()) ||
     JSON.stringify([...genres].sort((a, b) => a - b)) !==
-      JSON.stringify([...(preferences?.preferred_genres ?? [])].sort((a, b) => a - b));
+      JSON.stringify(
+        [...(preferences?.preferred_genres ?? [])].sort((a, b) => a - b),
+      );
 
   return (
     <Sheet
@@ -382,7 +430,10 @@ function PreferencesSheet({
         if (!v) onClose();
       }}
     >
-      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto flex flex-col gap-0 p-0">
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-md overflow-y-auto flex flex-col gap-0 p-0"
+      >
         {/* Header */}
         <div className="px-6 pt-6 pb-4 border-b border-border">
           <SheetHeader>
@@ -394,7 +445,8 @@ function PreferencesSheet({
             </SheetTitle>
           </SheetHeader>
           <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-            The engine strongly weights your selections — the more you set, the more tailored your feed.
+            The engine strongly weights your selections — the more you set, the
+            more tailored your feed.
           </p>
         </div>
 
@@ -404,14 +456,18 @@ function PreferencesSheet({
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Globe className="w-4 h-4 text-primary" />
-                <span className="text-sm font-semibold text-foreground">Languages</span>
+                <span className="text-sm font-semibold text-foreground">
+                  Languages
+                </span>
               </div>
-              <span className={cn(
-                "text-xs font-medium px-2 py-0.5 rounded-full transition-all duration-200",
-                langs.length > 0
-                  ? "bg-primary/15 text-primary"
-                  : "bg-muted text-muted-foreground",
-              )}>
+              <span
+                className={cn(
+                  "text-xs font-medium px-2 py-0.5 rounded-full transition-all duration-200",
+                  langs.length > 0
+                    ? "bg-primary/15 text-primary"
+                    : "bg-muted text-muted-foreground",
+                )}
+              >
                 {langs.length > 0 ? `${langs.length} selected` : "None"}
               </span>
             </div>
@@ -445,14 +501,18 @@ function PreferencesSheet({
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Film className="w-4 h-4 text-primary" />
-                <span className="text-sm font-semibold text-foreground">Genres</span>
+                <span className="text-sm font-semibold text-foreground">
+                  Genres
+                </span>
               </div>
-              <span className={cn(
-                "text-xs font-medium px-2 py-0.5 rounded-full transition-all duration-200",
-                genres.length > 0
-                  ? "bg-primary/15 text-primary"
-                  : "bg-muted text-muted-foreground",
-              )}>
+              <span
+                className={cn(
+                  "text-xs font-medium px-2 py-0.5 rounded-full transition-all duration-200",
+                  genres.length > 0
+                    ? "bg-primary/15 text-primary"
+                    : "bg-muted text-muted-foreground",
+                )}
+              >
                 {genres.length > 0 ? `${genres.length} selected` : "None"}
               </span>
             </div>
@@ -492,9 +552,18 @@ function PreferencesSheet({
             ) : (
               <Check className="w-4 h-4 mr-2" />
             )}
-            {saving ? "Saving…" : hasChanges ? "Save Preferences" : "No Changes"}
+            {saving
+              ? "Saving…"
+              : hasChanges
+                ? "Save Preferences"
+                : "No Changes"}
           </Button>
-          <Button variant="outline" onClick={onClose} disabled={saving} className="cursor-pointer">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            disabled={saving}
+            className="cursor-pointer"
+          >
             Cancel
           </Button>
         </div>
@@ -545,7 +614,10 @@ export default function Reckon() {
 
   const saveSetup = useCallback(async () => {
     setSetupSaving(true);
-    await updatePreferences({ preferred_languages: setupLangs, preferred_genres: setupGenres });
+    await updatePreferences({
+      preferred_languages: setupLangs,
+      preferred_genres: setupGenres,
+    });
     await refreshRecommendations();
     setSetupSaving(false);
   }, [updatePreferences, setupLangs, setupGenres, refreshRecommendations]);
@@ -605,9 +677,7 @@ export default function Reckon() {
             with_genres: genreParam,
             with_original_language: langParam,
             sort_by:
-              sortField === "release_date"
-                ? "first_air_date.desc"
-                : sortBy,
+              sortField === "release_date" ? "first_air_date.desc" : sortBy,
             "vote_count.gte": 50,
             page: nextPage,
           }).then((r) => r.results as (Movie | TVShow)[]),
@@ -615,14 +685,12 @@ export default function Reckon() {
       }
 
       const results = await Promise.all(fetches);
-      const fresh = results
-        .flat()
-        .filter((item) => {
-          const key = `${"title" in item ? "movie" : "tv"}:${item.id}`;
-          if (existingIds.has(key)) return false;
-          existingIds.add(key);
-          return true;
-        });
+      const fresh = results.flat().filter((item) => {
+        const key = `${"title" in item ? "movie" : "tv"}:${item.id}`;
+        if (existingIds.has(key)) return false;
+        existingIds.add(key);
+        return true;
+      });
 
       setExtraItems((prev) => [...prev, ...fresh]);
       setDiscoverPage(nextPage);
@@ -913,7 +981,8 @@ export default function Reckon() {
                   Unlock personalized recommendations
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Set your favorite languages and genres — the engine strongly prioritizes them.
+                  Set your favorite languages and genres — the engine strongly
+                  prioritizes them.
                 </p>
               </div>
               <Button
@@ -1114,7 +1183,10 @@ export default function Reckon() {
                     className="gap-2 border-primary/30 text-primary hover:bg-primary/10"
                   >
                     <RefreshCw
-                      className={cn("w-4 h-4", isFetchingMore && "animate-spin")}
+                      className={cn(
+                        "w-4 h-4",
+                        isFetchingMore && "animate-spin",
+                      )}
                     />
                     {isFetchingMore ? "Fetching…" : "Show More Like This"}
                   </Button>
