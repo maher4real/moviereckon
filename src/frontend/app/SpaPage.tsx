@@ -136,6 +136,19 @@ async function prefetchSearchQueries(queryClient: QueryClient) {
   });
 }
 
+async function prefetchHomeCriticalQueries(queryClient: QueryClient) {
+  await Promise.allSettled([
+    queryClient.prefetchQuery({
+      queryKey: ["trending-movies"],
+      queryFn: () => getServerTrendingMovies("week"),
+    }),
+    queryClient.prefetchQuery({
+      queryKey: ["popular-tv"],
+      queryFn: () => getServerPopularTVShows(),
+    }),
+  ]);
+}
+
 async function prefetchMovieDetailQueries(queryClient: QueryClient, movieId: number) {
   await Promise.allSettled([
     queryClient.prefetchQuery({
@@ -401,7 +414,7 @@ async function prefetchUpcomingQueries(queryClient: QueryClient, searchParams: S
 }
 
 function shouldSkipVisualDehydration(pathname: string): boolean {
-  return pathname === "/" || pathname === "/auth" || pathname === "/home";
+  return pathname === "/" || pathname === "/auth";
 }
 
 async function prefetchRouteData(
@@ -415,6 +428,11 @@ async function prefetchRouteData(
   }
 
   if (!hasAuthenticatedUser) return;
+
+  if (pathname === "/home") {
+    await prefetchHomeCriticalQueries(queryClient);
+    return;
+  }
 
   if (pathname === "/search") {
     await prefetchSearchQueries(queryClient);
@@ -465,6 +483,8 @@ export default async function SpaPage({ params, searchParams }: SpaPageProps) {
     defaultOptions: {
       queries: {
         retry: 1,
+        staleTime: 1000 * 60 * 10,
+        gcTime: 1000 * 60 * 60,
       },
     },
   });

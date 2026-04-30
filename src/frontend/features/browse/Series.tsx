@@ -81,14 +81,26 @@ const LANGUAGE_OPTIONS = [
 
 
 const PosterCard = memo(
-  ({ item, onClick, ottLabel }: { item: TVShow; onClick: () => void; ottLabel?: string }) => (
+  ({
+    item,
+    onClick,
+    ottLabel,
+    priority = false,
+  }: {
+    item: TVShow;
+    onClick: () => void;
+    ottLabel?: string;
+    priority?: boolean;
+  }) => (
     <div onClick={onClick} className="cursor-pointer group">
       <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
         <MediaImage
           src={getPosterUrl(item.poster_path, "medium")}
           alt={item.name}
           className="w-full h-full object-cover"
-          loading="lazy"
+          loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : "auto"}
+          priority={priority}
           fallbackSrc="/fallbacks/poster.svg"
         />
         <div className="absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -163,6 +175,7 @@ export default function Series() {
   const {
     data: contentData,
     isLoading,
+    isFetching,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -229,6 +242,7 @@ export default function Series() {
       return lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined;
     },
     staleTime: 1000 * 60 * 5,
+    placeholderData: (previousData) => previousData,
     enabled: !!user,
   });
 
@@ -416,11 +430,17 @@ export default function Series() {
             <PosterGridSkeleton count={18} />
           ) : (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {filteredSeries.map((item) => (
+              <div
+                className={cn(
+                  "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 transition-opacity duration-200",
+                  isFetching && !isFetchingNextPage && "opacity-75",
+                )}
+              >
+                {filteredSeries.map((item, index) => (
                   <PosterCard
                     key={item.id}
                     item={item}
+                    priority={index < 8}
                     onClick={() =>
                       navigate(`/tv/${item.id}`, {
                         state: {

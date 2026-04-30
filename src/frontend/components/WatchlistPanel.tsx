@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   DndContext,
   closestCenter,
@@ -18,7 +20,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Bookmark, GripVertical, Check, Trash2, BookMarked } from "lucide-react";
+import { Bookmark, GripVertical, Check, Trash2, BookMarked, ExternalLink } from "lucide-react";
 import { Button } from "@/frontend/components/ui/button";
 import { ScrollArea } from "@/frontend/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/frontend/components/ui/sheet";
@@ -28,18 +30,19 @@ import { useWatchlist, type WatchlistItem } from "@/frontend/hooks/useWatchlist"
 import { useIsMobile } from "@/frontend/hooks/use-mobile";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import MediaImage from "@/frontend/components/MediaImage";
+import { getPosterUrl } from "@/shared/lib/tmdb";
 import { cn } from "@/shared/lib/utils";
 
 // ─── Sortable item ──────────────────────────────────────────────────────────
 
 function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
+  const navigate = useNavigate();
   const { removeItem, markWatched } = useWatchlist();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    // Respect reduced motion — only animate if user hasn't opted out
     transition: transition ?? undefined,
     opacity: isDragging ? 0.5 : 1,
   };
@@ -52,6 +55,10 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
   const handleRemove = (e: React.MouseEvent) => {
     e.stopPropagation();
     removeItem(item.content_id, item.content_type);
+  };
+
+  const handleOpenDetail = () => {
+    navigate(`/${item.content_type}/${item.content_id}`);
   };
 
   return (
@@ -67,7 +74,7 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
         item.watched && "opacity-60",
       )}
     >
-      {/* Drag handle — 44px touch target on mobile */}
+      {/* Drag handle */}
       <button
         {...attributes}
         {...listeners}
@@ -76,7 +83,6 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
           "cursor-grab active:cursor-grabbing",
           "text-muted-foreground hover:text-foreground",
           "motion-safe:transition-colors duration-150",
-          // 44px min touch target
           "flex items-center justify-center",
           "min-h-11 min-w-11 md:min-h-0 md:min-w-0 md:p-1",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md",
@@ -86,33 +92,43 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
         <GripVertical className="h-4 w-4" />
       </button>
 
-      {/* Poster */}
-      <div className="shrink-0 w-10 h-14 rounded-lg overflow-hidden bg-muted">
-        <MediaImage
-          src={item.poster_path}
-          alt={item.title}
-          className="w-full h-full object-cover"
-          width={40}
-          height={56}
-        />
-      </div>
+      {/* Poster + title — clickable area to open detail */}
+      <button
+        onClick={handleOpenDetail}
+        className="flex items-center gap-3 flex-1 min-w-0 text-left group/link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
+        aria-label={`Open ${item.title}`}
+      >
+        <div className="shrink-0 w-10 h-14 rounded-lg overflow-hidden bg-muted">
+          <MediaImage
+            src={getPosterUrl(item.poster_path, "small")}
+            alt={item.title}
+            className="w-full h-full object-cover"
+            width={40}
+            height={56}
+            fallbackSrc="/fallbacks/poster.svg"
+          />
+        </div>
 
-      {/* Title + type */}
-      <div className="flex-1 min-w-0">
-        <p
-          className={cn(
-            "text-sm font-medium truncate leading-tight",
-            item.watched && "line-through text-muted-foreground",
-          )}
-        >
-          {item.title}
-        </p>
-        <p className="text-xs text-muted-foreground capitalize mt-0.5">
-          {item.content_type === "tv" ? "Series" : "Movie"}
-        </p>
-      </div>
+        <div className="flex-1 min-w-0">
+          <p
+            className={cn(
+              "text-sm font-medium truncate leading-tight",
+              "group-hover/link:text-primary motion-safe:transition-colors duration-150",
+              item.watched && "line-through text-muted-foreground",
+            )}
+          >
+            {item.title}
+          </p>
+          <div className="flex items-center gap-1 mt-0.5">
+            <p className="text-xs text-muted-foreground capitalize">
+              {item.content_type === "tv" ? "Series" : "Movie"}
+            </p>
+            <ExternalLink className="h-2.5 w-2.5 text-muted-foreground/50 group-hover/link:text-primary/60 motion-safe:transition-colors" />
+          </div>
+        </div>
+      </button>
 
-      {/* Actions — min 44px touch targets on mobile, 8px gap */}
+      {/* Actions */}
       <div className="flex items-center gap-2 shrink-0">
         <Tooltip>
           <TooltipTrigger asChild>
@@ -246,12 +262,45 @@ function WatchlistContent() {
 
 export default function WatchlistPanel() {
   const { user } = useAuth();
-  const { items, isOpen, openPanel, closePanel } = useWatchlist();
+  const { items, isOpen, openPanel, closePanel, toggleItem } = useWatchlist();
   const isMobile = useIsMobile();
+  const [isDragOver, setIsDragOver] = useState(false);
 
   if (!user) return null;
 
   const unwatchedCount = items.filter((i) => !i.watched).length;
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes("application/x-watchlist-item")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    try {
+      const raw = e.dataTransfer.getData("application/x-watchlist-item");
+      if (!raw) return;
+      const data = JSON.parse(raw) as {
+        content_id: number;
+        content_type: "movie" | "tv";
+        title: string;
+        poster_path: string | null;
+      };
+      await toggleItem(data);
+      openPanel();
+    } catch {
+      // malformed drag data — ignore
+    }
+  };
 
   const panelHeader = (
     <div className="flex items-center gap-2">
@@ -275,27 +324,32 @@ export default function WatchlistPanel() {
 
   return (
     <>
-      {/* FAB */}
+      {/* FAB — also a drop target on desktop */}
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
             onClick={openPanel}
+            onDragOver={isMobile ? undefined : handleDragOver}
+            onDragLeave={isMobile ? undefined : handleDragLeave}
+            onDrop={isMobile ? undefined : handleDrop}
             size="icon"
             className={cn(
               "fixed z-40 shadow-xl rounded-full cursor-pointer",
-              // Mobile: above bottom nav (nav is h-16 = 4rem, add 4 for gap)
+              // Mobile: above bottom nav (h-16) + gap
               "bottom-20 right-4 h-14 w-14",
               // Desktop
               "md:bottom-6 md:right-6 md:h-12 md:w-12",
               "bg-primary text-primary-foreground",
-              "hover:bg-primary/90 hover:shadow-primary/25",
               "motion-safe:transition-all motion-safe:duration-200",
               "hover:scale-105 active:scale-95",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+              isDragOver
+                ? "scale-110 shadow-2xl shadow-primary/50 ring-4 ring-primary/60 ring-offset-2 ring-offset-background bg-primary/90"
+                : "hover:bg-primary/90 hover:shadow-primary/25",
             )}
             aria-label="Open Watchlist"
           >
-            <Bookmark className="h-6 w-6 md:h-5 md:w-5" />
+            <Bookmark className={cn("md:h-5 md:w-5", isDragOver ? "h-7 w-7" : "h-6 w-6")} />
             {unwatchedCount > 0 && (
               <span
                 aria-label={`${unwatchedCount} unwatched items`}
@@ -314,20 +368,20 @@ export default function WatchlistPanel() {
           </Button>
         </TooltipTrigger>
         <TooltipContent side="left" className="hidden md:block">
-          Watchlist
+          {isDragOver ? "Drop to add to Watchlist" : "Watchlist"}
         </TooltipContent>
       </Tooltip>
 
       {/* Panel — Drawer on mobile, Sheet on desktop */}
       {isMobile ? (
         <Drawer open={isOpen} onOpenChange={(open) => !open && closePanel()}>
-          <DrawerContent className="max-h-[88vh] flex flex-col outline-none">
-            <DrawerHeader className="pb-3 pt-4 px-5 border-b border-border">
+          <DrawerContent className="max-h-[88dvh] flex flex-col outline-none">
+            <DrawerHeader className="pb-3 pt-4 px-5 border-b border-border shrink-0">
               <DrawerTitle asChild>
                 <div>{panelHeader}</div>
               </DrawerTitle>
             </DrawerHeader>
-            <div className="flex-1 overflow-hidden px-4 pb-[env(safe-area-inset-bottom,16px)]">
+            <div className="flex-1 overflow-hidden px-4 pb-[calc(env(safe-area-inset-bottom,0px)+5rem)]">
               {panelBody}
             </div>
           </DrawerContent>

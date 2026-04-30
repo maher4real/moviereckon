@@ -12,8 +12,8 @@ import {
   type DehydratedState,
 } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, StaticRouter } from "react-router-dom";
-import { lazy, Suspense, useState, type ReactNode } from "react";
-import { AuthProvider } from "@/frontend/hooks/useAuth";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+import { AuthProvider, useAuth } from "@/frontend/hooks/useAuth";
 import { UserDataProvider } from "@/frontend/hooks/useUserData";
 import { WatchlistProvider } from "@/frontend/hooks/useWatchlist";
 import WatchlistPanel from "@/frontend/components/WatchlistPanel";
@@ -26,26 +26,89 @@ import Auth from "@/frontend/features/auth/Auth";
 import Home from "@/frontend/features/browse/Home";
 import ProtectedRoute from "@/frontend/components/ProtectedRoute";
 
-const Upcoming = lazy(() => import("@/frontend/features/browse/Upcoming"));
-const Search = lazy(() => import("@/frontend/features/browse/Search"));
-const MovieDetail = lazy(() => import("@/frontend/features/browse/MovieDetail"));
-const TVDetail = lazy(() => import("@/frontend/features/browse/TVDetail"));
-const PersonDetail = lazy(() => import("@/frontend/features/browse/PersonDetail"));
-const Profile = lazy(() => import("@/frontend/features/profile/Profile"));
-const ProfileEdit = lazy(() => import("@/frontend/features/profile/ProfileEdit"));
-const Reckon = lazy(() => import("@/frontend/features/recommendations/Reckon"));
-const NotFound = lazy(() => import("@/frontend/features/system/NotFound"));
-const Movies = lazy(() => import("@/frontend/features/browse/Movies"));
-const Series = lazy(() => import("@/frontend/features/browse/Series"));
-const InfoPage = lazy(() => import("@/frontend/features/info/InfoPage"));
-const TheaterHome = lazy(() => import("@/frontend/features/theater/TheaterHome"));
-const TheaterDetail = lazy(() => import("@/frontend/features/theater/TheaterDetail"));
-const TheaterPlayer = lazy(() => import("@/frontend/features/theater/TheaterPlayer"));
-const TheaterAdmin = lazy(() => import("@/frontend/features/theater/TheaterAdmin"));
-const AdminLogin = lazy(() => import("@/frontend/features/admin/AdminLogin"));
-const VerifyEmail = lazy(() => import("@/frontend/features/auth/VerifyEmail"));
-const ForgotPassword = lazy(() => import("@/frontend/features/auth/ForgotPassword"));
-const ResetPassword = lazy(() => import("@/frontend/features/auth/ResetPassword"));
+const routeLoaders = {
+  upcoming: () => import("@/frontend/features/browse/Upcoming"),
+  search: () => import("@/frontend/features/browse/Search"),
+  movieDetail: () => import("@/frontend/features/browse/MovieDetail"),
+  tvDetail: () => import("@/frontend/features/browse/TVDetail"),
+  personDetail: () => import("@/frontend/features/browse/PersonDetail"),
+  profile: () => import("@/frontend/features/profile/Profile"),
+  profileEdit: () => import("@/frontend/features/profile/ProfileEdit"),
+  reckon: () => import("@/frontend/features/recommendations/Reckon"),
+  notFound: () => import("@/frontend/features/system/NotFound"),
+  movies: () => import("@/frontend/features/browse/Movies"),
+  series: () => import("@/frontend/features/browse/Series"),
+  infoPage: () => import("@/frontend/features/info/InfoPage"),
+  theaterHome: () => import("@/frontend/features/theater/TheaterHome"),
+  theaterDetail: () => import("@/frontend/features/theater/TheaterDetail"),
+  theaterPlayer: () => import("@/frontend/features/theater/TheaterPlayer"),
+  theaterAdmin: () => import("@/frontend/features/theater/TheaterAdmin"),
+  adminLogin: () => import("@/frontend/features/admin/AdminLogin"),
+  verifyEmail: () => import("@/frontend/features/auth/VerifyEmail"),
+  forgotPassword: () => import("@/frontend/features/auth/ForgotPassword"),
+  resetPassword: () => import("@/frontend/features/auth/ResetPassword"),
+} as const;
+
+const Upcoming = lazy(routeLoaders.upcoming);
+const Search = lazy(routeLoaders.search);
+const MovieDetail = lazy(routeLoaders.movieDetail);
+const TVDetail = lazy(routeLoaders.tvDetail);
+const PersonDetail = lazy(routeLoaders.personDetail);
+const Profile = lazy(routeLoaders.profile);
+const ProfileEdit = lazy(routeLoaders.profileEdit);
+const Reckon = lazy(routeLoaders.reckon);
+const NotFound = lazy(routeLoaders.notFound);
+const Movies = lazy(routeLoaders.movies);
+const Series = lazy(routeLoaders.series);
+const InfoPage = lazy(routeLoaders.infoPage);
+const TheaterHome = lazy(routeLoaders.theaterHome);
+const TheaterDetail = lazy(routeLoaders.theaterDetail);
+const TheaterPlayer = lazy(routeLoaders.theaterPlayer);
+const TheaterAdmin = lazy(routeLoaders.theaterAdmin);
+const AdminLogin = lazy(routeLoaders.adminLogin);
+const VerifyEmail = lazy(routeLoaders.verifyEmail);
+const ForgotPassword = lazy(routeLoaders.forgotPassword);
+const ResetPassword = lazy(routeLoaders.resetPassword);
+
+function useIdleRoutePreload(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled || typeof globalThis.window === "undefined") return;
+
+    const browserWindow = globalThis.window as Window &
+      typeof globalThis & {
+        requestIdleCallback?: (
+          callback: IdleRequestCallback,
+          options?: IdleRequestOptions,
+        ) => number;
+        cancelIdleCallback?: (handle: number) => void;
+      };
+
+    const preload = () => {
+      void Promise.allSettled([
+        routeLoaders.movies(),
+        routeLoaders.series(),
+        routeLoaders.upcoming(),
+        routeLoaders.search(),
+        routeLoaders.reckon(),
+        routeLoaders.profile(),
+      ]);
+    };
+
+    if (browserWindow.requestIdleCallback && browserWindow.cancelIdleCallback) {
+      const idleId = browserWindow.requestIdleCallback(preload, { timeout: 3000 });
+      return () => browserWindow.cancelIdleCallback?.(idleId);
+    }
+
+    const timeoutId = browserWindow.setTimeout(preload, 1200);
+    return () => browserWindow.clearTimeout(timeoutId);
+  }, [enabled]);
+}
+
+function AuthenticatedRoutePreload() {
+  const { user, isLoading } = useAuth();
+  useIdleRoutePreload(Boolean(user) && !isLoading);
+  return null;
+}
 
 type AppProps = {
   initialLocation?: string;
@@ -101,6 +164,7 @@ const App = ({
                 <Sonner />
                 <AppRouter initialLocation={initialLocation}>
                   <StartupSoundManager />
+                  <AuthenticatedRoutePreload />
                   <AuthTransitionOverlay />
                   <WatchlistPanel />
                   <Suspense fallback={<CenteredAppSkeleton />}>

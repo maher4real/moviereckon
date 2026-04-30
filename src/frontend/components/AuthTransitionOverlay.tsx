@@ -374,10 +374,19 @@ export default function AuthTransitionOverlay() {
       >
         <div
           className={cn(
-            "flex items-center",
+            "relative flex items-center",
             isCenter && "animate-auth-brand-intro",
           )}
         >
+          <div
+            aria-hidden="true"
+            className={cn(
+              "absolute -inset-x-5 -inset-y-4 rounded-3xl border border-white/10",
+              "bg-background/68 shadow-[0_18px_70px_hsl(0_0%_0%/0.46)] backdrop-blur-md",
+              "transition-opacity duration-300",
+              isCenter ? "opacity-100" : "opacity-35",
+            )}
+          />
           <BrandLogo size="xl" animated />
         </div>
       </div>

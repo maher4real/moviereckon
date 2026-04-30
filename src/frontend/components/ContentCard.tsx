@@ -4,6 +4,7 @@ import { Eye, Heart, Sparkles, Bookmark } from "lucide-react";
 import { Movie, TVShow, getPosterUrl, getLanguageLabel } from "@/shared/lib/tmdb";
 import { useUserData } from "@/frontend/hooks/useUserData";
 import { useWatchlist } from "@/frontend/hooks/useWatchlist";
+import { useIsMobile } from "@/frontend/hooks/use-mobile";
 import { cn } from "@/shared/lib/utils";
 import MediaImage from "@/frontend/components/MediaImage";
 import { Popover, PopoverContent, PopoverTrigger } from "@/frontend/components/ui/popover";
@@ -28,6 +29,7 @@ function ContentCardComponent({
   const location = useLocation();
   const { isWatched, isLiked, addToWatchHistory, toggleLike } = useUserData();
   const { isInWatchlist, toggleItem: toggleWatchlist } = useWatchlist();
+  const isMobile = useIsMobile();
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [watchAnimating, setWatchAnimating] = useState(false);
   const [bookmarkAnimating, setBookmarkAnimating] = useState(false);
@@ -105,9 +107,29 @@ function ContentCardComponent({
     }
   };
 
+  const handleDragStart = (e: React.DragEvent) => {
+    if (isMobile) {
+      e.preventDefault();
+      return;
+    }
+
+    e.dataTransfer.effectAllowed = "copy";
+    e.dataTransfer.setData(
+      "application/x-watchlist-item",
+      JSON.stringify({
+        content_id: item.id,
+        content_type: contentType,
+        title,
+        poster_path: item.poster_path,
+      }),
+    );
+  };
+
   return (
     <div
       onClick={handleClick}
+      draggable={!isMobile}
+      onDragStart={handleDragStart}
       className="min-w-0 w-full cursor-pointer group/card"
     >
       {/* Poster */}

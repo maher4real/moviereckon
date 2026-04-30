@@ -75,25 +75,25 @@ export default function Header() {
         isScrolled ? "bg-background/95 backdrop-blur-md shadow-lg" : "bg-gradient-to-b from-background/80 to-transparent"
       )}
     >
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-3 sm:px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link
             to="/home"
             data-brand-logo-anchor="true"
-            className="inline-flex items-center transition-opacity hover:opacity-80"
+            className="relative z-10 inline-flex shrink-0 items-center transition-opacity hover:opacity-80"
           >
-            <BrandLogo size="sm" labelClassName="hidden sm:inline" />
+            <BrandLogo size="sm" labelClassName="hidden lg:inline" />
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-6">
+          <nav className="hidden md:flex min-w-0 flex-1 items-center justify-center gap-3 lg:gap-6 px-3 lg:px-6">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 to={link.href}
                 className={cn(
-                  "text-sm font-medium transition-colors",
+                  "shrink-0 text-sm font-medium transition-colors",
                   isActive(link.href)
                     ? "text-primary"
                     : "text-muted-foreground hover:text-foreground"
@@ -105,7 +105,7 @@ export default function Header() {
           </nav>
 
           {/* Right Side Actions */}
-          <div className="flex items-center gap-2">
+          <div className="relative z-10 flex shrink-0 items-center gap-1 sm:gap-2">
             {/* Search Button */}
             <Button
               variant="ghost"

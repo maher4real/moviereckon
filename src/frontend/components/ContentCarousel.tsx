@@ -19,6 +19,7 @@ interface ContentCarouselProps {
   type: "movie" | "tv" | "mixed";
   viewAllHref?: string;
   showViewAllCard?: boolean;
+  priorityImages?: boolean;
   recommendationExplanations?: Record<
     string,
     {
@@ -32,6 +33,7 @@ const INITIAL_VISIBLE_MOBILE = 10;
 const INITIAL_VISIBLE_DESKTOP = 18;
 const LOAD_STEP_MOBILE = 8;
 const LOAD_STEP_DESKTOP = 12;
+const POSTER_CARD_WIDTH_CLASS = "w-[38vw] max-w-38 min-w-30 sm:w-36 md:w-44 lg:w-48";
 
 function getInitialVisibleCount(): number {
   if (typeof window === "undefined") return INITIAL_VISIBLE_DESKTOP;
@@ -51,6 +53,7 @@ export default function ContentCarousel({
   type,
   viewAllHref,
   showViewAllCard = true,
+  priorityImages = false,
   recommendationExplanations,
 }: ContentCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -157,19 +160,19 @@ export default function ContentCarousel({
   }
 
   return (
-    <section className="px-4 md:px-6 lg:px-8">
+    <section className="px-3 sm:px-4 md:px-6 lg:px-8">
       {title && (
-        <div className="flex items-center justify-between mb-3 md:mb-4">
-          <div className="flex items-center gap-2.5">
+        <div className="mb-3 flex min-w-0 items-center justify-between gap-3 md:mb-4">
+          <div className="flex min-w-0 items-center gap-2.5">
             <div className="w-1 h-6 rounded-full bg-primary shrink-0" />
             {Icon && <Icon className="w-5 h-5 text-primary shrink-0" />}
-            <h2 className="text-lg md:text-xl font-bold tracking-tight">{title}</h2>
+            <h2 className="min-w-0 truncate text-lg font-bold tracking-tight md:text-xl">{title}</h2>
           </div>
           {resolvedViewAllHref && (
             <button
               type="button"
               onClick={() => navigate(resolvedViewAllHref)}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors duration-200 cursor-pointer shrink-0"
+              className="flex shrink-0 items-center gap-1 rounded-full bg-background/60 px-2.5 py-1 text-xs text-muted-foreground backdrop-blur-sm transition-colors duration-200 hover:text-primary"
             >
               View All
               <ArrowRight className="w-3.5 h-3.5" />
@@ -179,6 +182,9 @@ export default function ContentCarousel({
       )}
 
       <div className="relative group">
+        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 hidden w-10 carousel-fade-left md:block" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 hidden w-10 carousel-fade-right md:block" />
+
         <Button
           variant="ghost"
           size="icon"
@@ -199,13 +205,13 @@ export default function ContentCarousel({
 
         <div
           ref={scrollRef}
-          className="flex gap-2 md:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory px-2 md:px-4 pt-2 md:pt-3 pb-2 md:pb-4"
+          className="flex gap-2.5 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory px-1 pt-2 pb-3 sm:gap-3 md:gap-4 md:px-4 md:pt-3 md:pb-4"
         >
           {isLoading ? (
             Array.from({ length: 8 }).map((_, i) => (
               <div
                 key={i}
-                className="shrink-0 snap-start w-32 sm:w-35 md:w-45 lg:w-50"
+                className={cn("shrink-0 snap-start", POSTER_CARD_WIDTH_CLASS)}
               >
                 <div className="aspect-2/3 rounded-lg bg-muted animate-pulse" />
                 <div className="mt-2 h-4 bg-muted rounded animate-pulse w-3/4" />
@@ -217,24 +223,26 @@ export default function ContentCarousel({
               {visibleItems.map((item, index) => {
                 const itemType = getItemType(item);
                 const explanation = recommendationExplanations?.[`${itemType}_${item.id}`];
-                // First 6 items are likely visible on screen — load them eagerly.
-                // The rest load lazily as the user scrolls toward them.
-                const isAboveFold = index < 6;
+                const isPriorityPoster = priorityImages && index < 6;
 
                 return (
                   <button
                     key={`${itemType}-${item.id}`}
                     type="button"
                     onClick={() => handleItemClick(item)}
-                    className="shrink-0 snap-start w-32 sm:w-35 md:w-45 lg:w-50 cursor-pointer group/card relative text-left bg-transparent border-0 p-0"
+                    className={cn(
+                      "shrink-0 snap-start cursor-pointer group/card relative text-left bg-transparent border-0 p-0",
+                      POSTER_CARD_WIDTH_CLASS,
+                    )}
                   >
                     <div className="relative aspect-2/3 rounded-lg overflow-hidden transform-gpu transition-[transform,box-shadow] duration-300 group-hover/card:-translate-y-1.5 group-hover/card:shadow-[0_12px_36px_rgba(0,0,0,0.48)]">
                       <MediaImage
                         src={getPosterUrl(item.poster_path, "medium")}
                         alt={getTitle(item)}
                         className="w-full h-full object-cover"
-                        loading={isAboveFold ? "eager" : "lazy"}
-                        fetchPriority={isAboveFold ? "high" : "auto"}
+                        loading={isPriorityPoster ? "eager" : "lazy"}
+                        fetchPriority={isPriorityPoster ? "high" : "auto"}
+                        priority={isPriorityPoster}
                         fallbackSrc="/fallbacks/poster.svg"
                       />
 
@@ -271,11 +279,12 @@ export default function ContentCarousel({
                           <PopoverTrigger asChild>
                             <button
                               type="button"
-                              className="inline-flex items-center gap-1 rounded-full border border-primary/35 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
+                              className="inline-flex items-center gap-1 rounded-full border border-primary/35 bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-primary transition-colors hover:bg-primary hover:text-primary-foreground sm:px-2 sm:tracking-wide"
                               onClick={(event) => event.stopPropagation()}
+                              aria-label="Why this recommendation"
                             >
                               <Sparkles className="h-3 w-3" />
-                              Why This
+                              <span className="hidden sm:inline">Why This</span>
                             </button>
                           </PopoverTrigger>
                           <PopoverContent
@@ -323,7 +332,10 @@ export default function ContentCarousel({
                 <button
                   type="button"
                   onClick={() => navigate(resolvedViewAllHref)}
-                  className="shrink-0 snap-start w-32 sm:w-35 md:w-45 lg:w-50 cursor-pointer group/viewall bg-transparent border-0 p-0 text-left"
+                  className={cn(
+                    "shrink-0 snap-start cursor-pointer group/viewall bg-transparent border-0 p-0 text-left",
+                    POSTER_CARD_WIDTH_CLASS,
+                  )}
                 >
                   <div className="relative aspect-2/3 rounded-lg overflow-hidden border border-border bg-linear-to-br from-card to-muted/40 transition-all duration-300 group-hover/viewall:border-primary/40 group-hover/viewall:shadow-[0_10px_30px_rgba(0,0,0,0.35)] flex items-center justify-center">
                     <div className="flex flex-col items-center justify-center gap-3 px-4 text-center">

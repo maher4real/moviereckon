@@ -60,14 +60,16 @@ const BOLLYWOOD_LANGUAGE_CODES = ["hi", "gu", "ta", "te", "kn"] as const;
 const BOLLYWOOD_LANGUAGE_SET: ReadonlySet<string> = new Set(BOLLYWOOD_LANGUAGE_CODES);
 
 
-const PosterCard = memo(({ item, onClick }: { item: Movie; onClick: () => void }) => (
+const PosterCard = memo(({ item, onClick, priority = false }: { item: Movie; onClick: () => void; priority?: boolean }) => (
   <div onClick={onClick} className="cursor-pointer group">
     <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
       <MediaImage
         src={getPosterUrl(item.poster_path, "medium")}
         alt={item.title}
         className="w-full h-full object-cover"
-        loading="lazy"
+        loading={priority ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : "auto"}
+        priority={priority}
         fallbackSrc="/fallbacks/poster.svg"
       />
       <div className="absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -122,6 +124,7 @@ export default function Movies() {
   const {
     data: contentData,
     isLoading,
+    isFetching,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -230,6 +233,7 @@ export default function Movies() {
       return lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined;
     },
     staleTime: 1000 * 60 * 5,
+    placeholderData: (previousData) => previousData,
     enabled: !!user,
   });
 
@@ -426,11 +430,17 @@ export default function Movies() {
             <PosterGridSkeleton count={18} />
           ) : (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {allMovies.map((item) => (
+              <div
+                className={cn(
+                  "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 transition-opacity duration-200",
+                  isFetching && !isFetchingNextPage && "opacity-75",
+                )}
+              >
+                {allMovies.map((item, index) => (
                   <PosterCard
                     key={item.id}
                     item={item}
+                    priority={index < 8}
                     onClick={() =>
                       navigate(`/movie/${item.id}`, {
                         state: {
