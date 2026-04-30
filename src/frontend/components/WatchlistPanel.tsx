@@ -1,0 +1,352 @@
+"use client";
+
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { Bookmark, GripVertical, Check, Trash2, BookMarked } from "lucide-react";
+import { Button } from "@/frontend/components/ui/button";
+import { ScrollArea } from "@/frontend/components/ui/scroll-area";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/frontend/components/ui/sheet";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/frontend/components/ui/drawer";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/frontend/components/ui/tooltip";
+import { useWatchlist, type WatchlistItem } from "@/frontend/hooks/useWatchlist";
+import { useIsMobile } from "@/frontend/hooks/use-mobile";
+import { useAuth } from "@/frontend/hooks/useAuth";
+import MediaImage from "@/frontend/components/MediaImage";
+import { cn } from "@/shared/lib/utils";
+
+// ─── Sortable item ──────────────────────────────────────────────────────────
+
+function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
+  const { removeItem, markWatched } = useWatchlist();
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    // Respect reduced motion — only animate if user hasn't opted out
+    transition: transition ?? undefined,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const handleMarkWatched = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    markWatched(item.content_id, item.content_type, !item.watched);
+  };
+
+  const handleRemove = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    removeItem(item.content_id, item.content_type);
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "flex items-center gap-3 p-2 rounded-xl",
+        "bg-card border border-border",
+        "motion-safe:transition-colors duration-200",
+        "hover:bg-accent/30",
+        isDragging && "shadow-lg ring-1 ring-primary/30 z-10",
+        item.watched && "opacity-60",
+      )}
+    >
+      {/* Drag handle — 44px touch target on mobile */}
+      <button
+        {...attributes}
+        {...listeners}
+        className={cn(
+          "touch-none shrink-0",
+          "cursor-grab active:cursor-grabbing",
+          "text-muted-foreground hover:text-foreground",
+          "motion-safe:transition-colors duration-150",
+          // 44px min touch target
+          "flex items-center justify-center",
+          "min-h-11 min-w-11 md:min-h-0 md:min-w-0 md:p-1",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md",
+        )}
+        aria-label="Drag to reorder"
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+
+      {/* Poster */}
+      <div className="shrink-0 w-10 h-14 rounded-lg overflow-hidden bg-muted">
+        <MediaImage
+          src={item.poster_path}
+          alt={item.title}
+          className="w-full h-full object-cover"
+          width={40}
+          height={56}
+        />
+      </div>
+
+      {/* Title + type */}
+      <div className="flex-1 min-w-0">
+        <p
+          className={cn(
+            "text-sm font-medium truncate leading-tight",
+            item.watched && "line-through text-muted-foreground",
+          )}
+        >
+          {item.title}
+        </p>
+        <p className="text-xs text-muted-foreground capitalize mt-0.5">
+          {item.content_type === "tv" ? "Series" : "Movie"}
+        </p>
+      </div>
+
+      {/* Actions — min 44px touch targets on mobile, 8px gap */}
+      <div className="flex items-center gap-2 shrink-0">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={handleMarkWatched}
+              className={cn(
+                "cursor-pointer rounded-lg",
+                "flex items-center justify-center",
+                "min-h-11 min-w-11 md:min-h-8 md:min-w-8",
+                "motion-safe:transition-colors duration-150",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                item.watched
+                  ? "text-green-500 bg-green-500/10 hover:bg-green-500/20"
+                  : "text-muted-foreground hover:text-green-500 hover:bg-green-500/10",
+              )}
+              aria-label={item.watched ? "Mark as unwatched" : "Mark as watched"}
+            >
+              <Check className="h-4 w-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            {item.watched ? "Mark as unwatched" : "Mark as watched"}
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={handleRemove}
+              className={cn(
+                "cursor-pointer rounded-lg",
+                "flex items-center justify-center",
+                "min-h-11 min-w-11 md:min-h-8 md:min-w-8",
+                "motion-safe:transition-colors duration-150",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "text-muted-foreground hover:text-destructive hover:bg-destructive/10",
+              )}
+              aria-label="Remove from watchlist"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Remove</TooltipContent>
+        </Tooltip>
+      </div>
+    </div>
+  );
+}
+
+// ─── Panel content ───────────────────────────────────────────────────────────
+
+function WatchlistContent() {
+  const { items, isLoading, reorder } = useWatchlist();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = items.findIndex((i) => i.id === active.id);
+    const newIndex = items.findIndex((i) => i.id === over.id);
+    reorder(arrayMove(items, oldIndex, newIndex));
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col gap-2 pt-2">
+        {[1, 2, 3].map((n) => (
+          <div
+            key={n}
+            className="h-17.5 rounded-xl bg-muted/50 animate-pulse"
+            aria-hidden="true"
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-50 gap-4 text-center px-6 py-8">
+        <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center">
+          <BookMarked className="h-8 w-8 text-muted-foreground/40" />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-foreground">Your watchlist is empty</p>
+          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+            Tap the bookmark icon on any movie or series to add it here.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const unwatched = items.filter((i) => !i.watched);
+  const watched = items.filter((i) => i.watched);
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+        <div className="flex flex-col gap-2">
+          {unwatched.map((item) => (
+            <SortableWatchlistCard key={item.id} item={item} />
+          ))}
+
+          {watched.length > 0 && (
+            <>
+              <div className="flex items-center gap-2 mt-3 mb-1 px-1">
+                <div className="flex-1 h-px bg-border" />
+                <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider shrink-0">
+                  Watched ({watched.length})
+                </p>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+              {watched.map((item) => (
+                <SortableWatchlistCard key={item.id} item={item} />
+              ))}
+            </>
+          )}
+        </div>
+      </SortableContext>
+    </DndContext>
+  );
+}
+
+// ─── FAB + Panel ─────────────────────────────────────────────────────────────
+
+export default function WatchlistPanel() {
+  const { user } = useAuth();
+  const { items, isOpen, openPanel, closePanel } = useWatchlist();
+  const isMobile = useIsMobile();
+
+  if (!user) return null;
+
+  const unwatchedCount = items.filter((i) => !i.watched).length;
+
+  const panelHeader = (
+    <div className="flex items-center gap-2">
+      <BookMarked className="h-4 w-4 text-primary shrink-0" />
+      <span className="font-semibold text-base">Watchlist</span>
+      {items.length > 0 && (
+        <span className="ml-1 text-xs text-muted-foreground">
+          · {items.length} {items.length === 1 ? "title" : "titles"}
+        </span>
+      )}
+    </div>
+  );
+
+  const panelBody = (
+    <ScrollArea className="h-full">
+      <div className="px-1 pb-6">
+        <WatchlistContent />
+      </div>
+    </ScrollArea>
+  );
+
+  return (
+    <>
+      {/* FAB */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            onClick={openPanel}
+            size="icon"
+            className={cn(
+              "fixed z-40 shadow-xl rounded-full cursor-pointer",
+              // Mobile: above bottom nav (nav is h-16 = 4rem, add 4 for gap)
+              "bottom-20 right-4 h-14 w-14",
+              // Desktop
+              "md:bottom-6 md:right-6 md:h-12 md:w-12",
+              "bg-primary text-primary-foreground",
+              "hover:bg-primary/90 hover:shadow-primary/25",
+              "motion-safe:transition-all motion-safe:duration-200",
+              "hover:scale-105 active:scale-95",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            )}
+            aria-label="Open Watchlist"
+          >
+            <Bookmark className="h-6 w-6 md:h-5 md:w-5" />
+            {unwatchedCount > 0 && (
+              <span
+                aria-label={`${unwatchedCount} unwatched items`}
+                className={cn(
+                  "absolute -top-1.5 -right-1.5",
+                  "h-5 w-5 rounded-full",
+                  "bg-destructive text-destructive-foreground",
+                  "text-[10px] font-bold",
+                  "flex items-center justify-center",
+                  "ring-2 ring-background",
+                )}
+              >
+                {unwatchedCount > 99 ? "99+" : unwatchedCount}
+              </span>
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="left" className="hidden md:block">
+          Watchlist
+        </TooltipContent>
+      </Tooltip>
+
+      {/* Panel — Drawer on mobile, Sheet on desktop */}
+      {isMobile ? (
+        <Drawer open={isOpen} onOpenChange={(open) => !open && closePanel()}>
+          <DrawerContent className="max-h-[88vh] flex flex-col outline-none">
+            <DrawerHeader className="pb-3 pt-4 px-5 border-b border-border">
+              <DrawerTitle asChild>
+                <div>{panelHeader}</div>
+              </DrawerTitle>
+            </DrawerHeader>
+            <div className="flex-1 overflow-hidden px-4 pb-[env(safe-area-inset-bottom,16px)]">
+              {panelBody}
+            </div>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Sheet open={isOpen} onOpenChange={(open) => !open && closePanel()}>
+          <SheetContent
+            side="right"
+            className="w-100 sm:w-110 flex flex-col p-0 gap-0"
+          >
+            <SheetHeader className="px-6 pt-6 pb-4 border-b border-border shrink-0">
+              <SheetTitle asChild>
+                <div>{panelHeader}</div>
+              </SheetTitle>
+            </SheetHeader>
+            <div className="flex-1 overflow-hidden px-5 py-4">{panelBody}</div>
+          </SheetContent>
+        </Sheet>
+      )}
+    </>
+  );
+}

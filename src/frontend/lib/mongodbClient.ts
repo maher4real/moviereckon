@@ -170,6 +170,18 @@ export interface LikedItem {
   liked_at: string;
 }
 
+export interface WatchlistItem {
+  id: string;
+  user_id: string;
+  content_id: number;
+  content_type: "movie" | "tv";
+  title: string;
+  poster_path: string | null;
+  added_at: string;
+  position: number;
+  watched: boolean;
+}
+
 export interface UserPreferences {
   id: string;
   user_id: string;
@@ -1106,6 +1118,80 @@ export async function fetchAIRecommendations(): Promise<AIRecommendationsPayload
     };
   } catch {
     return empty;
+  }
+}
+
+// ========== Watchlist ==========
+
+export async function fetchWatchlist(): Promise<WatchlistItem[]> {
+  try {
+    const response = await fetchWithAuth("/api/user/watchlist");
+    if (!response.ok) return [];
+    const data = await response.json();
+    return data.data || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function toggleWatchlistItem(
+  item: Omit<WatchlistItem, "id" | "user_id" | "added_at" | "position" | "watched">,
+): Promise<{ ok: boolean; action: "added" | "removed"; data: WatchlistItem | null }> {
+  try {
+    const response = await fetchWithAuth("/api/user/watchlist", {
+      method: "POST",
+      body: JSON.stringify(item),
+    });
+    if (!response.ok) return { ok: false, action: "removed", data: null };
+    const data = await response.json();
+    return { ok: true, action: data.action, data: data.data };
+  } catch {
+    return { ok: false, action: "removed", data: null };
+  }
+}
+
+export async function removeWatchlistItem(
+  contentId: number,
+  contentType: "movie" | "tv",
+): Promise<boolean> {
+  try {
+    const response = await fetchWithAuth("/api/user/watchlist", {
+      method: "DELETE",
+      body: JSON.stringify({ content_id: contentId, content_type: contentType }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function reorderWatchlist(
+  order: Array<{ id: string; position: number }>,
+): Promise<boolean> {
+  try {
+    const response = await fetchWithAuth("/api/user/watchlist", {
+      method: "PATCH",
+      body: JSON.stringify({ action: "reorder", order }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function markWatchlistItemWatched(
+  contentId: number,
+  contentType: "movie" | "tv",
+  watched: boolean,
+): Promise<boolean> {
+  try {
+    const response = await fetchWithAuth("/api/user/watchlist", {
+      method: "PATCH",
+      body: JSON.stringify({ action: "mark_watched", content_id: contentId, content_type: contentType, watched }),
+    });
+    return response.ok;
+  } catch {
+    return false;
   }
 }
 

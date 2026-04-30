@@ -15,6 +15,8 @@ import { BrowserRouter, Routes, Route, Navigate, StaticRouter } from "react-rout
 import { lazy, Suspense, useState, type ReactNode } from "react";
 import { AuthProvider } from "@/frontend/hooks/useAuth";
 import { UserDataProvider } from "@/frontend/hooks/useUserData";
+import { WatchlistProvider } from "@/frontend/hooks/useWatchlist";
+import WatchlistPanel from "@/frontend/components/WatchlistPanel";
 import ErrorBoundary from "@/frontend/components/ErrorBoundary";
 import StartupSoundManager from "@/frontend/components/StartupSoundManager";
 import AuthTransitionOverlay from "@/frontend/components/AuthTransitionOverlay";
@@ -93,12 +95,14 @@ const App = ({
         <HydrationBoundary state={dehydratedState}>
           <AuthProvider initialUser={initialUser} authResolved={authResolved}>
             <UserDataProvider>
+              <WatchlistProvider>
               <TooltipProvider>
                 <Toaster />
                 <Sonner />
                 <AppRouter initialLocation={initialLocation}>
                   <StartupSoundManager />
                   <AuthTransitionOverlay />
+                  <WatchlistPanel />
                   <Suspense fallback={<CenteredAppSkeleton />}>
                     <Routes>
                       {/* Public routes */}
@@ -146,6 +150,7 @@ const App = ({
                   </Suspense>
                 </AppRouter>
               </TooltipProvider>
+              </WatchlistProvider>
             </UserDataProvider>
           </AuthProvider>
         </HydrationBoundary>

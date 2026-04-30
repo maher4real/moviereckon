@@ -1,8 +1,9 @@
 import { memo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Eye, Heart, Sparkles } from "lucide-react";
+import { Eye, Heart, Sparkles, Bookmark } from "lucide-react";
 import { Movie, TVShow, getPosterUrl, getLanguageLabel } from "@/shared/lib/tmdb";
 import { useUserData } from "@/frontend/hooks/useUserData";
+import { useWatchlist } from "@/frontend/hooks/useWatchlist";
 import { cn } from "@/shared/lib/utils";
 import MediaImage from "@/frontend/components/MediaImage";
 import { Popover, PopoverContent, PopoverTrigger } from "@/frontend/components/ui/popover";
@@ -26,8 +27,10 @@ function ContentCardComponent({
   const navigate = useNavigate();
   const location = useLocation();
   const { isWatched, isLiked, addToWatchHistory, toggleLike } = useUserData();
+  const { isInWatchlist, toggleItem: toggleWatchlist } = useWatchlist();
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [watchAnimating, setWatchAnimating] = useState(false);
+  const [bookmarkAnimating, setBookmarkAnimating] = useState(false);
 
   const isTV = "first_air_date" in item;
   const itemType = type === "mixed" ? (isTV ? "tv" : "movie") : type;
@@ -38,6 +41,7 @@ function ContentCardComponent({
 
   const watched = isWatched(item.id, contentType);
   const liked = isLiked(item.id, contentType);
+  const bookmarked = isInWatchlist(item.id, contentType);
 
   const handleClick = () => {
     const fromPath = `${location.pathname}${location.search}${location.hash}`;
@@ -65,6 +69,18 @@ function ContentCardComponent({
     setLikeAnimating(true);
     setTimeout(() => setLikeAnimating(false), 300);
     await toggleLike({
+      content_id: item.id,
+      content_type: contentType,
+      title,
+      poster_path: item.poster_path,
+    });
+  };
+
+  const handleBookmark = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setBookmarkAnimating(true);
+    setTimeout(() => setBookmarkAnimating(false), 300);
+    await toggleWatchlist({
       content_id: item.id,
       content_type: contentType,
       title,
@@ -140,6 +156,19 @@ function ContentCardComponent({
               title={liked ? "Unlike" : "Like"}
             >
               <Heart className={cn("w-3 h-3", liked && "fill-current", likeAnimating && "animate-pulse")} />
+            </button>
+            <button
+              onClick={handleBookmark}
+              className={cn(
+                "p-1.5 rounded action-btn transition-all",
+                bookmarked
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-background/80 text-foreground hover:bg-primary/20 hover:text-primary",
+                bookmarkAnimating && "animate-heart-pop"
+              )}
+              title={bookmarked ? "Remove from Watchlist" : "Add to Watchlist"}
+            >
+              <Bookmark className={cn("w-3 h-3", bookmarked && "fill-current", bookmarkAnimating && "animate-pulse")} />
             </button>
           </div>
         )}

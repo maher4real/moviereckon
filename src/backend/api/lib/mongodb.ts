@@ -104,6 +104,14 @@ async function ensureMongoIndexes(db: Db): Promise<void> {
       name: "liked_items_user_time_desc",
     });
 
+    await createIndexSafe(db, "watchlist", { user_id: 1, content_id: 1, content_type: 1 }, {
+      unique: true,
+      name: "watchlist_user_content_unique",
+    });
+    await createIndexSafe(db, "watchlist", { user_id: 1, position: 1 }, {
+      name: "watchlist_user_position",
+    });
+
     await createIndexSafe(db, "content_feedback", { user_id: 1, content_id: 1, content_type: 1 }, {
       unique: true,
       name: "content_feedback_user_content_unique",

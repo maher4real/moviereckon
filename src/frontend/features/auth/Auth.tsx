@@ -698,7 +698,7 @@ export default function Auth() {
             </p>
           </div>
 
-          <section className="rounded-2xl border border-white/10 bg-card/78 p-8 shadow-2xl backdrop-blur-md">
+          <section className="rounded-3xl border border-white/11 bg-card/85 px-8 py-9 shadow-2xl shadow-black/50 backdrop-blur-2xl ring-1 ring-inset ring-white/6">
             {emailVerificationStatus ? (
               <Alert
                 className={cn(
@@ -731,7 +731,7 @@ export default function Auth() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-12 w-full rounded-xl border-white/15 bg-white text-sm font-semibold text-slate-900 transition-colors hover:bg-white/90"
+                  className="h-12 w-full cursor-pointer rounded-xl border-border/30 bg-white text-sm font-semibold text-slate-900 shadow-sm transition-all duration-150 hover:bg-white/95 hover:shadow-md active:scale-[0.98]"
                   onClick={handleGoogleSignIn}
                   disabled={isSubmitting || isGoogleSubmitting || isAuthenticating}
                 >
@@ -772,16 +772,16 @@ export default function Auth() {
                 setSignupCaptchaResetNonce((prev) => prev + 1);
               }}
             >
-              <TabsList className="mb-6 grid h-12 w-full grid-cols-2 rounded-xl border border-white/10 bg-background/65 p-1">
+              <TabsList className="mb-6 grid h-11 w-full grid-cols-2 rounded-xl border border-white/10 bg-background/60 p-1">
                 <TabsTrigger
                   value="signin"
-                  className="rounded-lg text-sm font-semibold tracking-wide data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-primary/35"
+                  className="rounded-lg text-sm font-semibold tracking-wide transition-all duration-200 data-[state=active]:bg-linear-to-r data-[state=active]:from-primary data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-primary/35 data-[state=inactive]:text-muted-foreground"
                 >
                   Sign In
                 </TabsTrigger>
                 <TabsTrigger
                   value="signup"
-                  className="rounded-lg text-sm font-semibold tracking-wide data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-primary/35"
+                  className="rounded-lg text-sm font-semibold tracking-wide transition-all duration-200 data-[state=active]:bg-linear-to-r data-[state=active]:from-primary data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-primary/35 data-[state=inactive]:text-muted-foreground"
                 >
                   Sign Up
                 </TabsTrigger>
@@ -821,7 +821,7 @@ export default function Auth() {
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="signin-email" className="text-sm font-medium">
+                    <Label htmlFor="signin-email" className="text-xs font-semibold tracking-wide text-foreground/75">
                       Email Address
                     </Label>
                     <div className="relative">
@@ -845,17 +845,20 @@ export default function Auth() {
                             setVerificationBanner(null);
                           }
                         }}
-                        className="h-12 rounded-xl border-white/15 bg-background/80 pl-10 pr-3 text-sm"
+                        className="h-12 rounded-xl border-border/50 bg-background/60 pl-10 pr-3 text-sm transition-colors duration-150 focus-visible:border-primary/50 focus-visible:ring-primary/20"
                         autoComplete="email"
                       />
                     </div>
                     {displayErrors.email && (
-                      <p className="text-xs text-destructive">{displayErrors.email}</p>
+                      <p className="flex items-center gap-1.5 text-xs text-destructive">
+                        <CircleAlert className="h-3 w-3 shrink-0" />
+                        {displayErrors.email}
+                      </p>
                     )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="signin-password" className="text-sm font-medium">
+                    <Label htmlFor="signin-password" className="text-xs font-semibold tracking-wide text-foreground/75">
                       Password
                     </Label>
                     <div className="relative">
@@ -869,7 +872,7 @@ export default function Auth() {
                           setPassword(e.target.value);
                           clearError("password");
                         }}
-                        className="h-12 rounded-xl border-white/15 bg-background/80 pl-10 pr-10 text-sm"
+                        className="h-12 rounded-xl border-border/50 bg-background/60 pl-10 pr-10 text-sm transition-colors duration-150 focus-visible:border-primary/50 focus-visible:ring-primary/20"
                         autoComplete="current-password"
                       />
                       <button
@@ -886,7 +889,8 @@ export default function Auth() {
                       </button>
                     </div>
                     {errors.password && (
-                      <p className="text-xs text-destructive">
+                      <p className="flex items-center gap-1.5 text-xs text-destructive">
+                        <CircleAlert className="h-3 w-3 shrink-0" />
                         {errors.password}
                       </p>
                     )}
@@ -894,7 +898,7 @@ export default function Auth() {
                       <button
                         type="button"
                         onClick={() => navigate("/forgot-password")}
-                        className="text-xs font-semibold text-primary transition-colors hover:text-primary/80"
+                        className="cursor-pointer text-xs font-semibold text-primary transition-colors hover:text-primary/80 focus-visible:outline-none focus-visible:underline"
                       >
                         Forgot password?
                       </button>
@@ -911,17 +915,21 @@ export default function Auth() {
                     resetNonce={signinCaptchaResetNonce}
                   />
                   {errors.captcha && activeTab === "signin" ? (
-                    <p className="text-xs text-destructive">{errors.captcha}</p>
+                    <p className="flex items-center gap-1.5 text-xs text-destructive">
+                      <CircleAlert className="h-3 w-3 shrink-0" />
+                      {errors.captcha}
+                    </p>
                   ) : null}
 
                   <Button
                     type="submit"
-                    className="auth-submit-btn mt-1 h-12 w-full rounded-xl bg-gradient-to-r from-primary via-red-500 to-orange-500 text-base font-semibold text-white shadow-lg shadow-primary/35 transition-all hover:brightness-110"
+                    className="auth-submit-btn relative overflow-hidden mt-1 h-12 w-full rounded-xl bg-linear-to-r from-primary via-red-500 to-orange-500 text-base font-semibold text-white shadow-lg shadow-primary/35 transition-all hover:brightness-110"
                     disabled={isSubmitting || isAuthenticating}
                   >
-                    <span className="inline-flex items-center gap-2">
+                    {isSubmitting && <span className="auth-btn-loading-fill" aria-hidden="true" />}
+                    <span className="relative z-10 inline-flex items-center gap-2">
                       {isSubmitting ? "Signing In..." : "Sign In"}
-                      <ArrowRight className="h-4 w-4" />
+                      {!isSubmitting && <ArrowRight className="h-4 w-4" />}
                     </span>
                   </Button>
                 </form>
@@ -930,7 +938,7 @@ export default function Auth() {
               <TabsContent value="signup" className="mt-0">
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="signup-username" className="text-sm font-medium">
+                    <Label htmlFor="signup-username" className="text-xs font-semibold tracking-wide text-foreground/75">
                       Username
                     </Label>
                     <div className="relative">
@@ -944,12 +952,13 @@ export default function Auth() {
                           setUsername(e.target.value);
                           clearError("username");
                         }}
-                        className="h-12 rounded-xl border-white/15 bg-background/80 pl-10 pr-3 text-sm"
+                        className="h-12 rounded-xl border-border/50 bg-background/60 pl-10 pr-3 text-sm transition-colors duration-150 focus-visible:border-primary/50 focus-visible:ring-primary/20"
                         autoComplete="name"
                       />
                     </div>
                     {displayErrors.username && (
-                      <p className="text-xs text-destructive">
+                      <p className="flex items-center gap-1.5 text-xs text-destructive">
+                        <CircleAlert className="h-3 w-3 shrink-0" />
                         {displayErrors.username}
                       </p>
                     )}
@@ -962,7 +971,7 @@ export default function Auth() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="signup-email" className="text-sm font-medium">
+                    <Label htmlFor="signup-email" className="text-xs font-semibold tracking-wide text-foreground/75">
                       Email Address
                     </Label>
                     <div className="relative">
@@ -977,12 +986,15 @@ export default function Auth() {
                           clearError("email");
                           setVerificationBanner(null);
                         }}
-                        className="h-12 rounded-xl border-white/15 bg-background/80 pl-10 pr-3 text-sm"
+                        className="h-12 rounded-xl border-border/50 bg-background/60 pl-10 pr-3 text-sm transition-colors duration-150 focus-visible:border-primary/50 focus-visible:ring-primary/20"
                         autoComplete="email"
                       />
                     </div>
                     {displayErrors.email && (
-                      <p className="text-xs text-destructive">{displayErrors.email}</p>
+                      <p className="flex items-center gap-1.5 text-xs text-destructive">
+                        <CircleAlert className="h-3 w-3 shrink-0" />
+                        {displayErrors.email}
+                      </p>
                     )}
                     {!displayErrors.email &&
                     activeTab === "signup" &&
@@ -993,7 +1005,7 @@ export default function Auth() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="signup-password" className="text-sm font-medium">
+                    <Label htmlFor="signup-password" className="text-xs font-semibold tracking-wide text-foreground/75">
                       Password
                     </Label>
                     <div className="relative">
@@ -1007,7 +1019,7 @@ export default function Auth() {
                           setPassword(e.target.value);
                           clearError("password");
                         }}
-                        className="h-12 rounded-xl border-white/15 bg-background/80 pl-10 pr-10 text-sm"
+                        className="h-12 rounded-xl border-border/50 bg-background/60 pl-10 pr-10 text-sm transition-colors duration-150 focus-visible:border-primary/50 focus-visible:ring-primary/20"
                         autoComplete="new-password"
                       />
                       <button
@@ -1024,7 +1036,8 @@ export default function Auth() {
                       </button>
                     </div>
                     {errors.password && (
-                      <p className="text-xs text-destructive">
+                      <p className="flex items-center gap-1.5 text-xs text-destructive">
+                        <CircleAlert className="h-3 w-3 shrink-0" />
                         {errors.password}
                       </p>
                     )}
@@ -1040,21 +1053,25 @@ export default function Auth() {
                     resetNonce={signupCaptchaResetNonce}
                   />
                   {errors.captcha && activeTab === "signup" ? (
-                    <p className="text-xs text-destructive">{errors.captcha}</p>
+                    <p className="flex items-center gap-1.5 text-xs text-destructive">
+                      <CircleAlert className="h-3 w-3 shrink-0" />
+                      {errors.captcha}
+                    </p>
                   ) : null}
 
                   <Button
                     type="submit"
-                    className="auth-submit-btn mt-1 h-12 w-full rounded-xl bg-gradient-to-r from-primary via-red-500 to-orange-500 text-base font-semibold text-white shadow-lg shadow-primary/35 transition-all hover:brightness-110"
+                    className="auth-submit-btn relative overflow-hidden mt-1 h-12 w-full rounded-xl bg-linear-to-r from-primary via-red-500 to-orange-500 text-base font-semibold text-white shadow-lg shadow-primary/35 transition-all hover:brightness-110"
                     disabled={
                       isSubmitting ||
                       isAuthenticating ||
                       Boolean(availabilityErrors.email || availabilityErrors.username)
                     }
                   >
-                    <span className="inline-flex items-center gap-2">
+                    {isSubmitting && <span className="auth-btn-loading-fill" aria-hidden="true" />}
+                    <span className="relative z-10 inline-flex items-center gap-2">
                       {isSubmitting ? "Creating Account..." : "Create Account"}
-                      <ArrowRight className="h-4 w-4" />
+                      {!isSubmitting && <ArrowRight className="h-4 w-4" />}
                     </span>
                   </Button>
                 </form>

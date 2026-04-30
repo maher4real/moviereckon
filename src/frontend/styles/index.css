@@ -565,6 +565,31 @@
     animation: auth-brand-glow-flow 3s ease-in-out infinite;
   }
 
+  @keyframes auth-btn-fill {
+    0% {
+      transform: scaleX(0.03);
+    }
+    60% {
+      transform: scaleX(0.78);
+      animation-timing-function: ease-out;
+    }
+    100% {
+      transform: scaleX(0.92);
+    }
+  }
+
+  .auth-btn-loading-fill {
+    position: absolute;
+    inset: 0;
+    transform-origin: left center;
+    transform: scaleX(0.03);
+    animation: auth-btn-fill 2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    background: linear-gradient(to right, var(--color-primary), #ef4444, #f97316);
+    opacity: 0.55;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
   @keyframes auth-button-shine {
     0%,
     60% {

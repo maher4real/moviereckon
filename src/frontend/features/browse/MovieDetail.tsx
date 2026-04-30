@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import { useUserData } from "@/frontend/hooks/useUserData";
+import { useWatchlist } from "@/frontend/hooks/useWatchlist";
 import {
   getMovieDetails,
   getMovieCredits,
@@ -42,6 +43,7 @@ import {
   Globe,
   Play,
   Heart,
+  Bookmark,
   Check,
   CircleDollarSign,
   Star,
@@ -64,8 +66,10 @@ export default function MovieDetail() {
   const location = useLocation();
   const { user } = useAuth();
   const { addToWatchHistory, isWatched, toggleLike, isLiked } = useUserData();
+  const { isInWatchlist, toggleItem: toggleWatchlist } = useWatchlist();
   const [watchAnimating, setWatchAnimating] = useState(false);
   const [likeAnimating, setLikeAnimating] = useState(false);
+  const [bookmarkAnimating, setBookmarkAnimating] = useState(false);
   const [isTrailerModalOpen, setIsTrailerModalOpen] = useState(false);
   const [trailerSessionId, setTrailerSessionId] = useState(0);
   const [isBackgroundVideoVisible, setIsBackgroundVideoVisible] = useState(true);
@@ -380,6 +384,18 @@ export default function MovieDetail() {
     });
   };
 
+  const handleToggleWatchlist = async () => {
+    if (!movie) return;
+    setBookmarkAnimating(true);
+    setTimeout(() => setBookmarkAnimating(false), 420);
+    await toggleWatchlist({
+      content_id: movie.id,
+      content_type: "movie",
+      title: movie.title,
+      poster_path: movie.poster_path,
+    });
+  };
+
   const formatRuntime = (minutes: number): string => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
@@ -611,6 +627,7 @@ export default function MovieDetail() {
 
   const watched = isWatched(movie.id, "movie");
   const liked = isLiked(movie.id, "movie");
+  const bookmarked = isInWatchlist(movie.id, "movie");
   const year = movie.release_date?.split("-")[0] || "";
   const matchScore = movie.vote_average > 0 ? Math.round(movie.vote_average * 10) : null;
   const languageLabel = getLanguageLabel(movie.original_language);
@@ -864,6 +881,20 @@ export default function MovieDetail() {
               >
                 <Heart className={cn("w-5 h-5 mr-2", liked && "fill-current")} />
                 {liked ? "Liked" : "Like"}
+              </Button>
+              <Button
+                size="lg"
+                className={cn(
+                  "action-btn",
+                  bookmarked
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "bg-muted text-foreground hover:bg-primary/20 hover:text-primary",
+                  bookmarkAnimating && "animate-heart-pop"
+                )}
+                onClick={handleToggleWatchlist}
+              >
+                <Bookmark className={cn("w-5 h-5 mr-2", bookmarked && "fill-current")} />
+                {bookmarked ? "Watchlisted" : "Watchlist"}
               </Button>
             </div>
 

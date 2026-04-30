@@ -2,12 +2,13 @@
  * User Router - Consolidated serverless function
  * Routes: /api/user/watch-history, /api/user/liked-items, /api/user/preferences,
  * /api/user/profile, /api/user/avatar-import, /api/user/avatar-upload, /api/user/clear-history,
- * /api/user/comments, /api/user/feedback, /api/user/recommendations
+ * /api/user/comments, /api/user/feedback, /api/user/recommendations, /api/user/watchlist
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { installGlobalSafeLogging } from "@/shared/lib/safeLogging";
 import watchHistoryHandler from "./_handlers/user/watch-history.js";
 import likedItemsHandler from "./_handlers/user/liked-items.js";
+import watchlistHandler from "./_handlers/user/watchlist.js";
 import preferencesHandler from "./_handlers/user/preferences.js";
 import profileHandler from "./_handlers/user/profile.js";
 import avatarImportHandler from "./_handlers/user/avatar-import.js";
@@ -148,6 +149,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return recommendationsHandler(req, res);
       case "ai-recommendations":
         return aiRecommendationsHandler(req, res);
+      case "watchlist":
+        return watchlistHandler(req, res);
       default:
         return res.status(404).json({ error: `User route not found: ${route}` });
     }
