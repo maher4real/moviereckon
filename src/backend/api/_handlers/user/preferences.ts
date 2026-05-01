@@ -96,7 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
       );
 
-      const prefs = result?.value;
+      const prefs = (result as any)?.value ?? result;
       if (!prefs) {
         return res
           .status(500)
@@ -141,22 +141,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const now = new Date().toISOString();
       const updates: Record<string, unknown> = { updated_at: now };
+      const insertDefaults: Record<string, unknown> = {
+        user_id: user.id,
+        inferred_languages: [],
+        inferred_genres: [],
+        created_at: now,
+      };
       if (preferredLanguages !== null)
         updates.preferred_languages = preferredLanguages;
+      else insertDefaults.preferred_languages = [];
       if (preferredGenres !== null) updates.preferred_genres = preferredGenres;
+      else insertDefaults.preferred_genres = [];
 
       await db.collection("user_preferences").updateOne(
         { user_id: user.id },
         {
           $set: updates,
-          $setOnInsert: {
-            user_id: user.id,
-            preferred_languages: [],
-            preferred_genres: [],
-            inferred_languages: [],
-            inferred_genres: [],
-            created_at: now,
-          },
+          $setOnInsert: insertDefaults,
         },
         { upsert: true },
       );
