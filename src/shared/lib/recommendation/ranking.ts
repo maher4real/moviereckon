@@ -56,6 +56,7 @@ type SimilarityProfile = {
 type DiversificationState = {
   dominantLanguage: string | null;
   preferredLanguageSet: Set<string>;
+  preferredGenreSet: Set<number>;
   selectedCount: number;
   languageCounts: Map<string, number>;
   typeCounts: Map<ContentType, number>;
@@ -154,6 +155,10 @@ function selectionBalanceAdjustment(
     adjustment += 0.028;
   }
 
+  if (candidate.item.genreIds.some((genreId) => state.preferredGenreSet.has(genreId))) {
+    adjustment += 0.02;
+  }
+
   if (dominantLanguage && candidateLanguage === dominantLanguage && languageShare >= 0.45) {
     adjustment -= Math.min(0.08, 0.015 + (languageShare - 0.45) * 0.25);
   } else if (languageShare >= 0.4) {
@@ -180,6 +185,7 @@ function createDiversificationState(
     preferredLanguageSet: new Set(
       (userContext?.preferredLanguages || []).map((language) => language.toLowerCase()),
     ),
+    preferredGenreSet: new Set(userContext?.preferredGenres || []),
     selectedCount: 0,
     languageCounts: new Map<string, number>(),
     typeCounts: new Map<ContentType, number>(),
@@ -417,12 +423,22 @@ function enforcePreferredLanguageCoverage(
 function baseFallbackRanking(
   candidates: UnifiedContentItem[],
   seenKeys: Set<string>,
+  userContext?: RecommendationUserContext,
 ): RankedRecommendation[] {
+  const preferredGenreSet = new Set(userContext?.preferredGenres || []);
+
   return candidates
     .filter((item) => !seenKeys.has(item.key))
     .map((item) => {
       const qualityComponent = (Math.max(0, item.voteAverage) / 10) * 0.6;
       const popularityComponent = Math.min(1, item.popularity / 150) * 0.4;
+      const preferredGenreMatches = item.genreIds.filter((genreId) =>
+        preferredGenreSet.has(genreId),
+      ).length;
+      const preferenceComponent =
+        preferredGenreMatches > 0
+          ? Math.min(0.34, 0.24 + preferredGenreMatches * 0.05)
+          : 0;
       const novelty = 0.05;
 
       const scoreBreakdown: ScoreBreakdown = {
@@ -439,11 +455,14 @@ function baseFallbackRanking(
 
       return {
         item,
-        score: qualityComponent + popularityComponent + novelty,
+        score: qualityComponent + popularityComponent + preferenceComponent + novelty,
         reasons: [
+          ...(preferenceComponent > 0
+            ? [{ label: "Matches preferred genre" } as RecommendationReason]
+            : []),
           { label: "Highly rated" },
           { label: "Popular pick" },
-        ] as RecommendationReason[],
+        ].slice(0, 3) as RecommendationReason[],
         scoreBreakdown,
         seedKey: null,
         seedTitle: null,
@@ -487,7 +506,7 @@ export function getRecommendations(
     userContext?.popularityMedian || calculatePopularityMedian(candidates);
 
   if (normalizedSeeds.length === 0) {
-    const fallback = baseFallbackRanking(candidates, seenKeys);
+    const fallback = baseFallbackRanking(candidates, seenKeys, userContext);
     const diversifiedFallback = diversifyTopResults(
       fallback,
       userContext?.diversificationTopN || DEFAULT_DIVERSIFICATION_TOP_N,
@@ -501,6 +520,7 @@ export function getRecommendations(
   }
 
   const seedWeights = userContext?.seedWeights || {};
+  const preferredGenreSet = new Set(userContext?.preferredGenres || []);
 
   const scored: RankedRecommendation[] = candidates
     .map((candidate) => {
@@ -550,7 +570,14 @@ export function getRecommendations(
       }
 
       const averageScore = weightTotal > 0 ? weightedScoreTotal / weightTotal : 0;
-      const blendedScore = bestScore * 0.65 + averageScore * 0.35;
+      const preferredGenreMatches = candidate.genreIds.filter((genreId) =>
+        preferredGenreSet.has(genreId),
+      ).length;
+      const preferenceBoost =
+        preferredGenreMatches > 0
+          ? Math.min(0.36, 0.28 + preferredGenreMatches * 0.04)
+          : 0;
+      const blendedScore = bestScore * 0.65 + averageScore * 0.35 + preferenceBoost;
 
       const scoreBreakdown: ScoreBreakdown = {
         genre: weightTotal > 0 ? weightedBreakdownTotals.genre / weightTotal : 0,
@@ -567,7 +594,12 @@ export function getRecommendations(
       return {
         item: candidate,
         score: blendedScore,
-        reasons: bestReasons.slice(0, 3),
+        reasons: [
+          ...(preferenceBoost > 0
+            ? [{ label: "Matches preferred genre" } as RecommendationReason]
+            : []),
+          ...bestReasons,
+        ].slice(0, 3),
         scoreBreakdown,
         seedKey: bestSeed?.key || null,
         seedTitle: bestSeed?.title || null,

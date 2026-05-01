@@ -62,6 +62,8 @@ interface FeedbackItem {
 interface UserPreferences {
   preferred_languages: string[];
   preferred_genres: number[];
+  inferred_languages: string[];
+  inferred_genres: number[];
 }
 
 interface SeedSignal {
@@ -272,6 +274,8 @@ function toPreferences(value: unknown): UserPreferences {
   return {
     preferred_languages: toLanguageList(doc.preferred_languages),
     preferred_genres: toGenreList(doc.preferred_genres),
+    inferred_languages: toLanguageList(doc.inferred_languages),
+    inferred_genres: toGenreList(doc.inferred_genres),
   };
 }
 
@@ -343,6 +347,8 @@ function buildRecommendationRevision(
   );
   const languagePrefs = [...preferences.preferred_languages].sort().join(",");
   const genrePrefs = [...preferences.preferred_genres].sort((a, b) => a - b).join(",");
+  const inferredLanguagePrefs = [...preferences.inferred_languages].sort().join(",");
+  const inferredGenrePrefs = [...preferences.inferred_genres].sort((a, b) => a - b).join(",");
 
   return [
     `w:${watchHistory.length}:${getLatest(watchHistory, (item) => item.watched_at)}:${watchSlice}`,
@@ -350,6 +356,8 @@ function buildRecommendationRevision(
     `f:${feedbackItems.length}:${feedbackSlice}`,
     `lang:${languagePrefs}`,
     `g:${genrePrefs}`,
+    `ilang:${inferredLanguagePrefs}`,
+    `ig:${inferredGenrePrefs}`,
   ].join("|");
 }
 
@@ -698,7 +706,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .toArray(),
         db.collection("user_preferences").findOne(
           { user_id: user.id },
-          { projection: { preferred_genres: 1, preferred_languages: 1 } },
+          { projection: { preferred_genres: 1, preferred_languages: 1, inferred_genres: 1, inferred_languages: 1 } },
         ),
       ]),
       DB_TIMEOUT_MS,
@@ -782,6 +790,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           addLanguageWeight(languageScores, language, Math.max(1.2, 2.8 - index * 0.2));
         });
 
+        preferences.inferred_genres.forEach((genreId, index) => {
+          const boost = Math.max(0.55, 1.2 - index * 0.08);
+          genreScores[genreId] = (genreScores[genreId] || 0) + boost;
+        });
+
+        preferences.inferred_languages.forEach((language, index) => {
+          addLanguageWeight(languageScores, language, Math.max(0.5, 1.15 - index * 0.08));
+        });
+
         const topGenres = Object.entries(genreScores)
           .sort(([, a], [, b]) => b - a)
           .slice(0, 6)
@@ -821,6 +838,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .sort((a, b) => b.weight - a.weight)
           .slice(0, MAX_SEEDS);
 
+        const hasExplicitPreferences =
+          preferences.preferred_genres.length > 0 ||
+          preferences.preferred_languages.length > 0;
         const hasPersonalizationData =
           seedSignals.length > 0 || topGenres.length > 0 || feedbackItems.length > 0;
         const hasStrongSignals =
@@ -1046,6 +1066,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ),
     );
 
+    const languageGenreTVResults = await Promise.all(
+      languageGenreSources.map(({ language, genreId }) =>
+        safe(
+          discoverServerTVShows({
+            with_original_language: language,
+            with_genres: genreId.toString(),
+            sort_by: "vote_average.desc",
+            "vote_count.gte": 50,
+            page: 1,
+          }),
+        ),
+      ),
+    );
+
     const candidateUnion = buildCandidateUnion(
       [
         ...similarResults.map((result, index) => ({
@@ -1093,6 +1127,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           items: result?.results,
           typeHint: "movie" as const,
         })),
+        ...languageGenreTVResults.map((result, index) => ({
+          source: `discover:tv:language-genre:${languageGenreSources[index]?.language || "none"}:${languageGenreSources[index]?.genreId || "none"}`,
+          items: result?.results,
+          typeHint: "tv" as const,
+        })),
         ...peopleMovieResults.map((result, index) => ({
           source: `people:movie:${creatorDirectorIds[index] || "none"}`,
           items: result?.results,
@@ -1130,6 +1169,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         seedWeights,
         seenIds,
         preferredLanguages: prioritizedLanguages,
+        preferredGenres: preferences.preferred_genres,
         dominantLanguage: prioritizedLanguages[0] || null,
         popularityMedian: candidateUnion.popularityMedian,
         maxCandidates: MAX_CANDIDATES,
@@ -1154,7 +1194,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const payload: RecommendationsPayload = {
           items,
-          isPersonalized: hasPersonalizationData && hasStrongSignals && items.length > 0,
+          isPersonalized:
+            hasPersonalizationData && (hasStrongSignals || hasExplicitPreferences) && items.length > 0,
           explanationById,
         };
 

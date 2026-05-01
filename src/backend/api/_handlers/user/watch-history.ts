@@ -281,7 +281,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-// Helper to update user preferences
+// Helper to update learned taste signals without overwriting explicit preferences
 async function updateUserPreferences(
   db: Database,
   userId: string,
@@ -298,21 +298,23 @@ async function updateUserPreferences(
       {
         $set: {
           user_id: userId,
-          preferred_languages: {
+          preferred_languages: { $ifNull: ["$preferred_languages", []] },
+          preferred_genres: { $ifNull: ["$preferred_genres", []] },
+          inferred_languages: {
             $slice: [
               {
                 $setUnion: [
                   incomingLanguages,
-                  { $ifNull: ["$preferred_languages", []] },
+                  { $ifNull: ["$inferred_languages", []] },
                 ],
               },
               5,
             ],
           },
-          preferred_genres: {
+          inferred_genres: {
             $slice: [
               {
-                $setUnion: [incomingGenres, { $ifNull: ["$preferred_genres", []] }],
+                $setUnion: [incomingGenres, { $ifNull: ["$inferred_genres", []] }],
               },
               10,
             ],

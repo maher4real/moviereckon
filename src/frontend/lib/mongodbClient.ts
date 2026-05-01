@@ -187,6 +187,8 @@ export interface UserPreferences {
   user_id: string;
   preferred_languages: string[];
   preferred_genres: number[];
+  inferred_languages?: string[];
+  inferred_genres?: number[];
 }
 
 export type FeedbackType = "give_it_a_go" | "one_time_watch" | "must_watch" | "skip";
@@ -1049,17 +1051,16 @@ export async function fetchUserPreferences(): Promise<UserPreferences | null> {
 }
 
 export async function updateUserPreferences(prefs: Partial<UserPreferences>): Promise<UserPreferences | null> {
-  try {
-    const response = await fetchWithAuth("/api/user/preferences", {
-      method: "PUT",
-      body: JSON.stringify(prefs),
-    });
-    if (!response.ok) return null;
-    const data = await response.json();
-    return data.data;
-  } catch {
-    return null;
+  const response = await fetchWithAuth("/api/user/preferences", {
+    method: "PUT",
+    body: JSON.stringify(prefs),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || "Unable to update preferences");
   }
+  const data = await response.json();
+  return data.data;
 }
 
 export async function clearAllHistory(): Promise<boolean> {

@@ -43,6 +43,8 @@ export interface UserPreferences {
   user_id: string;
   preferred_languages: string[];
   preferred_genres: number[];
+  inferred_languages?: string[];
+  inferred_genres?: number[];
 }
 
 export type FeedbackType = mongoClient.FeedbackType;
@@ -86,7 +88,7 @@ interface UserDataContextType {
   getTopGenres: (limit?: number) => number[];
   clearHistory: () => Promise<void>;
   refreshData: () => Promise<void>;
-  updatePreferences: (prefs: { preferred_languages?: string[]; preferred_genres?: number[] }) => Promise<void>;
+  updatePreferences: (prefs: { preferred_languages?: string[]; preferred_genres?: number[] }) => Promise<UserPreferences>;
 }
 
 const UserDataContext = createContext<UserDataContextType | undefined>(undefined);
@@ -497,7 +499,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       setWatchHistory([]);
       setLikedItems([]);
       setPreferences((prev) =>
-        prev ? { ...prev, preferred_languages: [], preferred_genres: [] } : null
+        prev ? { ...prev, inferred_languages: [], inferred_genres: [] } : null
       );
 
       toast({
@@ -524,12 +526,14 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
   const updatePreferences = useCallback(
     async (prefs: { preferred_languages?: string[]; preferred_genres?: number[] }) => {
       const userId = getUserId();
-      if (!userId) return;
+      if (!userId) throw new Error("User is not signed in");
       try {
         const result = await mongoClient.updateUserPreferences(prefs);
-        if (result) {
-          setPreferences(result as UserPreferences);
+        if (!result) {
+          throw new Error("preferences_update_failed");
         }
+        setPreferences(result as UserPreferences);
+        return result as UserPreferences;
       } catch (error) {
         console.error("Error updating preferences:", error);
         toast({
@@ -537,6 +541,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
           title: "Error",
           description: "Failed to save preferences",
         });
+        throw error;
       }
     },
     [getUserId, toast],

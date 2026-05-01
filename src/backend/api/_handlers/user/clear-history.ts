@@ -48,7 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       db.collection("liked_items").deleteMany({ user_id: user.id }),
       db.collection("user_preferences").updateOne(
         { user_id: user.id },
-        { $set: { preferred_languages: [], preferred_genres: [], updated_at: new Date().toISOString() } }
+        { $set: { inferred_languages: [], inferred_genres: [], updated_at: new Date().toISOString() } }
       ),
     ]);
 

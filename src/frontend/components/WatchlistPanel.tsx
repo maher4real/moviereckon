@@ -21,7 +21,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Bookmark, GripVertical, Check, Trash2, BookMarked, ExternalLink, ListVideo } from "lucide-react";
+import { Bookmark, GripVertical, Check, Trash2, BookMarked, ExternalLink, ListVideo, Clapperboard } from "lucide-react";
 import { Button } from "@/frontend/components/ui/button";
 import { ScrollArea } from "@/frontend/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/frontend/components/ui/popover";
@@ -397,31 +397,54 @@ export default function WatchlistPanel() {
                 onDrop={isMobile ? undefined : handleDrop}
                 size="icon"
                 className={cn(
-                  "fixed z-40 shadow-xl rounded-full cursor-pointer",
-                  "bottom-20 right-4 h-14 w-14",
-                  "md:bottom-6 md:right-6 md:h-14 md:w-14",
-                  "bg-primary text-primary-foreground",
-                  "motion-safe:transition-all motion-safe:duration-200",
-                  "hover:scale-105 active:scale-95",
+                  "group fixed z-40 rounded-full cursor-pointer overflow-visible",
+                  "bottom-20 right-4 size-15",
+                  "md:bottom-6 md:right-6 md:size-16",
+                  "border border-primary/35 bg-primary text-primary-foreground",
+                  "shadow-[0_16px_40px_hsl(var(--primary)/0.38)]",
+                  "motion-safe:transition-all motion-safe:duration-300",
+                  "hover:-translate-y-0.5 hover:shadow-[0_20px_52px_hsl(var(--primary)/0.48)] active:translate-y-0 active:scale-95",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                  "[&_svg]:size-6 md:[&_svg]:size-7",
                   isDragOver
-                    ? "scale-110 shadow-2xl shadow-primary/50 ring-4 ring-primary/60 ring-offset-2 ring-offset-background bg-primary/90"
-                    : "hover:bg-primary/90 hover:shadow-primary/25",
+                    ? "scale-110 bg-primary/95 shadow-[0_0_0_10px_hsl(var(--primary)/0.16),0_24px_64px_hsl(var(--primary)/0.58)] ring-4 ring-primary/60 ring-offset-2 ring-offset-background"
+                    : "hover:bg-primary/95",
                   isSwallowing && "animate-bucket-swallow"
                 )}
                 aria-label="Open Watchlist"
               >
-                <ListVideo className={cn("md:h-6 md:w-6 transition-transform", isDragOver ? "h-8 w-8 scale-110" : "h-6 w-6")} />
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "absolute inset-0 rounded-full bg-gradient-to-br from-white/28 via-white/6 to-transparent",
+                    "opacity-90 motion-safe:transition-opacity duration-300",
+                    "group-hover:opacity-100",
+                  )}
+                />
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "absolute inset-1 rounded-full border border-white/12",
+                    "motion-safe:transition-transform duration-300",
+                    isDragOver && "scale-90",
+                  )}
+                />
+                <Clapperboard
+                  data-icon="inline-start"
+                  className={cn(
+                    "relative motion-safe:transition-transform duration-300",
+                    isDragOver ? "scale-110 -rotate-6" : "group-hover:rotate-[-4deg]",
+                  )}
+                />
                 {unwatchedCount > 0 && !isDragOver && (
                   <span
                     aria-label={`${unwatchedCount} unwatched items`}
                     className={cn(
-                      "absolute -top-1.5 -right-1.5",
-                      "h-5 w-5 rounded-full",
-                      "bg-destructive text-destructive-foreground",
-                      "text-[10px] font-bold",
+                      "absolute -top-1.5 -right-1.5 size-5 rounded-full",
+                      "bg-background text-primary",
+                      "text-[10px] font-bold tabular-nums",
                       "flex items-center justify-center",
-                      "ring-2 ring-background",
+                      "ring-2 ring-primary shadow-[0_8px_20px_hsl(var(--primary)/0.36)]",
                     )}
                   >
                     {unwatchedCount > 99 ? "99+" : unwatchedCount}

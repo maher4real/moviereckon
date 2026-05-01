@@ -406,13 +406,16 @@ function PreferencesSheet({
 
   const save = async () => {
     setSaving(true);
-    await updatePreferences({
-      preferred_languages: langs,
-      preferred_genres: genres,
-    });
-    setSaving(false);
-    onSaved();
-    onClose();
+    try {
+      await updatePreferences({
+        preferred_languages: langs,
+        preferred_genres: genres,
+      });
+      onSaved();
+      onClose();
+    } finally {
+      setSaving(false);
+    }
   };
 
   const hasChanges =
@@ -614,12 +617,15 @@ export default function Reckon() {
 
   const saveSetup = useCallback(async () => {
     setSetupSaving(true);
-    await updatePreferences({
-      preferred_languages: setupLangs,
-      preferred_genres: setupGenres,
-    });
-    await refreshRecommendations();
-    setSetupSaving(false);
+    try {
+      await updatePreferences({
+        preferred_languages: setupLangs,
+        preferred_genres: setupGenres,
+      });
+      await refreshRecommendations();
+    } finally {
+      setSetupSaving(false);
+    }
   }, [updatePreferences, setupLangs, setupGenres, refreshRecommendations]);
   const [extraItems, setExtraItems] = useState<(Movie | TVShow)[]>([]);
   const [discoverPage, setDiscoverPage] = useState(1);
@@ -629,9 +635,9 @@ export default function Reckon() {
   useEffect(() => {
     setExtraItems([]);
     setDiscoverPage(1);
-  }, [selectedLanguage, selectedGenre, contentTypeFilter]);
+  }, [selectedLanguage, selectedGenre, contentTypeFilter, recTypeFilter, sortField, sortOrder]);
 
-  const canFetchMore = selectedLanguage !== "all" || selectedGenre !== "all";
+  const canFetchMore = true;
 
   const fetchMoreLikeThis = useCallback(async () => {
     if (isFetchingMore) return;
@@ -643,8 +649,16 @@ export default function Reckon() {
       ),
     );
 
-    const genreParam = selectedGenre !== "all" ? selectedGenre : undefined;
-    const langParam = selectedLanguage !== "all" ? selectedLanguage : undefined;
+    const genreParam =
+      selectedGenre !== "all"
+        ? selectedGenre
+        : preferences?.preferred_genres?.[0]
+          ? String(preferences.preferred_genres[0])
+          : undefined;
+    const langParam =
+      selectedLanguage !== "all"
+        ? selectedLanguage
+        : preferences?.preferred_languages?.[0];
     const sortBy =
       sortField === "popularity"
         ? "popularity.desc"
@@ -665,7 +679,8 @@ export default function Reckon() {
             with_genres: genreParam,
             with_original_language: langParam,
             sort_by: sortBy,
-            "vote_count.gte": 80,
+            "vote_count.gte":
+              recTypeFilter === "newreleases" ? 25 : recTypeFilter === "popular" ? 100 : 60,
             page: nextPage,
           }).then((r) => r.results as (Movie | TVShow)[]),
         );
@@ -678,7 +693,8 @@ export default function Reckon() {
             with_original_language: langParam,
             sort_by:
               sortField === "release_date" ? "first_air_date.desc" : sortBy,
-            "vote_count.gte": 50,
+            "vote_count.gte":
+              recTypeFilter === "newreleases" ? 20 : recTypeFilter === "popular" ? 80 : 40,
             page: nextPage,
           }).then((r) => r.results as (Movie | TVShow)[]),
         );
@@ -705,7 +721,9 @@ export default function Reckon() {
     extraItems,
     selectedGenre,
     selectedLanguage,
+    preferences,
     contentTypeFilter,
+    recTypeFilter,
     sortField,
     discoverPage,
   ]);
@@ -723,23 +741,25 @@ export default function Reckon() {
 
   const availableGenres = useMemo(() => {
     const genres = new Set<number>();
-    recommendations.forEach((item) => {
+    [...recommendations, ...extraItems].forEach((item) => {
       item.genre_ids?.forEach((g) => genres.add(g));
     });
+    preferences?.preferred_genres?.forEach((g) => genres.add(g));
     return Array.from(genres)
       .filter((g) => GENRE_MAP[g])
       .sort((a, b) => GENRE_MAP[a].localeCompare(GENRE_MAP[b]));
-  }, [recommendations]);
+  }, [recommendations, extraItems, preferences]);
 
   const availableLanguages = useMemo(() => {
     const langs = new Set<string>();
-    recommendations.forEach((item) => {
+    [...recommendations, ...extraItems].forEach((item) => {
       if (item.original_language) langs.add(item.original_language);
     });
+    preferences?.preferred_languages?.forEach((l) => langs.add(l));
     return Array.from(langs)
       .filter((l) => LANGUAGE_MAP[l])
       .sort((a, b) => LANGUAGE_MAP[a].localeCompare(LANGUAGE_MAP[b]));
-  }, [recommendations]);
+  }, [recommendations, extraItems, preferences]);
 
   const processedItems = useMemo(() => {
     // Merge extra discovered items, dedup by id+type
@@ -826,6 +846,7 @@ export default function Reckon() {
     return filtered;
   }, [
     recommendations,
+    extraItems,
     contentTypeFilter,
     recTypeFilter,
     selectedGenre,
@@ -1174,7 +1195,11 @@ export default function Reckon() {
                       ? `More ${GENRE_MAP[Number(selectedGenre)] || "content"} in ${LANGUAGE_MAP[selectedLanguage] || selectedLanguage}`
                       : selectedLanguage !== "all"
                         ? `More content in ${LANGUAGE_MAP[selectedLanguage] || selectedLanguage}`
-                        : `More ${GENRE_MAP[Number(selectedGenre)] || "content"}`}
+                        : selectedGenre !== "all"
+                          ? `More ${GENRE_MAP[Number(selectedGenre)] || "content"}`
+                          : hasPreferences
+                            ? "More picks guided by your preferences"
+                            : "More recommendations"}
                   </p>
                   <Button
                     variant="outline"

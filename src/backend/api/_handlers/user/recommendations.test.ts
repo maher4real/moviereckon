@@ -270,4 +270,56 @@ describe("user recommendations endpoint", () => {
     expect(languageCalls).toContain("hi");
     expect(languageCalls).toContain("en");
   });
+
+  it("treats explicit preferences as personalization without watch history", async () => {
+    mocks.connectToDatabase.mockResolvedValue({
+      db: createMockDb({
+        preferences: {
+          preferred_genres: [18],
+          preferred_languages: ["hi"],
+        },
+      }),
+    });
+
+    mocks.discoverServerMovies.mockImplementation(async (filters) => {
+      if (
+        (filters as Record<string, unknown>)?.with_genres === "18" ||
+        (filters as Record<string, unknown>)?.with_original_language === "hi"
+      ) {
+        return {
+          results: [
+            {
+              id: 701,
+              title: "Preference Match",
+              original_title: "Preference Match",
+              overview: "A drama aligned with explicit preferences",
+              poster_path: null,
+              backdrop_path: null,
+              release_date: "2024-05-01",
+              vote_average: 8.3,
+              vote_count: 1100,
+              popularity: 88,
+              genre_ids: [18],
+              original_language: "hi",
+              adult: false,
+              video: false,
+            },
+          ],
+        };
+      }
+
+      return { results: [] };
+    });
+
+    const req = createMockReq("4.4.4.4");
+    const { res } = createMockRes();
+
+    await handler(req, res);
+
+    const payload = (res.body as any)?.data;
+
+    expect(res.statusCode).toBe(200);
+    expect(payload.isPersonalized).toBe(true);
+    expect(payload.items.some((item: any) => item.id === 701)).toBe(true);
+  });
 });

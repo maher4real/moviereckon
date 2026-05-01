@@ -170,4 +170,39 @@ describe("recommendation engine scoring", () => {
 
     expect(topWindowLanguages.filter((language) => language === "hi").length).toBeGreaterThanOrEqual(2);
   });
+
+  it("boosts explicit preferred genres even when seed similarity is weaker", () => {
+    const seed = normalizeTmdbItem(
+      buildMovie(1000, {
+        title: "Broad Seed",
+        genre_ids: [28],
+        popularity: 80,
+      }),
+    )!;
+
+    const preferredDrama = buildMovie(1001, {
+      title: "Preferred Drama",
+      genre_ids: [18],
+      popularity: 55,
+      vote_average: 7.5,
+      vote_count: 900,
+    });
+    const actionMatch = buildMovie(1002, {
+      title: "Generic Action",
+      genre_ids: [28],
+      popularity: 110,
+      vote_average: 7.5,
+      vote_count: 900,
+    });
+
+    const ranked = getRecommendations([seed], [actionMatch, preferredDrama], {
+      preferredGenres: [18],
+      maxCandidates: 20,
+    });
+
+    expect(ranked[0]?.item.title).toBe("Preferred Drama");
+    expect(ranked[0]?.reasons.map((reason) => reason.label)).toContain(
+      "Matches preferred genre",
+    );
+  });
 });
