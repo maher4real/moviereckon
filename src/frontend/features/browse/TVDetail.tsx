@@ -563,7 +563,7 @@ export default function TVDetail() {
 
   if (tvLoading) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="app-page">
         <Header />
         <div className="pt-20">
           <div className="h-[60vh] bg-muted animate-pulse" />
@@ -584,8 +584,8 @@ export default function TVDetail() {
 
   if (tvError || !tvShow) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
+      <div className="app-page flex items-center justify-center px-4">
+        <div className="empty-state max-w-md">
           <p className="text-xl text-muted-foreground mb-2">
             {tvError ? "Failed to load TV show" : "TV Show not found"}
           </p>
@@ -628,7 +628,7 @@ export default function TVDetail() {
   const heroVisualSrc = getBackdropUrl(tvShow.backdrop_path, "large");
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0 overflow-x-hidden">
+    <div className="app-page pb-20 md:pb-0 overflow-x-hidden">
       <Header />
 
       {/* Backdrop */}
@@ -713,7 +713,7 @@ export default function TVDetail() {
             <MediaImage
               src={getPosterUrl(tvShow.poster_path, "large")}
               alt={tvShow.name}
-              className="w-[280px] lg:w-[320px] rounded-lg shadow-2xl"
+              className="w-[280px] rounded-lg border border-white/10 shadow-2xl shadow-black/45 lg:w-[320px]"
               fallbackSrc="/fallbacks/poster.svg"
               width={500}
               height={750}
@@ -913,7 +913,7 @@ export default function TVDetail() {
               </div>
 
               {/* Right Side Panel */}
-              <aside className="h-fit rounded-xl border border-border/70 bg-card/55 p-4 backdrop-blur-sm">
+              <aside className="surface-panel h-fit p-4">
                 <h3 className="text-lg font-semibold mb-4">Quick Facts</h3>
                 <div className="space-y-3">
                   {detailRows.map((row) => (

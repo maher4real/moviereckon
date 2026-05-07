@@ -43,16 +43,16 @@ export default function TheaterHome() {
   const grid = movies.slice(1);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="app-page text-foreground">
       {/* Bebas Neue for cinematic headings */}
       <link rel="stylesheet" href={FONT_URL} />
 
       <style>{`
         .bebas { font-family: 'Bebas Neue', sans-serif; }
-        .theater-card-img { transition: transform 0.5s cubic-bezier(.25,.46,.45,.94); }
-        .theater-card:hover .theater-card-img { transform: scale(1.07); }
-        .theater-card:hover .theater-play { opacity: 1; transform: scale(1); }
-        .theater-play { opacity: 0; transform: scale(0.8); transition: opacity 0.25s ease, transform 0.25s ease; }
+        .theater-card-img { transition: filter 0.25s ease; }
+        .theater-card:hover .theater-card-img { filter: saturate(1.12) contrast(1.05); }
+        .theater-card:hover .theater-play { opacity: 1; }
+        .theater-play { opacity: 0; transition: opacity 0.25s ease; }
         @keyframes cinema-pulse { 0%,100%{box-shadow:0 0 0 0 hsl(0 79% 52% / 0.5)} 50%{box-shadow:0 0 0 12px hsl(0 79% 52% / 0)} }
         .play-pulse { animation: cinema-pulse 2s ease-in-out infinite; }
         @keyframes fadeUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
@@ -74,13 +74,13 @@ export default function TheaterHome() {
 
       <Header />
 
-      <main className="pt-16 pb-20 md:pb-0">
+      <main className="pt-24 pb-20 md:pb-0">
 
         {/* ── Cinematic page header ── */}
         <div className="relative overflow-hidden border-b border-white/5"
           style={{ background: "linear-gradient(160deg, hsl(0 79% 8%) 0%, hsl(0 0% 4%) 60%)" }}>
           <div className="absolute inset-0 pointer-events-none"
-            style={{ background: "radial-gradient(ellipse 60% 100% at 90% 50%, hsl(0 79% 52% / 0.07) 0%, transparent 70%)" }} />
+            style={{ background: "linear-gradient(90deg, transparent 0%, hsl(var(--primary) / 0.08) 100%)" }} />
           <div className="container mx-auto px-4 md:px-8 py-8 flex items-center justify-between">
             <div>
               <p className="text-xs tracking-[0.3em] uppercase text-primary/80 font-medium mb-1">MovieReckon</p>
@@ -174,7 +174,7 @@ export default function TheaterHome() {
                       onClick={() => navigate(`/theater/${featured._id}`)}
                       style={{ filter: "drop-shadow(0 24px 48px hsl(0 0% 0% / 0.7))" }}
                     >
-                      <div className="aspect-[2/3] rounded-2xl overflow-hidden ring-1 ring-white/15 transition-transform duration-500 group-hover:scale-105">
+                      <div className="aspect-[2/3] rounded-lg overflow-hidden ring-1 ring-white/15 transition-colors duration-200 group-hover:ring-primary/45">
                         {featured.thumbnail ? (
                           <img src={featured.thumbnail} alt={featured.title} className="w-full h-full object-cover" />
                         ) : (

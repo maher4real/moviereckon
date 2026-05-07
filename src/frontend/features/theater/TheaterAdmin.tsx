@@ -140,9 +140,9 @@ export default function TheaterAdmin() {
 
   if (view === "form") {
     return (
-      <div className="min-h-screen bg-background text-foreground">
+      <div className="app-page text-foreground">
         <Header />
-        <main className="pt-16 pb-20 md:pb-0">
+        <main className="pt-24 pb-20 md:pb-0">
           <div className="container mx-auto px-4 md:px-8 py-6 max-w-5xl">
             {/* Page header */}
             <div className="flex items-center gap-4 mb-8">
@@ -322,9 +322,9 @@ export default function TheaterAdmin() {
 
   // ── List view ──────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="app-page text-foreground">
       <Header />
-      <main className="pt-16 pb-20 md:pb-0">
+      <main className="pt-24 pb-20 md:pb-0">
         <div className="container mx-auto px-4 md:px-8 py-6 max-w-5xl space-y-6">
           {/* Header */}
           <div className="flex items-center justify-between">

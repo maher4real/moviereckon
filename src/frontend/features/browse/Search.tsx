@@ -22,7 +22,7 @@ import { AppPageSkeleton, PosterGridSkeleton } from "@/frontend/components/AppSk
 import { Input } from "@/frontend/components/ui/input";
 import { Button } from "@/frontend/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/frontend/components/ui/tabs";
-import { Search as SearchIcon, X, Clock, TrendingUp } from "lucide-react";
+import { Search as SearchIcon, X, Clock, TrendingUp, Play, Star } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 
 const RECENT_SEARCHES_KEY = "moviereckon_recent_searches";
@@ -89,8 +89,8 @@ const ResultCard = memo(({ item, onClick }: { item: MultiSearchResult; onClick: 
 
         {/* Hover Overlay */}
         <div className="absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
-            <span className="text-xl text-primary-foreground">▶</span>
+          <div className="poster-play-button">
+            <Play className="h-5 w-5 fill-current" />
           </div>
         </div>
 
@@ -100,15 +100,16 @@ const ResultCard = memo(({ item, onClick }: { item: MultiSearchResult; onClick: 
             Cast
           </div>
         ) : (
-          <div className={cn("absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold", getLanguageBadgeClass(mediaItem?.original_language || "en"))}>
+          <div className={cn("language-badge absolute top-2 left-2", getLanguageBadgeClass(mediaItem?.original_language || "en"))}>
             {(mediaItem?.original_language || "en").toUpperCase()}
           </div>
         )}
 
         {/* Rating Badge */}
         {rating && (
-          <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
-            ⭐ {rating}
+          <div className="rating-badge absolute top-2 right-2">
+            <Star className="h-3 w-3 fill-current" />
+            {rating}
           </div>
         )}
       </div>
@@ -235,21 +236,21 @@ export default function Search() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col pb-20 md:pb-0">
+    <div className="app-page flex flex-col pb-20 md:pb-0">
       <Header />
 
-      <main className="flex-1 pt-20 pb-12">
+      <main className="page-main">
         <div className="container mx-auto px-4">
           {/* Search Input */}
           <div className="max-w-2xl mx-auto mb-8">
-            <div className="relative">
-              <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <div className="surface-panel relative p-2">
+              <SearchIcon className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <Input
                 type="text"
                 placeholder="Search movies, TV shows, cast..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                className="h-14 pl-12 pr-12 text-lg bg-card border-border focus:border-primary"
+                className="h-14 border-border/60 bg-background/60 pl-12 pr-12 text-base shadow-none transition-colors focus:border-primary md:text-lg"
                 autoFocus
               />
               {query && (
@@ -257,7 +258,8 @@ export default function Search() {
                   variant="ghost"
                   size="icon"
                   onClick={() => setQuery("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full"
+                  aria-label="Clear search"
                 >
                   <X className="w-5 h-5" />
                 </Button>
@@ -271,7 +273,7 @@ export default function Search() {
                 onValueChange={(value) => setFilterType(value as FilterType)}
                 className="mt-4"
               >
-                <TabsList className="bg-muted">
+                <TabsList className="border border-border/70 bg-card/70">
                   <TabsTrigger value="all">All</TabsTrigger>
                   <TabsTrigger value="movie">Movies</TabsTrigger>
                   <TabsTrigger value="tv">TV Shows</TabsTrigger>
@@ -284,9 +286,9 @@ export default function Search() {
           {/* Content */}
           {!debouncedQuery ? (
             // Recent Searches
-            <div className="max-w-2xl mx-auto">
+            <div className="mx-auto max-w-2xl space-y-8">
               {recentSearches.length > 0 && (
-                <div className="mb-8">
+                <div className="surface-panel p-4">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold flex items-center gap-2">
                       <Clock className="w-5 h-5" />
@@ -303,7 +305,7 @@ export default function Search() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleRecentSearchClick(search)}
-                        className="rounded-full border-white/80 bg-white text-black hover:bg-white/90 hover:text-black"
+                        className="filter-chip"
                       >
                         {search}
                       </Button>
@@ -313,7 +315,7 @@ export default function Search() {
               )}
 
               {/* Trending Suggestions */}
-              <div>
+              <div className="surface-panel p-4">
                 <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
                   <TrendingUp className="w-5 h-5" />
                   Popular Searches
@@ -326,7 +328,7 @@ export default function Search() {
                         variant="outline"
                         size="sm"
                         onClick={() => setQuery(suggestion)}
-                        className="rounded-full border-white/80 bg-white text-black hover:bg-white/90 hover:text-black"
+                        className="filter-chip"
                       >
                         {suggestion}
                       </Button>
@@ -344,7 +346,7 @@ export default function Search() {
             <PosterGridSkeleton count={12} />
           ) : filteredResults.length === 0 ? (
             // No Results
-            <div className="text-center py-12">
+            <div className="empty-state mx-auto max-w-2xl">
               <p className="text-xl text-muted-foreground mb-2">No results found for "{debouncedQuery}"</p>
               <p className="text-sm text-muted-foreground">
                 Try searching for something else
@@ -352,7 +354,7 @@ export default function Search() {
             </div>
           ) : (
             // Results Grid
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
               {filteredResults.map((item) => (
                 <ResultCard
                   key={`${item.id}-${isPersonResult(item) ? "person" : isTVResult(item) ? "tv" : "movie"}`}

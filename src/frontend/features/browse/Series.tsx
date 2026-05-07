@@ -26,7 +26,7 @@ import MediaImage from "@/frontend/components/MediaImage";
 import { Button } from "@/frontend/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/frontend/components/ui/select";
 import { cn, formatLocalDate, isAnimeLike } from "@/shared/lib/utils";
-import { Tv } from "lucide-react";
+import { CalendarDays, Clapperboard, Languages, Play, Star, TrendingUp, Tv } from "lucide-react";
 
 export type SeriesCategory =
   | "all"
@@ -94,6 +94,16 @@ const LANGUAGE_OPTIONS = [
   { value: "es", label: "Spanish" },
   { value: "fr", label: "French" },
 ];
+
+const SERIES_CATEGORY_OPTIONS = [
+  { value: "all", label: "All Series", Icon: Tv },
+  { value: "popular", label: "Popular", Icon: TrendingUp },
+  { value: "top_rated", label: "Top Rated", Icon: Star },
+  { value: "upcoming", label: "Upcoming", Icon: CalendarDays },
+  { value: "korean", label: "K-Drama", Icon: Languages },
+  { value: "indian", label: "Indian", Icon: Languages },
+  { value: "anime", label: "Anime", Icon: Clapperboard },
+] satisfies { value: SeriesCategory; label: string; Icon: typeof Tv }[];
 
 export function getSeriesCardTagLabel({
   category,
@@ -174,16 +184,17 @@ const PosterCard = memo(
           fallbackSrc="/fallbacks/poster.svg"
         />
         <div className="absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
-            <span className="text-xl text-primary-foreground">▶</span>
+          <div className="poster-play-button">
+            <Play className="h-5 w-5 fill-current" />
           </div>
         </div>
         {item.vote_average > 0 && (
-          <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
-            ⭐ {item.vote_average.toFixed(1)}
+          <div className="rating-badge absolute top-2 right-2">
+            <Star className="h-3 w-3 fill-current" />
+            {item.vote_average.toFixed(1)}
           </div>
         )}
-        <div className={cn("absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold", getLanguageBadgeClass(item.original_language))}>
+        <div className={cn("language-badge absolute top-2 left-2", getLanguageBadgeClass(item.original_language))}>
           {item.original_language.toUpperCase()}
         </div>
         {ottLabel && (
@@ -381,47 +392,48 @@ export default function Series() {
   }, [ottFilter, ottLabel, category]);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col pb-20 md:pb-0">
+    <div className="app-page flex flex-col pb-20 md:pb-0">
       <Header />
 
-      <main className="flex-1 pt-20 pb-12">
+      <main className="page-main">
         <div className="container mx-auto px-4">
-          <div className="flex items-center gap-3 mb-6">
-            <Tv className="w-8 h-8 text-primary" />
-            <h1 className="text-3xl font-bold">TV Series</h1>
-          </div>
-
-          <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 mb-6">
-            <div className="flex gap-2">
-              {[
-                { value: "all", label: "All Series" },
-                { value: "popular", label: "🔥 Popular" },
-                { value: "top_rated", label: "⭐ Top Rated" },
-                { value: "upcoming", label: "🗓️ Upcoming" },
-                { value: "korean", label: "🇰🇷 K-Drama" },
-                { value: "indian", label: "🇮🇳 Indian" },
-                { value: "anime", label: "🎌 Anime" },
-              ].map((cat) => (
-                <Button
-                  key={cat.value}
-                  variant={category === cat.value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setCategory(cat.value as SeriesCategory)}
-                  className="whitespace-nowrap"
-                >
-                  {cat.label}
-                </Button>
-              ))}
+          <div className="page-heading">
+            <div className="page-heading-icon">
+              <Tv className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="page-kicker">Browse Library</p>
+              <h1 className="page-title">TV Series</h1>
             </div>
           </div>
 
-          <div className="flex gap-3 flex-wrap mb-6">
+          <div className="filter-panel">
+            <div className="filter-row">
+              {SERIES_CATEGORY_OPTIONS.map((cat) => {
+                const active = category === cat.value;
+                return (
+                <Button
+                  key={cat.value}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCategory(cat.value)}
+                  className={cn("filter-chip", active && "filter-chip-active")}
+                >
+                  <cat.Icon className="h-4 w-4" />
+                  {cat.label}
+                </Button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="filter-panel flex flex-wrap gap-3">
             <Select
               value={selectedGenre}
               onValueChange={(v) => setSelectedGenre(v === "all" ? "" : v)}
               disabled={isSpecialCategory || category === "anime"}
             >
-              <SelectTrigger className="w-[150px] bg-card">
+              <SelectTrigger className="select-surface w-[150px]">
                 <SelectValue placeholder="All Genres" />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border z-50">
@@ -437,7 +449,7 @@ export default function Series() {
               onValueChange={(v) => setSortBy(v as SortOption)}
               disabled={isSpecialCategory}
             >
-              <SelectTrigger className="w-[150px] bg-card">
+              <SelectTrigger className="select-surface w-[150px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border z-50">
@@ -448,7 +460,7 @@ export default function Series() {
             </Select>
 
             <Select value={ottFilter} onValueChange={setOttFilter}>
-              <SelectTrigger className="w-[160px] bg-card">
+              <SelectTrigger className="select-surface w-[160px]">
                 <SelectValue placeholder="OTT Platform" />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border z-50">
@@ -462,7 +474,7 @@ export default function Series() {
               value={selectedYear}
               onValueChange={(v) => setSelectedYear(v === "all" ? "" : v)}
             >
-              <SelectTrigger className="w-[150px] bg-card">
+              <SelectTrigger className="select-surface w-[150px]">
                 <SelectValue placeholder="All Years" />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border z-50 max-h-[300px]">
@@ -478,7 +490,7 @@ export default function Series() {
               onValueChange={setSelectedLanguage}
               disabled={category === "korean" || category === "indian" || category === "anime"}
             >
-              <SelectTrigger className="w-[170px] bg-card">
+              <SelectTrigger className="select-surface w-[170px]">
                 <SelectValue placeholder="Language" />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border z-50">
@@ -495,7 +507,7 @@ export default function Series() {
             <>
               <div
                 className={cn(
-                  "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 sm:gap-4 transition-opacity duration-200",
+                  "content-grid",
                   isFetching && !isFetchingNextPage && "opacity-75",
                 )}
               >
@@ -517,7 +529,7 @@ export default function Series() {
               </div>
 
               {filteredSeries.length === 0 && (
-                <div className="text-center py-12">
+                <div className="empty-state">
                   <p className="text-muted-foreground">No series found for the selected filters.</p>
                 </div>
               )}

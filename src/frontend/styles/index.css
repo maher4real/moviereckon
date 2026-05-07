@@ -1,88 +1,88 @@
 @config "../../../tailwind.config.ts";
 @import "tailwindcss";
 
-/* MovieReckon - Netflix-inspired Dark Theme */
+/* MovieReckon - cinematic streaming interface */
 
 @layer base {
   :root {
-    --background: 0 0% 4%;
+    --background: 238 34% 5%;
     --foreground: 0 0% 98%;
 
-    --card: 0 0% 7%;
+    --card: 230 26% 9%;
     --card-foreground: 0 0% 98%;
 
-    --popover: 0 0% 7%;
+    --popover: 228 28% 10%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 0 79% 52%;
+    --primary: 350 89% 60%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 217 91% 60%;
+    --secondary: 244 72% 62%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 64%;
+    --muted: 225 22% 16%;
+    --muted-foreground: 222 18% 72%;
 
-    --accent: 0 70% 16%;
+    --accent: 151 56% 18%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
-    --ring: 0 79% 52%;
+    --border: 228 18% 20%;
+    --input: 228 18% 20%;
+    --ring: 350 89% 60%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 6%;
+    --sidebar-background: 238 34% 6%;
     --sidebar-foreground: 0 0% 90%;
-    --sidebar-primary: 0 79% 52%;
+    --sidebar-primary: 350 89% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 12%;
+    --sidebar-accent: 228 22% 14%;
     --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 0 0% 15%;
-    --sidebar-ring: 0 79% 52%;
+    --sidebar-border: 228 18% 18%;
+    --sidebar-ring: 350 89% 60%;
 
     /* Custom MovieReckon tokens */
-    --gradient-hero: linear-gradient(to top, hsl(0 0% 4%) 0%, transparent 100%);
+    --gradient-hero: linear-gradient(to top, hsl(var(--background)) 0%, transparent 100%);
     --gradient-card: linear-gradient(
       180deg,
       transparent 0%,
-      hsl(0 0% 4% / 0.9) 100%
+      hsl(var(--background) / 0.92) 100%
     );
-    --shadow-glow: 0 0 20px hsl(0 79% 52% / 0.3);
+    --shadow-glow: 0 0 24px hsl(var(--primary) / 0.32);
     --ease-fluid: cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .dark {
-    --background: 0 0% 4%;
+    --background: 238 34% 5%;
     --foreground: 0 0% 98%;
 
-    --card: 0 0% 7%;
+    --card: 230 26% 9%;
     --card-foreground: 0 0% 98%;
 
-    --popover: 0 0% 7%;
+    --popover: 228 28% 10%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 0 79% 52%;
+    --primary: 350 89% 60%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 217 91% 60%;
+    --secondary: 244 72% 62%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 64%;
+    --muted: 225 22% 16%;
+    --muted-foreground: 222 18% 72%;
 
-    --accent: 0 70% 16%;
+    --accent: 151 56% 18%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
-    --ring: 0 79% 52%;
+    --border: 228 18% 20%;
+    --input: 228 18% 20%;
+    --ring: 350 89% 60%;
   }
 }
 
@@ -104,6 +104,8 @@
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
     text-rendering: optimizeLegibility;
+    background:
+      linear-gradient(180deg, hsl(238 38% 7%) 0%, hsl(var(--background)) 46%, hsl(225 38% 5%) 100%);
   }
 
   button,
@@ -113,6 +115,17 @@
   textarea,
   select {
     -webkit-tap-highlight-color: rgba(229, 9, 20, 0.28);
+  }
+
+  button:not(:disabled),
+  [role="button"],
+  a[href] {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 3px;
   }
 
   ::selection {
@@ -140,6 +153,75 @@
 }
 
 @layer components {
+  .app-page {
+    @apply min-h-screen bg-background text-foreground;
+    background:
+      linear-gradient(180deg, hsl(238 38% 7% / 0.9), hsl(var(--background)) 34rem),
+      repeating-linear-gradient(
+        90deg,
+        hsl(var(--foreground) / 0.035) 0 1px,
+        transparent 1px 80px
+      );
+  }
+
+  .page-main {
+    @apply flex-1 pt-24 pb-12;
+  }
+
+  .page-heading {
+    @apply mb-6 flex min-w-0 items-center gap-3;
+  }
+
+  .page-heading-icon {
+    @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary shadow-lg shadow-primary/10;
+  }
+
+  .page-kicker {
+    @apply text-xs font-semibold uppercase tracking-[0.18em] text-primary/85;
+  }
+
+  .page-title {
+    @apply text-3xl font-bold tracking-tight md:text-4xl;
+  }
+
+  .surface-panel {
+    @apply rounded-lg border border-border/70 bg-card/70 shadow-xl shadow-black/20 backdrop-blur-md;
+  }
+
+  .filter-panel {
+    @apply mb-6 rounded-lg border border-border/70 bg-card/55 p-3 shadow-lg shadow-black/20 backdrop-blur-md;
+  }
+
+  .filter-row {
+    @apply flex gap-2 overflow-x-auto;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .filter-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  .filter-chip {
+    @apply h-9 shrink-0 rounded-full border border-border/70 bg-background/50 px-3 text-xs font-semibold text-muted-foreground transition-colors duration-200 hover:border-primary/45 hover:bg-primary/10 hover:text-foreground;
+  }
+
+  .filter-chip-active {
+    @apply border-primary/60 bg-primary text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary/90 hover:text-primary-foreground;
+  }
+
+  .select-surface {
+    @apply h-10 rounded-lg border-border/70 bg-card/70 text-sm shadow-sm shadow-black/15 backdrop-blur-sm transition-colors focus:border-primary/50;
+  }
+
+  .content-grid {
+    @apply grid grid-cols-3 gap-3 transition-opacity duration-200 sm:grid-cols-4 sm:gap-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7;
+  }
+
+  .empty-state {
+    @apply rounded-lg border border-border/70 bg-card/55 px-5 py-10 text-center shadow-lg shadow-black/15 backdrop-blur-sm;
+  }
+
   .hero-gradient {
     background: linear-gradient(
       to top,
@@ -208,27 +290,27 @@
 
   /* Button hierarchy - Primary is red, consistent styling */
   .btn-primary {
-    @apply bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-300 active:scale-95;
+    @apply bg-primary text-primary-foreground hover:bg-primary/90 transition-colors duration-200;
     transition-timing-function: var(--ease-fluid);
   }
 
   .btn-secondary {
-    @apply bg-primary/20 text-primary hover:bg-primary/30 transition-all duration-300 active:scale-95;
+    @apply bg-primary/20 text-primary hover:bg-primary/30 transition-colors duration-200;
     transition-timing-function: var(--ease-fluid);
   }
 
   .btn-brand-soft {
-    @apply bg-primary/14 text-primary shadow-[0_10px_24px_hsl(var(--primary)/0.14)] hover:bg-primary/20 hover:text-primary active:scale-95;
+    @apply bg-primary/15 text-primary shadow-[0_10px_24px_hsl(var(--primary)/0.14)] hover:bg-primary/20 hover:text-primary;
     transition-timing-function: var(--ease-fluid);
   }
 
   .btn-tertiary {
-    @apply bg-muted text-muted-foreground hover:bg-muted/80 transition-all duration-300 active:scale-95;
+    @apply bg-muted text-muted-foreground hover:bg-muted/80 transition-colors duration-200;
     transition-timing-function: var(--ease-fluid);
   }
 
   .btn-success {
-    @apply bg-emerald-600 text-white hover:bg-emerald-700 transition-all duration-300 active:scale-95;
+    @apply bg-emerald-600 text-white hover:bg-emerald-700 transition-colors duration-200;
     transition-timing-function: var(--ease-fluid);
   }
 
@@ -239,11 +321,11 @@
   }
 
   .interactive:hover {
-    @apply scale-[1.02];
+    @apply brightness-110;
   }
 
   .interactive:active {
-    @apply scale-[0.98];
+    @apply brightness-95;
   }
 
   /* Hide scrollbar for carousels */
@@ -258,34 +340,53 @@
 
   /* Poster card hover effect with animation */
   .poster-card {
-    @apply transition-all duration-300;
+    @apply border border-white/10 bg-card shadow-lg shadow-black/25 transition-[border-color,box-shadow,filter] duration-300;
     transition-timing-function: var(--ease-fluid);
   }
 
   .poster-card:hover {
-    @apply scale-105 z-10;
-    box-shadow: 0 10px 40px hsl(0 0% 0% / 0.5);
+    @apply border-primary/45;
+    box-shadow:
+      0 18px 42px hsl(0 0% 0% / 0.46),
+      0 0 0 1px hsl(var(--primary) / 0.12);
+  }
+
+  .group:hover .poster-card img,
+  .group\/card:hover .poster-card img {
+    filter: saturate(1.08) contrast(1.04);
+  }
+
+  .poster-play-button {
+    @apply flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-primary text-primary-foreground shadow-lg shadow-primary/30 backdrop-blur-sm transition-colors duration-200 hover:bg-primary/90;
+  }
+
+  .rating-badge {
+    @apply inline-flex items-center gap-1 rounded-md border border-amber-300/25 bg-background/80 px-2 py-1 text-xs font-semibold text-amber-200 backdrop-blur-sm;
+  }
+
+  .language-badge {
+    @apply inline-flex items-center rounded-md border border-white/10 px-2 py-1 text-xs font-semibold backdrop-blur-sm;
   }
 
   /* Language badges - all using primary color family */
   .badge-hindi {
-    @apply bg-primary text-primary-foreground;
+    @apply bg-emerald-500/90 text-white;
   }
 
   .badge-english {
-    @apply bg-primary/80 text-primary-foreground;
+    @apply bg-sky-500/90 text-white;
   }
 
   .badge-tamil {
-    @apply bg-primary/70 text-primary-foreground;
+    @apply bg-rose-500/90 text-white;
   }
 
   .badge-telugu {
-    @apply bg-primary/60 text-primary-foreground;
+    @apply bg-amber-500/90 text-black;
   }
 
   .badge-gujarati {
-    @apply bg-primary/50 text-primary-foreground;
+    @apply bg-violet-500/90 text-white;
   }
 
   /* Better placeholder for missing images */
@@ -353,7 +454,7 @@
 
   /* Action button consistent styling */
   .action-btn {
-    @apply transition-all duration-300 active:scale-95;
+    @apply transition-colors duration-200;
     transition-timing-function: var(--ease-fluid);
   }
 
@@ -411,6 +512,12 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto !important;
+    }
+
     .auth-poster-row,
     .animate-auth-brand-pulse,
     .animate-auth-brand-shimmer,

@@ -640,7 +640,7 @@ export default function Auth() {
   const showCard = !isLoading && !user;
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background">
+    <div className="app-page relative min-h-screen overflow-hidden">
       {/* Poster carousel — always rendered so queries fire immediately */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 scale-[1.08] -rotate-2">
@@ -678,9 +678,8 @@ export default function Auth() {
         </div>
         <div className="absolute inset-0 bg-black/22" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_22%,hsl(var(--secondary)/0.22),transparent_42%),radial-gradient(circle_at_84%_74%,hsl(var(--primary)/0.26),transparent_45%)]" />
-        <div className="absolute inset-0 bg-linear-to-br from-background/68 via-background/44 to-background/62" />
-        <div className="absolute top-1/4 -left-1/4 h-1/2 w-1/2 rounded-full bg-primary/16 blur-[120px]" />
-        <div className="absolute bottom-1/4 -right-1/4 h-1/2 w-1/2 rounded-full bg-secondary/18 blur-[120px]" />
+        <div className="absolute inset-0 bg-linear-to-br from-background/70 via-background/45 to-background/65" />
+        <div className="absolute inset-0 opacity-30 [background-image:repeating-linear-gradient(90deg,transparent_0,transparent_54px,hsl(var(--foreground)/0.04)_55px,hsl(var(--foreground)/0.04)_56px)]" />
       </div>
 
       <div className="relative z-10 flex min-h-screen w-full items-center justify-center p-4">
@@ -695,7 +694,7 @@ export default function Auth() {
               </p>
             </div>
 
-            <section className="rounded-3xl border border-white/11 bg-card/85 px-8 py-9 shadow-2xl shadow-black/50 backdrop-blur-2xl ring-1 ring-inset ring-white/6">
+            <section className="surface-panel px-8 py-9 ring-1 ring-inset ring-white/10">
             {emailVerificationStatus ? (
               <Alert
                 className={cn(
@@ -728,7 +727,7 @@ export default function Auth() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-12 w-full cursor-pointer rounded-xl border-border/30 bg-white text-sm font-semibold text-slate-900 shadow-sm transition-all duration-150 hover:bg-white/95 hover:shadow-md active:scale-[0.98]"
+                  className="h-12 w-full cursor-pointer rounded-xl border-border/30 bg-white text-sm font-semibold text-slate-900 shadow-sm transition-colors duration-150 hover:bg-white/95"
                   onClick={handleGoogleSignIn}
                   disabled={isSubmitting || isGoogleSubmitting || isAuthenticating}
                 >

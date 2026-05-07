@@ -130,7 +130,7 @@ function WorkCard({
     <button
       type="button"
       onClick={() => navigate(`/${credit.media_type}/${credit.id}`, { state: { from: fromPath } })}
-      className="group rounded-xl border border-border/70 bg-card/45 p-2.5 sm:p-3 text-left transition-all duration-300 hover:border-primary/40 hover:bg-card/70"
+      className="group surface-panel p-2.5 text-left transition-colors duration-200 hover:border-primary/40 hover:bg-card/70 sm:p-3"
     >
       <div className="flex gap-2.5 sm:gap-3">
         <MediaImage
@@ -179,11 +179,11 @@ function KnownForCard({
       onClick={() => navigate(`/${credit.media_type}/${credit.id}`, { state: { from: fromPath } })}
       className="group w-32 sm:w-36 md:w-40 shrink-0 text-left"
     >
-      <div className="overflow-hidden rounded-xl border border-border/70 bg-card/45 transition-all duration-300 group-hover:border-primary/40">
+      <div className="overflow-hidden rounded-lg poster-card">
         <MediaImage
           src={getPosterUrl(credit.poster_path, "medium")}
           alt={title}
-          className="aspect-[2/3] w-full object-cover bg-muted/30 transition-transform duration-300 group-hover:scale-[1.04]"
+          className="aspect-[2/3] w-full object-cover bg-muted/30"
           fallbackSrc="/fallbacks/poster.svg"
         />
       </div>
@@ -289,9 +289,9 @@ export default function PersonDetail() {
 
   if (personLoading) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="app-page">
         <Header />
-        <div className="pt-20 sm:pt-24 container mx-auto px-3 sm:px-4 space-y-3 sm:space-y-4">
+        <div className="container mx-auto space-y-3 px-3 pt-24 sm:space-y-4 sm:px-4">
           <div className="h-12 w-14 animate-pulse rounded-full bg-muted" />
           <div className="h-72 animate-pulse rounded-2xl bg-muted" />
           <div className="h-48 animate-pulse rounded-2xl bg-muted" />
@@ -302,8 +302,8 @@ export default function PersonDetail() {
 
   if (!person) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
+      <div className="app-page flex items-center justify-center px-4">
+        <div className="empty-state max-w-md">
           <p className="text-xl text-muted-foreground mb-4">Person not found</p>
           <Button onClick={() => navigate("/home")} className="bg-primary hover:bg-primary/90">
             Go Home
@@ -314,12 +314,12 @@ export default function PersonDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0 overflow-x-hidden">
+    <div className="app-page pb-20 md:pb-0 overflow-x-hidden">
       <Header />
 
-      <main className="pt-16 sm:pt-20">
+      <main className="pt-24">
         <section className="relative overflow-hidden border-b border-border/60">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(220,38,38,0.22),transparent_42%),radial-gradient(circle_at_85%_20%,rgba(251,146,60,0.15),transparent_30%),linear-gradient(to_bottom,rgba(15,15,18,0.8),rgba(10,10,12,1))]" />
+          <div className="absolute inset-0 bg-[linear-gradient(135deg,hsl(var(--primary)/0.18),transparent_38%),linear-gradient(to_bottom,hsl(var(--background)/0.78),hsl(var(--background)))]" />
           <div className="container relative mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8">
             <Button
               variant="ghost"
@@ -332,7 +332,7 @@ export default function PersonDetail() {
 
             <div className="grid gap-4 sm:gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
               <div className="mx-auto w-full max-w-[210px] sm:max-w-[240px] xl:max-w-[280px]">
-                <div className="rounded-3xl border border-border/70 bg-gradient-to-b from-card/70 to-card/35 p-3 shadow-2xl">
+                <div className="surface-panel bg-gradient-to-b from-card/70 to-card/35 p-3">
                   <MediaImage
                     src={profileImageSrc}
                     alt={person.name}
@@ -453,16 +453,16 @@ export default function PersonDetail() {
                 Complete credits fetched from TMDB API.
               </p>
             </div>
-            <div className="inline-flex rounded-full border border-border/70 bg-card/55 p-1">
+            <div className="filter-panel mb-0 inline-flex p-1">
               {(["all", "movie", "tv"] as const).map((filter) => (
                 <button
                   key={filter}
                   type="button"
                   onClick={() => setMediaFilter(filter)}
                   className={cn(
-                    "rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors",
+                    "filter-chip",
                     mediaFilter === filter
-                      ? "bg-primary text-primary-foreground"
+                      ? "filter-chip-active"
                       : "text-muted-foreground hover:text-foreground",
                   )}
                 >

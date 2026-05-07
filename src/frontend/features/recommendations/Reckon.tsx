@@ -230,7 +230,7 @@ function FirstTimeSetup({
   saving: boolean;
 }) {
   return (
-    <div className="mb-6 rounded-xl border border-primary/30 bg-linear-to-br from-primary/5 via-primary/3 to-primary/8 px-6 py-8">
+    <div className="surface-panel mb-6 border-primary/30 bg-linear-to-br from-primary/10 via-card/60 to-primary/5 px-6 py-8">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="text-center mb-6">
@@ -911,19 +911,16 @@ export default function Reckon() {
   const hasResolvedItems = processedItems.length > 0;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col pb-20 md:pb-0">
+    <div className="app-page flex flex-col pb-20 md:pb-0">
       <Header />
 
-      <main className="flex-1 pt-20 pb-12">
+      <main className="page-main">
         <div className="container mx-auto px-4">
           {/* Top header row */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className="absolute inset-0 rounded-xl bg-primary/20 blur-md" />
-                <div className="relative p-2 rounded-xl bg-primary/10 border border-primary/20">
-                  <Sparkles className="w-6 h-6 text-primary" />
-                </div>
+              <div className="page-heading-icon">
+                <Sparkles className="h-5 w-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
@@ -948,7 +945,7 @@ export default function Reckon() {
                 size="sm"
                 onClick={() => setPrefsOpen(true)}
                 className={cn(
-                  "gap-2 cursor-pointer transition-all duration-200",
+                  "gap-2 cursor-pointer transition-colors duration-200",
                   hasPreferences
                     ? "border-primary/40 text-primary hover:bg-primary/10 hover:border-primary/60"
                     : "hover:border-primary/30 hover:text-primary",
@@ -968,7 +965,7 @@ export default function Reckon() {
                 size="sm"
                 onClick={() => void refreshRecommendations()}
                 disabled={isRefreshing}
-                className="gap-2 cursor-pointer hover:border-primary/30 hover:text-primary transition-all duration-200"
+                className="gap-2 cursor-pointer transition-colors duration-200 hover:border-primary/30 hover:text-primary"
               >
                 <RefreshCw
                   className={cn("w-4 h-4", isRefreshing && "animate-spin")}
@@ -993,7 +990,7 @@ export default function Reckon() {
               saving={setupSaving}
             />
           ) : !hasPreferences && !reckonLoading ? (
-            <div className="mb-5 rounded-xl border border-primary/25 bg-linear-to-r from-primary/8 to-primary/4 px-4 py-3.5 flex items-center gap-3">
+            <div className="surface-panel mb-5 flex items-center gap-3 border-primary/25 bg-linear-to-r from-primary/10 to-primary/5 px-4 py-3.5">
               <div className="p-1.5 rounded-lg bg-primary/15 border border-primary/20 shrink-0">
                 <Sparkles className="w-4 h-4 text-primary" />
               </div>
@@ -1009,7 +1006,7 @@ export default function Reckon() {
               <Button
                 size="sm"
                 onClick={() => setPrefsOpen(true)}
-                className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer transition-all duration-200"
+                className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer transition-colors duration-200"
               >
                 Set Up
               </Button>
@@ -1018,37 +1015,40 @@ export default function Reckon() {
 
           {/* Content type + rec type filter rows */}
           <div className="flex flex-col gap-3 mb-6">
-            <div className="flex gap-2 bg-card/50 p-3 rounded-lg border border-border overflow-x-auto scrollbar-hide">
+            <div className="filter-panel mb-0">
+              <div className="filter-row">
               <Button
-                variant={contentTypeFilter === "all" ? "default" : "ghost"}
+                variant="ghost"
                 size="sm"
                 onClick={() => setContentTypeFilter("all")}
-                className="gap-2 shrink-0"
+                className={cn("filter-chip", contentTypeFilter === "all" && "filter-chip-active")}
               >
                 <Sparkles className="w-4 h-4" />
                 All
               </Button>
               <Button
-                variant={contentTypeFilter === "movie" ? "default" : "ghost"}
+                variant="ghost"
                 size="sm"
                 onClick={() => setContentTypeFilter("movie")}
-                className="gap-2 shrink-0"
+                className={cn("filter-chip", contentTypeFilter === "movie" && "filter-chip-active")}
               >
                 <Film className="w-4 h-4" />
                 Movies
               </Button>
               <Button
-                variant={contentTypeFilter === "tv" ? "default" : "ghost"}
+                variant="ghost"
                 size="sm"
                 onClick={() => setContentTypeFilter("tv")}
-                className="gap-2 shrink-0"
+                className={cn("filter-chip", contentTypeFilter === "tv" && "filter-chip-active")}
               >
                 <Tv className="w-4 h-4" />
                 TV Series
               </Button>
+              </div>
             </div>
 
-            <div className="flex gap-2 bg-muted/30 p-3 rounded-lg border border-border/50 overflow-x-auto scrollbar-hide">
+            <div className="filter-panel mb-0">
+              <div className="filter-row">
               {RECOMMENDATION_TYPES.map((t) => {
                 const active = recTypeFilter === t.id;
                 return (
@@ -1058,10 +1058,8 @@ export default function Reckon() {
                     onClick={() => setRecTypeFilter(t.id)}
                     title={t.description}
                     className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all duration-200 shrink-0 cursor-pointer",
-                      active
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                      "filter-chip flex items-center gap-1.5",
+                      active && "filter-chip-active",
                     )}
                   >
                     <t.Icon className="w-3.5 h-3.5" />
@@ -1069,6 +1067,7 @@ export default function Reckon() {
                   </button>
                 );
               })}
+              </div>
             </div>
           </div>
 
@@ -1079,9 +1078,9 @@ export default function Reckon() {
           />
 
           {/* Sort / filter bar */}
-          <div className="flex flex-col sm:flex-row gap-3 mb-6 flex-wrap">
+          <div className="filter-panel flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <Select value={selectedGenre} onValueChange={setSelectedGenre}>
-              <SelectTrigger className="w-full sm:w-42.5 bg-card">
+              <SelectTrigger className="select-surface w-full sm:w-42.5">
                 <SelectValue placeholder="All Genres" />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border z-50">
@@ -1098,7 +1097,7 @@ export default function Reckon() {
               value={selectedLanguage}
               onValueChange={setSelectedLanguage}
             >
-              <SelectTrigger className="w-full sm:w-42.5 bg-card">
+              <SelectTrigger className="select-surface w-full sm:w-42.5">
                 <SelectValue placeholder="All Languages" />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border z-50">
@@ -1115,7 +1114,7 @@ export default function Reckon() {
               value={sortField}
               onValueChange={(v) => setSortField(v as SortField)}
             >
-              <SelectTrigger className="w-full sm:w-42.5 bg-card">
+              <SelectTrigger className="select-surface w-full sm:w-42.5">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border z-50">
@@ -1130,7 +1129,7 @@ export default function Reckon() {
               variant="outline"
               size="icon"
               onClick={toggleSortOrder}
-              className="bg-card shrink-0"
+              className="select-surface shrink-0"
               title={sortOrder === "desc" ? "Descending" : "Ascending"}
             >
               <ArrowUpDown
@@ -1219,7 +1218,7 @@ export default function Reckon() {
               )}
             </>
           ) : (
-            <div className="text-center py-16">
+            <div className="empty-state">
               <Sparkles className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-xl font-semibold mb-2">
                 No recommendations found

@@ -190,14 +190,13 @@ export default function Profile() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0">
+    <div className="app-page pb-20 md:pb-0">
       <Header />
 
-      <main className="flex-1 pt-20 pb-12">
+      <main className="page-main">
         <div className="container mx-auto px-4 space-y-7">
-          <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-linear-to-br from-card via-card to-primary/10 p-5 md:p-7">
-            <div className="absolute -right-16 -top-20 h-52 w-52 rounded-full bg-primary/20 blur-3xl" />
-            <div className="absolute -bottom-20 -left-20 h-52 w-52 rounded-full bg-secondary/20 blur-3xl" />
+          <section className="surface-panel relative overflow-hidden bg-linear-to-br from-card via-card to-primary/10 p-5 md:p-7">
+            <div className="absolute inset-0 opacity-25 [background-image:repeating-linear-gradient(90deg,transparent_0,transparent_62px,hsl(var(--foreground)/0.05)_63px,hsl(var(--foreground)/0.05)_64px)]" />
 
             <div className="relative flex flex-col gap-6">
               <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
@@ -253,7 +252,7 @@ export default function Profile() {
               </div>
 
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                <Card className="border-border/50 bg-background/55">
+                <Card className="border-border/50 bg-background/55 shadow-none">
                   <CardContent className="p-4">
                     <p className="text-xl font-bold">{stats.movies}</p>
                     <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -262,7 +261,7 @@ export default function Profile() {
                     </p>
                   </CardContent>
                 </Card>
-                <Card className="border-border/50 bg-background/55">
+                <Card className="border-border/50 bg-background/55 shadow-none">
                   <CardContent className="p-4">
                     <p className="text-xl font-bold">{stats.tvShows}</p>
                     <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -271,7 +270,7 @@ export default function Profile() {
                     </p>
                   </CardContent>
                 </Card>
-                <Card className="border-border/50 bg-background/55">
+                <Card className="border-border/50 bg-background/55 shadow-none">
                   <CardContent className="p-4">
                     <p className="text-xl font-bold">{stats.activeThisWeek}</p>
                     <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -280,7 +279,7 @@ export default function Profile() {
                     </p>
                   </CardContent>
                 </Card>
-                <Card className="border-border/50 bg-background/55">
+                <Card className="border-border/50 bg-background/55 shadow-none">
                   <CardContent className="p-4">
                     <p className="text-xl font-bold">{stats.likes}</p>
                     <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -294,7 +293,7 @@ export default function Profile() {
           </section>
 
           <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <Card className="border-border/60 bg-card/70">
+            <Card className="surface-panel bg-card/70">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="flex items-center gap-2">
                   <Clock className="h-5 w-5" />
@@ -351,7 +350,7 @@ export default function Profile() {
               </CardContent>
             </Card>
 
-            <Card className="border-border/60 bg-card/70">
+            <Card className="surface-panel bg-card/70">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2">
                   <Heart className="h-5 w-5 text-primary" />

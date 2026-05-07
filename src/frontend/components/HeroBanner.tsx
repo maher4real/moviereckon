@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { Movie, getBackdropUrl, getLanguageBadgeClass, getLanguageLabel } from "@/shared/lib/tmdb";
 import { Button } from "@/frontend/components/ui/button";
-import { Play, Info } from "lucide-react";
+import { Play, Info, Star } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import MediaImage from "@/frontend/components/MediaImage";
 
@@ -54,7 +54,7 @@ export default function HeroBanner({
       />
 
       {/* Gradient Overlays */}
-      <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-background/45 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-r from-background/85 via-background/50 to-background/10" />
       <div className="absolute inset-0 hero-gradient" />
       <div className="hero-bottom-blend" />
 
@@ -66,20 +66,21 @@ export default function HeroBanner({
             <div className="flex items-center gap-2 mb-4">
               <span
                 className={cn(
-                  "px-2 py-1 rounded text-xs font-semibold",
+                  "language-badge",
                   getLanguageBadgeClass(movie.original_language)
                 )}
               >
                 {getLanguageLabel(movie.original_language)}
               </span>
               {year && (
-                <span className="px-2 py-1 rounded bg-muted text-xs font-medium">
+                <span className="language-badge bg-muted text-xs font-medium">
                   {year}
                 </span>
               )}
               {movie.vote_average > 0 && (
-                <span className="px-2 py-1 rounded bg-primary/20 text-primary text-xs font-semibold">
-                  ⭐ {movie.vote_average.toFixed(1)}
+                <span className="rating-badge">
+                  <Star className="h-3 w-3 fill-current" />
+                  {movie.vote_average.toFixed(1)}
                 </span>
               )}
             </div>
@@ -109,7 +110,7 @@ export default function HeroBanner({
               <Button
                 size="lg"
                 variant="outline"
-                className="font-semibold border-white/80 bg-white text-black shadow-lg shadow-black/35 animate-fade-in transition-all duration-300 hover:-translate-y-0.5 hover:scale-[1.02] hover:bg-white/90 hover:text-black active:scale-95"
+                className="animate-fade-in border-white/70 bg-white text-black shadow-lg shadow-black/35 transition-colors duration-200 hover:bg-white/90 hover:text-black font-semibold"
                 onClick={() =>
                   navigate(`/movie/${movie.id}`, { state: { from: fromPath } })
                 }

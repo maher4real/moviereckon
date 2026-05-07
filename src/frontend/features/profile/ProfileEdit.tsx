@@ -266,10 +266,10 @@ export default function ProfileEdit() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0">
+    <div className="app-page pb-20 md:pb-0">
       <Header />
 
-      <main className="flex-1 pt-20 pb-12">
+      <main className="page-main">
         <div className="container mx-auto max-w-6xl px-4">
           <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>

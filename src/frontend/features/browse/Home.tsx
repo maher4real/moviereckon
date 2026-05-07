@@ -26,6 +26,7 @@ import ContentCarousel from "@/frontend/components/ContentCarousel";
 import Footer from "@/frontend/components/Footer";
 import {
   Sparkles,
+  ArrowRight,
   TrendingUp,
   Star,
   Film,
@@ -376,7 +377,7 @@ export default function Home() {
   const tertiaryShelvesPending = !loadTertiaryShelves;
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0">
+    <div className="app-page pb-20 md:pb-0">
       <Header />
 
       {/* Hero Banner */}
@@ -395,14 +396,11 @@ export default function Home() {
 
           {/* Reckon - Personalized Recommendations */}
           {reckonItems.length > 0 && (
-            <section className="mx-2 md:mx-4 rounded-2xl border border-primary/20 bg-linear-to-b from-primary/6 via-card/40 to-transparent overflow-hidden">
+            <section className="surface-panel mx-2 overflow-hidden border-primary/25 bg-linear-to-b from-primary/10 via-card/45 to-transparent md:mx-4">
               <div className="px-4 md:px-6 pt-5 pb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="relative">
-                    <div className="absolute inset-0 rounded-lg bg-primary/20 blur-sm" />
-                    <div className="relative p-1.5 rounded-lg bg-primary/10 border border-primary/20">
-                      <Sparkles className="w-4 h-4 text-primary" />
-                    </div>
+                  <div className="rounded-lg border border-primary/25 bg-primary/10 p-1.5">
+                    <Sparkles className="w-4 h-4 text-primary" />
                   </div>
                   <h2 className="text-lg md:text-xl font-bold tracking-tight">
                     {isPersonalized ? "Reckon For You" : "Top Picks"}
@@ -417,13 +415,11 @@ export default function Home() {
                   type="button"
                   onClick={() => navigate("/reckon")}
                   className={cn(
-                    "flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors duration-200 cursor-pointer"
+                    "flex items-center gap-1 rounded-full border border-border/60 bg-background/55 px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors duration-200 hover:border-primary/45 hover:text-primary"
                   )}
                 >
                   View All
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
+                  <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               </div>
               <MemoizedCarousel

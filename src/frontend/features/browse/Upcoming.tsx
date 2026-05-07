@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, memo } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, Film, Play, Star, Tv } from "lucide-react";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import {
   discoverMovies,
@@ -128,18 +128,19 @@ const PosterCard = memo(({ item, onClick }: { item: Movie | TVShow; onClick: () 
           fallbackSrc="/fallbacks/poster.svg"
         />
         <div className="absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
-            <span className="text-xl text-primary-foreground">▶</span>
+          <div className="poster-play-button">
+            <Play className="h-5 w-5 fill-current" />
           </div>
         </div>
 
         {item.vote_average > 0 && (
-          <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
-            ⭐ {item.vote_average.toFixed(1)}
+          <div className="rating-badge absolute top-2 right-2">
+            <Star className="h-3 w-3 fill-current" />
+            {item.vote_average.toFixed(1)}
           </div>
         )}
 
-        <div className={cn("absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold", getLanguageBadgeClass(item.original_language))}>
+        <div className={cn("language-badge absolute top-2 left-2", getLanguageBadgeClass(item.original_language))}>
           {item.original_language.toUpperCase()}
         </div>
 
@@ -575,61 +576,71 @@ export default function Upcoming() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col pb-20 md:pb-0">
+    <div className="app-page flex flex-col pb-20 md:pb-0">
       <Header />
 
-      <main className="flex-1 pt-20 pb-12">
+      <main className="page-main">
         <div className="container mx-auto px-4">
-          <div className="flex items-center gap-3 mb-2">
-            <CalendarDays className="w-8 h-8 text-primary" />
-            <h1 className="text-3xl font-bold">Upcoming</h1>
+          <div className="page-heading mb-2">
+            <div className="page-heading-icon">
+              <CalendarDays className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="page-kicker">Release Calendar</p>
+              <h1 className="page-title">Upcoming</h1>
+            </div>
           </div>
           <p className="text-muted-foreground mb-6">
             Explore upcoming movies and series by section-specific filters.
           </p>
 
-          <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 mb-6">
-            <div className="flex gap-2">
+          <div className="filter-panel">
+            <div className="filter-row">
               {[
-                { value: "all", label: "All" },
-                { value: "movies", label: "Movies" },
-                { value: "series", label: "Series" },
-              ].map((entry) => (
-                <Button
-                  key={entry.value}
-                  variant={section === entry.value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSection(entry.value as UpcomingSection)}
-                  className="whitespace-nowrap"
-                >
-                  {entry.label}
-                </Button>
-              ))}
+                { value: "all", label: "All", Icon: CalendarDays },
+                { value: "movies", label: "Movies", Icon: Film },
+                { value: "series", label: "Series", Icon: Tv },
+              ].map((entry) => {
+                const active = section === entry.value;
+                return (
+                  <Button
+                    key={entry.value}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSection(entry.value as UpcomingSection)}
+                    className={cn("filter-chip", active && "filter-chip-active")}
+                  >
+                    <entry.Icon className="h-4 w-4" />
+                    {entry.label}
+                  </Button>
+                );
+              })}
             </div>
           </div>
 
           {section === "movies" && (
-            <div className="space-y-3 mb-6">
-              <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
-                <div className="flex gap-2">
-                  {MOVIE_SECTION_OPTIONS.map((option) => (
+            <div className="filter-panel space-y-3">
+              <div className="filter-row">
+                {MOVIE_SECTION_OPTIONS.map((option) => {
+                  const active = movieSectionFilter === option.value;
+                  return (
                     <Button
                       key={option.value}
-                      variant={movieSectionFilter === option.value ? "default" : "outline"}
+                      variant="ghost"
                       size="sm"
                       onClick={() => setMovieSectionFilter(option.value)}
-                      className="whitespace-nowrap"
+                      className={cn("filter-chip", active && "filter-chip-active")}
                     >
                       {option.label}
                     </Button>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
 
               <div className="flex gap-3 flex-wrap">
                 {movieSectionFilter === "bollywood" && (
                   <Select value={bollywoodLanguage} onValueChange={setBollywoodLanguage}>
-                    <SelectTrigger className="w-[170px] bg-card">
+                    <SelectTrigger className="select-surface w-[170px]">
                       <SelectValue placeholder="Language" />
                     </SelectTrigger>
                     <SelectContent className="bg-popover border-border z-50">
@@ -646,7 +657,7 @@ export default function Upcoming() {
                   value={movieGenre}
                   onValueChange={(value) => setMovieGenre(value === "all" ? "" : value)}
                 >
-                  <SelectTrigger className="w-[170px] bg-card">
+                  <SelectTrigger className="select-surface w-[170px]">
                     <SelectValue placeholder="Movie Genre" />
                   </SelectTrigger>
                   <SelectContent className="bg-popover border-border z-50">
@@ -663,9 +674,9 @@ export default function Upcoming() {
           )}
 
           {section === "series" && (
-            <div className="flex gap-3 flex-wrap mb-6">
+            <div className="filter-panel flex flex-wrap gap-3">
               <Select value={seriesOtt} onValueChange={setSeriesOtt}>
-                <SelectTrigger className="w-[170px] bg-card">
+                <SelectTrigger className="select-surface w-[170px]">
                   <SelectValue placeholder="OTT Platform" />
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border z-50">
@@ -678,7 +689,7 @@ export default function Upcoming() {
               </Select>
 
               <Select value={seriesLanguage} onValueChange={setSeriesLanguage}>
-                <SelectTrigger className="w-[170px] bg-card">
+                <SelectTrigger className="select-surface w-[170px]">
                   <SelectValue placeholder="Language" />
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border z-50">
@@ -694,7 +705,7 @@ export default function Upcoming() {
                 value={seriesGenre}
                 onValueChange={(value) => setSeriesGenre(value === "all" ? "" : value)}
               >
-                <SelectTrigger className="w-[170px] bg-card">
+                <SelectTrigger className="select-surface w-[170px]">
                   <SelectValue placeholder="Series Genre" />
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border z-50">
@@ -712,7 +723,7 @@ export default function Upcoming() {
           {isLoading ? (
             <UpcomingTimelineSkeleton />
           ) : upcomingError ? (
-            <div className="rounded-xl border border-border/80 bg-card/45 p-8 text-center">
+            <div className="empty-state">
               <p className="text-base font-medium text-foreground mb-1">Failed to load upcoming releases</p>
               <p className="text-sm text-muted-foreground mb-4">Check your connection and try again.</p>
               <button
@@ -725,7 +736,7 @@ export default function Upcoming() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="rounded-xl border border-border/80 bg-card/45 px-4 py-3">
+              <div className="surface-panel px-4 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/90">
                   Date-wise Schedule
                 </p>
@@ -735,7 +746,7 @@ export default function Upcoming() {
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-border/70 bg-card/35 overflow-hidden">
+              <div className="surface-panel overflow-hidden">
                 <div className="flex items-center justify-between gap-3 border-b border-border/70 bg-background/40 px-4 py-2.5">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground/85">
                     Full Calendar Timeline
@@ -755,10 +766,10 @@ export default function Upcoming() {
                         type="button"
                         onClick={() => setSelectedFilterDate("all")}
                         className={cn(
-                          "min-w-[108px] rounded-xl border px-3 py-2 text-left transition-all",
+                          "min-w-[108px] rounded-lg border px-3 py-2 text-left transition-colors",
                           selectedFilterDate === "all"
-                            ? "border-primary bg-gradient-to-b from-primary/20 to-primary/8 text-foreground shadow-[0_0_0_1px_hsl(var(--primary)/0.25)]"
-                            : "border-border/70 bg-gradient-to-b from-background/90 to-background/65 text-muted-foreground hover:-translate-y-0.5 hover:border-primary/45 hover:text-foreground",
+                            ? "border-primary bg-gradient-to-b from-primary/20 to-primary/10 text-foreground shadow-[0_0_0_1px_hsl(var(--primary)/0.25)]"
+                            : "border-border/70 bg-gradient-to-b from-background/90 to-background/65 text-muted-foreground hover:border-primary/45 hover:text-foreground",
                         )}
                       >
                         <p className="text-[10px] uppercase tracking-wide">Filter</p>
@@ -780,10 +791,10 @@ export default function Upcoming() {
                             type="button"
                             onClick={() => setSelectedFilterDate(entry.dateKey)}
                             className={cn(
-                              "relative min-w-[98px] rounded-xl border px-3 py-2 text-left transition-all",
+                              "relative min-w-[98px] rounded-lg border px-3 py-2 text-left transition-colors",
                               isSelected
-                                ? "border-primary bg-gradient-to-b from-primary/20 to-primary/8 text-foreground shadow-[0_0_0_1px_hsl(var(--primary)/0.25)]"
-                                : "border-border/70 bg-gradient-to-b from-background/90 to-background/65 text-muted-foreground hover:-translate-y-0.5 hover:border-primary/45 hover:text-foreground",
+                                ? "border-primary bg-gradient-to-b from-primary/20 to-primary/10 text-foreground shadow-[0_0_0_1px_hsl(var(--primary)/0.25)]"
+                                : "border-border/70 bg-gradient-to-b from-background/90 to-background/65 text-muted-foreground hover:border-primary/45 hover:text-foreground",
                               isWeekend && !isSelected && "border-primary/20",
                             )}
                           >
@@ -817,7 +828,7 @@ export default function Upcoming() {
                     >
                       <Card
                         className={cn(
-                          "border-border/70 bg-card/35",
+                          "surface-panel bg-card/45",
                           isSelected && "border-primary/60 ring-1 ring-primary/25",
                         )}
                       >
@@ -850,12 +861,12 @@ export default function Upcoming() {
                   );
                 })
               ) : isFetchingNextPage ? (
-                <div className="text-center py-12 border rounded-lg bg-card/40">
+                <div className="empty-state">
                   <InlineLoadMoreSkeleton className="py-0 justify-center" />
                   <p className="text-sm text-muted-foreground mt-3">Loading release schedule...</p>
                 </div>
               ) : (
-                <div className="text-center py-12 border rounded-lg bg-card/40">
+                <div className="empty-state">
                   <p className="text-muted-foreground">No date-wise releases found yet.</p>
                 </div>
               )}

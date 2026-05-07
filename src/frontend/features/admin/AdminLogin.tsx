@@ -67,15 +67,8 @@ export default function AdminLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
-      {/* Subtle red glow */}
-      <div
-        className="pointer-events-none fixed inset-0"
-        style={{
-          background:
-            "radial-gradient(ellipse at 50% 40%, hsl(0 79% 52% / 0.06) 0%, transparent 65%)",
-        }}
-      />
+    <div className="app-page flex min-h-screen flex-col items-center justify-center px-4">
+      <div className="pointer-events-none fixed inset-0 opacity-35 [background-image:repeating-linear-gradient(90deg,transparent_0,transparent_56px,hsl(var(--foreground)/0.04)_57px,hsl(var(--foreground)/0.04)_58px)]" />
 
       <div className="relative w-full max-w-sm space-y-8">
         {/* Logo */}
@@ -90,7 +83,7 @@ export default function AdminLogin() {
         </div>
 
         {/* Card */}
-        <div className="rounded-2xl border border-white/8 bg-card/60 backdrop-blur-sm p-8 space-y-6 shadow-2xl">
+        <div className="surface-panel space-y-6 p-8">
           <div className="space-y-1 text-center">
             <h1 className="text-xl font-semibold">Secure Admin Login</h1>
             <p className="text-sm text-muted-foreground">

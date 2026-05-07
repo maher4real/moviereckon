@@ -222,14 +222,14 @@ export default function InfoPage({ page }: InfoPageProps) {
   const Icon = content.icon;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col pb-20 md:pb-0">
+    <div className="app-page flex flex-col pb-20 md:pb-0">
       <Header />
 
-      <main className="flex-1 pt-20 pb-12">
+      <main className="page-main">
         <div className="container mx-auto px-4">
-          <div className="rounded-2xl border border-border/80 bg-card/60 p-6 md:p-8 backdrop-blur">
+          <div className="surface-panel p-6 md:p-8">
             <div className="flex items-start gap-3">
-              <div className="rounded-xl bg-primary/15 p-2 text-primary">
+              <div className="page-heading-icon">
                 <Icon className="h-6 w-6" />
               </div>
               <div>
@@ -243,7 +243,7 @@ export default function InfoPage({ page }: InfoPageProps) {
               {content.sections.map((section) => (
                 <section
                   key={section.heading}
-                  className="rounded-xl border border-border/70 bg-background/50 p-4 md:p-5"
+                  className="rounded-lg border border-border/70 bg-background/50 p-4 md:p-5"
                 >
                   <h2 className="text-lg font-semibold">{section.heading}</h2>
                   <div className="mt-3 space-y-2">

@@ -70,9 +70,9 @@ export default function TheaterDetail() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background text-foreground">
+      <div className="app-page text-foreground">
         <Header />
-        <main className="pt-16">
+        <main className="pt-24">
           {/* Hero skeleton */}
           <div className="relative h-[60vh] md:h-[75vh] bg-muted animate-pulse" />
           <div className="container mx-auto px-4 md:px-8 py-8 space-y-4">
@@ -87,9 +87,9 @@ export default function TheaterDetail() {
 
   if (isError || !movie) {
     return (
-      <div className="min-h-screen bg-background text-foreground">
+      <div className="app-page text-foreground">
         <Header />
-        <main className="pt-16 flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <main className="flex min-h-[60vh] flex-col items-center justify-center gap-4 pt-24">
           <Film className="w-16 h-16 text-muted-foreground/30" />
           <p className="text-muted-foreground">Movie not found.</p>
           <Button onClick={() => navigate("/theater")}>Back to Cinema</Button>
@@ -99,7 +99,7 @@ export default function TheaterDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="app-page text-foreground">
       <link rel="stylesheet" href={FONT_URL} />
       <style>{`.bebas { font-family: 'Bebas Neue', sans-serif; }`}</style>
 

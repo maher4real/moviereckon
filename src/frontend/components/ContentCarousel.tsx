@@ -1,6 +1,6 @@
 import { type ElementType, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ChevronLeft, ChevronRight, ArrowRight, Sparkles, Star } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowRight, Sparkles, Star, Play } from "lucide-react";
 import { Movie, TVShow, getPosterUrl, getLanguageBadgeClass } from "@/shared/lib/tmdb";
 import { Button } from "@/frontend/components/ui/button";
 import { cn } from "@/shared/lib/utils";
@@ -164,7 +164,7 @@ export default function ContentCarousel({
       {title && (
         <div className="mb-3 flex min-w-0 items-center justify-between gap-3 md:mb-4">
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className="w-1 h-6 rounded-full bg-primary shrink-0" />
+            <div className="h-8 w-1 rounded-full bg-primary shadow-lg shadow-primary/25 shrink-0" />
             {Icon && <Icon className="w-5 h-5 text-primary shrink-0" />}
             <h2 className="min-w-0 truncate text-lg font-bold tracking-tight md:text-xl">{title}</h2>
           </div>
@@ -172,7 +172,7 @@ export default function ContentCarousel({
             <button
               type="button"
               onClick={() => navigate(resolvedViewAllHref)}
-              className="flex shrink-0 items-center gap-1 rounded-full bg-background/60 px-2.5 py-1 text-xs text-muted-foreground backdrop-blur-sm transition-colors duration-200 hover:text-primary"
+              className="flex shrink-0 items-center gap-1 rounded-full border border-border/60 bg-card/70 px-2.5 py-1 text-xs font-semibold text-muted-foreground backdrop-blur-sm transition-colors duration-200 hover:border-primary/45 hover:text-primary"
             >
               View All
               <ArrowRight className="w-3.5 h-3.5" />
@@ -189,7 +189,8 @@ export default function ContentCarousel({
           variant="ghost"
           size="icon"
           onClick={() => scroll("left")}
-          className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-background/70 hover:bg-primary/20 hover:text-primary text-foreground/90 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
+          className="absolute left-2 top-1/2 z-10 hidden -translate-y-1/2 border border-white/10 bg-background/75 text-foreground/90 opacity-0 backdrop-blur-md transition-opacity hover:bg-primary/20 hover:text-primary group-hover:opacity-100 md:flex"
+          aria-label={`Scroll ${title || "carousel"} left`}
         >
           <ChevronLeft className="w-6 h-6" />
         </Button>
@@ -198,7 +199,8 @@ export default function ContentCarousel({
           variant="ghost"
           size="icon"
           onClick={() => scroll("right")}
-          className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-background/70 hover:bg-primary/20 hover:text-primary text-foreground/90 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
+          className="absolute right-2 top-1/2 z-10 hidden -translate-y-1/2 border border-white/10 bg-background/75 text-foreground/90 opacity-0 backdrop-blur-md transition-opacity hover:bg-primary/20 hover:text-primary group-hover:opacity-100 md:flex"
+          aria-label={`Scroll ${title || "carousel"} right`}
         >
           <ChevronRight className="w-6 h-6" />
         </Button>
@@ -235,7 +237,7 @@ export default function ContentCarousel({
                       POSTER_CARD_WIDTH_CLASS,
                     )}
                   >
-                    <div className="relative aspect-2/3 rounded-lg overflow-hidden transform-gpu transition-[transform,box-shadow] duration-300 group-hover/card:-translate-y-1.5 group-hover/card:shadow-[0_12px_36px_rgba(0,0,0,0.48)]">
+                    <div className="relative aspect-2/3 rounded-lg overflow-hidden poster-card">
                       <MediaImage
                         src={getPosterUrl(item.poster_path, "medium")}
                         alt={getTitle(item)}
@@ -247,21 +249,21 @@ export default function ContentCarousel({
                       />
 
                       <div className="absolute inset-0 bg-background/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
-                        <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center glow-primary">
-                          <span className="text-xl">▶</span>
+                        <div className="poster-play-button">
+                          <Play className="h-5 w-5 fill-current" />
                         </div>
                       </div>
 
                       {item.vote_average > 0 && (
-                        <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
-                          <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                        <div className="rating-badge absolute top-2 right-2">
+                          <Star className="h-3 w-3 fill-current" />
                           {item.vote_average.toFixed(1)}
                         </div>
                       )}
 
                       <div
                         className={cn(
-                          "absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold",
+                          "language-badge absolute top-2 left-2",
                           getLanguageBadgeClass(item.original_language),
                         )}
                       >

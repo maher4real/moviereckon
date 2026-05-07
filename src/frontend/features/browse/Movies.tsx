@@ -28,7 +28,7 @@ import MediaImage from "@/frontend/components/MediaImage";
 import { Button } from "@/frontend/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/frontend/components/ui/select";
 import { cn, formatLocalDate, isAnimeLike } from "@/shared/lib/utils";
-import { Film } from "lucide-react";
+import { Clapperboard, Film, Globe, Languages, Play, Star, TrendingUp } from "lucide-react";
 
 type MovieCategory = "all" | "now_playing" | "trending" | "bollywood" | "hollywood";
 type SortOption = "popularity.desc" | "vote_average.desc" | "release_date.desc" | "revenue.desc";
@@ -60,6 +60,13 @@ const BOLLYWOOD_LANGUAGE_OPTIONS = [
 const BOLLYWOOD_LANGUAGE_CODES = ["hi", "gu", "ta", "te", "kn"] as const;
 const BOLLYWOOD_LANGUAGE_SET: ReadonlySet<string> = new Set(BOLLYWOOD_LANGUAGE_CODES);
 
+const MOVIE_CATEGORY_OPTIONS = [
+  { value: "all", label: "All Movies", Icon: Film },
+  { value: "now_playing", label: "Now Playing", Icon: Clapperboard },
+  { value: "trending", label: "Trending", Icon: TrendingUp },
+  { value: "bollywood", label: "Bollywood", Icon: Languages },
+  { value: "hollywood", label: "Hollywood", Icon: Globe },
+] satisfies { value: MovieCategory; label: string; Icon: typeof Film }[];
 
 const PosterCard = memo(({ item, onClick, priority = false }: { item: Movie; onClick: () => void; priority?: boolean }) => (
   <div onClick={onClick} className="cursor-pointer group">
@@ -74,16 +81,17 @@ const PosterCard = memo(({ item, onClick, priority = false }: { item: Movie; onC
         fallbackSrc="/fallbacks/poster.svg"
       />
       <div className="absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-        <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
-          <span className="text-xl text-primary-foreground">▶</span>
+        <div className="poster-play-button">
+          <Play className="h-5 w-5 fill-current" />
         </div>
       </div>
       {item.vote_average > 0 && (
-        <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
-          ⭐ {item.vote_average.toFixed(1)}
+        <div className="rating-badge absolute top-2 right-2">
+          <Star className="h-3 w-3 fill-current" />
+          {item.vote_average.toFixed(1)}
         </div>
       )}
-      <div className={cn("absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold", getLanguageBadgeClass(item.original_language))}>
+      <div className={cn("language-badge absolute top-2 left-2", getLanguageBadgeClass(item.original_language))}>
         {item.original_language.toUpperCase()}
       </div>
     </div>
@@ -332,45 +340,48 @@ export default function Movies() {
   const isSpecialCategory = ["now_playing", "trending"].includes(category);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col pb-20 md:pb-0">
+    <div className="app-page flex flex-col pb-20 md:pb-0">
       <Header />
 
-      <main className="flex-1 pt-20 pb-12">
+      <main className="page-main">
         <div className="container mx-auto px-4">
-          <div className="flex items-center gap-3 mb-6">
-            <Film className="w-8 h-8 text-primary" />
-            <h1 className="text-3xl font-bold">Movies</h1>
-          </div>
-
-          <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 mb-6">
-            <div className="flex gap-2">
-              {[
-                { value: "all", label: "All Movies" },
-                { value: "now_playing", label: "🎬 Now Playing" },
-                { value: "trending", label: "🔥 Trending" },
-                { value: "bollywood", label: "🇮🇳 Bollywood" },
-                { value: "hollywood", label: "🎬 Hollywood" },
-              ].map((cat) => (
-                <Button
-                  key={cat.value}
-                  variant={category === cat.value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setCategory(cat.value as MovieCategory)}
-                  className="whitespace-nowrap"
-                >
-                  {cat.label}
-                </Button>
-              ))}
+          <div className="page-heading">
+            <div className="page-heading-icon">
+              <Film className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="page-kicker">Browse Library</p>
+              <h1 className="page-title">Movies</h1>
             </div>
           </div>
 
-          <div className="flex gap-3 flex-wrap mb-6">
+          <div className="filter-panel">
+            <div className="filter-row">
+              {MOVIE_CATEGORY_OPTIONS.map((cat) => {
+                const active = category === cat.value;
+                return (
+                <Button
+                  key={cat.value}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCategory(cat.value)}
+                  className={cn("filter-chip", active && "filter-chip-active")}
+                >
+                  <cat.Icon className="h-4 w-4" />
+                  {cat.label}
+                </Button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="filter-panel flex flex-wrap gap-3">
             <Select
               value={selectedGenre}
               onValueChange={(v) => setSelectedGenre(v === "all" ? "" : v)}
               disabled={isSpecialCategory}
             >
-              <SelectTrigger className="w-[150px] bg-card">
+              <SelectTrigger className="select-surface w-[150px]">
                 <SelectValue placeholder="All Genres" />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border z-50">
@@ -386,7 +397,7 @@ export default function Movies() {
               onValueChange={(v) => setSortBy(v as SortOption)}
               disabled={isSpecialCategory}
             >
-              <SelectTrigger className="w-[150px] bg-card">
+              <SelectTrigger className="select-surface w-[150px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border z-50">
@@ -400,7 +411,7 @@ export default function Movies() {
               value={selectedYear}
               onValueChange={(v) => setSelectedYear(v === "all" ? "" : v)}
             >
-              <SelectTrigger className="w-[150px] bg-card">
+              <SelectTrigger className="select-surface w-[150px]">
                 <SelectValue placeholder="All Years" />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border z-50 max-h-[300px]">
@@ -413,7 +424,7 @@ export default function Movies() {
 
             {category === "bollywood" && (
               <Select value={bollywoodLanguage} onValueChange={setBollywoodLanguage}>
-                <SelectTrigger className="w-[170px] bg-card">
+                <SelectTrigger className="select-surface w-[170px]">
                   <SelectValue placeholder="Language" />
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border z-50">
@@ -433,7 +444,7 @@ export default function Movies() {
             <>
               <div
                 className={cn(
-                  "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 sm:gap-4 transition-opacity duration-200",
+                  "content-grid",
                   isFetching && !isFetchingNextPage && "opacity-75",
                 )}
               >
@@ -454,7 +465,7 @@ export default function Movies() {
               </div>
 
               {allMovies.length === 0 && (
-                <div className="text-center py-12">
+                <div className="empty-state">
                   <p className="text-muted-foreground">No movies found for the selected filters.</p>
                 </div>
               )}

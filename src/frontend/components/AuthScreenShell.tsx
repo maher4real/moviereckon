@@ -22,18 +22,17 @@ export default function AuthScreenShell({
   className,
 }: AuthScreenShellProps) {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background px-4 py-10">
+    <div className="app-page relative min-h-screen overflow-hidden px-4 py-10">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.18),transparent_34%),radial-gradient(circle_at_bottom_right,hsl(var(--secondary)/0.16),transparent_30%)]" />
-        <div className="absolute inset-0 bg-linear-to-br from-background via-background/94 to-background/88" />
-        <div className="absolute top-[-12rem] left-[-10rem] h-[26rem] w-[26rem] rounded-full bg-primary/12 blur-[110px]" />
-        <div className="absolute right-[-10rem] bottom-[-12rem] h-[28rem] w-[28rem] rounded-full bg-secondary/14 blur-[120px]" />
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,hsl(var(--primary)/0.16),transparent_32%),linear-gradient(225deg,hsl(var(--secondary)/0.14),transparent_34%)]" />
+        <div className="absolute inset-0 bg-linear-to-br from-background via-background/95 to-background/90" />
+        <div className="absolute inset-0 opacity-35 [background-image:repeating-linear-gradient(90deg,transparent_0,transparent_46px,hsl(var(--foreground)/0.04)_47px,hsl(var(--foreground)/0.04)_48px)]" />
       </div>
 
       <div className="relative z-10 mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-lg items-center justify-center">
         <section
           className={cn(
-            "w-full rounded-[28px] border border-white/10 bg-card/82 p-7 shadow-2xl backdrop-blur-md sm:p-9",
+            "surface-panel w-full p-7 sm:p-9",
             className,
           )}
         >

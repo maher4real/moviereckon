@@ -1,6 +1,6 @@
 import { memo, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Eye, Sparkles, Bookmark } from "lucide-react";
+import { Eye, Sparkles, Bookmark, Play, Star } from "lucide-react";
 import { Movie, TVShow, getPosterUrl, getLanguageLabel } from "@/shared/lib/tmdb";
 import { useUserData } from "@/frontend/hooks/useUserData";
 import { useWatchlist } from "@/frontend/hooks/useWatchlist";
@@ -154,8 +154,8 @@ function ContentCardComponent({
 
         {/* Hover Overlay */}
         <div className="absolute inset-0 bg-background/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
-          <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center glow-primary">
-            <span className="text-xl">▶</span>
+          <div className="poster-play-button">
+            <Play className="h-5 w-5 fill-current" />
           </div>
         </div>
 
@@ -203,15 +203,16 @@ function ContentCardComponent({
 
         {/* Rating Badge */}
         {item.vote_average > 0 && (
-          <div className="absolute top-2 right-2 px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-xs font-semibold">
-            ⭐ {item.vote_average.toFixed(1)}
+          <div className="rating-badge absolute top-2 right-2">
+            <Star className="h-3 w-3 fill-current" />
+            {item.vote_average.toFixed(1)}
           </div>
         )}
 
         {/* Language Badge */}
         <div
           className={cn(
-            "absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold",
+            "language-badge absolute top-2 left-2",
             getLangBadgeClass(item.original_language)
           )}
         >
