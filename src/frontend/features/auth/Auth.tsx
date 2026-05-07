@@ -771,13 +771,13 @@ export default function Auth() {
               <TabsList className="mb-6 grid h-11 w-full grid-cols-2 rounded-xl border border-white/10 bg-background/60 p-1">
                 <TabsTrigger
                   value="signin"
-                  className="rounded-lg text-sm font-semibold tracking-wide transition-all duration-200 data-[state=active]:bg-linear-to-r data-[state=active]:from-primary data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-primary/35 data-[state=inactive]:text-muted-foreground"
+                  className="rounded-lg text-sm font-semibold tracking-wide transition-all duration-200 data-[state=active]:bg-linear-to-r data-[state=active]:from-primary data-[state=active]:to-red-900 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-primary/35 data-[state=inactive]:text-muted-foreground"
                 >
                   Sign In
                 </TabsTrigger>
                 <TabsTrigger
                   value="signup"
-                  className="rounded-lg text-sm font-semibold tracking-wide transition-all duration-200 data-[state=active]:bg-linear-to-r data-[state=active]:from-primary data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-primary/35 data-[state=inactive]:text-muted-foreground"
+                  className="rounded-lg text-sm font-semibold tracking-wide transition-all duration-200 data-[state=active]:bg-linear-to-r data-[state=active]:from-primary data-[state=active]:to-red-900 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-primary/35 data-[state=inactive]:text-muted-foreground"
                 >
                   Sign Up
                 </TabsTrigger>
@@ -794,7 +794,7 @@ export default function Auth() {
                         <Button
                           type="button"
                           size="sm"
-                          className="rounded-lg bg-gradient-to-r from-primary via-red-500 to-orange-500 text-white hover:brightness-110"
+                          className="rounded-lg bg-gradient-to-r from-primary via-red-600 to-red-900 text-white hover:brightness-110"
                           onClick={handleResendVerification}
                           disabled={isSubmitting || isAuthenticating || isResendingVerification}
                         >
@@ -919,7 +919,7 @@ export default function Auth() {
 
                   <Button
                     type="submit"
-                    className="auth-submit-btn relative overflow-hidden mt-1 h-12 w-full rounded-xl bg-linear-to-r from-primary via-red-500 to-orange-500 text-base font-semibold text-white shadow-lg shadow-primary/35 transition-all hover:brightness-110"
+                    className="auth-submit-btn relative overflow-hidden mt-1 h-12 w-full rounded-xl bg-linear-to-r from-primary via-red-600 to-red-900 text-base font-semibold text-white shadow-lg shadow-primary/35 transition-all hover:brightness-110"
                     disabled={isSubmitting || isAuthenticating}
                   >
                     {isSubmitting && <span className="auth-btn-loading-fill" aria-hidden="true" />}
@@ -1057,7 +1057,7 @@ export default function Auth() {
 
                   <Button
                     type="submit"
-                    className="auth-submit-btn relative overflow-hidden mt-1 h-12 w-full rounded-xl bg-linear-to-r from-primary via-red-500 to-orange-500 text-base font-semibold text-white shadow-lg shadow-primary/35 transition-all hover:brightness-110"
+                    className="auth-submit-btn relative overflow-hidden mt-1 h-12 w-full rounded-xl bg-linear-to-r from-primary via-red-600 to-red-900 text-base font-semibold text-white shadow-lg shadow-primary/35 transition-all hover:brightness-110"
                     disabled={
                       isSubmitting ||
                       isAuthenticating ||

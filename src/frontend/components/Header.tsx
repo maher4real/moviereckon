@@ -69,46 +69,39 @@ export default function Header() {
       : undefined;
 
   return (
-    <header className="pointer-events-none fixed left-0 right-0 top-3 z-50 px-3 transition-all duration-300">
-      <div
-        className={cn(
-          "container pointer-events-auto mx-auto overflow-hidden rounded-2xl border px-3 shadow-2xl backdrop-blur-xl transition-all duration-300 sm:px-4",
-          isScrolled
-            ? "border-border/80 bg-background/90 shadow-black/40"
-            : "border-white/10 bg-background/60 shadow-black/25",
-        )}
-      >
+    <header
+      className={cn(
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+        isScrolled ? "bg-background/95 backdrop-blur-md shadow-lg" : "bg-gradient-to-b from-background/80 to-transparent"
+      )}
+    >
+      <div className="container mx-auto px-3 sm:px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link
             to="/home"
             data-brand-logo-anchor="true"
-            className="relative z-10 inline-flex shrink-0 items-center rounded-lg transition-opacity hover:opacity-85"
-            aria-label="Go to home"
+            className="relative z-10 inline-flex shrink-0 items-center transition-opacity hover:opacity-80"
           >
             <BrandLogo size="sm" labelClassName="hidden lg:inline" />
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden min-w-0 flex-1 items-center justify-center gap-1 px-3 md:flex lg:px-6">
-            {navLinks.map((link) => {
-              const active = isActive(link.href);
-              return (
-                <Link
-                  key={link.href}
-                  to={link.href}
-                  className={cn(
-                    "inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition-colors duration-200",
-                    active
-                      ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                      : "text-muted-foreground hover:bg-white/10 hover:text-foreground",
-                  )}
-                >
-                  <link.icon className={cn("h-4 w-4", active && "text-primary-foreground")} />
-                  <span>{link.label}</span>
-                </Link>
-              );
-            })}
+          <nav className="hidden md:flex min-w-0 flex-1 items-center justify-center gap-3 lg:gap-6 px-3 lg:px-6">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                to={link.href}
+                className={cn(
+                  "shrink-0 text-sm font-medium transition-colors",
+                  isActive(link.href)
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {link.label}
+              </Link>
+            ))}
           </nav>
 
           {/* Right Side Actions */}
@@ -118,8 +111,7 @@ export default function Header() {
               variant="ghost"
               size="icon"
               onClick={() => navigate("/search")}
-              className="rounded-full text-muted-foreground hover:bg-white/10 hover:text-foreground"
-              aria-label="Search"
+              className="text-muted-foreground hover:text-foreground"
             >
               <Search className="w-5 h-5" />
             </Button>
@@ -145,9 +137,7 @@ export default function Header() {
               variant="ghost"
               size="icon"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="rounded-full text-muted-foreground hover:bg-white/10 hover:text-foreground md:hidden"
-              aria-label={isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
-              aria-expanded={isMobileMenuOpen}
+              className="md:hidden text-muted-foreground hover:text-foreground"
             >
               {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </Button>
@@ -157,15 +147,15 @@ export default function Header() {
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="container pointer-events-auto mx-auto mt-2 overflow-hidden rounded-2xl border border-border/70 bg-background/95 shadow-2xl shadow-black/35 backdrop-blur-xl animate-fade-in md:hidden">
-          <nav className="px-4 py-4 flex flex-col gap-2">
+        <div className="md:hidden bg-background/95 backdrop-blur-md border-t border-border animate-fade-in">
+          <nav className="container mx-auto px-4 py-4 flex flex-col gap-2">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 to={link.href}
                 onClick={() => setIsMobileMenuOpen(false)}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-semibold transition-colors",
+                  "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
                   isActive(link.href)
                     ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"

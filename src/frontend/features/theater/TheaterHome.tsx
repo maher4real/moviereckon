@@ -53,7 +53,7 @@ export default function TheaterHome() {
         .theater-card:hover .theater-card-img { filter: saturate(1.12) contrast(1.05); }
         .theater-card:hover .theater-play { opacity: 1; }
         .theater-play { opacity: 0; transition: opacity 0.25s ease; }
-        @keyframes cinema-pulse { 0%,100%{box-shadow:0 0 0 0 hsl(0 79% 52% / 0.5)} 50%{box-shadow:0 0 0 12px hsl(0 79% 52% / 0)} }
+        @keyframes cinema-pulse { 0%,100%{box-shadow:0 0 0 0 hsl(var(--primary) / 0.5)} 50%{box-shadow:0 0 0 12px hsl(var(--primary) / 0)} }
         .play-pulse { animation: cinema-pulse 2s ease-in-out infinite; }
         @keyframes fadeUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
         .fade-up { animation: fadeUp 0.6s ease forwards; }

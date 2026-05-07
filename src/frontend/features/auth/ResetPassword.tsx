@@ -148,7 +148,7 @@ export default function ResetPassword() {
 
             <Button
               type="submit"
-              className="auth-submit-btn h-12 w-full rounded-xl bg-gradient-to-r from-primary via-red-500 to-orange-500 text-white hover:brightness-110"
+              className="auth-submit-btn h-12 w-full rounded-xl bg-gradient-to-r from-primary via-red-600 to-red-900 text-white hover:brightness-110"
               disabled={isSubmitting || !email || !token}
             >
               {isSubmitting ? (
