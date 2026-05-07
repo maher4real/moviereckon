@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, memo, useRef } from "react";
 import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { motion } from "motion/react";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import {
   discoverMovies,
@@ -69,7 +70,13 @@ const MOVIE_CATEGORY_OPTIONS = [
 ] satisfies { value: MovieCategory; label: string; Icon: typeof Film }[];
 
 const PosterCard = memo(({ item, onClick, priority = false }: { item: Movie; onClick: () => void; priority?: boolean }) => (
-  <div onClick={onClick} className="cursor-pointer group">
+  <motion.div
+    onClick={onClick}
+    whileHover={{ y: -6 }}
+    whileTap={{ scale: 0.985 }}
+    transition={{ type: "spring", stiffness: 360, damping: 30 }}
+    className="cursor-pointer group"
+  >
     <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
       <MediaImage
         src={getPosterUrl(item.poster_path, "medium")}
@@ -81,9 +88,14 @@ const PosterCard = memo(({ item, onClick, priority = false }: { item: Movie; onC
         fallbackSrc="/fallbacks/poster.svg"
       />
       <div className="absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-        <div className="poster-play-button">
+        <motion.div
+          className="poster-play-button"
+          initial={false}
+          whileHover={{ scale: 1.08 }}
+          transition={{ type: "spring", stiffness: 420, damping: 24 }}
+        >
           <Play className="h-5 w-5 fill-current" />
-        </div>
+        </motion.div>
       </div>
       {item.vote_average > 0 && (
         <div className="rating-badge absolute top-2 right-2">
@@ -99,7 +111,7 @@ const PosterCard = memo(({ item, onClick, priority = false }: { item: Movie; onC
       {item.title}
     </h3>
     <p className="text-xs text-muted-foreground">{item.release_date?.split("-")[0] || ""}</p>
-  </div>
+  </motion.div>
 ));
 
 PosterCard.displayName = "PosterCard";

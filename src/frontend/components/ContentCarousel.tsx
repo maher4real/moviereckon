@@ -1,5 +1,6 @@
 import { type ElementType, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { motion } from "motion/react";
 import { ChevronLeft, ChevronRight, ArrowRight, Sparkles, Star, Play } from "lucide-react";
 import { Movie, TVShow, getPosterUrl, getLanguageBadgeClass } from "@/shared/lib/tmdb";
 import { Button } from "@/frontend/components/ui/button";
@@ -160,7 +161,13 @@ export default function ContentCarousel({
   }
 
   return (
-    <section className="px-3 sm:px-4 md:px-6 lg:px-8">
+    <motion.section
+      initial={{ opacity: 0, y: 18 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.18 }}
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      className="px-3 sm:px-4 md:px-6 lg:px-8"
+    >
       {title && (
         <div className="mb-3 flex min-w-0 items-center justify-between gap-3 md:mb-4">
           <div className="flex min-w-0 items-center gap-2.5">
@@ -228,10 +235,13 @@ export default function ContentCarousel({
                 const isPriorityPoster = priorityImages && index < 6;
 
                 return (
-                  <button
+                  <motion.button
                     key={`${itemType}-${item.id}`}
                     type="button"
                     onClick={() => handleItemClick(item)}
+                    whileHover={{ y: -6 }}
+                    whileTap={{ scale: 0.985 }}
+                    transition={{ type: "spring", stiffness: 360, damping: 30 }}
                     className={cn(
                       "shrink-0 snap-start cursor-pointer group/card relative text-left bg-transparent border-0 p-0",
                       POSTER_CARD_WIDTH_CLASS,
@@ -249,9 +259,14 @@ export default function ContentCarousel({
                       />
 
                       <div className="absolute inset-0 bg-background/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
-                        <div className="poster-play-button">
+                        <motion.div
+                          className="poster-play-button"
+                          initial={false}
+                          whileHover={{ scale: 1.08 }}
+                          transition={{ type: "spring", stiffness: 420, damping: 24 }}
+                        >
                           <Play className="h-5 w-5 fill-current" />
-                        </div>
+                        </motion.div>
                       </div>
 
                       {item.vote_average > 0 && (
@@ -326,14 +341,17 @@ export default function ContentCarousel({
                         </Popover>
                       ) : null}
                     </div>
-                  </button>
+                  </motion.button>
                 );
               })}
 
               {shouldRenderViewAllCard && (
-                <button
+                <motion.button
                   type="button"
                   onClick={() => navigate(resolvedViewAllHref)}
+                  whileHover={{ y: -6 }}
+                  whileTap={{ scale: 0.985 }}
+                  transition={{ type: "spring", stiffness: 360, damping: 30 }}
                   className={cn(
                     "shrink-0 snap-start cursor-pointer group/viewall bg-transparent border-0 p-0 text-left",
                     POSTER_CARD_WIDTH_CLASS,
@@ -356,12 +374,12 @@ export default function ContentCarousel({
                   {title && (
                     <p className="text-xs text-muted-foreground">{title}</p>
                   )}
-                </button>
+                </motion.button>
               )}
             </>
           )}
         </div>
       </div>
-    </section>
+    </motion.section>
   );
 }

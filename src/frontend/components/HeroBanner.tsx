@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "motion/react";
 import { Movie, getBackdropUrl, getLanguageBadgeClass, getLanguageLabel } from "@/shared/lib/tmdb";
 import { Button } from "@/frontend/components/ui/button";
 import { Play, Info, Star } from "lucide-react";
@@ -40,18 +41,29 @@ export default function HeroBanner({
   return (
     <div className="relative h-[70vh] md:h-[85vh] overflow-hidden">
       {/* Background Image */}
-      <MediaImage
-        src={getBackdropUrl(movie.backdrop_path, "large")}
-        alt={`${movie.title} backdrop`}
-        className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700"
-        fallbackSrc="/fallbacks/backdrop.svg"
-        width={1280}
-        height={720}
-        sizes="100vw"
-        priority
-        fadeIn
-        onLoad={onBackdropReady}
-      />
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={`hero-backdrop-${movie.id}`}
+          initial={{ opacity: 0, scale: 1.035 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 1.015 }}
+          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+          className="absolute inset-0"
+        >
+          <MediaImage
+            src={getBackdropUrl(movie.backdrop_path, "large")}
+            alt={`${movie.title} backdrop`}
+            className="w-full h-full object-cover"
+            fallbackSrc="/fallbacks/backdrop.svg"
+            width={1280}
+            height={720}
+            sizes="100vw"
+            priority
+            fadeIn
+            onLoad={onBackdropReady}
+          />
+        </motion.div>
+      </AnimatePresence>
 
       {/* Gradient Overlays */}
       <div className="absolute inset-0 bg-gradient-to-r from-background/85 via-background/50 to-background/10" />
@@ -61,65 +73,89 @@ export default function HeroBanner({
       {/* Content */}
       <div className="absolute inset-0 flex items-center">
         <div className="container mx-auto px-4">
-          <div className="max-w-2xl animate-slide-up">
-            {/* Language Badge */}
-            <div className="flex items-center gap-2 mb-4">
-              <span
-                className={cn(
-                  "language-badge",
-                  getLanguageBadgeClass(movie.original_language)
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={`hero-copy-${movie.id}`}
+              initial={{ opacity: 0, y: 28, filter: "blur(8px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, y: -12, filter: "blur(4px)" }}
+              transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+              className="max-w-2xl"
+            >
+              {/* Language Badge */}
+              <div className="flex items-center gap-2 mb-4">
+                <span
+                  className={cn(
+                    "language-badge",
+                    getLanguageBadgeClass(movie.original_language)
+                  )}
+                >
+                  {getLanguageLabel(movie.original_language)}
+                </span>
+                {year && (
+                  <span className="language-badge bg-muted text-xs font-medium">
+                    {year}
+                  </span>
                 )}
-              >
-                {getLanguageLabel(movie.original_language)}
-              </span>
-              {year && (
-                <span className="language-badge bg-muted text-xs font-medium">
-                  {year}
-                </span>
-              )}
-              {movie.vote_average > 0 && (
-                <span className="rating-badge">
-                  <Star className="h-3 w-3 fill-current" />
-                  {movie.vote_average.toFixed(1)}
-                </span>
-              )}
-            </div>
+                {movie.vote_average > 0 && (
+                  <span className="rating-badge">
+                    <Star className="h-3 w-3 fill-current" />
+                    {movie.vote_average.toFixed(1)}
+                  </span>
+                )}
+              </div>
 
-            {/* Title */}
-            <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-4 leading-tight">
-              {movie.title}
-            </h1>
+              {/* Title */}
+              <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-4 leading-tight">
+                {movie.title}
+              </h1>
 
-            {/* Overview */}
-            <p className="text-muted-foreground text-sm md:text-base lg:text-lg mb-6 line-clamp-3 md:line-clamp-4">
-              {movie.overview}
-            </p>
+              {/* Overview */}
+              <p className="text-muted-foreground text-sm md:text-base lg:text-lg mb-6 line-clamp-3 md:line-clamp-4">
+                {movie.overview}
+              </p>
 
-            {/* Action Buttons */}
-            <div className="flex flex-wrap gap-3">
-              <Button
-                size="lg"
-                className="bg-primary hover:bg-primary/90 glow-primary font-semibold text-primary-foreground"
-                onClick={() =>
-                  navigate(`/movie/${movie.id}`, { state: { from: fromPath, autoPlayTrailer: true } })
-                }
+              {/* Action Buttons */}
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.08, duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                className="flex flex-wrap gap-3"
               >
-                <Play className="w-5 h-5 mr-2 fill-current" />
-                Watch Trailer
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="animate-fade-in border-white/70 bg-white text-black shadow-lg shadow-black/35 transition-colors duration-200 hover:bg-white/90 hover:text-black font-semibold"
-                onClick={() =>
-                  navigate(`/movie/${movie.id}`, { state: { from: fromPath } })
-                }
-              >
-                <Info className="w-5 h-5 mr-2" />
-                More Info
-              </Button>
-            </div>
-          </div>
+                <motion.div
+                  whileTap={{ scale: 0.97 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 28 }}
+                >
+                  <Button
+                    size="lg"
+                    className="bg-primary hover:bg-primary/90 glow-primary font-semibold text-primary-foreground"
+                    onClick={() =>
+                      navigate(`/movie/${movie.id}`, { state: { from: fromPath, autoPlayTrailer: true } })
+                    }
+                  >
+                    <Play className="w-5 h-5 mr-2 fill-current" />
+                    Watch Trailer
+                  </Button>
+                </motion.div>
+                <motion.div
+                  whileTap={{ scale: 0.97 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 28 }}
+                >
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="border-white/70 bg-white text-black shadow-lg shadow-black/35 transition-colors duration-200 hover:bg-white/90 hover:text-black font-semibold"
+                    onClick={() =>
+                      navigate(`/movie/${movie.id}`, { state: { from: fromPath } })
+                    }
+                  >
+                    <Info className="w-5 h-5 mr-2" />
+                    More Info
+                  </Button>
+                </motion.div>
+              </motion.div>
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
 
@@ -127,13 +163,15 @@ export default function HeroBanner({
       {totalSlides > 1 && (
         <div className="absolute bottom-24 md:bottom-32 left-1/2 -translate-x-1/2 flex gap-2">
           {Array.from({ length: totalSlides }).map((_, index) => (
-            <button
+            <motion.button
               key={index}
               onClick={() => onDotClick(index)}
+              animate={{ width: index === currentIndex ? 32 : 8 }}
+              transition={{ type: "spring", stiffness: 420, damping: 34 }}
               className={cn(
-                "w-2 h-2 rounded-full transition-all duration-300",
+                "h-2 rounded-full transition-colors duration-300",
                 index === currentIndex
-                  ? "w-8 bg-primary"
+                  ? "bg-primary"
                   : "bg-foreground/30 hover:bg-foreground/50"
               )}
               aria-label={`Go to slide ${index + 1}`}

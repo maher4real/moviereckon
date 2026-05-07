@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { motion } from "motion/react";
 import {
   ArrowLeft,
   BriefcaseBusiness,
@@ -127,9 +128,12 @@ function WorkCard({
   const title = getCreditTitle(credit);
 
   return (
-    <button
+    <motion.button
       type="button"
       onClick={() => navigate(`/${credit.media_type}/${credit.id}`, { state: { from: fromPath } })}
+      whileHover={{ y: -3 }}
+      whileTap={{ scale: 0.985 }}
+      transition={{ type: "spring", stiffness: 360, damping: 30 }}
       className="group surface-panel p-2.5 text-left transition-colors duration-200 hover:border-primary/40 hover:bg-card/70 sm:p-3"
     >
       <div className="flex gap-2.5 sm:gap-3">
@@ -159,7 +163,7 @@ function WorkCard({
           </p>
         </div>
       </div>
-    </button>
+    </motion.button>
   );
 }
 
@@ -174,9 +178,12 @@ function KnownForCard({
   const title = getCreditTitle(credit);
 
   return (
-    <button
+    <motion.button
       type="button"
       onClick={() => navigate(`/${credit.media_type}/${credit.id}`, { state: { from: fromPath } })}
+      whileHover={{ y: -6 }}
+      whileTap={{ scale: 0.985 }}
+      transition={{ type: "spring", stiffness: 360, damping: 30 }}
       className="group w-32 sm:w-36 md:w-40 shrink-0 text-left"
     >
       <div className="overflow-hidden rounded-lg poster-card">
@@ -190,7 +197,7 @@ function KnownForCard({
       <p className="mt-2 line-clamp-2 text-sm font-medium group-hover:text-primary transition-colors">
         {title}
       </p>
-    </button>
+    </motion.button>
   );
 }
 

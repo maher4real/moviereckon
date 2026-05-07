@@ -11,8 +11,16 @@ import {
   QueryClientProvider,
   type DehydratedState,
 } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, StaticRouter } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  StaticRouter,
+  useLocation,
+} from "react-router-dom";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+import { AnimatePresence, MotionConfig, motion, useReducedMotion } from "motion/react";
 import { AuthProvider, useAuth } from "@/frontend/hooks/useAuth";
 import { UserDataProvider } from "@/frontend/hooks/useUserData";
 import { WatchlistProvider } from "@/frontend/hooks/useWatchlist";
@@ -110,6 +118,36 @@ function AuthenticatedRoutePreload() {
   return null;
 }
 
+function RouteTransition({ children }: { children: ReactNode }) {
+  const location = useLocation();
+  const shouldReduceMotion = useReducedMotion();
+
+  const initialState = shouldReduceMotion
+    ? { opacity: 0 }
+    : { opacity: 0, y: 14, filter: "blur(6px)" };
+  const animateState = shouldReduceMotion
+    ? { opacity: 1 }
+    : { opacity: 1, y: 0, filter: "blur(0px)" };
+  const exitState = shouldReduceMotion
+    ? { opacity: 0 }
+    : { opacity: 0, y: -8, filter: "blur(4px)" };
+
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={location.pathname}
+        initial={initialState}
+        animate={animateState}
+        exit={exitState}
+        transition={{ duration: shouldReduceMotion ? 0.01 : 0.28, ease: [0.22, 1, 0.36, 1] }}
+        className="min-h-screen"
+      >
+        <Routes location={location}>{children}</Routes>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 type AppProps = {
   initialLocation?: string;
   dehydratedState?: DehydratedState;
@@ -159,61 +197,63 @@ const App = ({
           <AuthProvider initialUser={initialUser} authResolved={authResolved}>
             <UserDataProvider>
               <WatchlistProvider>
-              <TooltipProvider>
-                <Toaster />
-                <Sonner />
-                <AppRouter initialLocation={initialLocation}>
-                  <StartupSoundManager />
-                  <AuthenticatedRoutePreload />
-                  <AuthTransitionOverlay />
-                  <WatchlistPanel />
-                  <Suspense fallback={<CenteredAppSkeleton />}>
-                    <Routes>
-                      {/* Public routes */}
-                      <Route path="/" element={<Auth />} />
-                      <Route path="/auth" element={<Auth />} />
-                      <Route path="/verify-email" element={<VerifyEmail />} />
-                      <Route path="/forgot-password" element={<ForgotPassword />} />
-                      <Route path="/reset-password" element={<ResetPassword />} />
+                <TooltipProvider>
+                  <Toaster />
+                  <Sonner />
+                  <MotionConfig reducedMotion="user">
+                    <AppRouter initialLocation={initialLocation}>
+                      <StartupSoundManager />
+                      <AuthenticatedRoutePreload />
+                      <AuthTransitionOverlay />
+                      <WatchlistPanel />
+                      <Suspense fallback={<CenteredAppSkeleton />}>
+                        <RouteTransition>
+                          {/* Public routes */}
+                          <Route path="/" element={<Auth />} />
+                          <Route path="/auth" element={<Auth />} />
+                          <Route path="/verify-email" element={<VerifyEmail />} />
+                          <Route path="/forgot-password" element={<ForgotPassword />} />
+                          <Route path="/reset-password" element={<ResetPassword />} />
 
-                      {/* Redirect aliases */}
-                      <Route path="/browse" element={<Navigate to="/upcoming" replace />} />
-                      <Route path="/browse/movies" element={<Navigate to="/upcoming?section=movies" replace />} />
-                      <Route path="/browse/bollywood" element={<Navigate to="/upcoming?section=movies&movieType=bollywood" replace />} />
-                      <Route path="/browse/hollywood" element={<Navigate to="/upcoming?section=movies&movieType=hollywood" replace />} />
-                      <Route path="/browse/tv" element={<Navigate to="/upcoming?section=series" replace />} />
+                          {/* Redirect aliases */}
+                          <Route path="/browse" element={<Navigate to="/upcoming" replace />} />
+                          <Route path="/browse/movies" element={<Navigate to="/upcoming?section=movies" replace />} />
+                          <Route path="/browse/bollywood" element={<Navigate to="/upcoming?section=movies&movieType=bollywood" replace />} />
+                          <Route path="/browse/hollywood" element={<Navigate to="/upcoming?section=movies&movieType=hollywood" replace />} />
+                          <Route path="/browse/tv" element={<Navigate to="/upcoming?section=series" replace />} />
 
-                      {/* Protected routes */}
-                      <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-                      <Route path="/upcoming" element={<ProtectedRoute><Upcoming /></ProtectedRoute>} />
-                      <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
-                      <Route path="/movie/:id" element={<ProtectedRoute><MovieDetail /></ProtectedRoute>} />
-                      <Route path="/tv/:id" element={<ProtectedRoute><TVDetail /></ProtectedRoute>} />
-                      <Route path="/person/:id" element={<ProtectedRoute><PersonDetail /></ProtectedRoute>} />
-                      <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                      <Route path="/profile/edit" element={<ProtectedRoute><ProfileEdit /></ProtectedRoute>} />
-                      <Route path="/reckon" element={<ProtectedRoute><Reckon /></ProtectedRoute>} />
-                      <Route path="/movies" element={<ProtectedRoute><Movies /></ProtectedRoute>} />
-                      <Route path="/series" element={<ProtectedRoute><Series /></ProtectedRoute>} />
-                      <Route path="/about" element={<InfoPage page="about" />} />
-                      <Route path="/feedback" element={<InfoPage page="feedback" />} />
-                      <Route path="/contact" element={<InfoPage page="contact" />} />
-                      <Route path="/faq" element={<InfoPage page="faq" />} />
-                      <Route path="/terms" element={<InfoPage page="terms" />} />
-                      <Route path="/privacy" element={<InfoPage page="privacy" />} />
-                      {/* Admin login - public, no auth required */}
-                      <Route path="/admin" element={<AdminLogin />} />
-                      {/* Theater Mode routes */}
-                      <Route path="/theater" element={<ProtectedRoute><TheaterHome /></ProtectedRoute>} />
-                      <Route path="/theater/admin" element={<ProtectedRoute><TheaterAdmin /></ProtectedRoute>} />
-                      <Route path="/theater/:id" element={<ProtectedRoute><TheaterDetail /></ProtectedRoute>} />
-                      <Route path="/theater/:id/play" element={<ProtectedRoute><TheaterPlayer /></ProtectedRoute>} />
-                      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
-                  </Suspense>
-                </AppRouter>
-              </TooltipProvider>
+                          {/* Protected routes */}
+                          <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+                          <Route path="/upcoming" element={<ProtectedRoute><Upcoming /></ProtectedRoute>} />
+                          <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
+                          <Route path="/movie/:id" element={<ProtectedRoute><MovieDetail /></ProtectedRoute>} />
+                          <Route path="/tv/:id" element={<ProtectedRoute><TVDetail /></ProtectedRoute>} />
+                          <Route path="/person/:id" element={<ProtectedRoute><PersonDetail /></ProtectedRoute>} />
+                          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                          <Route path="/profile/edit" element={<ProtectedRoute><ProfileEdit /></ProtectedRoute>} />
+                          <Route path="/reckon" element={<ProtectedRoute><Reckon /></ProtectedRoute>} />
+                          <Route path="/movies" element={<ProtectedRoute><Movies /></ProtectedRoute>} />
+                          <Route path="/series" element={<ProtectedRoute><Series /></ProtectedRoute>} />
+                          <Route path="/about" element={<InfoPage page="about" />} />
+                          <Route path="/feedback" element={<InfoPage page="feedback" />} />
+                          <Route path="/contact" element={<InfoPage page="contact" />} />
+                          <Route path="/faq" element={<InfoPage page="faq" />} />
+                          <Route path="/terms" element={<InfoPage page="terms" />} />
+                          <Route path="/privacy" element={<InfoPage page="privacy" />} />
+                          {/* Admin login - public, no auth required */}
+                          <Route path="/admin" element={<AdminLogin />} />
+                          {/* Theater Mode routes */}
+                          <Route path="/theater" element={<ProtectedRoute><TheaterHome /></ProtectedRoute>} />
+                          <Route path="/theater/admin" element={<ProtectedRoute><TheaterAdmin /></ProtectedRoute>} />
+                          <Route path="/theater/:id" element={<ProtectedRoute><TheaterDetail /></ProtectedRoute>} />
+                          <Route path="/theater/:id/play" element={<ProtectedRoute><TheaterPlayer /></ProtectedRoute>} />
+                          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                          <Route path="*" element={<NotFound />} />
+                        </RouteTransition>
+                      </Suspense>
+                    </AppRouter>
+                  </MotionConfig>
+                </TooltipProvider>
               </WatchlistProvider>
             </UserDataProvider>
           </AuthProvider>

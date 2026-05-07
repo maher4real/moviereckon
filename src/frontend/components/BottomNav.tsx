@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
+import { motion } from "motion/react";
 import { Home, Clapperboard, Search, Sparkles, Tv, CalendarDays } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 
@@ -28,14 +29,21 @@ export default function BottomNav() {
               key={item.href}
               to={item.href}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 flex-1 h-full transition-colors min-w-0",
+                "relative flex flex-1 flex-col items-center justify-center gap-1 h-full min-w-0 overflow-hidden rounded-lg transition-colors",
                 active
                   ? "text-primary"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <item.icon className={cn("w-5 h-5", active && "fill-primary/20")} />
-              <span className="text-[10px] font-medium truncate">{item.label}</span>
+              {active && (
+                <motion.span
+                  layoutId="bottom-nav-active"
+                  className="absolute inset-x-1 top-1 bottom-1 rounded-lg border border-primary/20 bg-primary/10 shadow-[0_0_18px_hsl(var(--primary)/0.14)]"
+                  transition={{ type: "spring", stiffness: 440, damping: 36 }}
+                />
+              )}
+              <item.icon className={cn("relative z-10 w-5 h-5", active && "fill-primary/20")} />
+              <span className="relative z-10 text-[10px] font-medium truncate">{item.label}</span>
             </Link>
           );
         })}

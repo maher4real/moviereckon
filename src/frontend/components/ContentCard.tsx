@@ -1,5 +1,6 @@
 import { memo, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { motion } from "motion/react";
 import { Eye, Sparkles, Bookmark, Play, Star } from "lucide-react";
 import { Movie, TVShow, getPosterUrl, getLanguageLabel } from "@/shared/lib/tmdb";
 import { useUserData } from "@/frontend/hooks/useUserData";
@@ -142,6 +143,12 @@ function ContentCardComponent({
       onDragStart={handleDragStart}
       className="min-w-0 w-full cursor-pointer group/card"
     >
+      <motion.div
+        whileHover={{ y: -6 }}
+        whileTap={{ scale: 0.985 }}
+        transition={{ type: "spring", stiffness: 360, damping: 30 }}
+        className="min-w-0 w-full"
+      >
       {/* Poster */}
       <div ref={posterRef} className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
         <MediaImage
@@ -154,16 +161,23 @@ function ContentCardComponent({
 
         {/* Hover Overlay */}
         <div className="absolute inset-0 bg-background/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
-          <div className="poster-play-button">
+          <motion.div
+            className="poster-play-button"
+            initial={false}
+            whileHover={{ scale: 1.08 }}
+            transition={{ type: "spring", stiffness: 420, damping: 24 }}
+          >
             <Play className="h-5 w-5 fill-current" />
-          </div>
+          </motion.div>
         </div>
 
         {/* Action Buttons - Red themed for consistency */}
         {showActions && (
           <div className="absolute bottom-2 left-2 right-2 flex gap-1 opacity-0 group-hover/card:opacity-100 transition-all duration-200 transform translate-y-2 group-hover/card:translate-y-0">
-            <button
+            <motion.button
               onClick={handleWatched}
+              whileTap={{ scale: 0.94 }}
+              transition={{ type: "spring", stiffness: 500, damping: 28 }}
               className={cn(
                 "flex-1 py-1.5 rounded text-xs font-medium flex items-center justify-center gap-1 action-btn transition-all",
                 watched
@@ -175,7 +189,7 @@ function ContentCardComponent({
             >
               <Eye className={cn("w-3 h-3", watchAnimating && "animate-pulse")} />
               {watched ? "Watched" : "Watch"}
-            </button>
+            </motion.button>
             <ContentReactionButtons
               contentId={item.id}
               contentType={contentType}
@@ -185,8 +199,10 @@ function ContentCardComponent({
               language={item.original_language || "en"}
               size="compact"
             />
-            <button
+            <motion.button
               onClick={handleBookmark}
+              whileTap={{ scale: 0.92 }}
+              transition={{ type: "spring", stiffness: 520, damping: 28 }}
               className={cn(
                 "p-1.5 rounded action-btn transition-all",
                 bookmarked
@@ -197,7 +213,7 @@ function ContentCardComponent({
               title={bookmarked ? "Remove from Watchlist" : "Add to Watchlist"}
             >
               <Bookmark className={cn("w-3 h-3", bookmarked && "fill-current", bookmarkAnimating && "animate-pulse")} />
-            </button>
+            </motion.button>
           </div>
         )}
 
@@ -221,11 +237,21 @@ function ContentCardComponent({
 
         {/* Watched Indicator */}
         {watched && (
-          <div className="absolute inset-0 bg-background/40 flex items-center justify-center pointer-events-none">
-            <div className="bg-primary rounded-full p-2">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: "spring", stiffness: 360, damping: 28 }}
+            className="absolute inset-0 bg-background/40 flex items-center justify-center pointer-events-none"
+          >
+            <motion.div
+              initial={{ scale: 0.7 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 500, damping: 24 }}
+              className="bg-primary rounded-full p-2"
+            >
               <Eye className="w-6 h-6 text-primary-foreground" />
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         )}
       </div>
 
@@ -282,6 +308,7 @@ function ContentCardComponent({
           </Popover>
         )}
       </div>
+      </motion.div>
     </div>
   );
 }

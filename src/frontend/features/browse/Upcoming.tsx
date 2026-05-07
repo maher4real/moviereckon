@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, memo } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { motion } from "motion/react";
 import { CalendarDays, Film, Play, Star, Tv } from "lucide-react";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import {
@@ -118,7 +119,13 @@ const PosterCard = memo(({ item, onClick }: { item: Movie | TVShow; onClick: () 
   const year = getReleaseDate(item)?.split("-")[0] || "";
 
   return (
-    <div onClick={onClick} className="cursor-pointer group">
+    <motion.div
+      onClick={onClick}
+      whileHover={{ y: -6 }}
+      whileTap={{ scale: 0.985 }}
+      transition={{ type: "spring", stiffness: 360, damping: 30 }}
+      className="cursor-pointer group"
+    >
       <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
         <MediaImage
           src={getPosterUrl(item.poster_path, "medium")}
@@ -128,9 +135,14 @@ const PosterCard = memo(({ item, onClick }: { item: Movie | TVShow; onClick: () 
           fallbackSrc="/fallbacks/poster.svg"
         />
         <div className="absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <div className="poster-play-button">
+          <motion.div
+            className="poster-play-button"
+            initial={false}
+            whileHover={{ scale: 1.08 }}
+            transition={{ type: "spring", stiffness: 420, damping: 24 }}
+          >
             <Play className="h-5 w-5 fill-current" />
-          </div>
+          </motion.div>
         </div>
 
         {item.vote_average > 0 && (
@@ -153,7 +165,7 @@ const PosterCard = memo(({ item, onClick }: { item: Movie | TVShow; onClick: () 
         {title}
       </h3>
       <p className="text-xs text-muted-foreground">{year}</p>
-    </div>
+    </motion.div>
   );
 });
 

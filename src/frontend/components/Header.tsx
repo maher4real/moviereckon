@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import {
   Search,
@@ -88,20 +89,31 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex min-w-0 flex-1 items-center justify-center gap-3 lg:gap-6 px-3 lg:px-6">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                to={link.href}
-                className={cn(
-                  "shrink-0 text-sm font-medium transition-colors",
-                  isActive(link.href)
-                    ? "text-primary"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {link.label}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              const active = isActive(link.href);
+
+              return (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  className={cn(
+                    "relative inline-flex h-9 shrink-0 items-center rounded-full px-3 text-sm font-medium transition-colors",
+                    active
+                      ? "text-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="header-nav-active"
+                      className="absolute inset-0 rounded-full border border-primary/25 bg-primary/10 shadow-[0_0_22px_hsl(var(--primary)/0.16)]"
+                      transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                    />
+                  )}
+                  <span className="relative z-10">{link.label}</span>
+                </Link>
+              );
+            })}
           </nav>
 
           {/* Right Side Actions */}
@@ -146,44 +158,64 @@ export default function Header() {
       </div>
 
       {/* Mobile Menu */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden bg-background/95 backdrop-blur-md border-t border-border animate-fade-in">
-          <nav className="container mx-auto px-4 py-4 flex flex-col gap-2">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                to={link.href}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
-                  isActive(link.href)
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                )}
-              >
-                <link.icon className="w-5 h-5" />
-                {link.label}
-              </Link>
-            ))}
-            {profile && (
-              <>
-                <div className="px-4 py-3 mt-2 border-t border-border">
-                  <p className="text-sm text-muted-foreground">
-                    Logged in as <span className="text-foreground font-medium">{profile.username}</span>
-                  </p>
-                </div>
-                <button
-                  onClick={handleSignOut}
-                  className="flex items-center gap-3 px-4 py-3 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
-                >
-                  <LogOut className="w-5 h-5" />
-                  Sign Out
-                </button>
-              </>
-            )}
-          </nav>
-        </div>
-      )}
+      <AnimatePresence initial={false}>
+        {isMobileMenuOpen && (
+          <motion.div
+            key="mobile-header-menu"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            className="overflow-hidden md:hidden bg-background/95 backdrop-blur-md border-t border-border"
+          >
+            <nav className="container mx-auto px-4 py-4 flex flex-col gap-2">
+              {navLinks.map((link) => {
+                const active = isActive(link.href);
+
+                return (
+                  <Link
+                    key={link.href}
+                    to={link.href}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={cn(
+                      "relative flex items-center gap-3 overflow-hidden rounded-lg px-4 py-3 transition-colors",
+                      active
+                        ? "text-primary"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
+                  >
+                    {active && (
+                      <motion.span
+                        layoutId="mobile-header-nav-active"
+                        className="absolute inset-0 rounded-lg bg-primary/10"
+                        transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                      />
+                    )}
+                    <link.icon className="relative z-10 w-5 h-5" />
+                    <span className="relative z-10">{link.label}</span>
+                  </Link>
+                );
+              })}
+              {profile && (
+                <>
+                  <div className="px-4 py-3 mt-2 border-t border-border">
+                    <p className="text-sm text-muted-foreground">
+                      Logged in as <span className="text-foreground font-medium">{profile.username}</span>
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleSignOut}
+                    className="flex items-center gap-3 px-4 py-3 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
+                  >
+                    <LogOut className="w-5 h-5" />
+                    Sign Out
+                  </button>
+                </>
+              )}
+            </nav>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 }
