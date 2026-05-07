@@ -800,6 +800,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
         const topGenres = Object.entries(genreScores)
+          .filter(([, score]) => score > 0)
           .sort(([, a], [, b]) => b - a)
           .slice(0, 6)
           .map(([genreId]) => Number(genreId));

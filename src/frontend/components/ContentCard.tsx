@@ -1,12 +1,13 @@
 import { memo, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Eye, Heart, Sparkles, Bookmark } from "lucide-react";
+import { Eye, Sparkles, Bookmark } from "lucide-react";
 import { Movie, TVShow, getPosterUrl, getLanguageLabel } from "@/shared/lib/tmdb";
 import { useUserData } from "@/frontend/hooks/useUserData";
 import { useWatchlist } from "@/frontend/hooks/useWatchlist";
 import { useIsMobile } from "@/frontend/hooks/use-mobile";
 import { cn } from "@/shared/lib/utils";
 import MediaImage from "@/frontend/components/MediaImage";
+import ContentReactionButtons from "@/frontend/components/ContentReactionButtons";
 import { Popover, PopoverContent, PopoverTrigger } from "@/frontend/components/ui/popover";
 import { RecommendationReason } from "@/shared/lib/recommendation";
 
@@ -35,11 +36,10 @@ function ContentCardComponent({
 }: ContentCardProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isWatched, isLiked, addToWatchHistory, toggleLike } = useUserData();
+  const { isWatched, addToWatchHistory } = useUserData();
   const { isInWatchlist, toggleItem: toggleWatchlist } = useWatchlist();
   const isMobile = useIsMobile();
   const posterRef = useRef<HTMLDivElement>(null);
-  const [likeAnimating, setLikeAnimating] = useState(false);
   const [watchAnimating, setWatchAnimating] = useState(false);
   const [bookmarkAnimating, setBookmarkAnimating] = useState(false);
 
@@ -51,7 +51,6 @@ function ContentCardComponent({
   const year = ("release_date" in item ? item.release_date : item.first_air_date)?.split("-")[0] || "";
 
   const watched = isWatched(item.id, contentType);
-  const liked = isLiked(item.id, contentType);
   const bookmarked = isInWatchlist(item.id, contentType);
 
   const handleClick = () => {
@@ -73,18 +72,6 @@ function ContentCardComponent({
         language: item.original_language || "en",
       });
     }
-  };
-
-  const handleLike = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setLikeAnimating(true);
-    setTimeout(() => setLikeAnimating(false), 300);
-    await toggleLike({
-      content_id: item.id,
-      content_type: contentType,
-      title,
-      poster_path: item.poster_path,
-    });
   };
 
   const handleBookmark = async (e: React.MouseEvent) => {
@@ -189,19 +176,15 @@ function ContentCardComponent({
               <Eye className={cn("w-3 h-3", watchAnimating && "animate-pulse")} />
               {watched ? "Watched" : "Watch"}
             </button>
-            <button
-              onClick={handleLike}
-              className={cn(
-                "p-1.5 rounded action-btn transition-all",
-                liked
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-background/80 text-foreground hover:bg-primary/20 hover:text-primary",
-                likeAnimating && "animate-heart-pop"
-              )}
-              title={liked ? "Unlike" : "Like"}
-            >
-              <Heart className={cn("w-3 h-3", liked && "fill-current", likeAnimating && "animate-pulse")} />
-            </button>
+            <ContentReactionButtons
+              contentId={item.id}
+              contentType={contentType}
+              title={title}
+              posterPath={item.poster_path}
+              genres={item.genre_ids || []}
+              language={item.original_language || "en"}
+              size="compact"
+            />
             <button
               onClick={handleBookmark}
               className={cn(

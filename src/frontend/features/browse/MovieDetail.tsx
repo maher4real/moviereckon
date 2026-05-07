@@ -27,6 +27,7 @@ import ContentCarousel from "@/frontend/components/ContentCarousel";
 import WhereToWatch from "@/frontend/components/WhereToWatch";
 import CastList from "@/frontend/components/CastList";
 import MediaImage from "@/frontend/components/MediaImage";
+import ContentReactionButtons from "@/frontend/components/ContentReactionButtons";
 import { Button } from "@/frontend/components/ui/button";
 import {
   Dialog,
@@ -42,7 +43,6 @@ import {
   DollarSign,
   Globe,
   Play,
-  Heart,
   Bookmark,
   Check,
   CircleDollarSign,
@@ -65,10 +65,9 @@ export default function MovieDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   useAuth();
-  const { addToWatchHistory, isWatched, toggleLike, isLiked } = useUserData();
+  const { addToWatchHistory, isWatched } = useUserData();
   const { isInWatchlist, toggleItem: toggleWatchlist } = useWatchlist();
   const [watchAnimating, setWatchAnimating] = useState(false);
-  const [likeAnimating, setLikeAnimating] = useState(false);
   const [bookmarkAnimating, setBookmarkAnimating] = useState(false);
   const [isTrailerModalOpen, setIsTrailerModalOpen] = useState(false);
   const [trailerSessionId, setTrailerSessionId] = useState(0);
@@ -372,18 +371,6 @@ export default function MovieDetail() {
     });
   };
 
-  const handleToggleLike = async () => {
-    if (!movie) return;
-    setLikeAnimating(true);
-    setTimeout(() => setLikeAnimating(false), 420);
-    await toggleLike({
-      content_id: movie.id,
-      content_type: "movie",
-      title: movie.title,
-      poster_path: movie.poster_path,
-    });
-  };
-
   const handleToggleWatchlist = async () => {
     if (!movie) return;
     setBookmarkAnimating(true);
@@ -626,7 +613,6 @@ export default function MovieDetail() {
   }
 
   const watched = isWatched(movie.id, "movie");
-  const liked = isLiked(movie.id, "movie");
   const bookmarked = isInWatchlist(movie.id, "movie");
   const year = movie.release_date?.split("-")[0] || "";
   const matchScore = movie.vote_average > 0 ? Math.round(movie.vote_average * 10) : null;
@@ -868,20 +854,14 @@ export default function MovieDetail() {
                 <Check className="w-5 h-5 mr-2" />
                 {watched ? "Watched" : "Mark as Watched"}
               </Button>
-              <Button
-                size="lg"
-                className={cn(
-                  "action-btn",
-                  liked
-                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                    : "bg-muted text-foreground hover:bg-primary/20 hover:text-primary",
-                  likeAnimating && "animate-heart-pop"
-                )}
-                onClick={handleToggleLike}
-              >
-                <Heart className={cn("w-5 h-5 mr-2", liked && "fill-current")} />
-                {liked ? "Liked" : "Like"}
-              </Button>
+              <ContentReactionButtons
+                contentId={movie.id}
+                contentType="movie"
+                title={movie.title}
+                posterPath={movie.poster_path}
+                genres={movie.genres.map((genre) => genre.id)}
+                language={movie.original_language}
+              />
               <Button
                 size="lg"
                 className={cn(

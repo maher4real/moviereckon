@@ -322,4 +322,36 @@ describe("user recommendations endpoint", () => {
     expect(payload.isPersonalized).toBe(true);
     expect(payload.items.some((item: any) => item.id === 701)).toBe(true);
   });
+
+  it("does not use disliked-only genres for recommendation discovery", async () => {
+    mocks.connectToDatabase.mockResolvedValue({
+      db: createMockDb({
+        feedbackItems: [
+          {
+            content_id: 901,
+            content_type: "movie",
+            feedback_type: "skip",
+            title: "Skipped Horror",
+            genres: [27],
+          },
+        ],
+      }),
+    });
+
+    const req = createMockReq("5.5.5.5");
+    const { res } = createMockRes();
+
+    await handler(req, res);
+
+    const movieGenreCalls = mocks.discoverServerMovies.mock.calls
+      .map(([filters]) => filters as Record<string, unknown>)
+      .filter((filters) => filters.with_genres === "27");
+    const tvGenreCalls = mocks.discoverServerTVShows.mock.calls
+      .map(([filters]) => filters as Record<string, unknown>)
+      .filter((filters) => filters.with_genres === "27");
+
+    expect(res.statusCode).toBe(200);
+    expect(movieGenreCalls).toHaveLength(0);
+    expect(tvGenreCalls).toHaveLength(0);
+  });
 });
