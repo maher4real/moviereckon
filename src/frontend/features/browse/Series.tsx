@@ -61,20 +61,26 @@ const yearOptions = Array.from({ length: currentYear - 1949 }, (_, i) => current
 const OTT_OPTIONS = [
   { value: "all", label: "All OTT" },
   { value: "8", label: "Netflix" },
-  { value: "9", label: "Prime Video" },
+  { value: "119", label: "Prime Video" },
+  { value: "122", label: "Hotstar / JioHotstar" },
+  { value: "220", label: "JioCinema" },
   { value: "337", label: "Disney+" },
   { value: "15", label: "Hulu" },
   { value: "350", label: "Apple TV+" },
+  { value: "192", label: "YouTube Movies" },
+  { value: "237", label: "SonyLIV" },
 ];
 
 const TRUSTED_INDIAN_OTT_PROVIDER_IDS = [
   "8", // Netflix
   "119", // Prime Video
-  "122", // Hotstar / JioHotstar catalog
-  "237", // SonyLIV
-  "232", // ZEE5
+  "122", // Hotstar / JioHotstar
   "220", // JioCinema
+  "337", // Disney+
+  "15", // Hulu
   "350", // Apple TV+
+  "192", // YouTube
+  "237", // SonyLIV
 ];
 
 const LANGUAGE_OPTIONS = [
@@ -108,21 +114,36 @@ export function getSeriesCardTagLabel({
 export function getSeriesWatchProviderFilter({
   category,
   ottFilter,
+  selectedLanguage = "all",
 }: {
   category: SeriesCategory;
   ottFilter: string;
-}): Pick<DiscoverFilters, "with_watch_providers" | "watch_region"> {
+  selectedLanguage?: string;
+}): Pick<
+  DiscoverFilters,
+  "with_watch_providers" | "watch_region" | "vote_count.gte" | "vote_average.gte"
+> {
+  const usesIndianContentFilter = category === "indian" || selectedLanguage === "hi";
+  const qualityGate = usesIndianContentFilter
+    ? {
+        "vote_count.gte": 20,
+        "vote_average.gte": 5,
+      }
+    : {};
+
   if (ottFilter !== "all") {
     return {
       with_watch_providers: ottFilter,
-      watch_region: category === "indian" ? "IN" : "US",
+      watch_region: usesIndianContentFilter ? "IN" : "US",
+      ...qualityGate,
     };
   }
 
-  if (category === "indian") {
+  if (usesIndianContentFilter) {
     return {
       with_watch_providers: TRUSTED_INDIAN_OTT_PROVIDER_IDS.join("|"),
       watch_region: "IN",
+      ...qualityGate,
     };
   }
 
@@ -239,7 +260,11 @@ export default function Series() {
       const tomorrowStr = formatLocalDate(tomorrow);
       const yearStart = selectedYear ? `${selectedYear}-01-01` : undefined;
       const yearEnd = selectedYear ? `${selectedYear}-12-31` : undefined;
-      const watchProviderFilter = getSeriesWatchProviderFilter({ category, ottFilter });
+      const watchProviderFilter = getSeriesWatchProviderFilter({
+        category,
+        ottFilter,
+        selectedLanguage,
+      });
 
       if (category === "popular" && !needsFilteredDiscover) {
         return getPopularTVShows(page);

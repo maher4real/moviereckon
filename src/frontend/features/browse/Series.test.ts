@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { getSeriesCardTagLabel, getSeriesWatchProviderFilter } from "./Series";
 
+const REQUESTED_TRUSTED_PROVIDER_IDS = "8|119|122|220|337|15|350|192|237";
+
 describe("getSeriesCardTagLabel", () => {
   it("does not show an Indian OTT poster tag for the Indian category", () => {
     expect(
@@ -19,8 +21,40 @@ describe("getSeriesCardTagLabel", () => {
         ottFilter: "all",
       }),
     ).toEqual({
-      with_watch_providers: "8|119|122|237|232|220|350",
+      with_watch_providers: REQUESTED_TRUSTED_PROVIDER_IDS,
       watch_region: "IN",
+      "vote_count.gte": 20,
+      "vote_average.gte": 5,
+    });
+  });
+
+  it("limits the Hindi language filter to trusted India OTT providers by default", () => {
+    expect(
+      getSeriesWatchProviderFilter({
+        category: "all",
+        ottFilter: "all",
+        selectedLanguage: "hi",
+      }),
+    ).toEqual({
+      with_watch_providers: REQUESTED_TRUSTED_PROVIDER_IDS,
+      watch_region: "IN",
+      "vote_count.gte": 20,
+      "vote_average.gte": 5,
+    });
+  });
+
+  it("uses the India provider region when Hindi is combined with a selected OTT", () => {
+    expect(
+      getSeriesWatchProviderFilter({
+        category: "all",
+        ottFilter: "8",
+        selectedLanguage: "hi",
+      }),
+    ).toEqual({
+      with_watch_providers: "8",
+      watch_region: "IN",
+      "vote_count.gte": 20,
+      "vote_average.gte": 5,
     });
   });
 });
