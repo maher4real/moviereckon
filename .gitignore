@@ -27,3 +27,13 @@ dist-ssr
 
 # Claude Code skills (local only)
 .claude/skills/
+
+# Local AI/agent tooling and generated knowledge graphs
+.agents/
+.codex/
+.claude/
+.code-review-graph/
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+skills-lock.json
