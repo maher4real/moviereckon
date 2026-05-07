@@ -28,7 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn, formatLocalDate, isAnimeLike } from "@/shared/lib/utils";
 import { Tv } from "lucide-react";
 
-type SeriesCategory =
+export type SeriesCategory =
   | "all"
   | "popular"
   | "top_rated"
@@ -67,6 +67,16 @@ const OTT_OPTIONS = [
   { value: "350", label: "Apple TV+" },
 ];
 
+const TRUSTED_INDIAN_OTT_PROVIDER_IDS = [
+  "8", // Netflix
+  "119", // Prime Video
+  "122", // Hotstar / JioHotstar catalog
+  "237", // SonyLIV
+  "232", // ZEE5
+  "220", // JioCinema
+  "350", // Apple TV+
+];
+
 const LANGUAGE_OPTIONS = [
   { value: "all", label: "All Languages" },
   { value: "en", label: "English" },
@@ -79,6 +89,45 @@ const LANGUAGE_OPTIONS = [
   { value: "fr", label: "French" },
 ];
 
+export function getSeriesCardTagLabel({
+  category,
+  ottFilter,
+  ottLabel,
+}: {
+  category: SeriesCategory;
+  ottFilter: string;
+  ottLabel?: string;
+}): string | undefined {
+  if (ottFilter !== "all") return ottLabel || undefined;
+  if (category === "anime") return "Anime";
+  if (category === "korean") return "K-Drama";
+  if (category === "indian") return undefined;
+  return "OTT Mix";
+}
+
+export function getSeriesWatchProviderFilter({
+  category,
+  ottFilter,
+}: {
+  category: SeriesCategory;
+  ottFilter: string;
+}): Pick<DiscoverFilters, "with_watch_providers" | "watch_region"> {
+  if (ottFilter !== "all") {
+    return {
+      with_watch_providers: ottFilter,
+      watch_region: category === "indian" ? "IN" : "US",
+    };
+  }
+
+  if (category === "indian") {
+    return {
+      with_watch_providers: TRUSTED_INDIAN_OTT_PROVIDER_IDS.join("|"),
+      watch_region: "IN",
+    };
+  }
+
+  return {};
+}
 
 const PosterCard = memo(
   ({
@@ -190,6 +239,7 @@ export default function Series() {
       const tomorrowStr = formatLocalDate(tomorrow);
       const yearStart = selectedYear ? `${selectedYear}-01-01` : undefined;
       const yearEnd = selectedYear ? `${selectedYear}-12-31` : undefined;
+      const watchProviderFilter = getSeriesWatchProviderFilter({ category, ottFilter });
 
       if (category === "popular" && !needsFilteredDiscover) {
         return getPopularTVShows(page);
@@ -207,12 +257,8 @@ export default function Series() {
           with_original_language: resolvedLanguage,
           "first_air_date.gte": yearStart ? (yearStart > tomorrowStr ? yearStart : tomorrowStr) : tomorrowStr,
           "first_air_date.lte": yearEnd,
+          ...watchProviderFilter,
         };
-
-        if (ottFilter !== "all") {
-          filters.with_watch_providers = ottFilter;
-          filters.watch_region = "US";
-        }
 
         return discoverTVShows(filters);
       }
@@ -228,12 +274,8 @@ export default function Series() {
         with_original_language: resolvedLanguage,
         "first_air_date.gte": yearStart,
         "first_air_date.lte": yearEnd,
+        ...watchProviderFilter,
       };
-
-      if (ottFilter !== "all") {
-        filters.with_watch_providers = ottFilter;
-        filters.watch_region = "US";
-      }
 
       return discoverTVShows(filters);
     },
@@ -310,11 +352,7 @@ export default function Series() {
   );
 
   const cardOttLabel = useMemo(() => {
-    if (ottFilter !== "all") return ottLabel;
-    if (category === "anime") return "Anime";
-    if (category === "korean") return "K-Drama";
-    if (category === "indian") return "Indian OTT";
-    return "OTT Mix";
+    return getSeriesCardTagLabel({ category, ottFilter, ottLabel });
   }, [ottFilter, ottLabel, category]);
 
   return (
