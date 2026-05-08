@@ -628,13 +628,23 @@ export default function Reckon() {
   }, [updatePreferences, setupLangs, setupGenres, refreshRecommendations]);
   const [extraItems, setExtraItems] = useState<(Movie | TVShow)[]>([]);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [moreExhausted, setMoreExhausted] = useState(false);
 
   // Reset extra items whenever precision filters change
   useEffect(() => {
     setExtraItems([]);
-  }, [selectedLanguage, selectedGenre, contentTypeFilter, recTypeFilter, sortField, sortOrder]);
+    setMoreExhausted(false);
+  }, [
+    recommendations,
+    selectedLanguage,
+    selectedGenre,
+    contentTypeFilter,
+    recTypeFilter,
+    sortField,
+    sortOrder,
+  ]);
 
-  const canFetchMore = true;
+  const canFetchMore = !moreExhausted;
 
   const hasPreferences =
     (preferences?.preferred_languages?.length ?? 0) > 0 ||
@@ -795,6 +805,7 @@ export default function Reckon() {
         return true;
       });
 
+      setMoreExhausted(fresh.length === 0);
       setExtraItems((prev) => [...prev, ...fresh]);
     } catch {
       return;

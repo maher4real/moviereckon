@@ -570,4 +570,123 @@ describe("user recommendations endpoint", () => {
     expect(ids).not.toContain(777);
     expect(ids).toContain(778);
   });
+
+  it("filters final more-like-this results by requested genre and language", async () => {
+    mocks.getServerTrendingMovies.mockResolvedValue([
+      {
+        id: 880,
+        title: "Hindi Drama Match",
+        original_title: "Hindi Drama Match",
+        overview: "Matching item",
+        poster_path: null,
+        backdrop_path: null,
+        release_date: "2024-01-01",
+        vote_average: 8.4,
+        vote_count: 900,
+        popularity: 90,
+        genre_ids: [18],
+        original_language: "hi",
+        adult: false,
+        video: false,
+      },
+      {
+        id: 881,
+        title: "English Comedy Mismatch",
+        original_title: "English Comedy Mismatch",
+        overview: "Wrong language and genre",
+        poster_path: null,
+        backdrop_path: null,
+        release_date: "2024-02-01",
+        vote_average: 9.1,
+        vote_count: 1200,
+        popularity: 200,
+        genre_ids: [35],
+        original_language: "en",
+        adult: false,
+        video: false,
+      },
+    ]);
+    mocks.getServerTrendingTVShows.mockResolvedValue([
+      {
+        id: 882,
+        name: "English Drama Mismatch",
+        original_name: "English Drama Mismatch",
+        overview: "Wrong language",
+        poster_path: null,
+        backdrop_path: null,
+        first_air_date: "2024-02-02",
+        vote_average: 8.9,
+        vote_count: 1000,
+        popularity: 180,
+        genre_ids: [18],
+        original_language: "en",
+        origin_country: ["US"],
+      },
+    ]);
+
+    const req = {
+      ...createMockReq("8.8.8.8"),
+      url: "/api/user?route=recommendations&mode=more-like-this&genre=18&language=hi&seed=movie_880",
+    } as any;
+    const { res } = createMockRes();
+
+    await handler(req, res);
+
+    const items = ((res.body as any)?.data?.items || []) as any[];
+    expect(res.statusCode).toBe(200);
+    expect(items.map((item) => item.id)).toContain(880);
+    expect(items).toHaveLength(1);
+    expect(
+      items.every(
+        (item) =>
+          item.original_language === "hi" &&
+          Array.isArray(item.genre_ids) &&
+          item.genre_ids.includes(18),
+      ),
+    ).toBe(true);
+  });
+
+  it("does not use a contextual stale cache entry for a later normal feed fallback", async () => {
+    mocks.getServerTrendingMovies.mockResolvedValue([
+      {
+        id: 990,
+        title: "Context Only Pick",
+        original_title: "Context Only Pick",
+        overview: "Cached contextual item",
+        poster_path: null,
+        backdrop_path: null,
+        release_date: "2024-01-01",
+        vote_average: 8,
+        vote_count: 900,
+        popularity: 120,
+        genre_ids: [18],
+        original_language: "en",
+        adult: false,
+        video: false,
+      },
+    ]);
+
+    const contextualReq = {
+      ...createMockReq("9.9.9.9"),
+      url: "/api/user?route=recommendations&mode=more-like-this&seed=movie_990",
+    } as any;
+    const contextual = createMockRes();
+
+    await handler(contextualReq, contextual.res);
+
+    expect(contextual.res.statusCode).toBe(200);
+    expect(
+      ((contextual.res.body as any)?.data?.items || []).map((item: any) => item.id),
+    ).toContain(990);
+
+    mocks.connectToDatabase.mockRejectedValueOnce(new Error("db unavailable"));
+
+    const normalReq = createMockReq("9.9.9.10");
+    const normal = createMockRes();
+
+    await handler(normalReq, normal.res);
+
+    expect(normal.res.statusCode).toBe(500);
+    expect(normal.headers.get("x-recommendations-fallback")).toBeUndefined();
+  });
 });

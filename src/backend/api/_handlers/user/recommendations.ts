@@ -167,7 +167,7 @@ interface RecommendationCacheEntry {
 }
 
 const recommendationsCache = new Map<string, RecommendationCacheEntry>();
-const RECOMMENDATIONS_CACHE_VERSION = "v3";
+const RECOMMENDATIONS_CACHE_VERSION = "v4";
 
 const WEIGHTS = {
   LIKED: 1.5,
@@ -484,9 +484,20 @@ function evictOldestEntries(maxEntries: number) {
   }
 }
 
-function getRecommendationsRedisKey(userId: string): string {
-  const digest = createHash("sha256").update(userId).digest("hex").slice(0, 24);
-  return getRedisKey(`recommendations:${RECOMMENDATIONS_CACHE_VERSION}:${digest}`);
+function getRevisionDigest(revision: string): string {
+  return createHash("sha256").update(revision).digest("hex").slice(0, 24);
+}
+
+function getCacheMapKey(userId: string, revision: string): string {
+  return `${userId}:${getRevisionDigest(revision)}`;
+}
+
+function getRecommendationsRedisKey(userId: string, revision: string): string {
+  const userDigest = createHash("sha256").update(userId).digest("hex").slice(0, 24);
+  const revisionDigest = getRevisionDigest(revision);
+  return getRedisKey(
+    `recommendations:${RECOMMENDATIONS_CACHE_VERSION}:${userDigest}:${revisionDigest}`,
+  );
 }
 
 function isValidRecommendationsPayload(value: unknown): value is RecommendationsPayload {
@@ -519,10 +530,16 @@ function toCacheEntry(value: unknown): RecommendationCacheEntry | null {
   };
 }
 
-async function readDistributedCacheEntry(userId: string): Promise<RecommendationCacheEntry | null> {
+async function readDistributedCacheEntry(
+  userId: string,
+  revision: string,
+): Promise<RecommendationCacheEntry | null> {
   if (!isRedisConfigured()) return null;
 
-  const response = await runRedisCommand<string>(["GET", getRecommendationsRedisKey(userId)]);
+  const response = await runRedisCommand<string>([
+    "GET",
+    getRecommendationsRedisKey(userId, revision),
+  ]);
   if (!response.ok || !response.result) return null;
 
   try {
@@ -538,7 +555,7 @@ async function writeDistributedCacheEntry(entry: RecommendationCacheEntry): Prom
 
   await runRedisCommand([
     "SET",
-    getRecommendationsRedisKey(entry.userId),
+    getRecommendationsRedisKey(entry.userId, entry.revision),
     JSON.stringify(entry),
     "PX",
     CACHE_STALE_TTL_MS,
@@ -550,15 +567,16 @@ async function readCachedPayload(
   revision: string,
 ): Promise<RecommendationsPayload | null> {
   const now = Date.now();
-  const local = recommendationsCache.get(userId);
+  const cacheKey = getCacheMapKey(userId, revision);
+  const local = recommendationsCache.get(cacheKey);
   if (local && local.revision === revision && local.expiresAt > now) {
     return local.payload;
   }
 
-  const distributed = await readDistributedCacheEntry(userId);
+  const distributed = await readDistributedCacheEntry(userId, revision);
   if (!distributed) return null;
 
-  recommendationsCache.set(userId, distributed);
+  recommendationsCache.set(cacheKey, distributed);
   if (distributed.revision !== revision) return null;
   if (distributed.expiresAt <= now) return null;
   return distributed.payload;
@@ -566,18 +584,21 @@ async function readCachedPayload(
 
 async function readLatestUserPayload(
   userId: string,
+  revision: string,
   mode: "fresh" | "stale" = "stale",
 ): Promise<RecommendationsPayload | null> {
   const now = Date.now();
-  const local = recommendationsCache.get(userId);
+  const cacheKey = getCacheMapKey(userId, revision);
+  const local = recommendationsCache.get(cacheKey);
   if (local) {
     if (mode === "fresh" && local.expiresAt > now) return local.payload;
     if (mode === "stale" && local.staleUntil > now) return local.payload;
   }
 
-  const distributed = await readDistributedCacheEntry(userId);
+  const distributed = await readDistributedCacheEntry(userId, revision);
   if (!distributed) return null;
-  recommendationsCache.set(userId, distributed);
+  recommendationsCache.set(cacheKey, distributed);
+  if (distributed.revision !== revision) return null;
   if (mode === "fresh" && distributed.expiresAt > now) return distributed.payload;
   if (mode === "stale" && distributed.staleUntil > now) return distributed.payload;
   return null;
@@ -597,9 +618,38 @@ async function writeCachedPayload(
     staleUntil: now + CACHE_STALE_TTL_MS,
     updatedAt: now,
   };
-  recommendationsCache.set(userId, entry);
+  recommendationsCache.set(getCacheMapKey(userId, revision), entry);
   cleanupCache(now);
   await writeDistributedCacheEntry(entry);
+}
+
+function filterCandidatesForRequestContext(
+  items: UnifiedContentItem[],
+  requestContext: RecommendationRequestContext,
+): UnifiedContentItem[] {
+  if (
+    requestContext.contentType === "all" &&
+    !requestContext.genreId &&
+    !requestContext.language
+  ) {
+    return items;
+  }
+
+  return items.filter((item) => {
+    if (requestContext.contentType !== "all" && item.type !== requestContext.contentType) {
+      return false;
+    }
+    if (requestContext.genreId && !item.genreIds.includes(requestContext.genreId)) {
+      return false;
+    }
+    if (
+      requestContext.language &&
+      normalizeLanguageCode(item.originalLanguage) !== requestContext.language
+    ) {
+      return false;
+    }
+    return true;
+  });
 }
 
 function pushSeed(map: Map<string, SeedSignal>, seed: SeedSignal): void {
@@ -744,6 +794,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .json({ error: "Too many recommendation requests. Please try again shortly." });
   }
 
+  let requestRevision: string | null = null;
+
   try {
     const requestContext = parseRecommendationRequest(req);
     const { db } = await connectToDatabase();
@@ -845,7 +897,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       feedbackItems,
       preferences,
     );
-    const requestRevision = [
+    requestRevision = [
       revision,
       `mode:${requestContext.mode}`,
       `seed:${requestContext.seedKeys.join(",")}`,
@@ -1337,13 +1389,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       MAX_CANDIDATES,
     );
 
-    const contentFilteredCandidates =
-      requestContext.contentType === "all"
-        ? candidateUnion.items
-        : candidateUnion.items.filter((item) => item.type === requestContext.contentType);
+    const requestFilteredCandidates = filterCandidatesForRequestContext(
+      candidateUnion.items,
+      requestContext,
+    );
 
     const enrichedCandidates = await withTimeout(
-      enrichCandidatesWithKeywords(contentFilteredCandidates, {
+      enrichCandidatesWithKeywords(requestFilteredCandidates, {
         fetchMovieKeywords: (id) =>
           safe(getServerMovieKeywords(id)).then((value) => value || []),
         fetchTVKeywords: (id) =>
@@ -1352,7 +1404,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         deadlineMs: METADATA_ENRICHMENT_TIMEOUT_MS,
       }),
       METADATA_ENRICHMENT_TIMEOUT_MS,
-    ).catch(() => contentFilteredCandidates);
+    ).catch(() => requestFilteredCandidates);
 
     const seenIds = new Set<string>();
 
@@ -1440,7 +1492,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       req,
       userId: user.id,
     });
-    const fallbackPayload = await readLatestUserPayload(user.id, "stale");
+    const fallbackPayload = requestRevision
+      ? await readLatestUserPayload(user.id, requestRevision, "stale")
+      : null;
     if (fallbackPayload) {
       res.setHeader("X-Recommendations-Fallback", "stale-cache");
       return res.status(200).json({ data: fallbackPayload });
