@@ -51,6 +51,13 @@ interface LikedItem {
   liked_at: string;
 }
 
+interface WatchlistItem {
+  content_id: number;
+  content_type: ContentType;
+  title: string;
+  added_at: string;
+}
+
 interface FeedbackItem {
   content_id: number;
   content_type: ContentType;
@@ -135,6 +142,7 @@ const RECOMMENDATIONS_CACHE_VERSION = "v3";
 
 const WEIGHTS = {
   LIKED: 1.5,
+  WATCHLIST: 1.2,
   WATCHED_RECENT: 1.15,
   WATCHED_OLD: 0.9,
   FEEDBACK_MUST_WATCH: 1.35,
@@ -249,6 +257,25 @@ function toLikedItems(items: unknown[]): LikedItem[] {
     .sort((a, b) => b.liked_at.localeCompare(a.liked_at));
 }
 
+function toWatchlistItems(items: unknown[]): WatchlistItem[] {
+  return items
+    .map((item) => {
+      const doc = (item || {}) as Record<string, unknown>;
+      const contentId = toPositiveInteger(doc.content_id);
+      const contentType = toContentType(doc.content_type);
+      if (!contentId || !contentType) return null;
+
+      return {
+        content_id: contentId,
+        content_type: contentType,
+        title: toTrimmedString(doc.title, "Untitled"),
+        added_at: toTrimmedString(doc.added_at, new Date(0).toISOString()),
+      } satisfies WatchlistItem;
+    })
+    .filter((item): item is WatchlistItem => item !== null)
+    .sort((a, b) => b.added_at.localeCompare(a.added_at));
+}
+
 function toFeedbackItems(items: unknown[]): FeedbackItem[] {
   return items
     .map((item) => {
@@ -331,6 +358,7 @@ function getExplorationLanguages(
 function buildRecommendationRevision(
   watchHistory: WatchHistoryItem[],
   likedItems: LikedItem[],
+  watchlistItems: WatchlistItem[],
   feedbackItems: FeedbackItem[],
   preferences: UserPreferences,
 ): string {
@@ -339,6 +367,9 @@ function buildRecommendationRevision(
   );
   const likedSlice = toSeedSlice(
     likedItems.map((item) => `${item.content_type}:${item.content_id}:${item.liked_at}`),
+  );
+  const watchlistSlice = toSeedSlice(
+    watchlistItems.map((item) => `${item.content_type}:${item.content_id}:${item.added_at}`),
   );
   const feedbackSlice = toSeedSlice(
     feedbackItems.map(
@@ -353,6 +384,7 @@ function buildRecommendationRevision(
   return [
     `w:${watchHistory.length}:${getLatest(watchHistory, (item) => item.watched_at)}:${watchSlice}`,
     `l:${likedItems.length}:${getLatest(likedItems, (item) => item.liked_at)}:${likedSlice}`,
+    `wl:${watchlistItems.length}:${getLatest(watchlistItems, (item) => item.added_at)}:${watchlistSlice}`,
     `f:${feedbackItems.length}:${feedbackSlice}`,
     `lang:${languagePrefs}`,
     `g:${genrePrefs}`,
@@ -649,7 +681,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { db } = await connectToDatabase();
 
-    const [watchHistoryDocs, likedItemsDocs, feedbackDocs, preferencesDoc] = await withTimeout(
+    const [
+      watchHistoryDocs,
+      likedItemsDocs,
+      watchlistDocs,
+      feedbackDocs,
+      preferencesDoc,
+    ] = await withTimeout(
       Promise.all([
         db
           .collection("watch_history")
@@ -686,6 +724,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .limit(180)
           .toArray(),
         db
+          .collection("watchlist")
+          .find(
+            { user_id: user.id },
+            {
+              projection: {
+                content_id: 1,
+                content_type: 1,
+                title: 1,
+                added_at: 1,
+              },
+            },
+          )
+          .sort({ added_at: -1, _id: -1 })
+          .limit(180)
+          .toArray(),
+        db
           .collection("content_feedback")
           .find(
             { user_id: user.id },
@@ -714,11 +768,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const watchHistory = toWatchHistory(watchHistoryDocs);
     const likedItems = toLikedItems(likedItemsDocs);
+    const watchlistItems = toWatchlistItems(watchlistDocs);
     const feedbackItems = toFeedbackItems(feedbackDocs);
     const preferences = toPreferences(preferencesDoc);
     const revision = buildRecommendationRevision(
       watchHistory,
       likedItems,
+      watchlistItems,
       feedbackItems,
       preferences,
     );
@@ -813,6 +869,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             type: item.content_type,
             title: item.title,
             weight: WEIGHTS.LIKED * recencyMultiplier(item.liked_at),
+          });
+        });
+
+        watchlistItems.forEach((item) => {
+          pushSeed(seedMap, {
+            id: item.content_id,
+            type: item.content_type,
+            title: item.title,
+            weight: WEIGHTS.WATCHLIST * recencyMultiplier(item.added_at),
           });
         });
 
@@ -1157,11 +1222,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       seenIds.add(getContentKey(item.content_type, item.content_id));
     });
 
+    watchlistItems.forEach((item) => {
+      seenIds.add(getContentKey(item.content_type, item.content_id));
+    });
+
     feedbackItems.forEach((item) => {
       if (item.feedback_type === "skip") {
         seenIds.add(getContentKey(item.content_type, item.content_id));
       }
     });
+
+    const negativeGenreIds = Array.from(
+      new Set(
+        feedbackItems
+          .filter((item) => item.feedback_type === "skip")
+          .flatMap((item) => item.genres),
+      ),
+    );
 
     const rankedRecommendations = getRecommendations(
       seedProfilesForRanking,
@@ -1171,6 +1248,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         seenIds,
         preferredLanguages: prioritizedLanguages,
         preferredGenres: preferences.preferred_genres,
+        negativeGenreIds,
         dominantLanguage: prioritizedLanguages[0] || null,
         popularityMedian: candidateUnion.popularityMedian,
         maxCandidates: MAX_CANDIDATES,

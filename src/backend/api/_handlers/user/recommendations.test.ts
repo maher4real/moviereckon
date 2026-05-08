@@ -53,11 +53,13 @@ function makeCursor(rows: unknown[]) {
 function createMockDb(options?: {
   watchHistory?: unknown[];
   likedItems?: unknown[];
+  watchlistItems?: unknown[];
   feedbackItems?: unknown[];
   preferences?: Record<string, unknown>;
 }) {
   const watchHistory = options?.watchHistory || [];
   const likedItems = options?.likedItems || [];
+  const watchlistItems = options?.watchlistItems || [];
   const feedbackItems = options?.feedbackItems || [];
   const preferences = options?.preferences || { preferred_genres: [] };
 
@@ -78,6 +80,12 @@ function createMockDb(options?: {
       if (name === "liked_items") {
         return {
           find: vi.fn(() => makeCursor(likedItems)),
+        };
+      }
+
+      if (name === "watchlist") {
+        return {
+          find: vi.fn(() => makeCursor(watchlistItems)),
         };
       }
 
@@ -353,5 +361,145 @@ describe("user recommendations endpoint", () => {
     expect(res.statusCode).toBe(200);
     expect(movieGenreCalls).toHaveLength(0);
     expect(tvGenreCalls).toHaveLength(0);
+  });
+
+  it("excludes watched, liked, watchlisted, and skipped content from recommendations", async () => {
+    mocks.connectToDatabase.mockResolvedValue({
+      db: createMockDb({
+        watchHistory: [
+          {
+            content_id: 10,
+            content_type: "movie",
+            title: "Already Watched",
+            genres: [18],
+            language: "en",
+            watched_at: new Date().toISOString(),
+          },
+        ],
+        likedItems: [
+          {
+            content_id: 20,
+            content_type: "tv",
+            title: "Already Liked",
+            liked_at: new Date().toISOString(),
+          },
+        ],
+        watchlistItems: [
+          {
+            content_id: 30,
+            content_type: "movie",
+            title: "Already Saved",
+            added_at: new Date().toISOString(),
+          },
+        ],
+        feedbackItems: [
+          {
+            content_id: 40,
+            content_type: "movie",
+            feedback_type: "skip",
+            title: "Skipped",
+            genres: [27],
+          },
+        ],
+      }),
+    });
+
+    mocks.getServerTrendingMovies.mockResolvedValue([
+      {
+        id: 10,
+        title: "Already Watched",
+        original_title: "Already Watched",
+        overview: "Watched movie",
+        poster_path: null,
+        backdrop_path: null,
+        release_date: "2024-01-01",
+        vote_average: 8,
+        vote_count: 1000,
+        popularity: 150,
+        genre_ids: [18],
+        original_language: "en",
+        adult: false,
+        video: false,
+      },
+      {
+        id: 30,
+        title: "Already Saved",
+        original_title: "Already Saved",
+        overview: "Saved movie",
+        poster_path: null,
+        backdrop_path: null,
+        release_date: "2024-02-01",
+        vote_average: 8,
+        vote_count: 900,
+        popularity: 130,
+        genre_ids: [18],
+        original_language: "en",
+        adult: false,
+        video: false,
+      },
+      {
+        id: 40,
+        title: "Skipped",
+        original_title: "Skipped",
+        overview: "Skipped movie",
+        poster_path: null,
+        backdrop_path: null,
+        release_date: "2024-03-01",
+        vote_average: 8,
+        vote_count: 900,
+        popularity: 125,
+        genre_ids: [27],
+        original_language: "en",
+        adult: false,
+        video: false,
+      },
+      {
+        id: 50,
+        title: "Fresh Pick",
+        original_title: "Fresh Pick",
+        overview: "Fresh recommendation",
+        poster_path: null,
+        backdrop_path: null,
+        release_date: "2024-04-01",
+        vote_average: 8,
+        vote_count: 900,
+        popularity: 120,
+        genre_ids: [18],
+        original_language: "en",
+        adult: false,
+        video: false,
+      },
+    ]);
+
+    mocks.getServerTrendingTVShows.mockResolvedValue([
+      {
+        id: 20,
+        name: "Already Liked",
+        original_name: "Already Liked",
+        overview: "Liked show",
+        poster_path: null,
+        backdrop_path: null,
+        first_air_date: "2024-01-01",
+        vote_average: 8,
+        vote_count: 800,
+        popularity: 110,
+        genre_ids: [18],
+        original_language: "en",
+        origin_country: ["US"],
+      },
+    ]);
+
+    const req = createMockReq("6.6.6.6");
+    const { res } = createMockRes();
+
+    await handler(req, res);
+
+    const ids = ((res.body as any)?.data?.items || []).map((item: any) => item.id);
+    expect(res.statusCode).toBe(200);
+    expect(ids).not.toContain(10);
+    expect(ids).not.toContain(20);
+    expect(ids).not.toContain(30);
+    expect(ids).not.toContain(40);
+    expect(ids).toContain(50);
   });
 });
