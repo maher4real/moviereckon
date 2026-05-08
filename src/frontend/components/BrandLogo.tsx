@@ -72,9 +72,9 @@ export default function BrandLogo({
         <span
           data-brand-label="true"
           className={cn(
-            "text-gradient font-bold",
+            "brand-logo-label font-bold text-primary",
             animated &&
-              "brand-text-gradient-loop animate-auth-brand-gradient-flow drop-shadow-[0_10px_34px_hsl(var(--primary)/0.16)]",
+              "brand-logo-shine drop-shadow-[0_10px_34px_hsl(var(--primary)/0.16)]",
             styles.label,
             labelClassName,
           )}
