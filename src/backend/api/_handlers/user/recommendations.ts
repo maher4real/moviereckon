@@ -13,14 +13,20 @@ import type { Movie, TVShow } from "@/shared/lib/tmdb";
 import {
   discoverServerMovies,
   discoverServerTVShows,
+  getServerMovieKeywords,
   getServerMovieRecommendationProfile,
   getServerMovieRecommendations,
+  getServerNowPlayingMovies,
+  getServerPopularTVShows,
   getServerSimilarMovies,
   getServerSimilarTVShows,
+  getServerTopRatedMovies,
   getServerTVRecommendationProfile,
+  getServerTVShowKeywords,
   getServerTVShowRecommendations,
   getServerTrendingMovies,
   getServerTrendingTVShows,
+  getServerUpcomingMovies,
 } from "@/backend/services/tmdbServer";
 import {
   buildCandidateUnion,
@@ -31,6 +37,7 @@ import {
   type ScoreBreakdown,
   type UnifiedContentItem,
 } from "@/shared/lib/recommendation";
+import { enrichCandidatesWithKeywords } from "./recommendation-metadata";
 
 type ContentType = "movie" | "tv";
 type FeedbackType = "give_it_a_go" | "one_time_watch" | "must_watch" | "skip";
@@ -115,6 +122,16 @@ const MAX_USER_REQUESTS = 35;
 const LANGUAGE_DISCOVERY_LIMIT = 4;
 const CROSS_LANGUAGE_LIMIT = 2;
 const LANGUAGE_GENRE_DISCOVERY_LIMIT = 2;
+const KEYWORD_ENRICHMENT_LIMIT = 90;
+const SOURCE_BOOSTS: Record<string, number> = {
+  "recommendations:": 0.08,
+  "similar:": 0.07,
+  "people:": 0.05,
+  "discover:": 0.03,
+  "trending:": 0.02,
+  "top-rated:": 0.025,
+  "new-release:": 0.02,
+};
 const DISCOVERY_LANGUAGE_FALLBACKS = [
   "en",
   "hi",
@@ -917,10 +934,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           seedWeights[getContentKey(seed.type, seed.id)] = seed.weight;
         });
 
-    const [trendingMovies, trendingTV] = await Promise.all([
-      safe(getServerTrendingMovies("week")),
-      safe(getServerTrendingTVShows("week")),
-    ]);
+    const [trendingMovies, trendingTV, topRatedMovies, popularTV, nowPlaying, upcoming] =
+      await Promise.all([
+        safe(getServerTrendingMovies("week")),
+        safe(getServerTrendingTVShows("week")),
+        safe(getServerTopRatedMovies(1)),
+        safe(getServerPopularTVShows(1)),
+        safe(getServerNowPlayingMovies(1)),
+        safe(getServerUpcomingMovies(1)),
+      ]);
 
     const genreMovieResults = await Promise.all(
       topGenres.slice(0, 5).flatMap((genreId, index) =>
@@ -1168,6 +1190,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           items: trendingTV,
           typeHint: "tv" as const,
         },
+        {
+          source: "top-rated:movie:p1",
+          items: topRatedMovies?.results,
+          typeHint: "movie" as const,
+        },
+        {
+          source: "popular:tv:p1",
+          items: popularTV?.results,
+          typeHint: "tv" as const,
+        },
+        {
+          source: "new-release:movie:now-playing:p1",
+          items: nowPlaying?.results,
+          typeHint: "movie" as const,
+        },
+        {
+          source: "new-release:movie:upcoming:p1",
+          items: upcoming?.results,
+          typeHint: "movie" as const,
+        },
         ...genreMovieResults.map((result, index) => ({
           source: `discover:movie:genre:${topGenres[Math.floor(index / 2)] || "none"}:p${(index % 2) + 1}`,
           items: result?.results,
@@ -1212,6 +1254,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       MAX_CANDIDATES,
     );
 
+    const enrichedCandidates = await enrichCandidatesWithKeywords(candidateUnion.items, {
+      fetchMovieKeywords: (id) =>
+        safe(getServerMovieKeywords(id)).then((value) => value || []),
+      fetchTVKeywords: (id) =>
+        safe(getServerTVShowKeywords(id)).then((value) => value || []),
+      limit: KEYWORD_ENRICHMENT_LIMIT,
+    });
+
     const seenIds = new Set<string>();
 
     watchHistory.forEach((item) => {
@@ -1242,7 +1292,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const rankedRecommendations = getRecommendations(
       seedProfilesForRanking,
-      candidateUnion.items,
+      enrichedCandidates,
       {
         seedWeights,
         seenIds,
@@ -1253,6 +1303,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         popularityMedian: candidateUnion.popularityMedian,
         maxCandidates: MAX_CANDIDATES,
         diversificationTopN: DIVERSIFICATION_TOP_N,
+        sourceBoosts: SOURCE_BOOSTS,
       },
     );
 

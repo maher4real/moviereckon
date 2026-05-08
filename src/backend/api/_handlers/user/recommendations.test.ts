@@ -5,6 +5,12 @@ const mocks = vi.hoisted(() => ({
   connectToDatabase: vi.fn(),
   getServerTrendingMovies: vi.fn(),
   getServerTrendingTVShows: vi.fn(),
+  getServerTopRatedMovies: vi.fn(),
+  getServerPopularTVShows: vi.fn(),
+  getServerNowPlayingMovies: vi.fn(),
+  getServerUpcomingMovies: vi.fn(),
+  getServerMovieKeywords: vi.fn(),
+  getServerTVShowKeywords: vi.fn(),
   discoverServerMovies: vi.fn(),
   discoverServerTVShows: vi.fn(),
   getServerMovieRecommendationProfile: vi.fn(),
@@ -26,6 +32,12 @@ vi.mock("../../lib/mongodb.js", () => ({
 vi.mock("@/backend/services/tmdbServer", () => ({
   getServerTrendingMovies: mocks.getServerTrendingMovies,
   getServerTrendingTVShows: mocks.getServerTrendingTVShows,
+  getServerTopRatedMovies: mocks.getServerTopRatedMovies,
+  getServerPopularTVShows: mocks.getServerPopularTVShows,
+  getServerNowPlayingMovies: mocks.getServerNowPlayingMovies,
+  getServerUpcomingMovies: mocks.getServerUpcomingMovies,
+  getServerMovieKeywords: mocks.getServerMovieKeywords,
+  getServerTVShowKeywords: mocks.getServerTVShowKeywords,
   discoverServerMovies: mocks.discoverServerMovies,
   discoverServerTVShows: mocks.discoverServerTVShows,
   getServerMovieRecommendationProfile: mocks.getServerMovieRecommendationProfile,
@@ -186,6 +198,12 @@ describe("user recommendations endpoint", () => {
 
     mocks.discoverServerMovies.mockResolvedValue({ results: [] });
     mocks.discoverServerTVShows.mockResolvedValue({ results: [] });
+    mocks.getServerTopRatedMovies.mockResolvedValue({ results: [] });
+    mocks.getServerPopularTVShows.mockResolvedValue({ results: [] });
+    mocks.getServerNowPlayingMovies.mockResolvedValue({ results: [] });
+    mocks.getServerUpcomingMovies.mockResolvedValue({ results: [] });
+    mocks.getServerMovieKeywords.mockResolvedValue([]);
+    mocks.getServerTVShowKeywords.mockResolvedValue([]);
     mocks.getServerMovieRecommendationProfile.mockResolvedValue(null);
     mocks.getServerTVRecommendationProfile.mockResolvedValue(null);
     mocks.getServerSimilarMovies.mockResolvedValue({ results: [] });
