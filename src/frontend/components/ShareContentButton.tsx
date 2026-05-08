@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Share2 } from "lucide-react";
-import { Button } from "@/frontend/components/ui/button";
+import { Button, type ButtonProps } from "@/frontend/components/ui/button";
 import { useToast } from "@/frontend/hooks/use-toast";
 import {
   shareContentDetails,
@@ -10,10 +10,14 @@ import { cn } from "@/shared/lib/utils";
 
 interface ShareContentButtonProps extends ShareContentDetails {
   className?: string;
+  iconOnly?: boolean;
+  size?: ButtonProps["size"];
 }
 
 export default function ShareContentButton({
   className,
+  iconOnly = false,
+  size = "lg",
   ...shareDetails
 }: ShareContentButtonProps) {
   const { toast } = useToast();
@@ -45,7 +49,7 @@ export default function ShareContentButton({
   return (
     <Button
       type="button"
-      size="lg"
+      size={size}
       className={cn(
         "action-btn bg-muted text-foreground hover:bg-primary/20 hover:text-primary",
         className,
@@ -54,8 +58,8 @@ export default function ShareContentButton({
       disabled={isSharing}
       aria-label={`Share ${shareDetails.title}`}
     >
-      <Share2 className="w-5 h-5 mr-2" />
-      {isSharing ? "Preparing" : "Share"}
+      <Share2 className={cn("w-5 h-5", !iconOnly && "mr-2")} />
+      {!iconOnly && (isSharing ? "Preparing" : "Share")}
     </Button>
   );
 }

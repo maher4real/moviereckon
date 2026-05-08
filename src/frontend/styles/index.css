@@ -471,6 +471,10 @@
     transition-timing-function: var(--ease-fluid);
   }
 
+  .detail-share-button {
+    @apply rounded-full border border-white/10 bg-background/70 px-3 text-xs font-semibold text-foreground/90 shadow-lg shadow-black/20 backdrop-blur-md transition-colors duration-200 hover:border-primary/45 hover:bg-primary/15 hover:text-primary;
+  }
+
   /* Interactive elements - unified transitions */
   .interactive {
     @apply transition-all duration-300;

@@ -634,6 +634,16 @@ export default function MovieDetail() {
       ? `/movie/${movie.id}`
       : `${window.location.origin}/movie/${movie.id}`;
   const posterShareUrl = getPosterUrl(movie.poster_path, "large");
+  const shareDetails = {
+    contentType: "movie" as const,
+    title: movie.title,
+    year,
+    overview: movie.overview,
+    rating: movie.vote_average,
+    genres: movie.genres.map((genre) => genre.name),
+    posterUrl: posterShareUrl,
+    pageUrl: sharePageUrl,
+  };
 
   return (
     <div className="app-page pb-20 md:pb-0 overflow-x-hidden">
@@ -747,15 +757,29 @@ export default function MovieDetail() {
                 {movie.tagline && (
                   <p className="text-muted-foreground italic text-sm">{movie.tagline}</p>
                 )}
+                <ShareContentButton
+                  {...shareDetails}
+                  size="sm"
+                  className="detail-share-button mt-3"
+                />
               </div>
             </div>
 
             {/* Desktop Title */}
             <div className="hidden md:block mb-6">
-              <h1 className="text-4xl lg:text-5xl font-bold mb-3">{movie.title}</h1>
-              {movie.tagline && (
-                <p className="text-xl text-muted-foreground italic">{movie.tagline}</p>
-              )}
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h1 className="text-4xl lg:text-5xl font-bold mb-3">{movie.title}</h1>
+                  {movie.tagline && (
+                    <p className="text-xl text-muted-foreground italic">{movie.tagline}</p>
+                  )}
+                </div>
+                <ShareContentButton
+                  {...shareDetails}
+                  size="sm"
+                  className="detail-share-button mt-1 shrink-0"
+                />
+              </div>
             </div>
 
             {/* Meta Info */}
@@ -869,16 +893,6 @@ export default function MovieDetail() {
                 posterPath={movie.poster_path}
                 genres={movie.genres.map((genre) => genre.id)}
                 language={movie.original_language}
-              />
-              <ShareContentButton
-                contentType="movie"
-                title={movie.title}
-                year={year}
-                overview={movie.overview}
-                rating={movie.vote_average}
-                genres={movie.genres.map((genre) => genre.name)}
-                posterUrl={posterShareUrl}
-                pageUrl={sharePageUrl}
               />
               <Button
                 size="lg"
