@@ -594,7 +594,7 @@ export default function TVDetail() {
             {tvError && (
               <p className="text-sm text-muted-foreground mb-4">Check your connection and try again.</p>
             )}
-            <Button onClick={() => navigate(-1)} className="bg-primary hover:bg-primary/90">
+            <Button onClick={() => navigate(-1)} className="brand-primary-button">
               Go Back
             </Button>
           </div>
@@ -768,7 +768,7 @@ export default function TVDetail() {
                   </span>
                 )}
 
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-300">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs font-semibold text-primary">
                   <BadgeCheck className="h-3.5 w-3.5" />
                   {tvShow.status || "Status Unknown"}
                 </span>
@@ -846,7 +846,7 @@ export default function TVDetail() {
               {trailerModalKey && (
                 <Button
                   size="lg"
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground action-btn"
+                  className="brand-primary-button text-primary-foreground action-btn"
                   onClick={openTrailerModal}
                 >
                   <Play className="w-5 h-5 mr-2 fill-current" />
@@ -858,7 +858,7 @@ export default function TVDetail() {
                 className={cn(
                   "action-btn",
                   watched
-                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    ? "brand-primary-button text-primary-foreground"
                     : "bg-muted text-foreground hover:bg-primary/20 hover:text-primary",
                   watchAnimating && "animate-watched-pop"
                 )}
@@ -890,7 +890,7 @@ export default function TVDetail() {
                 className={cn(
                   "action-btn",
                   bookmarked
-                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    ? "brand-primary-button text-primary-foreground"
                     : "bg-muted text-foreground hover:bg-primary/20 hover:text-primary",
                   bookmarkAnimating && "animate-heart-pop"
                 )}
@@ -1136,7 +1136,7 @@ export default function TVDetail() {
             <DialogClose asChild>
               <button
                 type="button"
-                className="absolute -top-3 -right-3 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-primary/45 bg-primary text-primary-foreground shadow-[0_8px_24px_rgba(0,0,0,0.45)] transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                className="brand-primary-button absolute -top-3 -right-3 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-primary/45 text-primary-foreground shadow-[0_8px_24px_rgba(0,0,0,0.45)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                 aria-label="Close trailer"
               >
                 <X className="h-5 w-5" />

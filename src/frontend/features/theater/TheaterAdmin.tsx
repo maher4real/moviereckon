@@ -222,7 +222,7 @@ export default function TheaterAdmin() {
                       <div className="flex items-center gap-3">
                         <Input type="number" value={form.rating} onChange={(e) => setForm((f) => ({ ...f, rating: Number(e.target.value) }))} min={0} max={10} step={0.1} className="max-w-[120px]" />
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Star className="w-4 h-4 text-yellow-400" fill="currentColor" />
+                          <Star className="w-4 h-4 text-primary" fill="currentColor" />
                           <span>{Number(form.rating).toFixed(1)} / 10</span>
                         </div>
                       </div>
@@ -389,7 +389,7 @@ export default function TheaterAdmin() {
                     </div>
                     {movie.rating > 0 && (
                       <div className="flex items-center gap-1 mt-1.5">
-                        <Star className="w-3 h-3 text-yellow-400" fill="currentColor" />
+                        <Star className="w-3 h-3 text-primary" fill="currentColor" />
                         <span className="text-xs text-muted-foreground">{movie.rating.toFixed(1)}</span>
                       </div>
                     )}

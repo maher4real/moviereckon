@@ -17,13 +17,13 @@
     --primary: 357 92% 48%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 43 92% 32%;
+    --secondary: 357 78% 28%;
     --secondary-foreground: 0 0% 100%;
 
     --muted: 0 0% 15%;
     --muted-foreground: 0 0% 64%;
 
-    --accent: 42 82% 15%;
+    --accent: 357 76% 14%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -31,7 +31,7 @@
 
     --border: 0 0% 18%;
     --input: 0 0% 18%;
-    --ring: 43 94% 38%;
+    --ring: 357 92% 48%;
 
     --radius: 0.5rem;
 
@@ -42,22 +42,22 @@
     --sidebar-accent: 0 0% 12%;
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 0 0% 15%;
-    --sidebar-ring: 43 94% 38%;
+    --sidebar-ring: 357 92% 48%;
 
     /* Custom MovieReckon tokens */
-    --brand-yellow: 43 94% 34%;
-    --brand-ember: 14 95% 43%;
+    --brand-red-deep: 357 78% 30%;
+    --brand-red-bright: 358 94% 58%;
     --brand-gradient: linear-gradient(
       135deg,
       hsl(var(--primary)) 0%,
-      hsl(var(--brand-ember)) 42%,
-      hsl(var(--brand-yellow)) 100%
+      hsl(var(--brand-red-deep)) 48%,
+      hsl(var(--brand-red-bright)) 100%
     );
     --brand-gradient-soft: linear-gradient(
       135deg,
       hsl(var(--primary) / 0.18) 0%,
-      hsl(var(--brand-ember) / 0.14) 42%,
-      hsl(var(--brand-yellow) / 0.18) 100%
+      hsl(var(--brand-red-deep) / 0.14) 48%,
+      hsl(var(--brand-red-bright) / 0.16) 100%
     );
     --gradient-hero: linear-gradient(to top, hsl(var(--background)) 0%, transparent 100%);
     --gradient-card: linear-gradient(
@@ -65,7 +65,7 @@
       transparent 0%,
       hsl(var(--background) / 0.92) 100%
     );
-    --shadow-glow: 0 0 24px hsl(var(--brand-ember) / 0.34);
+    --shadow-glow: 0 0 24px hsl(var(--primary) / 0.34);
     --ease-fluid: cubic-bezier(0.22, 1, 0.36, 1);
   }
 
@@ -82,13 +82,13 @@
     --primary: 357 92% 48%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 43 92% 32%;
+    --secondary: 357 78% 28%;
     --secondary-foreground: 0 0% 100%;
 
     --muted: 0 0% 15%;
     --muted-foreground: 0 0% 64%;
 
-    --accent: 42 82% 15%;
+    --accent: 357 76% 14%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -96,7 +96,7 @@
 
     --border: 0 0% 18%;
     --input: 0 0% 18%;
-    --ring: 43 94% 38%;
+    --ring: 357 92% 48%;
   }
 }
 
@@ -120,7 +120,7 @@
     text-rendering: optimizeLegibility;
     background:
       radial-gradient(circle at 10% -8%, hsl(var(--primary) / 0.16), transparent 34rem),
-      radial-gradient(circle at 84% 12%, hsl(var(--brand-yellow) / 0.13), transparent 32rem),
+      radial-gradient(circle at 84% 12%, hsl(var(--brand-red-bright) / 0.12), transparent 32rem),
       linear-gradient(180deg, hsl(0 0% 6%) 0%, hsl(var(--background)) 46%, hsl(0 0% 3%) 100%);
   }
 
@@ -173,7 +173,7 @@
     @apply min-h-screen bg-background text-foreground;
     background:
       radial-gradient(circle at 12% 5%, hsl(var(--primary) / 0.13), transparent 26rem),
-      radial-gradient(circle at 88% 10%, hsl(var(--brand-yellow) / 0.12), transparent 26rem),
+      radial-gradient(circle at 88% 10%, hsl(var(--brand-red-bright) / 0.11), transparent 26rem),
       linear-gradient(180deg, hsl(0 0% 6% / 0.92), hsl(var(--background)) 34rem),
       repeating-linear-gradient(
         90deg,
@@ -191,7 +191,8 @@
   }
 
   .page-heading-icon {
-    @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary shadow-lg shadow-primary/10;
+    @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-primary/35 text-primary-foreground shadow-lg shadow-primary/20;
+    background-image: var(--brand-gradient);
   }
 
   .page-kicker {
@@ -203,11 +204,20 @@
   }
 
   .surface-panel {
-    @apply rounded-lg border border-border/70 bg-card/70 shadow-xl shadow-black/20 backdrop-blur-md;
+    @apply rounded-lg border border-primary/15 shadow-xl shadow-black/20 backdrop-blur-md;
+    background:
+      linear-gradient(145deg, hsl(var(--primary) / 0.09), transparent 34%),
+      linear-gradient(180deg, hsl(var(--card) / 0.82), hsl(var(--card) / 0.58));
+    box-shadow:
+      0 18px 48px hsl(0 0% 0% / 0.24),
+      inset 0 1px 0 hsl(var(--foreground) / 0.04);
   }
 
   .filter-panel {
-    @apply mb-6 rounded-lg border border-border/70 bg-card/55 p-3 shadow-lg shadow-black/20 backdrop-blur-md;
+    @apply mb-6 rounded-lg border border-primary/15 p-3 shadow-lg shadow-black/20 backdrop-blur-md;
+    background:
+      linear-gradient(135deg, hsl(var(--primary) / 0.08), transparent 42%),
+      hsl(var(--card) / 0.56);
   }
 
   .filter-row {
@@ -225,11 +235,12 @@
   }
 
   .filter-chip-active {
-    @apply border-primary/60 bg-primary text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary/90 hover:text-primary-foreground;
+    @apply border-primary/60 text-primary-foreground shadow-md shadow-primary/25 hover:text-primary-foreground;
+    background-image: var(--brand-gradient);
   }
 
   .select-surface {
-    @apply h-10 rounded-lg border-border/70 bg-card/70 text-sm shadow-sm shadow-black/15 backdrop-blur-sm transition-colors focus:border-primary/50;
+    @apply h-10 rounded-lg border-primary/15 bg-card/70 text-sm shadow-sm shadow-black/15 backdrop-blur-sm transition-colors focus:border-primary/50;
   }
 
   .content-grid {
@@ -237,7 +248,10 @@
   }
 
   .empty-state {
-    @apply rounded-lg border border-border/70 bg-card/55 px-5 py-10 text-center shadow-lg shadow-black/15 backdrop-blur-sm;
+    @apply rounded-lg border border-primary/15 px-5 py-10 text-center shadow-lg shadow-black/15 backdrop-blur-sm;
+    background:
+      radial-gradient(circle at 50% 0%, hsl(var(--primary) / 0.12), transparent 22rem),
+      hsl(var(--card) / 0.56);
   }
 
   .hero-gradient {
@@ -285,13 +299,13 @@
     background-image: linear-gradient(
       90deg,
       hsl(var(--primary)) 0%,
-      hsl(var(--brand-ember)) 12.5%,
-      hsl(var(--brand-yellow)) 25%,
-      hsl(48 96% 62%) 37.5%,
+      hsl(var(--brand-red-deep)) 12.5%,
+      hsl(var(--brand-red-bright)) 25%,
+      hsl(0 96% 62%) 37.5%,
       hsl(var(--primary)) 50%,
-      hsl(var(--brand-ember)) 62.5%,
-      hsl(var(--brand-yellow)) 75%,
-      hsl(48 96% 62%) 87.5%,
+      hsl(var(--brand-red-deep)) 62.5%,
+      hsl(var(--brand-red-bright)) 75%,
+      hsl(0 96% 62%) 87.5%,
       hsl(var(--primary)) 100%
     );
     background-position: 0% 50%;
@@ -302,22 +316,32 @@
   .glow-primary {
     box-shadow:
       0 0 20px hsl(var(--primary) / 0.3),
-      0 0 34px hsl(var(--brand-yellow) / 0.16);
+      0 0 34px hsl(var(--brand-red-bright) / 0.16);
   }
 
   .glow-secondary {
     box-shadow: 0 0 20px hsl(var(--secondary) / 0.3);
   }
 
-  /* Button hierarchy - primary brand uses a red to dark-yellow gradient */
+  /* Button hierarchy - primary brand uses a red-only gradient */
   .btn-primary {
-    @apply bg-primary text-primary-foreground hover:bg-primary/90 transition-colors duration-200;
+    @apply bg-primary text-primary-foreground transition-[filter,box-shadow,transform] duration-200;
     background-image: var(--brand-gradient);
+    box-shadow:
+      0 12px 30px hsl(var(--primary) / 0.24),
+      inset 0 1px 0 hsl(var(--foreground) / 0.12);
     transition-timing-function: var(--ease-fluid);
   }
 
+  .btn-primary:hover {
+    filter: brightness(1.06) saturate(1.08);
+  }
+
   .btn-secondary {
-    @apply bg-primary/20 text-primary hover:bg-primary/30 transition-colors duration-200;
+    @apply border border-primary/20 text-primary hover:border-primary/35 transition-colors duration-200;
+    background:
+      linear-gradient(135deg, hsl(var(--primary) / 0.18), hsl(var(--brand-red-bright) / 0.08)),
+      hsl(var(--background) / 0.68);
     transition-timing-function: var(--ease-fluid);
   }
 
@@ -332,7 +356,7 @@
     background-image: var(--brand-gradient);
     box-shadow:
       0 14px 34px hsl(var(--primary) / 0.26),
-      0 0 28px hsl(var(--brand-yellow) / 0.18);
+      0 0 28px hsl(var(--brand-red-bright) / 0.18);
     transition-timing-function: var(--ease-fluid);
   }
 
@@ -340,12 +364,12 @@
     filter: saturate(1.08) brightness(1.04);
     box-shadow:
       0 18px 44px hsl(var(--primary) / 0.3),
-      0 0 36px hsl(var(--brand-yellow) / 0.22);
+      0 0 36px hsl(var(--brand-red-bright) / 0.22);
   }
 
   .brand-warm-surface {
     background:
-      linear-gradient(135deg, hsl(var(--primary) / 0.12), hsl(var(--brand-yellow) / 0.08) 45%, hsl(var(--card) / 0.68)),
+      linear-gradient(135deg, hsl(var(--primary) / 0.12), hsl(var(--brand-red-bright) / 0.08) 45%, hsl(var(--card) / 0.68)),
       hsl(var(--card) / 0.42);
   }
 
@@ -390,6 +414,9 @@
   /* Poster card hover effect with animation */
   .poster-card {
     @apply border border-white/10 bg-card shadow-lg shadow-black/25 transition-[border-color,box-shadow,filter] duration-300;
+    background:
+      linear-gradient(145deg, hsl(var(--primary) / 0.12), transparent 36%),
+      hsl(var(--card));
     transition-timing-function: var(--ease-fluid);
   }
 
@@ -398,7 +425,7 @@
     box-shadow:
       0 18px 42px hsl(0 0% 0% / 0.46),
       0 0 0 1px hsl(var(--primary) / 0.14),
-      0 0 28px hsl(var(--brand-yellow) / 0.12);
+      0 0 28px hsl(var(--brand-red-bright) / 0.12);
   }
 
   .group:hover .poster-card img,
@@ -412,7 +439,7 @@
   }
 
   .rating-badge {
-    @apply inline-flex items-center gap-1 rounded-md border border-amber-300/25 bg-background/80 px-2 py-1 text-xs font-semibold text-amber-200 backdrop-blur-sm;
+    @apply inline-flex items-center gap-1 rounded-md border border-primary/30 bg-background/80 px-2 py-1 text-xs font-semibold text-primary backdrop-blur-sm;
   }
 
   .language-badge {

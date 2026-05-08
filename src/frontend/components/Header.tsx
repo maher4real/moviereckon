@@ -73,7 +73,9 @@ export default function Header() {
     <header
       className={cn(
         "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
-        isScrolled ? "bg-background/95 backdrop-blur-md shadow-lg" : "bg-gradient-to-b from-background/80 to-transparent"
+        isScrolled
+          ? "border-b border-primary/15 bg-[linear-gradient(180deg,hsl(var(--background)/0.97),hsl(var(--background)/0.9)),radial-gradient(circle_at_50%_0%,hsl(var(--primary)/0.18),transparent_32rem)] shadow-[0_14px_42px_hsl(0_0%_0%/0.28)] backdrop-blur-md"
+          : "bg-[linear-gradient(180deg,hsl(var(--background)/0.86),hsl(var(--background)/0.34)_58%,transparent)]"
       )}
     >
       <div className="container mx-auto px-3 sm:px-4">
@@ -106,7 +108,7 @@ export default function Header() {
                   {active && (
                     <motion.span
                       layoutId="header-nav-active"
-                      className="absolute inset-0 rounded-full border border-primary/25 bg-primary/10 shadow-[0_0_22px_hsl(var(--primary)/0.16)]"
+                      className="absolute inset-0 rounded-full border border-primary/35 bg-[image:var(--brand-gradient-soft)] shadow-[0_0_22px_hsl(var(--primary)/0.22)]"
                       transition={{ type: "spring", stiffness: 420, damping: 34 }}
                     />
                   )}
@@ -134,7 +136,7 @@ export default function Header() {
               variant="ghost"
               size="icon"
               onClick={() => navigate("/profile")}
-              className="h-10 w-10 rounded-full border border-white/10 bg-background/40 p-0 text-muted-foreground backdrop-blur-sm hover:bg-background/70 hover:text-foreground"
+            className="h-10 w-10 rounded-full border border-primary/15 bg-background/40 p-0 text-muted-foreground backdrop-blur-sm hover:border-primary/30 hover:bg-primary/10 hover:text-foreground"
               aria-label="Open profile"
             >
               <Avatar className="h-8 w-8">
@@ -171,7 +173,7 @@ export default function Header() {
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className="overflow-hidden md:hidden bg-background/95 backdrop-blur-md border-t border-border"
+            className="overflow-hidden border-t border-primary/15 bg-[linear-gradient(180deg,hsl(var(--background)/0.98),hsl(var(--card)/0.9))] backdrop-blur-md md:hidden"
           >
             <nav className="container mx-auto px-4 py-4 flex flex-col gap-2">
               {navLinks.map((link) => {
@@ -192,7 +194,7 @@ export default function Header() {
                     {active && (
                       <motion.span
                         layoutId="mobile-header-nav-active"
-                        className="absolute inset-0 rounded-lg bg-primary/10"
+                        className="absolute inset-0 rounded-lg border border-primary/25 bg-[image:var(--brand-gradient-soft)]"
                         transition={{ type: "spring", stiffness: 420, damping: 34 }}
                       />
                     )}

@@ -131,7 +131,7 @@ export default function TheaterHome() {
 
                     <div className="fade-up fade-up-3 flex flex-wrap items-center gap-3 text-sm">
                       {featured.rating > 0 && (
-                        <span className="flex items-center gap-1.5 text-yellow-400 font-semibold">
+                        <span className="flex items-center gap-1.5 text-primary font-semibold">
                           <Star className="w-4 h-4" fill="currentColor" />
                           {featured.rating.toFixed(1)}
                         </span>
@@ -244,7 +244,7 @@ function FilmCard({ movie }: { movie: TheaterMovie }) {
         {/* Rating top-right */}
         {movie.rating > 0 && (
           <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/60 backdrop-blur-sm rounded-full px-2 py-0.5 text-xs">
-            <Star className="w-2.5 h-2.5 text-yellow-400" fill="currentColor" />
+            <Star className="w-2.5 h-2.5 text-primary" fill="currentColor" />
             <span className="text-white font-medium">{movie.rating.toFixed(1)}</span>
           </div>
         )}

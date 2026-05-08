@@ -76,7 +76,7 @@ export default function ContentReactionButtons({
           className={cn(
             "p-1.5 rounded action-btn transition-all",
             liked
-              ? "bg-primary text-primary-foreground"
+              ? "brand-primary-button text-primary-foreground"
               : "bg-background/80 text-foreground hover:bg-primary/20 hover:text-primary",
             activeAction === "like" && "animate-heart-pop",
           )}
@@ -92,7 +92,7 @@ export default function ContentReactionButtons({
           className={cn(
             "p-1.5 rounded action-btn transition-all",
             disliked
-              ? "bg-primary text-primary-foreground"
+              ? "brand-primary-button text-primary-foreground"
               : "bg-background/80 text-foreground hover:bg-primary/20 hover:text-primary",
             activeAction === "dislike" && "animate-heart-pop",
           )}
@@ -113,7 +113,7 @@ export default function ContentReactionButtons({
         className={cn(
           "action-btn",
           liked
-            ? "bg-primary text-primary-foreground hover:bg-primary/90"
+            ? "brand-primary-button text-primary-foreground"
             : "bg-muted text-foreground hover:bg-primary/20 hover:text-primary",
           activeAction === "like" && "animate-heart-pop",
         )}
@@ -128,7 +128,7 @@ export default function ContentReactionButtons({
         className={cn(
           "action-btn",
           disliked
-            ? "bg-primary text-primary-foreground hover:bg-primary/90"
+            ? "brand-primary-button text-primary-foreground"
             : "bg-muted text-foreground hover:bg-primary/20 hover:text-primary",
           activeAction === "dislike" && "animate-heart-pop",
         )}

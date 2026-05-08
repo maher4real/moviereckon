@@ -23,7 +23,7 @@ export default function BottomNav() {
     <nav
       aria-label="Primary mobile navigation"
       data-bottom-nav="true"
-      className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-background/95 backdrop-blur-md border-t border-border safe-area-bottom"
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-primary/15 bg-[linear-gradient(180deg,hsl(var(--card)/0.92),hsl(var(--background)/0.98)),radial-gradient(circle_at_50%_0%,hsl(var(--primary)/0.16),transparent_22rem)] backdrop-blur-md safe-area-bottom md:hidden"
     >
       <div className="flex items-center justify-around h-16 px-1">
         {navItems.map((item) => {
@@ -42,7 +42,7 @@ export default function BottomNav() {
               {active && (
                 <motion.span
                   layoutId="bottom-nav-active"
-                  className="absolute inset-x-1 top-1 bottom-1 rounded-lg border border-primary/20 bg-primary/10 shadow-[0_0_18px_hsl(var(--primary)/0.14)]"
+                  className="absolute inset-x-1 top-1 bottom-1 rounded-lg border border-primary/30 bg-[image:var(--brand-gradient-soft)] shadow-[0_0_18px_hsl(var(--primary)/0.2)]"
                   transition={{ type: "spring", stiffness: 440, damping: 36 }}
                 />
               )}

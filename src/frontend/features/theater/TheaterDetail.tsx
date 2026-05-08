@@ -166,7 +166,7 @@ export default function TheaterDetail() {
                 <div className="flex flex-wrap items-center gap-3 text-sm text-white/70">
                   {movie.rating > 0 && (
                     <span className="flex items-center gap-1.5">
-                      <Star className="w-4 h-4 text-yellow-400" fill="currentColor" />
+                      <Star className="w-4 h-4 text-primary" fill="currentColor" />
                       <span className="text-white font-semibold">{movie.rating.toFixed(1)}</span>
                     </span>
                   )}

@@ -48,6 +48,38 @@ function getCurrentPageUrl(): string {
   return window.location.href;
 }
 
+function getUrlBase(): string {
+  if (typeof window === "undefined") return "https://moviereckon.local";
+  return window.location.origin;
+}
+
+function buildShortShareUrl(pageUrl: string, contentType: ShareContentType): string {
+  const cleanUrl = cleanText(pageUrl);
+  if (!cleanUrl) return "";
+
+  const isAbsoluteUrl = /^[a-z][a-z0-9+.-]*:\/\//i.test(cleanUrl);
+  const isRootRelativeUrl = cleanUrl.startsWith("/");
+
+  try {
+    const url = new URL(cleanUrl, getUrlBase());
+    const routePrefix = contentType === "movie" ? "movie" : "tv";
+    const shortPrefix = contentType === "movie" ? "m" : "s";
+    const match = url.pathname.match(new RegExp(`^/${routePrefix}/([^/?#]+)/?$`));
+
+    if (!match) return cleanUrl;
+
+    url.pathname = `/${shortPrefix}/${match[1]}`;
+    url.search = "";
+    url.hash = "";
+
+    if (isAbsoluteUrl) return url.href;
+    if (isRootRelativeUrl) return url.pathname;
+    return cleanUrl;
+  } catch {
+    return cleanUrl;
+  }
+}
+
 function buildFileName(title: string): string {
   const slug = title
     .toLowerCase()
@@ -87,7 +119,7 @@ export function buildShareCardPayload(details: ShareContentDetails): ShareCardPa
   return {
     title: displayTitle,
     text,
-    url: details.pageUrl || getCurrentPageUrl(),
+    url: buildShortShareUrl(details.pageUrl || getCurrentPageUrl(), details.contentType),
     posterUrl: cleanText(details.posterUrl) || null,
     fileName: buildFileName(displayTitle),
   };

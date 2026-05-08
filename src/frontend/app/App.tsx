@@ -18,6 +18,7 @@ import {
   Navigate,
   StaticRouter,
   useLocation,
+  useParams,
 } from "react-router-dom";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, MotionConfig, motion, useReducedMotion } from "motion/react";
@@ -117,6 +118,12 @@ function AuthenticatedRoutePreload() {
   const { user, isLoading } = useAuth();
   useIdleRoutePreload(Boolean(user) && !isLoading);
   return null;
+}
+
+function ShortContentRedirect({ contentType }: { contentType: "movie" | "tv" }) {
+  const { id } = useParams<{ id: string }>();
+  const basePath = contentType === "movie" ? "movie" : "tv";
+  return <Navigate to={`/${basePath}/${id}`} replace />;
 }
 
 function RouteTransition({ children }: { children: ReactNode }) {
@@ -274,6 +281,8 @@ const App = ({
                           <Route path="/browse/bollywood" element={<Navigate to="/upcoming?section=movies&movieType=bollywood" replace />} />
                           <Route path="/browse/hollywood" element={<Navigate to="/upcoming?section=movies&movieType=hollywood" replace />} />
                           <Route path="/browse/tv" element={<Navigate to="/upcoming?section=series" replace />} />
+                          <Route path="/m/:id" element={<ShortContentRedirect contentType="movie" />} />
+                          <Route path="/s/:id" element={<ShortContentRedirect contentType="tv" />} />
 
                           {/* Protected routes */}
                           <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />

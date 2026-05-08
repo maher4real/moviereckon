@@ -160,7 +160,7 @@ function ContentCardComponent({
         />
 
         {/* Hover Overlay */}
-        <div className="absolute inset-0 bg-background/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
+        <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_50%_45%,hsl(var(--primary)/0.28),transparent_38%),linear-gradient(180deg,transparent,hsl(var(--background)/0.78))] opacity-0 transition-opacity group-hover/card:opacity-100">
           <motion.div
             className="poster-play-button"
             initial={false}
@@ -181,7 +181,7 @@ function ContentCardComponent({
               className={cn(
                 "flex-1 py-1.5 rounded text-xs font-medium flex items-center justify-center gap-1 action-btn transition-all",
                 watched
-                  ? "bg-primary text-primary-foreground"
+                  ? "brand-primary-button text-primary-foreground"
                   : "bg-background/80 text-foreground hover:bg-primary/20 hover:text-primary",
                 watchAnimating && "animate-watched-pop"
               )}
@@ -206,7 +206,7 @@ function ContentCardComponent({
               className={cn(
                 "p-1.5 rounded action-btn transition-all",
                 bookmarked
-                  ? "bg-primary text-primary-foreground"
+                  ? "brand-primary-button text-primary-foreground"
                   : "bg-background/80 text-foreground hover:bg-primary/20 hover:text-primary",
                 bookmarkAnimating && "animate-heart-pop"
               )}
@@ -247,7 +247,7 @@ function ContentCardComponent({
               initial={{ scale: 0.7 }}
               animate={{ scale: 1 }}
               transition={{ type: "spring", stiffness: 500, damping: 24 }}
-              className="bg-primary rounded-full p-2"
+              className="brand-primary-button rounded-full p-2"
             >
               <Eye className="w-6 h-6 text-primary-foreground" />
             </motion.div>

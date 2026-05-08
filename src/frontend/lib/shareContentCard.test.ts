@@ -19,7 +19,7 @@ describe("buildShareCardPayload", () => {
       text:
         "Dune: Part Two (2024) • Movie • 8.4/10 • Science Fiction, Adventure\n" +
         "Paul Atreides unites with Chani and the Fremen while seeking revenge.",
-      url: "https://moviereckon.test/movie/693134",
+      url: "https://moviereckon.test/m/693134",
       posterUrl: "https://image.tmdb.org/t/p/w500/dune.jpg",
       fileName: "dune-part-two-2024-poster.jpg",
     });
@@ -37,6 +37,7 @@ describe("buildShareCardPayload", () => {
 
     expect(payload.title).toBe("Signal Show");
     expect(payload.text).toBe("Signal Show • Series");
+    expect(payload.url).toBe("https://moviereckon.test/s/321");
     expect(payload.fileName).toBe("signal-show-poster.jpg");
   });
 });
@@ -82,6 +83,7 @@ describe("shareContentDetails", () => {
     expect(share).toHaveBeenCalledOnce();
 
     const shareData = share.mock.calls[0][0] as ShareData;
+    expect(shareData.url).toBe("https://moviereckon.test/m/693134");
     expect(shareData.files).toHaveLength(1);
     expect(shareData.files?.[0]).toMatchObject({
       name: "dune-part-two-2024-poster.jpg",

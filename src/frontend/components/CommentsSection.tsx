@@ -67,7 +67,7 @@ type FeedbackOption = {
 
 const FEEDBACK_OPTIONS: FeedbackOption[] = [
   { value: "give_it_a_go", label: "Give it a go", icon: Rocket, color: "text-blue-400 bg-blue-400/10 border-blue-400/30" },
-  { value: "one_time_watch", label: "One-time watch", icon: Timer, color: "text-amber-400 bg-amber-400/10 border-amber-400/30" },
+  { value: "one_time_watch", label: "One-time watch", icon: Timer, color: "text-primary bg-primary/10 border-primary/30" },
   { value: "must_watch", label: "Must Watch", icon: Medal, color: "text-emerald-400 bg-emerald-400/10 border-emerald-400/30" },
   { value: "skip", label: "Skip", icon: CircleX, color: "text-rose-400 bg-rose-400/10 border-rose-400/30" },
 ];
@@ -100,13 +100,13 @@ function StarRating({ value, onChange, max = 10, interactive = false, sizeClass 
               className="rounded-sm p-0.5 transition-transform duration-150 hover:scale-110"
               aria-label={`Rate ${ratingValue} out of ${max}`}
             >
-              <Star className={cn(sizeClass, filled ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-300")} />
+              <Star className={cn(sizeClass, filled ? "fill-primary text-primary" : "text-muted-foreground/40 hover:text-primary")} />
             </button>
           );
         }
 
         return (
-          <Star key={ratingValue} className={cn(sizeClass, filled ? "fill-amber-400 text-amber-400" : "text-muted-foreground/35")} />
+          <Star key={ratingValue} className={cn(sizeClass, filled ? "fill-primary text-primary" : "text-muted-foreground/35")} />
         );
       })}
     </div>
