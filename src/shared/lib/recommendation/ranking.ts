@@ -47,6 +47,75 @@ function languageKey(item: UnifiedContentItem): string {
   return (item.originalLanguage || "unknown").toLowerCase();
 }
 
+function getSourceBoost(
+  item: UnifiedContentItem,
+  sourceBoosts?: Record<string, number>,
+): number {
+  if (!sourceBoosts || item.sourceTags.length === 0) return 0;
+
+  let boost = 0;
+  for (const tag of item.sourceTags) {
+    const exact = sourceBoosts[tag] || 0;
+    const prefix = Object.entries(sourceBoosts)
+      .filter(([key]) => key.endsWith(":") && tag.startsWith(key))
+      .reduce((sum, [, value]) => sum + value, 0);
+    boost += exact + prefix;
+  }
+
+  return clamp(boost, 0, 0.24);
+}
+
+function getCollaborativeBoost(
+  item: UnifiedContentItem,
+  collaborativeBoosts?: Record<string, number>,
+): number {
+  if (!collaborativeBoosts) return 0;
+  return clamp(collaborativeBoosts[item.key] || 0, 0, 0.18);
+}
+
+function getPreferenceBoost(
+  item: UnifiedContentItem,
+  userContext: RecommendationUserContext | undefined,
+  preferredGenreMatches: number,
+): number {
+  const genreBoost =
+    preferredGenreMatches > 0
+      ? Math.min(0.36, 0.28 + preferredGenreMatches * 0.04)
+      : 0;
+  const preferredLanguageSet = new Set(
+    (userContext?.preferredLanguages || []).map((language) =>
+      language.toLowerCase(),
+    ),
+  );
+  const languageBoost =
+    item.originalLanguage &&
+    preferredLanguageSet.has(item.originalLanguage.toLowerCase())
+      ? 0.12
+      : 0;
+
+  return clamp(genreBoost + languageBoost, 0, 0.42);
+}
+
+function getNegativePenalty(
+  item: UnifiedContentItem,
+  userContext?: RecommendationUserContext,
+): number {
+  const negativeGenres = new Set(userContext?.negativeGenreIds || []);
+  const negativeKeywords = new Set(
+    (userContext?.negativeKeywordTokens || []).map((token) =>
+      token.toLowerCase(),
+    ),
+  );
+  const genreHits = item.genreIds.filter((genreId) =>
+    negativeGenres.has(genreId),
+  ).length;
+  const keywordHits = item.keywordTokens.filter((token) =>
+    negativeKeywords.has(token.toLowerCase()),
+  ).length;
+
+  return clamp(genreHits * 0.08 + keywordHits * 0.05, 0, 0.26);
+}
+
 type SimilarityProfile = {
   genreIds: Set<number>;
   leadActorIds: Set<number>;
@@ -573,11 +642,24 @@ export function getRecommendations(
       const preferredGenreMatches = candidate.genreIds.filter((genreId) =>
         preferredGenreSet.has(genreId),
       ).length;
-      const preferenceBoost =
-        preferredGenreMatches > 0
-          ? Math.min(0.36, 0.28 + preferredGenreMatches * 0.04)
-          : 0;
-      const blendedScore = bestScore * 0.65 + averageScore * 0.35 + preferenceBoost;
+      const preferenceBoost = getPreferenceBoost(
+        candidate,
+        userContext,
+        preferredGenreMatches,
+      );
+      const sourceBoost = getSourceBoost(candidate, userContext?.sourceBoosts);
+      const collaborativeBoost = getCollaborativeBoost(
+        candidate,
+        userContext?.collaborativeBoosts,
+      );
+      const negativePenalty = getNegativePenalty(candidate, userContext);
+      const blendedScore =
+        bestScore * 0.65 +
+        averageScore * 0.35 +
+        preferenceBoost +
+        sourceBoost +
+        collaborativeBoost -
+        negativePenalty;
 
       const scoreBreakdown: ScoreBreakdown = {
         genre: weightTotal > 0 ? weightedBreakdownTotals.genre / weightTotal : 0,
@@ -589,6 +671,10 @@ export function getRecommendations(
         popularity: weightTotal > 0 ? weightedBreakdownTotals.popularity / weightTotal : 0,
         novelty: weightTotal > 0 ? weightedBreakdownTotals.novelty / weightTotal : 0,
         diversityPenalty: 0,
+        preference: preferenceBoost,
+        source: sourceBoost,
+        collaborative: collaborativeBoost,
+        negativePenalty,
       };
 
       return {

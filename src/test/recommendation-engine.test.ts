@@ -205,4 +205,80 @@ describe("recommendation engine scoring", () => {
       "Matches preferred genre",
     );
   });
+
+  it("applies source and collaborative boosts without overriding hard exclusions", () => {
+    const seed = normalizeTmdbItem(buildMovie(1200, { genre_ids: [18, 53] }))!;
+    const excluded = normalizeTmdbItem(buildMovie(1201, { title: "Already Seen" }))!;
+    const sourceMatched = normalizeTmdbItem(
+      buildMovie(1202, { title: "TMDB Similar Match", genre_ids: [18] }),
+      { sourceTag: "similar:movie:1200" },
+    )!;
+    const collaborativeMatched = normalizeTmdbItem(
+      buildMovie(1203, { title: "Local Taste Match", genre_ids: [35] }),
+    )!;
+
+    const ranked = getRecommendations(
+      [seed],
+      [excluded, sourceMatched, collaborativeMatched],
+      {
+        seenIds: [excluded.key],
+        sourceBoosts: { "similar:": 0.12 },
+        collaborativeBoosts: { [collaborativeMatched.key]: 0.16 },
+        maxCandidates: 20,
+      },
+    );
+
+    expect(ranked.map((entry) => entry.item.key)).not.toContain(excluded.key);
+    expect(ranked.slice(0, 2).map((entry) => entry.item.key)).toEqual(
+      expect.arrayContaining([sourceMatched.key, collaborativeMatched.key]),
+    );
+    expect(
+      ranked.find((entry) => entry.item.key === collaborativeMatched.key)
+        ?.scoreBreakdown.collaborative,
+    ).toBeGreaterThan(0);
+    expect(
+      ranked.find((entry) => entry.item.key === sourceMatched.key)?.scoreBreakdown
+        .source,
+    ).toBeGreaterThan(0);
+  });
+
+  it("penalizes candidates near skipped genre and keyword signals", () => {
+    const seed = normalizeTmdbItem(
+      buildMovie(1300, {
+        title: "Drama Seed",
+        genre_ids: [18],
+        keywords: [{ id: 99, name: "revenge" }],
+      }),
+    )!;
+    const skippedLike = normalizeTmdbItem(
+      buildMovie(1301, {
+        title: "Skipped-Like Candidate",
+        genre_ids: [27],
+        keywords: [{ id: 99, name: "revenge" }],
+      }),
+    )!;
+    const cleanCandidate = normalizeTmdbItem(
+      buildMovie(1302, {
+        title: "Cleaner Candidate",
+        genre_ids: [18],
+        keywords: [{ id: 101, name: "family" }],
+      }),
+    )!;
+
+    const ranked = getRecommendations(
+      [seed],
+      [skippedLike, cleanCandidate],
+      {
+        negativeGenreIds: [27],
+        negativeKeywordTokens: ["revenge"],
+        maxCandidates: 20,
+      },
+    );
+
+    expect(ranked[0]?.item.key).toBe(cleanCandidate.key);
+    expect(
+      ranked.find((entry) => entry.item.key === skippedLike.key)?.scoreBreakdown
+        .negativePenalty,
+    ).toBeGreaterThan(0);
+  });
 });

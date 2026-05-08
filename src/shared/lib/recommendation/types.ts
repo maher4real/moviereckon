@@ -15,6 +15,10 @@ export interface ScoreBreakdown {
   popularity: number;
   novelty: number;
   diversityPenalty: number;
+  preference?: number;
+  source?: number;
+  collaborative?: number;
+  negativePenalty?: number;
 }
 
 export interface UnifiedKeyword {
@@ -79,6 +83,10 @@ export interface RecommendationUserContext {
   popularityMedian?: number;
   maxCandidates?: number;
   diversificationTopN?: number;
+  sourceBoosts?: Record<string, number>;
+  collaborativeBoosts?: Record<string, number>;
+  negativeGenreIds?: number[];
+  negativeKeywordTokens?: string[];
   debug?: boolean;
 }
 
