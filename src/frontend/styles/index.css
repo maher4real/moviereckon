@@ -316,10 +316,10 @@
     background: linear-gradient(
       to top,
       hsl(var(--background)) 0%,
-      hsl(var(--background) / 0.95) 14%,
-      hsl(var(--background) / 0.7) 36%,
-      hsl(var(--background) / 0.42) 56%,
-      hsl(var(--background) / 0.16) 76%,
+      hsl(var(--background) / 0.86) 12%,
+      hsl(var(--background) / 0.52) 30%,
+      hsl(var(--background) / 0.22) 48%,
+      hsl(var(--background) / 0.06) 66%,
       transparent 100%
     );
   }
@@ -346,39 +346,18 @@
     inset-inline: 0;
     bottom: -1px;
     z-index: 6;
-    height: clamp(160px, 28vh, 340px);
+    height: clamp(88px, 14vh, 170px);
     pointer-events: none;
     background: linear-gradient(
       to bottom,
       hsl(var(--background) / 0) 0%,
-      hsl(var(--background) / 0.36) 42%,
-      hsl(var(--background) / 0.82) 72%,
+      hsl(var(--background) / 0.36) 58%,
       hsl(var(--background)) 100%
     );
   }
 
   .detail-content-shell {
     isolation: isolate;
-  }
-
-  .detail-content-shell::before {
-    content: "";
-    position: absolute;
-    left: 50%;
-    top: clamp(-180px, -18vh, -104px);
-    z-index: -1;
-    width: 100vw;
-    height: clamp(260px, 34vh, 420px);
-    transform: translateX(-50%);
-    pointer-events: none;
-    background: linear-gradient(
-      to bottom,
-      hsl(var(--background) / 0) 0%,
-      hsl(var(--background) / 0.86) 28%,
-      hsl(var(--background)) 58%,
-      hsl(var(--background)) 78%,
-      hsl(var(--primary) / 0.055) 100%
-    );
   }
 
   .card-gradient {
