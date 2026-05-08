@@ -24,13 +24,6 @@ const nextConfig = {
       "@radix-ui/react-dropdown-menu",
     ],
   },
-  turbopack: {
-    resolveExtensionAlias: {
-      ".js": [".ts", ".tsx", ".js"],
-      ".mjs": [".mts", ".mjs"],
-      ".cjs": [".cts", ".cjs"],
-    },
-  },
   webpack: (config) => {
     config.resolve.extensionAlias = {
       ...(config.resolve.extensionAlias || {}),

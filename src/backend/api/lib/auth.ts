@@ -13,7 +13,7 @@ import {
 import { isEmailVerificationSatisfied } from "./email-auth.js";
 import type { Db } from "mongodb";
 
-const JWT_SECRET = (() => {
+function getJwtSecret(): string {
   const value = process.env.JWT_SECRET;
   // Legacy fallback (disabled for security):
   // const value = process.env.JWT_SECRET || "your-super-secret-jwt-key-change-in-production";
@@ -21,7 +21,11 @@ const JWT_SECRET = (() => {
     throw new Error("JWT_SECRET must be configured and at least 32 characters");
   }
   return value;
-})();
+}
+
+function getRefreshTokenPepper(): string {
+  return process.env.REFRESH_TOKEN_PEPPER || getJwtSecret();
+}
 
 const JWT_ISSUER = "moviereckon";
 const JWT_AUDIENCE = "moviereckon-web";
@@ -31,7 +35,6 @@ const JWT_EXPIRES_IN = "15m";
 // const JWT_EXPIRES_IN = "7d";
 
 const REFRESH_TOKEN_EXPIRES_IN = "30d";
-const REFRESH_TOKEN_PEPPER = process.env.REFRESH_TOKEN_PEPPER || JWT_SECRET;
 const SESSION_FINGERPRINT_VERSION = "v2";
 
 export type UserRole = "user" | "moderator" | "admin";
@@ -97,8 +100,9 @@ export function generateTokens(
   options: { refreshSessionId?: string } = {},
 ): TokenPair {
   const refreshSessionId = options.refreshSessionId || generateRefreshSessionId();
+  const jwtSecret = getJwtSecret();
 
-  const accessToken = jwt.sign(user, JWT_SECRET, {
+  const accessToken = jwt.sign(user, jwtSecret, {
     expiresIn: JWT_EXPIRES_IN,
     issuer: JWT_ISSUER,
     audience: JWT_AUDIENCE,
@@ -106,7 +110,7 @@ export function generateTokens(
 
   const refreshToken = jwt.sign(
     { id: user.id, type: "refresh", sid: refreshSessionId },
-    JWT_SECRET,
+    jwtSecret,
     {
       expiresIn: REFRESH_TOKEN_EXPIRES_IN,
       issuer: JWT_ISSUER,
@@ -119,7 +123,7 @@ export function generateTokens(
 
 export function verifyAccessToken(token: string): UserPayload | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET, {
+    const decoded = jwt.verify(token, getJwtSecret(), {
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,
     }) as Partial<UserPayload>;
@@ -138,7 +142,7 @@ export function verifyAccessToken(token: string): UserPayload | null {
 
 export function verifyRefreshToken(token: string): { id: string; sid: string | null } | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET, {
+    const decoded = jwt.verify(token, getJwtSecret(), {
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,
     }) as { id: string; type: string; sid?: unknown };
@@ -151,11 +155,11 @@ export function verifyRefreshToken(token: string): { id: string; sid: string | n
 }
 
 export function hashRefreshToken(token: string): string {
-  return createHash("sha256").update(`${REFRESH_TOKEN_PEPPER}:${token}`).digest("hex");
+  return createHash("sha256").update(`${getRefreshTokenPepper()}:${token}`).digest("hex");
 }
 
 export function hashDeviceId(deviceId: string): string {
-  return createHash("sha256").update(`${REFRESH_TOKEN_PEPPER}:device:${deviceId}`).digest("hex");
+  return createHash("sha256").update(`${getRefreshTokenPepper()}:device:${deviceId}`).digest("hex");
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -244,7 +248,7 @@ export function getSessionFingerprintFromRequest(request: RequestLike): string {
 
   return `${SESSION_FINGERPRINT_VERSION}:${createHash("sha256")
     .update(
-      `${REFRESH_TOKEN_PEPPER}:browser:${browserFamily}|platform:${platformFamily}|lang:${primaryLanguage}`,
+      `${getRefreshTokenPepper()}:browser:${browserFamily}|platform:${platformFamily}|lang:${primaryLanguage}`,
     )
     .digest("hex")}`;
 }
