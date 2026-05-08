@@ -8,8 +8,18 @@ type BuildCollaborativeBoostsInput = {
 };
 
 const MIN_POSITIVE_KEYS = 3;
+const MIN_NEIGHBORS = 3;
+const MIN_CANDIDATE_NEIGHBORS = 2;
 const MIN_COLLABORATIVE_ROWS = 2;
 const MAX_BOOST = 0.1;
+const AGGREGATION_MAX_TIME_MS = 650;
+
+type CollaborativeBoostRow = {
+  _id: { content_type: "movie" | "tv"; content_id: number };
+  count: number;
+  candidateNeighborCount: number;
+  totalNeighborCount: number;
+};
 
 function splitKey(key: string): { content_type: "movie" | "tv"; content_id: number } | null {
   const match = /^(movie|tv)_(\d+)$/.exec(key);
@@ -40,12 +50,9 @@ export async function buildCollaborativeBoosts(
 
   if (seedPairs.length < MIN_POSITIVE_KEYS) return {};
 
-  const rows = await db
+  const cursor = db
     .collection("liked_items")
-    .aggregate<{
-      _id: { content_type: "movie" | "tv"; content_id: number };
-      count: number;
-    }>([
+    .aggregate<CollaborativeBoostRow>([
       {
         $match: {
           user_id: { $ne: input.userId },
@@ -63,11 +70,39 @@ export async function buildCollaborativeBoosts(
           overlap: { $gte: 2 },
         },
       },
+      { $limit: 500 },
+      {
+        $group: {
+          _id: null,
+          neighborIds: { $push: "$_id" },
+          totalNeighborCount: { $sum: 1 },
+        },
+      },
+      {
+        $match: {
+          totalNeighborCount: { $gte: MIN_NEIGHBORS },
+        },
+      },
+      { $unwind: "$neighborIds" },
       {
         $lookup: {
           from: "liked_items",
-          localField: "_id",
-          foreignField: "user_id",
+          let: { neighborUserId: "$neighborIds" },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ["$user_id", "$$neighborUserId"] },
+              },
+            },
+            {
+              $project: {
+                _id: 0,
+                content_type: 1,
+                content_id: 1,
+              },
+            },
+            { $limit: 300 },
+          ],
           as: "liked",
         },
       },
@@ -79,21 +114,48 @@ export async function buildCollaborativeBoosts(
             content_id: "$liked.content_id",
           },
           count: { $sum: 1 },
+          candidateNeighborIds: { $addToSet: "$neighborIds" },
+          totalNeighborCount: { $first: "$totalNeighborCount" },
+        },
+      },
+      {
+        $project: {
+          count: 1,
+          candidateNeighborCount: { $size: "$candidateNeighborIds" },
+          totalNeighborCount: 1,
+        },
+      },
+      {
+        $match: {
+          candidateNeighborCount: { $gte: MIN_CANDIDATE_NEIGHBORS },
         },
       },
       { $sort: { count: -1 } },
       { $limit: 120 },
-    ])
-    .toArray();
+    ]);
 
-  if (rows.length < MIN_COLLABORATIVE_ROWS) return {};
+  const timedCursor =
+    typeof cursor.maxTimeMS === "function"
+      ? cursor.maxTimeMS(AGGREGATION_MAX_TIME_MS)
+      : cursor;
+  const rows = await timedCursor.toArray();
 
-  const maxCount = Math.max(...rows.map((row) => row.count), 1);
+  const eligibleRows = rows.filter((row) => {
+    const key = getContentKey(row._id.content_type, row._id.content_id);
+    return (
+      !input.excludedKeys.has(key) &&
+      row.totalNeighborCount >= MIN_NEIGHBORS &&
+      row.candidateNeighborCount >= MIN_CANDIDATE_NEIGHBORS
+    );
+  });
+
+  if (eligibleRows.length < MIN_COLLABORATIVE_ROWS) return {};
+
+  const maxCount = Math.max(...eligibleRows.map((row) => row.count), 1);
   const boosts: Record<string, number> = {};
 
-  for (const row of rows) {
+  for (const row of eligibleRows) {
     const key = getContentKey(row._id.content_type, row._id.content_id);
-    if (input.excludedKeys.has(key)) continue;
     boosts[key] = Math.min(MAX_BOOST, (row.count / maxCount) * MAX_BOOST);
   }
 
