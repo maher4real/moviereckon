@@ -771,13 +771,13 @@ export default function Auth() {
               <TabsList className="mb-6 grid h-11 w-full grid-cols-2 rounded-xl border border-white/10 bg-background/60 p-1">
                 <TabsTrigger
                   value="signin"
-                  className="rounded-lg text-sm font-semibold tracking-wide transition-all duration-200 data-[state=active]:bg-[image:var(--brand-gradient)] data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:shadow-primary/35 data-[state=inactive]:text-muted-foreground"
+                  className="rounded-lg text-sm font-semibold tracking-wide transition-all duration-200 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:shadow-primary/35 data-[state=inactive]:text-muted-foreground"
                 >
                   Sign In
                 </TabsTrigger>
                 <TabsTrigger
                   value="signup"
-                  className="rounded-lg text-sm font-semibold tracking-wide transition-all duration-200 data-[state=active]:bg-[image:var(--brand-gradient)] data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:shadow-primary/35 data-[state=inactive]:text-muted-foreground"
+                  className="rounded-lg text-sm font-semibold tracking-wide transition-all duration-200 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:shadow-primary/35 data-[state=inactive]:text-muted-foreground"
                 >
                   Sign Up
                 </TabsTrigger>

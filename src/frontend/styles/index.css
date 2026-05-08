@@ -235,8 +235,7 @@
   }
 
   .filter-chip-active {
-    @apply border-primary/60 text-primary-foreground shadow-md shadow-primary/25 hover:text-primary-foreground;
-    background-image: var(--brand-gradient);
+    @apply border-primary/60 bg-primary text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary/90 hover:text-primary-foreground;
   }
 
   .select-surface {
@@ -323,10 +322,9 @@
     box-shadow: 0 0 20px hsl(var(--secondary) / 0.3);
   }
 
-  /* Button hierarchy - primary brand uses a red-only gradient */
+  /* Button hierarchy - buttons stay solid red; gradients are reserved for surfaces. */
   .btn-primary {
-    @apply bg-primary text-primary-foreground transition-[filter,box-shadow,transform] duration-200;
-    background-image: var(--brand-gradient);
+    @apply bg-primary text-primary-foreground transition-[background-color,box-shadow,transform] duration-200 hover:bg-primary/90;
     box-shadow:
       0 12px 30px hsl(var(--primary) / 0.24),
       inset 0 1px 0 hsl(var(--foreground) / 0.12);
@@ -334,37 +332,33 @@
   }
 
   .btn-primary:hover {
-    filter: brightness(1.06) saturate(1.08);
+    box-shadow:
+      0 14px 34px hsl(var(--primary) / 0.3),
+      inset 0 1px 0 hsl(var(--foreground) / 0.12);
   }
 
   .btn-secondary {
-    @apply border border-primary/20 text-primary hover:border-primary/35 transition-colors duration-200;
-    background:
-      linear-gradient(135deg, hsl(var(--primary) / 0.18), hsl(var(--brand-red-bright) / 0.08)),
-      hsl(var(--background) / 0.68);
+    @apply border border-primary/20 bg-primary/10 text-primary transition-colors duration-200 hover:border-primary/35 hover:bg-primary/15;
     transition-timing-function: var(--ease-fluid);
   }
 
   .btn-brand-soft {
-    @apply text-primary shadow-[0_10px_24px_hsl(var(--primary)/0.14)] hover:text-primary;
-    background: var(--brand-gradient-soft);
+    @apply border border-primary/20 bg-primary/10 text-primary shadow-[0_10px_24px_hsl(var(--primary)/0.14)] hover:bg-primary/15 hover:text-primary;
     transition-timing-function: var(--ease-fluid);
   }
 
   .brand-primary-button {
-    @apply text-primary-foreground transition-[filter,box-shadow,transform] duration-200;
-    background-image: var(--brand-gradient);
+    @apply bg-primary text-primary-foreground transition-[background-color,box-shadow,transform] duration-200 hover:bg-primary/90;
     box-shadow:
       0 14px 34px hsl(var(--primary) / 0.26),
-      0 0 28px hsl(var(--brand-red-bright) / 0.18);
+      0 0 24px hsl(var(--primary) / 0.16);
     transition-timing-function: var(--ease-fluid);
   }
 
   .brand-primary-button:hover {
-    filter: saturate(1.08) brightness(1.04);
     box-shadow:
       0 18px 44px hsl(var(--primary) / 0.3),
-      0 0 36px hsl(var(--brand-red-bright) / 0.22);
+      0 0 30px hsl(var(--primary) / 0.2);
   }
 
   .brand-warm-surface {
@@ -435,7 +429,6 @@
 
   .poster-play-button {
     @apply flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-primary text-primary-foreground shadow-lg shadow-primary/30 backdrop-blur-sm transition-colors duration-200 hover:bg-primary/90;
-    background-image: var(--brand-gradient);
   }
 
   .rating-badge {
@@ -772,7 +765,7 @@
     transform-origin: left center;
     transform: scaleX(0.03);
     animation: auth-btn-fill 2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-    background: var(--brand-gradient);
+    background: hsl(var(--primary));
     opacity: 0.55;
     border-radius: inherit;
     pointer-events: none;
