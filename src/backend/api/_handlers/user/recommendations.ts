@@ -117,6 +117,7 @@ const MAX_CACHE_ENTRIES = Math.max(
 const DB_TIMEOUT_MS = 4500;
 const TMDB_TIMEOUT_MS = 6500;
 const BUILD_TIMEOUT_MS = 12_000;
+const METADATA_ENRICHMENT_TIMEOUT_MS = 1800;
 const MAX_IP_REQUESTS = 70;
 const MAX_USER_REQUESTS = 35;
 const LANGUAGE_DISCOVERY_LIMIT = 4;
@@ -130,6 +131,7 @@ const SOURCE_BOOSTS: Record<string, number> = {
   "discover:": 0.03,
   "trending:": 0.02,
   "top-rated:": 0.025,
+  "popular:": 0.02,
   "new-release:": 0.02,
 };
 const DISCOVERY_LANGUAGE_FALLBACKS = [
@@ -1254,13 +1256,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       MAX_CANDIDATES,
     );
 
-    const enrichedCandidates = await enrichCandidatesWithKeywords(candidateUnion.items, {
-      fetchMovieKeywords: (id) =>
-        safe(getServerMovieKeywords(id)).then((value) => value || []),
-      fetchTVKeywords: (id) =>
-        safe(getServerTVShowKeywords(id)).then((value) => value || []),
-      limit: KEYWORD_ENRICHMENT_LIMIT,
-    });
+    const enrichedCandidates = await withTimeout(
+      enrichCandidatesWithKeywords(candidateUnion.items, {
+        fetchMovieKeywords: (id) =>
+          safe(getServerMovieKeywords(id)).then((value) => value || []),
+        fetchTVKeywords: (id) =>
+          safe(getServerTVShowKeywords(id)).then((value) => value || []),
+        limit: KEYWORD_ENRICHMENT_LIMIT,
+      }),
+      METADATA_ENRICHMENT_TIMEOUT_MS,
+    ).catch(() => candidateUnion.items);
 
     const seenIds = new Set<string>();
 

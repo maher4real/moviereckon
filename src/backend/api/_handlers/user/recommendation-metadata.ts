@@ -9,7 +9,39 @@ type KeywordFetchers = {
   fetchMovieKeywords: (id: number) => Promise<MovieKeyword[]>;
   fetchTVKeywords: (id: number) => Promise<MovieKeyword[]>;
   limit: number;
+  concurrency?: number;
 };
+
+const DEFAULT_KEYWORD_CONCURRENCY = 6;
+
+function getConcurrency(value: number | undefined): number {
+  if (!Number.isFinite(value) || !value || value <= 0) {
+    return DEFAULT_KEYWORD_CONCURRENCY;
+  }
+
+  return Math.max(1, Math.floor(value));
+}
+
+async function runWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  task: (item: T) => Promise<void>,
+): Promise<void> {
+  let nextIndex = 0;
+  const workerCount = Math.min(concurrency, items.length);
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < items.length) {
+        const item = items[nextIndex];
+        nextIndex += 1;
+        if (item) {
+          await task(item);
+        }
+      }
+    }),
+  );
+}
 
 export async function enrichCandidatesWithKeywords(
   candidates: UnifiedContentItem[],
@@ -19,9 +51,12 @@ export async function enrichCandidatesWithKeywords(
 
   const enrichedByKey = new Map<string, UnifiedContentItem>();
   const bounded = candidates.slice(0, fetchers.limit);
+  const concurrency = getConcurrency(fetchers.concurrency);
 
-  await Promise.all(
-    bounded.map(async (candidate) => {
+  await runWithConcurrency(
+    bounded,
+    concurrency,
+    async (candidate) => {
       if (candidate.keywords.length > 0) return;
 
       try {
@@ -64,7 +99,7 @@ export async function enrichCandidatesWithKeywords(
       } catch {
         return;
       }
-    }),
+    },
   );
 
   return candidates.map((candidate) => enrichedByKey.get(candidate.key) || candidate);
