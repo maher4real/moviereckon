@@ -646,6 +646,57 @@ describe("user recommendations endpoint", () => {
     ).toBe(true);
   });
 
+  it("includes requested more-like-this language in discovery sources before final filtering", async () => {
+    mocks.getServerTrendingMovies.mockResolvedValue([]);
+    mocks.getServerTrendingTVShows.mockResolvedValue([]);
+    mocks.discoverServerMovies.mockImplementation(async (filters) => {
+      if (
+        (filters as Record<string, unknown>)?.with_original_language === "de"
+      ) {
+        return {
+          results: [
+            {
+              id: 883,
+              title: "German Context Match",
+              original_title: "German Context Match",
+              overview: "Requested language item",
+              poster_path: null,
+              backdrop_path: null,
+              release_date: "2024-04-01",
+              vote_average: 8.2,
+              vote_count: 800,
+              popularity: 95,
+              genre_ids: [53],
+              original_language: "de",
+              adult: false,
+              video: false,
+            },
+          ],
+        };
+      }
+
+      return { results: [] };
+    });
+
+    const req = {
+      ...createMockReq("8.8.8.9"),
+      url: "/api/user?route=recommendations&mode=more-like-this&language=de&seed=movie_883",
+    } as any;
+    const { res } = createMockRes();
+
+    await handler(req, res);
+
+    const movieLanguages = mocks.discoverServerMovies.mock.calls
+      .map(([filters]) => (filters as Record<string, unknown>)?.with_original_language)
+      .filter((value): value is string => typeof value === "string");
+    const items = ((res.body as any)?.data?.items || []) as any[];
+
+    expect(res.statusCode).toBe(200);
+    expect(movieLanguages[0]).toBe("de");
+    expect(items.map((item) => item.id)).toContain(883);
+    expect(items.every((item) => item.original_language === "de")).toBe(true);
+  });
+
   it("does not use a contextual stale cache entry for a later normal feed fallback", async () => {
     mocks.getServerTrendingMovies.mockResolvedValue([
       {

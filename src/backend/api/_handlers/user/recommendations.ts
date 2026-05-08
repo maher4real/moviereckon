@@ -1208,8 +1208,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       prioritizedLanguages,
       CROSS_LANGUAGE_LIMIT,
     );
-    const discoveryLanguages = Array.from(
+    const baseDiscoveryLanguages = Array.from(
       new Set([...prioritizedLanguages, ...explorationLanguages]),
+    );
+    const discoveryLanguages = Array.from(
+      new Set(
+        requestLanguageFilter
+          ? [requestLanguageFilter, ...baseDiscoveryLanguages]
+          : baseDiscoveryLanguages,
+      ),
     ).slice(0, LANGUAGE_DISCOVERY_LIMIT);
 
     const peopleMovieResults = await Promise.all(
