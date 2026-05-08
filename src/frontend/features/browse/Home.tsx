@@ -168,7 +168,7 @@ function HomeIntroShelfSkeleton({
     >
       <div className="mb-3 flex min-w-0 items-center justify-between gap-3 md:mb-4">
         <div className="flex min-w-0 items-center gap-2.5">
-          <div className="brand-gradient-bar h-8 w-1 shrink-0 rounded-full shadow-lg shadow-primary/25" />
+          <div className="h-8 w-8 shrink-0 rounded-lg border border-white/8 bg-white/10 shadow-lg shadow-black/20" />
           <div className={cn("h-5 rounded-full bg-white/13", shelf.titleWidth)} />
         </div>
         <div className="h-7 w-16 shrink-0 rounded-full border border-white/8 bg-white/8" />
@@ -686,9 +686,9 @@ export default function Home() {
             <section className="surface-panel brand-warm-surface mx-2 overflow-hidden border-primary/25 md:mx-4">
               <div className="px-4 md:px-6 pt-5 pb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="rounded-lg border border-primary/25 bg-primary/10 p-1.5">
-                    <Sparkles className="w-4 h-4 text-primary" />
-                  </div>
+                  <span className="section-glass-icon h-9 w-9" aria-hidden="true">
+                    <Sparkles className="h-4 w-4" />
+                  </span>
                   <h2 className="text-lg md:text-xl font-bold tracking-tight">
                     {isPersonalized ? "Reckon For You" : "Top Picks"}
                   </h2>

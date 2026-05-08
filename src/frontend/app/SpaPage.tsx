@@ -2,6 +2,7 @@ import App from "@/frontend/app/App";
 import { installGlobalSafeLogging } from "@/shared/lib/safeLogging";
 import { dehydrate, QueryClient } from "@tanstack/react-query";
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import type { MongoUser } from "@/frontend/lib/mongodbClient";
 import type { DiscoverFilters, Movie, TVShow } from "@/shared/lib/tmdb";
 import {
@@ -96,6 +97,16 @@ function normalizeSearch(searchParams: SearchParams | undefined): string {
 
   const queryString = urlSearch.toString();
   return queryString ? `?${queryString}` : "";
+}
+
+function getShortContentRedirectPath(pathname: string): string | null {
+  const movieMatch = /^\/m\/(\d+)\/?$/.exec(pathname);
+  if (movieMatch) return `/movie/${movieMatch[1]}`;
+
+  const tvMatch = /^\/s\/(\d+)\/?$/.exec(pathname);
+  if (tvMatch) return `/tv/${tvMatch[1]}`;
+
+  return null;
 }
 
 async function resolveInitialUser(): Promise<MongoUser | null> {
@@ -477,6 +488,11 @@ export default async function SpaPage({ params, searchParams }: SpaPageProps) {
 
   const pathname = normalizePathname(resolvedParams.slug);
   const queryString = normalizeSearch(resolvedSearchParams);
+  const shortContentRedirectPath = getShortContentRedirectPath(pathname);
+  if (shortContentRedirectPath) {
+    redirect(`${shortContentRedirectPath}${queryString}`);
+  }
+
   const initialUser = await resolveInitialUser();
 
   const queryClient = new QueryClient({

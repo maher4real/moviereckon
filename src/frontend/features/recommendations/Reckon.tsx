@@ -953,9 +953,9 @@ export default function Reckon() {
             />
           ) : !hasPreferences && !reckonLoading ? (
             <div className="surface-panel mb-5 flex items-center gap-3 border-primary/25 bg-linear-to-r from-primary/10 to-primary/5 px-4 py-3.5">
-              <div className="p-1.5 rounded-lg bg-primary/15 border border-primary/20 shrink-0">
-                <Sparkles className="w-4 h-4 text-primary" />
-              </div>
+              <span className="section-glass-icon" aria-hidden="true">
+                <Sparkles className="h-4 w-4" />
+              </span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground">
                   Unlock personalized recommendations

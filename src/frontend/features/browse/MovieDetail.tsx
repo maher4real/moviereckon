@@ -642,7 +642,7 @@ export default function MovieDetail() {
       {/* Backdrop with optional video */}
       <div
         ref={heroMediaRef}
-        className="relative h-[54vh] sm:h-[60vh] md:h-[70vh] lg:h-[74vh] xl:h-[78vh] overflow-hidden group/hero"
+        className="detail-hero-media relative h-[54vh] sm:h-[60vh] md:h-[70vh] lg:h-[74vh] xl:h-[78vh] overflow-hidden group/hero"
       >
         <MediaImage
           src={heroVisualSrc}
@@ -714,7 +714,7 @@ export default function MovieDetail() {
       </div>
 
       {/* Content */}
-      <div className="container mx-auto px-4 -mt-48 md:-mt-64 relative z-10 pb-12">
+      <div className="detail-content-shell container mx-auto px-4 -mt-48 md:-mt-64 relative z-10 pb-12">
         <div className="flex flex-col md:flex-row gap-8">
           {/* Poster */}
           <div className="hidden md:block flex-shrink-0">

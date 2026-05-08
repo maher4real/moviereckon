@@ -171,8 +171,11 @@ export default function ContentCarousel({
       {title && (
         <div className="mb-3 flex min-w-0 items-center justify-between gap-3 md:mb-4">
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className="brand-gradient-bar h-8 w-1 shrink-0 rounded-full shadow-lg shadow-primary/25" />
-            {Icon && <Icon className="w-5 h-5 text-primary shrink-0" />}
+            {Icon && (
+              <span className="section-glass-icon" aria-hidden="true">
+                <Icon className="h-4 w-4" />
+              </span>
+            )}
             <h2 className="min-w-0 truncate text-lg font-bold tracking-tight md:text-xl">{title}</h2>
           </div>
           {resolvedViewAllHref && (
@@ -189,9 +192,6 @@ export default function ContentCarousel({
       )}
 
       <div className="relative group">
-        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 hidden w-10 carousel-fade-left md:block" />
-        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 hidden w-10 carousel-fade-right md:block" />
-
         <Button
           variant="ghost"
           size="icon"
@@ -214,7 +214,7 @@ export default function ContentCarousel({
 
         <div
           ref={scrollRef}
-          className="flex gap-2.5 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory px-1 pt-2 pb-3 sm:gap-3 md:gap-4 md:px-4 md:pt-3 md:pb-4"
+          className="carousel-edge-mask flex gap-2.5 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory px-1 pt-2 pb-3 sm:gap-3 md:gap-4 md:px-4 md:pt-3 md:pb-4"
         >
           {isLoading ? (
             Array.from({ length: 8 }).map((_, i) => (

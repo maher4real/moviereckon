@@ -435,8 +435,10 @@ export default function PersonDetail() {
 
         {knownForCredits.length > 0 && (
           <section className="container mx-auto px-3 sm:px-4 pt-6 sm:pt-8">
-            <h2 className="mb-3 flex items-center gap-2 text-xl sm:text-2xl font-bold">
-              <Sparkles className="h-5 w-5 text-primary" />
+            <h2 className="mb-3 flex items-center gap-2.5 text-xl font-bold sm:text-2xl">
+              <span className="section-glass-icon" aria-hidden="true">
+                <Sparkles className="h-4 w-4" />
+              </span>
               Known For
             </h2>
             <ScrollArea className="w-full">
