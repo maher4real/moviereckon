@@ -37,6 +37,7 @@ import {
   type ScoreBreakdown,
   type UnifiedContentItem,
 } from "@/shared/lib/recommendation";
+import { buildCollaborativeBoosts } from "./recommendation-collaborative";
 import { enrichCandidatesWithKeywords } from "./recommendation-metadata";
 
 type ContentType = "movie" | "tv";
@@ -128,6 +129,7 @@ const DB_TIMEOUT_MS = 4500;
 const TMDB_TIMEOUT_MS = 6500;
 const BUILD_TIMEOUT_MS = 12_000;
 const METADATA_ENRICHMENT_TIMEOUT_MS = 1800;
+const COLLABORATIVE_BOOST_TIMEOUT_MS = 700;
 const MAX_IP_REQUESTS = 70;
 const MAX_USER_REQUESTS = 35;
 const LANGUAGE_DISCOVERY_LIMIT = 4;
@@ -1435,6 +1437,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     requestContext.displayedKeys.forEach((key) => seenIds.add(key));
 
+    const positiveKeys = Array.from(
+      new Set([
+        ...likedItems.map((item) => getContentKey(item.content_type, item.content_id)),
+        ...feedbackItems
+          .filter((item) => item.feedback_type !== "skip")
+          .map((item) => getContentKey(item.content_type, item.content_id)),
+        ...watchlistItems.map((item) => getContentKey(item.content_type, item.content_id)),
+      ]),
+    );
+
+    const collaborativeBoosts =
+      (await withTimeout(
+        buildCollaborativeBoosts(db, {
+          userId: user.id,
+          positiveKeys,
+          excludedKeys: seenIds,
+        }),
+        COLLABORATIVE_BOOST_TIMEOUT_MS,
+      ).catch(() => ({} as Record<string, number>))) || {};
+
     const negativeGenreIds = Array.from(
       new Set(
         feedbackItems
@@ -1457,6 +1479,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         maxCandidates: MAX_CANDIDATES,
         diversificationTopN: DIVERSIFICATION_TOP_N,
         sourceBoosts: SOURCE_BOOSTS,
+        collaborativeBoosts,
       },
     );
 
