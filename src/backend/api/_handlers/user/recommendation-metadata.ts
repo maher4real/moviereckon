@@ -10,6 +10,7 @@ type KeywordFetchers = {
   fetchTVKeywords: (id: number) => Promise<MovieKeyword[]>;
   limit: number;
   concurrency?: number;
+  deadlineMs?: number;
 };
 
 const DEFAULT_KEYWORD_CONCURRENCY = 6;
@@ -26,6 +27,7 @@ async function runWithConcurrency<T>(
   items: T[],
   concurrency: number,
   task: (item: T) => Promise<void>,
+  shouldContinue?: () => boolean,
 ): Promise<void> {
   let nextIndex = 0;
   const workerCount = Math.min(concurrency, items.length);
@@ -33,6 +35,8 @@ async function runWithConcurrency<T>(
   await Promise.all(
     Array.from({ length: workerCount }, async () => {
       while (nextIndex < items.length) {
+        if (shouldContinue && !shouldContinue()) return;
+
         const item = items[nextIndex];
         nextIndex += 1;
         if (item) {
@@ -52,6 +56,11 @@ export async function enrichCandidatesWithKeywords(
   const enrichedByKey = new Map<string, UnifiedContentItem>();
   const bounded = candidates.slice(0, fetchers.limit);
   const concurrency = getConcurrency(fetchers.concurrency);
+  const deadlineAt =
+    typeof fetchers.deadlineMs === "number" && Number.isFinite(fetchers.deadlineMs)
+      ? Date.now() + Math.max(0, fetchers.deadlineMs)
+      : null;
+  const hasTimeRemaining = () => deadlineAt === null || Date.now() < deadlineAt;
 
   await runWithConcurrency(
     bounded,
@@ -100,6 +109,7 @@ export async function enrichCandidatesWithKeywords(
         return;
       }
     },
+    hasTimeRemaining,
   );
 
   return candidates.map((candidate) => enrichedByKey.get(candidate.key) || candidate);

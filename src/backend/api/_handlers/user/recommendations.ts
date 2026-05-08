@@ -1263,6 +1263,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         fetchTVKeywords: (id) =>
           safe(getServerTVShowKeywords(id)).then((value) => value || []),
         limit: KEYWORD_ENRICHMENT_LIMIT,
+        deadlineMs: METADATA_ENRICHMENT_TIMEOUT_MS,
       }),
       METADATA_ENRICHMENT_TIMEOUT_MS,
     ).catch(() => candidateUnion.items);

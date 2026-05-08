@@ -170,4 +170,38 @@ describe("recommendation metadata enrichment", () => {
     expect(fetchMovieKeywords).toHaveBeenCalledTimes(4);
     expect(maxInFlight).toBeLessThanOrEqual(2);
   });
+
+  it("stops scheduling keyword lookups after the deadline expires", async () => {
+    vi.useFakeTimers();
+
+    try {
+      const fetchMovieKeywords = vi.fn(
+        (id: number) =>
+          new Promise<{ id: number; name: string }[]>((resolve) => {
+            setTimeout(() => resolve([{ id, name: `keyword ${id}` }]), 10);
+          }),
+      );
+
+      const enrichment = enrichCandidatesWithKeywords(
+        [movie(21), movie(22), movie(23), movie(24), movie(25)],
+        {
+          fetchMovieKeywords,
+          fetchTVKeywords: vi.fn(async () => []),
+          limit: 5,
+          concurrency: 2,
+          deadlineMs: 5,
+        },
+      );
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(fetchMovieKeywords).toHaveBeenCalledTimes(2);
+
+      await vi.advanceTimersByTimeAsync(100);
+      await enrichment;
+
+      expect(fetchMovieKeywords).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
