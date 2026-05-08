@@ -171,7 +171,7 @@ export default function HeroBanner({
               className={cn(
                 "h-2 rounded-full transition-colors duration-300",
                 index === currentIndex
-                  ? "bg-primary shadow-[0_0_16px_hsl(var(--brand-orange)/0.28)]"
+                  ? "bg-primary shadow-[0_0_16px_hsl(var(--brand-yellow)/0.28)]"
                   : "bg-foreground/30 hover:bg-foreground/50"
               )}
               aria-label={`Go to slide ${index + 1}`}

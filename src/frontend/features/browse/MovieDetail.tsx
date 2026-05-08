@@ -830,7 +830,7 @@ export default function MovieDetail() {
               )}
             </div>
 
-            {/* Action Buttons - All using primary red color */}
+            {/* Action Buttons - All using primary brand color */}
             <div className="flex flex-wrap gap-3 mb-8">
               {trailerModalKey && (
                 <Button

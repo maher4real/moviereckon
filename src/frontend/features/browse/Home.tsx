@@ -127,7 +127,7 @@ function HomeIntroPosterSkeleton({
         ease: [0.16, 1, 0.3, 1],
       }}
     >
-      <div className="relative aspect-[2/3] overflow-hidden rounded-lg border border-white/10 bg-[linear-gradient(145deg,hsl(var(--primary)/0.2),hsl(var(--muted)/0.72)_44%,hsl(var(--brand-orange)/0.26))] shadow-[0_20px_55px_hsl(0_0%_0%/0.36),0_0_28px_hsl(var(--brand-orange)/0.12)]">
+      <div className="relative aspect-[2/3] overflow-hidden rounded-lg border border-white/10 bg-[linear-gradient(145deg,hsl(var(--primary)/0.2),hsl(var(--muted)/0.72)_44%,hsl(var(--brand-yellow)/0.26))] shadow-[0_20px_55px_hsl(0_0%_0%/0.36),0_0_28px_hsl(var(--brand-yellow)/0.12)]">
         <motion.div
           className="absolute inset-y-0 w-1/2 bg-[linear-gradient(100deg,transparent,hsl(var(--foreground)/0.18),transparent)]"
           initial={{ x: "-140%" }}
@@ -209,10 +209,10 @@ function HomeStartupTransition({ active }: { active: boolean }) {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.28 }}
           >
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_14%,hsl(var(--primary)/0.24),transparent_25rem),radial-gradient(circle_at_88%_8%,hsl(var(--brand-orange)/0.2),transparent_30rem),linear-gradient(180deg,hsl(0_0%_5%),hsl(var(--background))_54%,hsl(0_0%_3%))]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_14%,hsl(var(--primary)/0.24),transparent_25rem),radial-gradient(circle_at_88%_8%,hsl(var(--brand-yellow)/0.2),transparent_30rem),linear-gradient(180deg,hsl(0_0%_5%),hsl(var(--background))_54%,hsl(0_0%_3%))]" />
             <div className="absolute inset-0 opacity-30 [background-image:repeating-linear-gradient(90deg,hsl(var(--foreground)/0.05)_0_1px,transparent_1px_82px)]" />
             <motion.div
-              className="absolute inset-x-[-12%] top-[38%] h-32 -rotate-2 bg-[linear-gradient(90deg,transparent,hsl(var(--primary)/0.28),hsl(var(--brand-orange)/0.2),transparent)] blur-2xl"
+              className="absolute inset-x-[-12%] top-[38%] h-32 -rotate-2 bg-[linear-gradient(90deg,transparent,hsl(var(--primary)/0.28),hsl(var(--brand-yellow)/0.2),transparent)] blur-2xl"
               initial={{ x: "-12%", opacity: 0 }}
               animate={{ x: "12%", opacity: [0, 1, 0.38] }}
               transition={{ duration: 1.62, ease: [0.22, 1, 0.36, 1] }}
@@ -226,7 +226,7 @@ function HomeStartupTransition({ active }: { active: boolean }) {
             transition={{ delay: 0.08, duration: 0.44, ease: [0.22, 1, 0.36, 1] }}
           >
             <div className="mx-auto flex h-full max-w-7xl items-center justify-between">
-              <div className="h-9 w-32 rounded-lg bg-[linear-gradient(135deg,hsl(var(--primary)/0.44),hsl(var(--brand-orange)/0.22))]" />
+              <div className="h-9 w-32 rounded-lg bg-[linear-gradient(135deg,hsl(var(--primary)/0.44),hsl(var(--brand-yellow)/0.22))]" />
               <div className="hidden min-w-0 flex-1 items-center justify-center gap-3 px-6 md:flex">
                 {[72, 68, 76, 64, 78].map((width) => (
                   <div
@@ -245,7 +245,7 @@ function HomeStartupTransition({ active }: { active: boolean }) {
 
           <div className="relative h-[70vh] overflow-hidden md:h-[85vh]">
             <motion.div
-              className="absolute inset-0 bg-[radial-gradient(circle_at_70%_28%,hsl(var(--brand-orange)/0.34),transparent_23rem),linear-gradient(116deg,hsl(var(--background))_0%,hsl(var(--primary)/0.22)_46%,hsl(var(--brand-orange)/0.18)_100%)]"
+              className="absolute inset-0 bg-[radial-gradient(circle_at_70%_28%,hsl(var(--brand-yellow)/0.34),transparent_23rem),linear-gradient(116deg,hsl(var(--background))_0%,hsl(var(--primary)/0.22)_46%,hsl(var(--brand-yellow)/0.18)_100%)]"
               initial={{ scale: 1.04, opacity: 0.72 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
@@ -270,7 +270,7 @@ function HomeStartupTransition({ active }: { active: boolean }) {
                   <div className="h-4 w-[min(72vw,30rem)] rounded-full bg-white/10" />
                   <div className="h-4 w-[min(58vw,24rem)] rounded-full bg-white/8" />
                   <div className="flex gap-3 pt-2">
-                    <div className="h-11 w-36 rounded-md bg-[linear-gradient(135deg,hsl(var(--primary)),hsl(var(--brand-orange)))] shadow-lg shadow-primary/20" />
+                    <div className="h-11 w-36 rounded-md bg-[linear-gradient(135deg,hsl(var(--primary)),hsl(var(--brand-yellow)))] shadow-lg shadow-primary/20" />
                     <div className="h-11 w-32 rounded-md border border-white/14 bg-white/12" />
                   </div>
                 </motion.div>
