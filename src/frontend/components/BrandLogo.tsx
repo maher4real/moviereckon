@@ -71,6 +71,7 @@ export default function BrandLogo({
       {!compact ? (
         <span
           data-brand-label="true"
+          data-brand-text="MovieReckon"
           className={cn(
             "brand-logo-label font-bold text-primary",
             animated &&

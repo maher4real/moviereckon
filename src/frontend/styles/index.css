@@ -296,26 +296,31 @@
   }
 
   .brand-logo-shine {
-    overflow: hidden;
+    overflow: visible;
     color: hsl(var(--primary));
   }
 
   .brand-logo-shine::after {
-    content: "";
+    content: attr(data-brand-text);
     position: absolute;
-    inset: -18% -42%;
+    inset: 0;
     pointer-events: none;
+    color: transparent;
     background: linear-gradient(
       105deg,
       transparent 34%,
-      hsl(var(--foreground) / 0.72) 48%,
-      transparent 62%
+      hsl(var(--foreground) / 0.96) 47%,
+      hsl(var(--foreground) / 0.72) 50%,
+      transparent 63%
     );
-    mix-blend-mode: screen;
-    opacity: 0.62;
-    transform: translateX(-115%) skewX(-16deg);
+    background-size: 260% 100%;
+    background-position: 160% 0;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    opacity: 0.78;
     animation: brand-logo-shine 1.55s ease-in-out infinite;
-    will-change: transform;
+    will-change: background-position;
   }
 
   .glow-primary {
@@ -717,10 +722,10 @@
   @keyframes brand-logo-shine {
     0%,
     42% {
-      transform: translateX(-115%) skewX(-16deg);
+      background-position: 160% 0;
     }
     100% {
-      transform: translateX(115%) skewX(-16deg);
+      background-position: -120% 0;
     }
   }
 

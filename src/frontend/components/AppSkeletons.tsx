@@ -134,56 +134,69 @@ export function AppPageSkeleton({
 
 export function CenteredAppSkeleton() {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <BrandLogo size="xl" animated />
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
+      <LoadingPosterCarouselBackdrop rowCount={3} postersPerRow={8} />
+
+      <div className="relative z-10 flex items-center justify-center">
+        <BrandLogo size="xl" animated />
+      </div>
     </div>
   );
 }
 
 export function AuthPageSkeleton() {
-  const rowCount = 3;
-  const postersPerRow = 8;
-
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute inset-0 scale-110 -rotate-2">
-          <div
-            className="flex h-full flex-col justify-center gap-3 opacity-62"
-            style={{ filter: "saturate(1.12) contrast(1.04) brightness(0.92)" }}
-          >
-            {Array.from({ length: rowCount }).map((_, rowIndex) => (
-              <div
-                key={`auth-skeleton-row-${rowIndex}`}
-                className={cn(
-                  "auth-poster-row",
-                  rowIndex % 2 === 1 && "auth-poster-row-reverse",
-                )}
-                style={{ animationDuration: `${34 + rowIndex * 4}s` }}
-              >
-                {Array.from({ length: postersPerRow * 2 }).map(
-                  (_, posterIndex) => (
-                    <div
-                      key={`auth-skeleton-tile-${rowIndex}-${posterIndex}`}
-                      className="auth-poster-tile"
-                    >
-                      <Skeleton className="h-full w-full rounded-none" />
-                    </div>
-                  ),
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="absolute inset-0 bg-black/24" />
-        <div className="absolute inset-0 bg-linear-to-br from-background/70 via-background/46 to-background/66" />
-        <div className="absolute top-1/4 -left-1/4 w-1/2 h-1/2 bg-primary/16 rounded-full blur-[100px]" />
-        <div className="absolute bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-secondary/18 rounded-full blur-[100px]" />
-      </div>
+      <LoadingPosterCarouselBackdrop rowCount={3} postersPerRow={8} />
 
       <div className="relative z-10 flex flex-col items-center justify-center">
         <BrandLogo size="xl" animated />
       </div>
+    </div>
+  );
+}
+
+interface LoadingPosterCarouselBackdropProps {
+  rowCount?: number;
+  postersPerRow?: number;
+}
+
+function LoadingPosterCarouselBackdrop({
+  rowCount = 3,
+  postersPerRow = 8,
+}: LoadingPosterCarouselBackdropProps) {
+  return (
+    <div className="absolute inset-0 overflow-hidden">
+      <div className="absolute inset-0 scale-110 -rotate-2">
+        <div
+          className="flex h-full flex-col justify-center gap-3 opacity-62"
+          style={{ filter: "saturate(1.12) contrast(1.04) brightness(0.92)" }}
+        >
+          {Array.from({ length: rowCount }).map((_, rowIndex) => (
+            <div
+              key={`loading-poster-row-${rowIndex}`}
+              className={cn(
+                "auth-poster-row",
+                rowIndex % 2 === 1 && "auth-poster-row-reverse",
+              )}
+              style={{ animationDuration: `${34 + rowIndex * 4}s` }}
+            >
+              {Array.from({ length: postersPerRow * 2 }).map(
+                (_, posterIndex) => (
+                  <div
+                    key={`loading-poster-tile-${rowIndex}-${posterIndex}`}
+                    className="auth-poster-tile"
+                  >
+                    <Skeleton className="h-full w-full rounded-none" />
+                  </div>
+                ),
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="absolute inset-0 bg-black/24" />
+      <div className="absolute inset-0 bg-linear-to-br from-background/70 via-background/46 to-background/66" />
     </div>
   );
 }
