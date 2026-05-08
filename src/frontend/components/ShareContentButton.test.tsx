@@ -21,7 +21,7 @@ describe("ShareContentButton", () => {
     mocks.shareContentDetails.mockResolvedValue({ method: "native", sharedFile: true });
   });
 
-  it("shares the current content details with poster card data", async () => {
+  it("shares the current content details with poster image data", async () => {
     render(
       <ShareContentButton
         contentType="movie"

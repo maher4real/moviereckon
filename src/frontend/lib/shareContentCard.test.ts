@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { buildShareCardPayload } from "./shareContentCard";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { buildShareCardPayload, shareContentDetails } from "./shareContentCard";
 
 describe("buildShareCardPayload", () => {
-  it("builds social share copy and poster card metadata for a movie", () => {
+  it("builds social share copy and poster file metadata for a movie", () => {
     const payload = buildShareCardPayload({
       contentType: "movie",
       title: "Dune: Part Two",
@@ -21,7 +21,7 @@ describe("buildShareCardPayload", () => {
         "Paul Atreides unites with Chani and the Fremen while seeking revenge.",
       url: "https://moviereckon.test/movie/693134",
       posterUrl: "https://image.tmdb.org/t/p/w500/dune.jpg",
-      fileName: "dune-part-two-2024-share-card.png",
+      fileName: "dune-part-two-2024-poster.jpg",
     });
   });
 
@@ -37,6 +37,55 @@ describe("buildShareCardPayload", () => {
 
     expect(payload.title).toBe("Signal Show");
     expect(payload.text).toBe("Signal Show • Series");
-    expect(payload.fileName).toBe("signal-show-share-card.png");
+    expect(payload.fileName).toBe("signal-show-poster.jpg");
+  });
+});
+
+describe("shareContentDetails", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("shares the raw poster image file without generating a card canvas", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    const canShare = vi.fn().mockReturnValue(true);
+    const createElementSpy = vi.spyOn(document, "createElement");
+
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: share,
+    });
+    Object.defineProperty(navigator, "canShare", {
+      configurable: true,
+      value: canShare,
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        {
+          ok: true,
+          blob: async () => new Blob(["poster"], { type: "image/jpeg" }),
+        },
+      ),
+    );
+
+    await shareContentDetails({
+      contentType: "movie",
+      title: "Dune: Part Two",
+      year: "2024",
+      posterUrl: "https://image.tmdb.org/t/p/w500/dune.jpg",
+      pageUrl: "https://moviereckon.test/movie/693134",
+    });
+
+    expect(fetch).toHaveBeenCalledWith("https://image.tmdb.org/t/p/w500/dune.jpg");
+    expect(createElementSpy).not.toHaveBeenCalledWith("canvas");
+    expect(share).toHaveBeenCalledOnce();
+
+    const shareData = share.mock.calls[0][0] as ShareData;
+    expect(shareData.files).toHaveLength(1);
+    expect(shareData.files?.[0]).toMatchObject({
+      name: "dune-part-two-2024-poster.jpg",
+      type: "image/jpeg",
+    });
   });
 });
