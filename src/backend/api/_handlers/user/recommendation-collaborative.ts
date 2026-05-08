@@ -12,9 +12,12 @@ const MIN_COLLABORATIVE_ROWS = 2;
 const MAX_BOOST = 0.1;
 
 function splitKey(key: string): { content_type: "movie" | "tv"; content_id: number } | null {
-  const [type, idText] = key.split("_");
+  const match = /^(movie|tv)_(\d+)$/.exec(key);
+  if (!match) return null;
+
+  const [, type, idText] = match;
   const id = Number(idText);
-  if ((type !== "movie" && type !== "tv") || !Number.isInteger(id) || id <= 0) {
+  if ((type !== "movie" && type !== "tv") || !Number.isSafeInteger(id) || id <= 0) {
     return null;
   }
   return { content_type: type, content_id: id };

@@ -46,4 +46,25 @@ describe("recommendation collaborative boosts", () => {
     expect(boosts.tv_300).toBeGreaterThan(0);
     expect(Math.max(...Object.values(boosts))).toBeLessThanOrEqual(0.1);
   });
+
+  it("ignores malformed keys before applying the data gate", async () => {
+    const db = {
+      collection: vi.fn(() => collection([])),
+    } as any;
+
+    const boosts = await buildCollaborativeBoosts(db, {
+      userId: "user_1",
+      positiveKeys: [
+        "movie_1_extra",
+        "movie_0x10",
+        "movie_ 1",
+        "movie_1",
+        "tv_2",
+      ],
+      excludedKeys: new Set<string>(),
+    });
+
+    expect(boosts).toEqual({});
+    expect(db.collection).not.toHaveBeenCalled();
+  });
 });
