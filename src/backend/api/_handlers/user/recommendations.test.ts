@@ -520,4 +520,54 @@ describe("user recommendations endpoint", () => {
     expect(ids).not.toContain(40);
     expect(ids).toContain(50);
   });
+
+  it("excludes caller-provided displayed ids in more-like-this mode", async () => {
+    mocks.getServerTrendingMovies.mockResolvedValue([
+      {
+        id: 777,
+        title: "Already Displayed",
+        original_title: "Already Displayed",
+        overview: "Visible item",
+        poster_path: null,
+        backdrop_path: null,
+        release_date: "2024-01-01",
+        vote_average: 8,
+        vote_count: 900,
+        popularity: 120,
+        genre_ids: [18],
+        original_language: "en",
+        adult: false,
+        video: false,
+      },
+      {
+        id: 778,
+        title: "Fresh Context Pick",
+        original_title: "Fresh Context Pick",
+        overview: "New item",
+        poster_path: null,
+        backdrop_path: null,
+        release_date: "2024-02-01",
+        vote_average: 8,
+        vote_count: 900,
+        popularity: 115,
+        genre_ids: [18],
+        original_language: "en",
+        adult: false,
+        video: false,
+      },
+    ]);
+
+    const req = {
+      ...createMockReq("7.7.7.7"),
+      url: "/api/user?route=recommendations&mode=more-like-this&exclude=movie_777&seed=movie_778",
+    } as any;
+    const { res } = createMockRes();
+
+    await handler(req, res);
+
+    const ids = ((res.body as any)?.data?.items || []).map((item: any) => item.id);
+    expect(res.statusCode).toBe(200);
+    expect(ids).not.toContain(777);
+    expect(ids).toContain(778);
+  });
 });

@@ -41,6 +41,16 @@ import { enrichCandidatesWithKeywords } from "./recommendation-metadata";
 
 type ContentType = "movie" | "tv";
 type FeedbackType = "give_it_a_go" | "one_time_watch" | "must_watch" | "skip";
+type RecommendationMode = "feed" | "more-like-this";
+
+interface RecommendationRequestContext {
+  mode: RecommendationMode;
+  seedKeys: string[];
+  displayedKeys: string[];
+  genreId: number | null;
+  language: string | null;
+  contentType: ContentType | "all";
+}
 
 interface WatchHistoryItem {
   content_id: number;
@@ -210,6 +220,43 @@ function normalizeLanguageCode(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const normalized = value.trim().toLowerCase();
   return /^[a-z]{2,3}$/.test(normalized) ? normalized : null;
+}
+
+function getUrl(req: VercelRequest): URL {
+  const host =
+    typeof req.headers.host === "string" ? req.headers.host : "localhost";
+  return new URL(req.url || "/api/user/recommendations", `http://${host}`);
+}
+
+function parseKeyList(searchParams: URLSearchParams, name: string): string[] {
+  const values = searchParams.getAll(name).flatMap((value) => value.split(","));
+  return Array.from(
+    new Set(
+      values
+        .map((value) => value.trim())
+        .filter((value) => /^(movie|tv)_\d+$/.test(value)),
+    ),
+  ).slice(0, 160);
+}
+
+function parseRecommendationRequest(req: VercelRequest): RecommendationRequestContext {
+  const searchParams = getUrl(req).searchParams;
+  const mode =
+    searchParams.get("mode") === "more-like-this" ? "more-like-this" : "feed";
+  const contentTypeParam = searchParams.get("content_type");
+  const contentType =
+    contentTypeParam === "movie" || contentTypeParam === "tv"
+      ? contentTypeParam
+      : "all";
+
+  return {
+    mode,
+    seedKeys: parseKeyList(searchParams, "seed"),
+    displayedKeys: parseKeyList(searchParams, "exclude"),
+    genreId: toPositiveInteger(searchParams.get("genre")),
+    language: normalizeLanguageCode(searchParams.get("language")),
+    contentType,
+  };
 }
 
 function toGenreList(value: unknown): number[] {
@@ -698,6 +745,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    const requestContext = parseRecommendationRequest(req);
     const { db } = await connectToDatabase();
 
     const [
@@ -797,9 +845,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       feedbackItems,
       preferences,
     );
+    const requestRevision = [
+      revision,
+      `mode:${requestContext.mode}`,
+      `seed:${requestContext.seedKeys.join(",")}`,
+      `exclude:${requestContext.displayedKeys.join(",")}`,
+      `genre:${requestContext.genreId || "all"}`,
+      `language:${requestContext.language || "all"}`,
+      `type:${requestContext.contentType}`,
+    ].join("|");
     cleanupCache();
 
-    const cachedPayload = await readCachedPayload(user.id, revision);
+    const cachedPayload = await readCachedPayload(user.id, requestRevision);
     if (cachedPayload) {
       return res.status(200).json({ data: cachedPayload });
     }
@@ -919,6 +976,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           });
         });
 
+        if (requestContext.mode === "more-like-this") {
+          requestContext.seedKeys.forEach((key, index) => {
+            const [type, idText] = key.split("_");
+            const id = toPositiveInteger(idText);
+            if ((type === "movie" || type === "tv") && id) {
+              pushSeed(seedMap, {
+                id,
+                type,
+                title: `Selected ${type}`,
+                weight: Math.max(1.6, 2.2 - index * 0.12),
+              });
+            }
+          });
+        }
+
         const seedSignals = Array.from(seedMap.values())
           .sort((a, b) => b.weight - a.weight)
           .slice(0, MAX_SEEDS);
@@ -946,12 +1018,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         safe(getServerUpcomingMovies(1)),
       ]);
 
+    const requestGenreFilter = requestContext.genreId
+      ? requestContext.genreId.toString()
+      : undefined;
+    const requestLanguageFilter = requestContext.language || undefined;
+
     const genreMovieResults = await Promise.all(
       topGenres.slice(0, 5).flatMap((genreId, index) =>
         [1, 2].map((page) =>
           safe(
             discoverServerMovies({
-              with_genres: genreId.toString(),
+              with_genres: requestGenreFilter || genreId.toString(),
+              with_original_language: requestLanguageFilter,
               sort_by: index === 0 ? "popularity.desc" : "vote_average.desc",
               "vote_count.gte": index === 0 ? 100 : 180,
               page,
@@ -966,7 +1044,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         [1, 2].map((page) =>
           safe(
             discoverServerTVShows({
-              with_genres: genreId.toString(),
+              with_genres: requestGenreFilter || genreId.toString(),
+              with_original_language: requestLanguageFilter,
               sort_by: index === 0 ? "popularity.desc" : "vote_average.desc",
               "vote_count.gte": index === 0 ? 60 : 120,
               page,
@@ -1112,6 +1191,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         safe(
           discoverServerMovies({
             with_original_language: language,
+            with_genres: requestGenreFilter,
             sort_by: index === 0 ? "popularity.desc" : "vote_average.desc",
             "vote_count.gte": index === 0 ? 90 : 140,
             page: 1,
@@ -1125,6 +1205,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         safe(
           discoverServerTVShows({
             with_original_language: language,
+            with_genres: requestGenreFilter,
             sort_by: index === 0 ? "popularity.desc" : "vote_average.desc",
             "vote_count.gte": index === 0 ? 70 : 120,
             page: 1,
@@ -1146,8 +1227,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       languageGenreSources.map(({ language, genreId }) =>
         safe(
           discoverServerMovies({
-            with_original_language: language,
-            with_genres: genreId.toString(),
+            with_original_language: requestLanguageFilter || language,
+            with_genres: requestGenreFilter || genreId.toString(),
             sort_by: "vote_average.desc",
             "vote_count.gte": 60,
             page: 1,
@@ -1160,8 +1241,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       languageGenreSources.map(({ language, genreId }) =>
         safe(
           discoverServerTVShows({
-            with_original_language: language,
-            with_genres: genreId.toString(),
+            with_original_language: requestLanguageFilter || language,
+            with_genres: requestGenreFilter || genreId.toString(),
             sort_by: "vote_average.desc",
             "vote_count.gte": 50,
             page: 1,
@@ -1256,8 +1337,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       MAX_CANDIDATES,
     );
 
+    const contentFilteredCandidates =
+      requestContext.contentType === "all"
+        ? candidateUnion.items
+        : candidateUnion.items.filter((item) => item.type === requestContext.contentType);
+
     const enrichedCandidates = await withTimeout(
-      enrichCandidatesWithKeywords(candidateUnion.items, {
+      enrichCandidatesWithKeywords(contentFilteredCandidates, {
         fetchMovieKeywords: (id) =>
           safe(getServerMovieKeywords(id)).then((value) => value || []),
         fetchTVKeywords: (id) =>
@@ -1266,7 +1352,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         deadlineMs: METADATA_ENRICHMENT_TIMEOUT_MS,
       }),
       METADATA_ENRICHMENT_TIMEOUT_MS,
-    ).catch(() => candidateUnion.items);
+    ).catch(() => contentFilteredCandidates);
 
     const seenIds = new Set<string>();
 
@@ -1287,6 +1373,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         seenIds.add(getContentKey(item.content_type, item.content_id));
       }
     });
+
+    requestContext.displayedKeys.forEach((key) => seenIds.add(key));
 
     const negativeGenreIds = Array.from(
       new Set(
@@ -1340,7 +1428,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       BUILD_TIMEOUT_MS,
     );
 
-    await writeCachedPayload(user.id, revision, payload);
+    await writeCachedPayload(user.id, requestRevision, payload);
     return res.status(200).json({ data: payload });
   } catch (error) {
     console.error("Recommendations handler error:", error);

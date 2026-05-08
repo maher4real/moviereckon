@@ -235,6 +235,16 @@ export interface PersonalizedRecommendationsPayload {
   explanationById: Record<string, RecommendationExplanation>;
 }
 
+export interface RecommendationFeedOptions {
+  variant?: string;
+  mode?: "feed" | "more-like-this";
+  seedKeys?: string[];
+  excludedKeys?: string[];
+  genre?: string;
+  language?: string;
+  contentType?: "all" | "movie" | "tv";
+}
+
 export interface CommentItem {
   id: string;
   user_id: string;
@@ -813,9 +823,9 @@ export async function fetchUserFeedback(): Promise<FeedbackItem[]> {
   }
 }
 
-export async function fetchRecommendationsFeed(options?: {
-  variant?: string;
-}): Promise<PersonalizedRecommendationsPayload> {
+export async function fetchRecommendationsFeed(
+  options?: RecommendationFeedOptions,
+): Promise<PersonalizedRecommendationsPayload> {
   const emptyPayload: PersonalizedRecommendationsPayload = {
     items: [],
     isPersonalized: false,
@@ -826,6 +836,18 @@ export async function fetchRecommendationsFeed(options?: {
     const query = new URLSearchParams();
     if (options?.variant) {
       query.set("variant", options.variant);
+    }
+    if (options?.mode) query.set("mode", options.mode);
+    options?.seedKeys?.slice(0, 12).forEach((key) => query.append("seed", key));
+    options?.excludedKeys
+      ?.slice(0, 160)
+      .forEach((key) => query.append("exclude", key));
+    if (options?.genre && options.genre !== "all") query.set("genre", options.genre);
+    if (options?.language && options.language !== "all") {
+      query.set("language", options.language);
+    }
+    if (options?.contentType && options.contentType !== "all") {
+      query.set("content_type", options.contentType);
     }
 
     const endpoint = query.size > 0
@@ -853,6 +875,15 @@ export async function fetchRecommendationsFeed(options?: {
   } catch {
     return emptyPayload;
   }
+}
+
+export async function fetchMoreLikeThisRecommendations(
+  options: Omit<RecommendationFeedOptions, "mode">,
+): Promise<PersonalizedRecommendationsPayload> {
+  return fetchRecommendationsFeed({
+    ...options,
+    mode: "more-like-this",
+  });
 }
 
 export async function setContentFeedback(item: {

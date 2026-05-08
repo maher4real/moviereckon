@@ -8,12 +8,8 @@ import React, {
 } from "react";
 import { useRecommendations } from "@/frontend/hooks/useRecommendations";
 import { useUserData } from "@/frontend/hooks/useUserData";
-import {
-  Movie,
-  TVShow,
-  discoverMovies,
-  discoverTVShows,
-} from "@/shared/lib/tmdb";
+import { Movie, TVShow } from "@/shared/lib/tmdb";
+import * as mongoClient from "@/frontend/lib/mongodbClient";
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
 import { PosterGridSkeleton } from "@/frontend/components/AppSkeletons";
@@ -141,6 +137,10 @@ const LANGUAGE_MAP: Record<string, string> = {
 
 const getRecommendationItemType = (item: Movie | TVShow): "movie" | "tv" =>
   "title" in item ? "movie" : "tv";
+
+function getRecommendationKey(item: Movie | TVShow): string {
+  return `${getRecommendationItemType(item)}_${item.id}`;
+}
 
 const PREF_LANGUAGES = [
   { code: "en", label: "English" },
@@ -627,105 +627,14 @@ export default function Reckon() {
     }
   }, [updatePreferences, setupLangs, setupGenres, refreshRecommendations]);
   const [extraItems, setExtraItems] = useState<(Movie | TVShow)[]>([]);
-  const [discoverPage, setDiscoverPage] = useState(1);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
 
   // Reset extra items whenever precision filters change
   useEffect(() => {
     setExtraItems([]);
-    setDiscoverPage(1);
   }, [selectedLanguage, selectedGenre, contentTypeFilter, recTypeFilter, sortField, sortOrder]);
 
   const canFetchMore = true;
-
-  const fetchMoreLikeThis = useCallback(async () => {
-    if (isFetchingMore) return;
-    setIsFetchingMore(true);
-
-    const existingIds = new Set(
-      [...recommendations, ...extraItems].map(
-        (item) => `${"title" in item ? "movie" : "tv"}:${item.id}`,
-      ),
-    );
-
-    const genreParam =
-      selectedGenre !== "all"
-        ? selectedGenre
-        : preferences?.preferred_genres?.[0]
-          ? String(preferences.preferred_genres[0])
-          : undefined;
-    const langParam =
-      selectedLanguage !== "all"
-        ? selectedLanguage
-        : preferences?.preferred_languages?.[0];
-    const sortBy =
-      sortField === "popularity"
-        ? "popularity.desc"
-        : sortField === "rating"
-          ? "vote_average.desc"
-          : sortField === "release_date"
-            ? "primary_release_date.desc"
-            : "vote_average.desc";
-
-    const nextPage = discoverPage + 1;
-
-    try {
-      const fetches: Promise<(Movie | TVShow)[]>[] = [];
-
-      if (contentTypeFilter !== "tv") {
-        fetches.push(
-          discoverMovies({
-            with_genres: genreParam,
-            with_original_language: langParam,
-            sort_by: sortBy,
-            "vote_count.gte":
-              recTypeFilter === "newreleases" ? 25 : recTypeFilter === "popular" ? 100 : 60,
-            page: nextPage,
-          }).then((r) => r.results as (Movie | TVShow)[]),
-        );
-      }
-
-      if (contentTypeFilter !== "movie") {
-        fetches.push(
-          discoverTVShows({
-            with_genres: genreParam,
-            with_original_language: langParam,
-            sort_by:
-              sortField === "release_date" ? "first_air_date.desc" : sortBy,
-            "vote_count.gte":
-              recTypeFilter === "newreleases" ? 20 : recTypeFilter === "popular" ? 80 : 40,
-            page: nextPage,
-          }).then((r) => r.results as (Movie | TVShow)[]),
-        );
-      }
-
-      const results = await Promise.all(fetches);
-      const fresh = results.flat().filter((item) => {
-        const key = `${"title" in item ? "movie" : "tv"}:${item.id}`;
-        if (existingIds.has(key)) return false;
-        existingIds.add(key);
-        return true;
-      });
-
-      setExtraItems((prev) => [...prev, ...fresh]);
-      setDiscoverPage(nextPage);
-    } catch {
-      // silently fail — button will still be visible for retry
-    } finally {
-      setIsFetchingMore(false);
-    }
-  }, [
-    isFetchingMore,
-    recommendations,
-    extraItems,
-    selectedGenre,
-    selectedLanguage,
-    preferences,
-    contentTypeFilter,
-    recTypeFilter,
-    sortField,
-    discoverPage,
-  ]);
 
   const hasPreferences =
     (preferences?.preferred_languages?.length ?? 0) > 0 ||
@@ -858,6 +767,49 @@ export default function Reckon() {
     () => processedItems.slice(0, visibleCount),
     [processedItems, visibleCount],
   );
+
+  const fetchMoreLikeThis = useCallback(async () => {
+    if (isFetchingMore) return;
+    setIsFetchingMore(true);
+
+    const currentItems = [...recommendations, ...extraItems];
+    const excludedKeys = Array.from(
+      new Set(currentItems.map(getRecommendationKey)),
+    );
+    const seedKeys = visibleItems.slice(0, 10).map(getRecommendationKey);
+    const fallbackSeedKeys = currentItems.slice(0, 10).map(getRecommendationKey);
+
+    try {
+      const payload = await mongoClient.fetchMoreLikeThisRecommendations({
+        seedKeys: seedKeys.length ? seedKeys : fallbackSeedKeys,
+        excludedKeys,
+        genre: selectedGenre,
+        language: selectedLanguage,
+        contentType: contentTypeFilter,
+      });
+      const existing = new Set(excludedKeys);
+      const fresh = payload.items.filter((item) => {
+        const key = getRecommendationKey(item);
+        if (existing.has(key)) return false;
+        existing.add(key);
+        return true;
+      });
+
+      setExtraItems((prev) => [...prev, ...fresh]);
+    } catch {
+      return;
+    } finally {
+      setIsFetchingMore(false);
+    }
+  }, [
+    isFetchingMore,
+    recommendations,
+    extraItems,
+    visibleItems,
+    selectedGenre,
+    selectedLanguage,
+    contentTypeFilter,
+  ]);
 
   const hasMore = visibleCount < processedItems.length;
 
