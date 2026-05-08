@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import TVDetail from "./TVDetail";
+import MovieDetail from "./MovieDetail";
 
 const mocks = vi.hoisted(() => ({
   useQuery: vi.fn(),
@@ -35,16 +35,15 @@ vi.mock("@/frontend/hooks/useWatchlist", () => ({
 }));
 
 vi.mock("@/shared/lib/tmdb", () => ({
-  getTVShowDetails: vi.fn(),
-  getTVShowCredits: vi.fn(),
-  getTVShowVideos: vi.fn(),
-  getTVShowKeywords: vi.fn(),
-  getSimilarTVShows: vi.fn(),
-  getTVSeasonDetails: vi.fn(),
-  getTVWatchProviders: vi.fn(),
+  getMovieDetails: vi.fn(),
+  getMovieCredits: vi.fn(),
+  getMovieReleaseDates: vi.fn(),
+  getMovieVideos: vi.fn(),
+  getMovieKeywords: vi.fn(),
+  getSimilarMovies: vi.fn(),
+  getMovieWatchProviders: vi.fn(),
   getBackdropUrl: () => "/backdrop.jpg",
   getPosterUrl: () => "/poster.jpg",
-  getStillUrl: () => "/still.jpg",
   getYouTubeTrailerUrl: () => null,
   getLanguageLabel: () => "English",
 }));
@@ -81,41 +80,33 @@ vi.mock("@/frontend/components/CommentsSection", () => ({
   default: () => <div data-testid="comments-section" />,
 }));
 
-const tvShow = {
-  id: 321,
-  name: "Signal Show",
-  original_name: "Signal Show",
+const movie = {
+  id: 693134,
+  title: "Dune: Part Two",
+  original_title: "Dune: Part Two",
   tagline: "",
-  overview: "A test show",
-  poster_path: null,
+  overview: "A test movie",
+  poster_path: "/dune.jpg",
   backdrop_path: null,
-  first_air_date: "2024-01-01",
-  vote_average: 8.2,
-  vote_count: 500,
-  popularity: 50,
-  genre_ids: [18],
+  release_date: "2024-03-01",
+  vote_average: 8.4,
+  vote_count: 1200,
+  popularity: 100,
+  genre_ids: [878],
   original_language: "en",
-  origin_country: ["US"],
-  genres: [{ id: 18, name: "Drama" }],
-  status: "Returning Series",
-  type: "Scripted",
-  number_of_seasons: 1,
-  number_of_episodes: 8,
-  episode_run_time: [45],
-  seasons: [
-    {
-      id: 1,
-      name: "Season 1",
-      overview: "",
-      poster_path: null,
-      air_date: "2024-01-01",
-      episode_count: 8,
-      season_number: 1,
-    },
-  ],
+  adult: false,
+  video: false,
+  genres: [{ id: 878, name: "Science Fiction" }],
+  production_countries: [],
+  status: "Released",
+  runtime: 166,
+  budget: 190000000,
+  revenue: 700000000,
+  imdb_id: "tt15239678",
+  homepage: "",
 };
 
-describe("TVDetail", () => {
+describe("MovieDetail", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.scrollTo = vi.fn();
@@ -132,9 +123,9 @@ describe("TVDetail", () => {
       },
     );
 
-    mocks.useParams.mockReturnValue({ id: "321" });
+    mocks.useParams.mockReturnValue({ id: "693134" });
     mocks.useNavigate.mockReturnValue(vi.fn());
-    mocks.useLocation.mockReturnValue({ state: null, pathname: "/tv/321", search: "", hash: "" });
+    mocks.useLocation.mockReturnValue({ state: null, pathname: "/movie/693134", search: "", hash: "" });
     mocks.useAuth.mockReturnValue({ user: { id: "user_1" } });
     mocks.useUserData.mockReturnValue({
       addToWatchHistory: vi.fn(),
@@ -150,26 +141,19 @@ describe("TVDetail", () => {
     });
     mocks.useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
       const key = queryKey[0];
-      if (key === "tv") return { data: tvShow, isLoading: false, isError: false };
-      if (key === "tv-credits") return { data: { cast: [], crew: [] } };
-      if (key === "tv-videos") return { data: { results: [] } };
-      if (key === "similar-tv") return { data: { results: [] }, isLoading: false };
-      if (key === "tv-season") return { data: { episodes: [] }, isLoading: false };
-      if (key === "tv-watch-providers") return { data: { results: {} } };
-      if (key === "tv-keywords") return { data: [] };
+      if (key === "movie") return { data: movie, isLoading: false, isError: false };
+      if (key === "movie-credits") return { data: { cast: [], crew: [] } };
+      if (key === "movie-videos") return { data: { results: [] } };
+      if (key === "similar-movies") return { data: { results: [] }, isLoading: false };
+      if (key === "movie-watch-providers") return { data: { results: {} } };
+      if (key === "movie-release-dates") return { data: { results: [] } };
+      if (key === "movie-keywords") return { data: [] };
       return { data: undefined, isLoading: false, isError: false };
     });
   });
 
-  it("shows like and dislike reactions in the TV detail action row", () => {
-    render(<TVDetail />);
-
-    expect(screen.getByRole("button", { name: /^Like$/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Dislike$/i })).toBeInTheDocument();
-  });
-
-  it("shows a share action in the TV detail action row", () => {
-    render(<TVDetail />);
+  it("shows a share action in the movie detail action row", () => {
+    render(<MovieDetail />);
 
     expect(screen.getByRole("button", { name: /share/i })).toBeInTheDocument();
   });

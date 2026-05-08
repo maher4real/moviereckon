@@ -27,6 +27,7 @@ import WhereToWatch from "@/frontend/components/WhereToWatch";
 import CastList from "@/frontend/components/CastList";
 import MediaImage from "@/frontend/components/MediaImage";
 import ContentReactionButtons from "@/frontend/components/ContentReactionButtons";
+import ShareContentButton from "@/frontend/components/ShareContentButton";
 import { Button } from "@/frontend/components/ui/button";
 import {
   Dialog,
@@ -628,6 +629,11 @@ export default function MovieDetail() {
     { label: "Revenue", value: formatMoney(movie.revenue), icon: CircleDollarSign },
   ];
   const heroVisualSrc = getBackdropUrl(movie.backdrop_path, "large");
+  const sharePageUrl =
+    typeof window === "undefined"
+      ? `/movie/${movie.id}`
+      : `${window.location.origin}/movie/${movie.id}`;
+  const posterShareUrl = getPosterUrl(movie.poster_path, "large");
 
   return (
     <div className="app-page pb-20 md:pb-0 overflow-x-hidden">
@@ -863,6 +869,16 @@ export default function MovieDetail() {
                 posterPath={movie.poster_path}
                 genres={movie.genres.map((genre) => genre.id)}
                 language={movie.original_language}
+              />
+              <ShareContentButton
+                contentType="movie"
+                title={movie.title}
+                year={year}
+                overview={movie.overview}
+                rating={movie.vote_average}
+                genres={movie.genres.map((genre) => genre.name)}
+                posterUrl={posterShareUrl}
+                pageUrl={sharePageUrl}
               />
               <Button
                 size="lg"

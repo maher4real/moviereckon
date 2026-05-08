@@ -29,6 +29,7 @@ import WhereToWatch from "@/frontend/components/WhereToWatch";
 import CastList from "@/frontend/components/CastList";
 import MediaImage from "@/frontend/components/MediaImage";
 import ContentReactionButtons from "@/frontend/components/ContentReactionButtons";
+import ShareContentButton from "@/frontend/components/ShareContentButton";
 import { Button } from "@/frontend/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/frontend/components/ui/tabs";
 import {
@@ -628,6 +629,11 @@ export default function TVDetail() {
     { label: "Original Language", value: languageLabel, icon: Globe },
   ];
   const heroVisualSrc = getBackdropUrl(tvShow.backdrop_path, "large");
+  const sharePageUrl =
+    typeof window === "undefined"
+      ? `/tv/${tvShow.id}`
+      : `${window.location.origin}/tv/${tvShow.id}`;
+  const posterShareUrl = getPosterUrl(tvShow.poster_path, "large");
 
   return (
     <div className="app-page pb-20 md:pb-0 overflow-x-hidden">
@@ -868,6 +874,16 @@ export default function TVDetail() {
                 posterPath={tvShow.poster_path}
                 genres={tvShow.genres.map((genre) => genre.id)}
                 language={tvShow.original_language}
+              />
+              <ShareContentButton
+                contentType="tv"
+                title={tvShow.name}
+                year={year}
+                overview={tvShow.overview}
+                rating={tvShow.vote_average}
+                genres={tvShow.genres.map((genre) => genre.name)}
+                posterUrl={posterShareUrl}
+                pageUrl={sharePageUrl}
               />
               <Button
                 size="lg"
