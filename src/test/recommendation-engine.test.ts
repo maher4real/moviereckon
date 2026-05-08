@@ -281,4 +281,127 @@ describe("recommendation engine scoring", () => {
         .negativePenalty,
     ).toBeGreaterThan(0);
   });
+
+  it("applies ranking controls in seedless fallback without overriding hard exclusions", () => {
+    const excluded = normalizeTmdbItem(buildMovie(1400, { title: "Displayed" }))!;
+    const sourceMatched = normalizeTmdbItem(
+      buildMovie(1401, {
+        title: "Fallback Similar Source",
+        genre_ids: [28],
+        original_language: "fr",
+        popularity: 75,
+        vote_average: 7.1,
+      }),
+      { sourceTag: "similar:movie:10" },
+    )!;
+    const collaborativeMatched = normalizeTmdbItem(
+      buildMovie(1402, {
+        title: "Fallback Taste Match",
+        genre_ids: [35],
+        original_language: "es",
+        popularity: 38,
+        vote_average: 6.4,
+      }),
+    )!;
+    const skippedLike = normalizeTmdbItem(
+      buildMovie(1403, {
+        title: "Fallback Skipped-Like",
+        genre_ids: [27],
+        keywords: [{ id: 99, name: "revenge" }],
+        original_language: "en",
+        popularity: 80,
+        vote_average: 7,
+      }),
+    )!;
+    const cleanCandidate = normalizeTmdbItem(
+      buildMovie(1404, {
+        title: "Fallback Clean",
+        genre_ids: [18],
+        original_language: "en",
+        popularity: 75,
+        vote_average: 7.1,
+      }),
+    )!;
+
+    const ranked = getRecommendations(
+      [],
+      [excluded, sourceMatched, collaborativeMatched, skippedLike, cleanCandidate],
+      {
+        displayedIds: [excluded.key],
+        preferredLanguages: ["fr"],
+        sourceBoosts: { "similar:": 0.12 },
+        collaborativeBoosts: { [collaborativeMatched.key]: 0.16 },
+        negativeGenreIds: [27],
+        negativeKeywordTokens: ["revenge"],
+        maxCandidates: 20,
+      },
+    );
+
+    expect(ranked.map((entry) => entry.item.key)).not.toContain(excluded.key);
+    expect(ranked.slice(0, 2).map((entry) => entry.item.key)).toEqual(
+      expect.arrayContaining([sourceMatched.key, collaborativeMatched.key]),
+    );
+    expect(
+      ranked.find((entry) => entry.item.key === sourceMatched.key)?.scoreBreakdown
+        .source,
+    ).toBeGreaterThan(0);
+    expect(
+      ranked.find((entry) => entry.item.key === sourceMatched.key)?.scoreBreakdown
+        .preference,
+    ).toBeGreaterThan(0);
+    expect(
+      ranked.find((entry) => entry.item.key === collaborativeMatched.key)
+        ?.scoreBreakdown.collaborative,
+    ).toBeGreaterThan(0);
+    expect(
+      ranked.find((entry) => entry.item.key === skippedLike.key)?.scoreBreakdown
+        .negativePenalty,
+    ).toBeGreaterThan(0);
+    expect(
+      ranked.findIndex((entry) => entry.item.key === skippedLike.key),
+    ).toBeGreaterThan(ranked.findIndex((entry) => entry.item.key === cleanCandidate.key));
+  });
+
+  it("labels language-only preference boosts separately from genre boosts", () => {
+    const seed = normalizeTmdbItem(
+      buildMovie(1500, {
+        title: "English Seed",
+        genre_ids: [28],
+        original_language: "en",
+      }),
+    )!;
+    const languageMatch = normalizeTmdbItem(
+      buildMovie(1501, {
+        title: "Hindi Language Match",
+        genre_ids: [35],
+        original_language: "hi",
+        popularity: 80,
+      }),
+    )!;
+    const genericMatch = normalizeTmdbItem(
+      buildMovie(1502, {
+        title: "Generic Match",
+        genre_ids: [35],
+        original_language: "en",
+        popularity: 80,
+      }),
+    )!;
+
+    const ranked = getRecommendations(
+      [seed],
+      [genericMatch, languageMatch],
+      {
+        preferredLanguages: ["hi"],
+        maxCandidates: 20,
+      },
+    );
+    const languageEntry = ranked.find(
+      (entry) => entry.item.key === languageMatch.key,
+    );
+    const reasonLabels = languageEntry?.reasons.map((reason) => reason.label) || [];
+
+    expect(languageEntry?.scoreBreakdown.preference).toBeGreaterThan(0);
+    expect(reasonLabels).toContain("Matches preferred language");
+    expect(reasonLabels).not.toContain("Matches preferred genre");
+  });
 });

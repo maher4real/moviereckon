@@ -73,11 +73,17 @@ function getCollaborativeBoost(
   return clamp(collaborativeBoosts[item.key] || 0, 0, 0.18);
 }
 
-function getPreferenceBoost(
+type PreferenceSignals = {
+  boost: number;
+  genreBoost: number;
+  languageBoost: number;
+};
+
+function getPreferenceSignals(
   item: UnifiedContentItem,
   userContext: RecommendationUserContext | undefined,
   preferredGenreMatches: number,
-): number {
+): PreferenceSignals {
   const genreBoost =
     preferredGenreMatches > 0
       ? Math.min(0.36, 0.28 + preferredGenreMatches * 0.04)
@@ -93,7 +99,11 @@ function getPreferenceBoost(
       ? 0.12
       : 0;
 
-  return clamp(genreBoost + languageBoost, 0, 0.42);
+  return {
+    boost: clamp(genreBoost + languageBoost, 0, 0.42),
+    genreBoost,
+    languageBoost,
+  };
 }
 
 function getNegativePenalty(
@@ -504,10 +514,17 @@ function baseFallbackRanking(
       const preferredGenreMatches = item.genreIds.filter((genreId) =>
         preferredGenreSet.has(genreId),
       ).length;
-      const preferenceComponent =
-        preferredGenreMatches > 0
-          ? Math.min(0.34, 0.24 + preferredGenreMatches * 0.05)
-          : 0;
+      const preferenceSignals = getPreferenceSignals(
+        item,
+        userContext,
+        preferredGenreMatches,
+      );
+      const sourceBoost = getSourceBoost(item, userContext?.sourceBoosts);
+      const collaborativeBoost = getCollaborativeBoost(
+        item,
+        userContext?.collaborativeBoosts,
+      );
+      const negativePenalty = getNegativePenalty(item, userContext);
       const novelty = 0.05;
 
       const scoreBreakdown: ScoreBreakdown = {
@@ -520,14 +537,28 @@ function baseFallbackRanking(
         popularity: popularityComponent,
         novelty,
         diversityPenalty: 0,
+        preference: preferenceSignals.boost,
+        source: sourceBoost,
+        collaborative: collaborativeBoost,
+        negativePenalty,
       };
 
       return {
         item,
-        score: qualityComponent + popularityComponent + preferenceComponent + novelty,
+        score:
+          qualityComponent +
+          popularityComponent +
+          preferenceSignals.boost +
+          sourceBoost +
+          collaborativeBoost +
+          novelty -
+          negativePenalty,
         reasons: [
-          ...(preferenceComponent > 0
+          ...(preferenceSignals.genreBoost > 0
             ? [{ label: "Matches preferred genre" } as RecommendationReason]
+            : []),
+          ...(preferenceSignals.languageBoost > 0
+            ? [{ label: "Matches preferred language" } as RecommendationReason]
             : []),
           { label: "Highly rated" },
           { label: "Popular pick" },
@@ -642,7 +673,7 @@ export function getRecommendations(
       const preferredGenreMatches = candidate.genreIds.filter((genreId) =>
         preferredGenreSet.has(genreId),
       ).length;
-      const preferenceBoost = getPreferenceBoost(
+      const preferenceSignals = getPreferenceSignals(
         candidate,
         userContext,
         preferredGenreMatches,
@@ -656,7 +687,7 @@ export function getRecommendations(
       const blendedScore =
         bestScore * 0.65 +
         averageScore * 0.35 +
-        preferenceBoost +
+        preferenceSignals.boost +
         sourceBoost +
         collaborativeBoost -
         negativePenalty;
@@ -671,7 +702,7 @@ export function getRecommendations(
         popularity: weightTotal > 0 ? weightedBreakdownTotals.popularity / weightTotal : 0,
         novelty: weightTotal > 0 ? weightedBreakdownTotals.novelty / weightTotal : 0,
         diversityPenalty: 0,
-        preference: preferenceBoost,
+        preference: preferenceSignals.boost,
         source: sourceBoost,
         collaborative: collaborativeBoost,
         negativePenalty,
@@ -681,8 +712,11 @@ export function getRecommendations(
         item: candidate,
         score: blendedScore,
         reasons: [
-          ...(preferenceBoost > 0
+          ...(preferenceSignals.genreBoost > 0
             ? [{ label: "Matches preferred genre" } as RecommendationReason]
+            : []),
+          ...(preferenceSignals.languageBoost > 0
+            ? [{ label: "Matches preferred language" } as RecommendationReason]
             : []),
           ...bestReasons,
         ].slice(0, 3),
