@@ -1,6 +1,5 @@
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import BottomNav from "@/frontend/components/BottomNav";
 import Footer from "@/frontend/components/Footer";
 import Header from "@/frontend/components/Header";
 import { AppPageSkeleton } from "@/frontend/components/AppSkeletons";
@@ -504,7 +503,6 @@ export default function ProfileEdit() {
       </main>
 
       <Footer />
-      <BottomNav />
     </div>
   );
 }

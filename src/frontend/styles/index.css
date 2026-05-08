@@ -14,16 +14,16 @@
     --popover: 0 0% 7%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 357 92% 47%;
+    --primary: 357 92% 48%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 357 78% 28%;
+    --secondary: 23 92% 32%;
     --secondary-foreground: 0 0% 100%;
 
     --muted: 0 0% 15%;
     --muted-foreground: 0 0% 64%;
 
-    --accent: 357 78% 16%;
+    --accent: 18 82% 17%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -31,27 +31,41 @@
 
     --border: 0 0% 18%;
     --input: 0 0% 18%;
-    --ring: 357 92% 47%;
+    --ring: 14 95% 48%;
 
     --radius: 0.5rem;
 
     --sidebar-background: 0 0% 6%;
     --sidebar-foreground: 0 0% 90%;
-    --sidebar-primary: 357 92% 47%;
+    --sidebar-primary: 357 92% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 0 0% 12%;
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 0 0% 15%;
-    --sidebar-ring: 357 92% 47%;
+    --sidebar-ring: 14 95% 48%;
 
     /* Custom MovieReckon tokens */
+    --brand-orange: 23 92% 32%;
+    --brand-ember: 14 95% 43%;
+    --brand-gradient: linear-gradient(
+      135deg,
+      hsl(var(--primary)) 0%,
+      hsl(var(--brand-ember)) 48%,
+      hsl(var(--brand-orange)) 100%
+    );
+    --brand-gradient-soft: linear-gradient(
+      135deg,
+      hsl(var(--primary) / 0.18) 0%,
+      hsl(var(--brand-ember) / 0.14) 48%,
+      hsl(var(--brand-orange) / 0.18) 100%
+    );
     --gradient-hero: linear-gradient(to top, hsl(var(--background)) 0%, transparent 100%);
     --gradient-card: linear-gradient(
       180deg,
       transparent 0%,
       hsl(var(--background) / 0.92) 100%
     );
-    --shadow-glow: 0 0 24px hsl(var(--primary) / 0.32);
+    --shadow-glow: 0 0 24px hsl(var(--brand-ember) / 0.34);
     --ease-fluid: cubic-bezier(0.22, 1, 0.36, 1);
   }
 
@@ -65,16 +79,16 @@
     --popover: 0 0% 7%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 357 92% 47%;
+    --primary: 357 92% 48%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 357 78% 28%;
+    --secondary: 23 92% 32%;
     --secondary-foreground: 0 0% 100%;
 
     --muted: 0 0% 15%;
     --muted-foreground: 0 0% 64%;
 
-    --accent: 357 78% 16%;
+    --accent: 18 82% 17%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -82,7 +96,7 @@
 
     --border: 0 0% 18%;
     --input: 0 0% 18%;
-    --ring: 357 92% 47%;
+    --ring: 14 95% 48%;
   }
 }
 
@@ -105,6 +119,8 @@
     -webkit-overflow-scrolling: touch;
     text-rendering: optimizeLegibility;
     background:
+      radial-gradient(circle at 10% -8%, hsl(var(--primary) / 0.16), transparent 34rem),
+      radial-gradient(circle at 84% 12%, hsl(var(--brand-orange) / 0.13), transparent 32rem),
       linear-gradient(180deg, hsl(0 0% 6%) 0%, hsl(var(--background)) 46%, hsl(0 0% 3%) 100%);
   }
 
@@ -156,6 +172,8 @@
   .app-page {
     @apply min-h-screen bg-background text-foreground;
     background:
+      radial-gradient(circle at 12% 5%, hsl(var(--primary) / 0.13), transparent 26rem),
+      radial-gradient(circle at 88% 10%, hsl(var(--brand-orange) / 0.12), transparent 26rem),
       linear-gradient(180deg, hsl(0 0% 6% / 0.92), hsl(var(--background)) 34rem),
       repeating-linear-gradient(
         90deg,
@@ -259,20 +277,21 @@
   }
 
   .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary via-red-500 to-red-200;
+    @apply bg-clip-text text-transparent;
+    background-image: var(--brand-gradient);
   }
 
   .brand-text-gradient-loop {
     background-image: linear-gradient(
       90deg,
       hsl(var(--primary)) 0%,
-      hsl(357 92% 56%) 12.5%,
-      hsl(357 86% 42%) 25%,
-      hsl(0 0% 98%) 37.5%,
+      hsl(var(--brand-ember)) 12.5%,
+      hsl(var(--brand-orange)) 25%,
+      hsl(32 95% 72%) 37.5%,
       hsl(var(--primary)) 50%,
-      hsl(357 92% 56%) 62.5%,
-      hsl(357 86% 42%) 75%,
-      hsl(0 0% 98%) 87.5%,
+      hsl(var(--brand-ember)) 62.5%,
+      hsl(var(--brand-orange)) 75%,
+      hsl(32 95% 72%) 87.5%,
       hsl(var(--primary)) 100%
     );
     background-position: 0% 50%;
@@ -281,7 +300,9 @@
   }
 
   .glow-primary {
-    box-shadow: 0 0 20px hsl(var(--primary) / 0.3);
+    box-shadow:
+      0 0 20px hsl(var(--primary) / 0.3),
+      0 0 34px hsl(var(--brand-orange) / 0.16);
   }
 
   .glow-secondary {
@@ -291,6 +312,7 @@
   /* Button hierarchy - Primary is red, consistent styling */
   .btn-primary {
     @apply bg-primary text-primary-foreground hover:bg-primary/90 transition-colors duration-200;
+    background-image: var(--brand-gradient);
     transition-timing-function: var(--ease-fluid);
   }
 
@@ -300,8 +322,35 @@
   }
 
   .btn-brand-soft {
-    @apply bg-primary/15 text-primary shadow-[0_10px_24px_hsl(var(--primary)/0.14)] hover:bg-primary/20 hover:text-primary;
+    @apply text-primary shadow-[0_10px_24px_hsl(var(--primary)/0.14)] hover:text-primary;
+    background: var(--brand-gradient-soft);
     transition-timing-function: var(--ease-fluid);
+  }
+
+  .brand-primary-button {
+    @apply text-primary-foreground transition-[filter,box-shadow,transform] duration-200;
+    background-image: var(--brand-gradient);
+    box-shadow:
+      0 14px 34px hsl(var(--primary) / 0.26),
+      0 0 28px hsl(var(--brand-orange) / 0.18);
+    transition-timing-function: var(--ease-fluid);
+  }
+
+  .brand-primary-button:hover {
+    filter: saturate(1.08) brightness(1.04);
+    box-shadow:
+      0 18px 44px hsl(var(--primary) / 0.3),
+      0 0 36px hsl(var(--brand-orange) / 0.22);
+  }
+
+  .brand-warm-surface {
+    background:
+      linear-gradient(135deg, hsl(var(--primary) / 0.12), hsl(var(--brand-orange) / 0.08) 45%, hsl(var(--card) / 0.68)),
+      hsl(var(--card) / 0.42);
+  }
+
+  .brand-gradient-bar {
+    background-image: var(--brand-gradient);
   }
 
   .btn-tertiary {
@@ -348,7 +397,8 @@
     @apply border-primary/45;
     box-shadow:
       0 18px 42px hsl(0 0% 0% / 0.46),
-      0 0 0 1px hsl(var(--primary) / 0.12);
+      0 0 0 1px hsl(var(--primary) / 0.14),
+      0 0 28px hsl(var(--brand-orange) / 0.12);
   }
 
   .group:hover .poster-card img,
@@ -358,6 +408,7 @@
 
   .poster-play-button {
     @apply flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-primary text-primary-foreground shadow-lg shadow-primary/30 backdrop-blur-sm transition-colors duration-200 hover:bg-primary/90;
+    background-image: var(--brand-gradient);
   }
 
   .rating-badge {

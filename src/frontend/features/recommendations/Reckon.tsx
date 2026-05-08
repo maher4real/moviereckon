@@ -16,7 +16,6 @@ import {
 } from "@/shared/lib/tmdb";
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
-import BottomNav from "@/frontend/components/BottomNav";
 import { PosterGridSkeleton } from "@/frontend/components/AppSkeletons";
 import { ContentCard } from "@/frontend/components/ContentCard";
 import { Button } from "@/frontend/components/ui/button";
@@ -1237,7 +1236,6 @@ export default function Reckon() {
       </main>
 
       <Footer />
-      <BottomNav />
     </div>
   );
 }

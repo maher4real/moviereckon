@@ -29,6 +29,7 @@ import ErrorBoundary from "@/frontend/components/ErrorBoundary";
 import StartupSoundManager from "@/frontend/components/StartupSoundManager";
 import AuthTransitionOverlay from "@/frontend/components/AuthTransitionOverlay";
 import { CenteredAppSkeleton } from "@/frontend/components/AppSkeletons";
+import BottomNav from "@/frontend/components/BottomNav";
 import type { MongoUser } from "@/frontend/lib/mongodbClient";
 import Auth from "@/frontend/features/auth/Auth";
 import Home from "@/frontend/features/browse/Home";
@@ -169,6 +170,58 @@ function AppRouter({
   return <BrowserRouter>{children}</BrowserRouter>;
 }
 
+const protectedBottomNavRouteRoots = [
+  "/home",
+  "/upcoming",
+  "/search",
+  "/profile",
+  "/reckon",
+  "/movies",
+  "/series",
+  "/theater",
+];
+
+const publicBottomNavRouteRoots = [
+  "/about",
+  "/feedback",
+  "/contact",
+  "/faq",
+  "/terms",
+  "/privacy",
+];
+
+const protectedBottomNavDetailPrefixes = ["/movie/", "/tv/", "/person/"];
+
+function isRouteRootMatch(pathname: string, roots: string[]) {
+  return roots.some((root) => pathname === root || pathname.startsWith(`${root}/`));
+}
+
+function isProtectedBottomNavRoute(pathname: string) {
+  if (/^\/theater\/[^/]+\/play\/?$/.test(pathname)) {
+    return false;
+  }
+
+  return (
+    isRouteRootMatch(pathname, protectedBottomNavRouteRoots) ||
+    protectedBottomNavDetailPrefixes.some((prefix) => pathname.startsWith(prefix))
+  );
+}
+
+function MobileBottomNav() {
+  const location = useLocation();
+  const { user, isLoading } = useAuth();
+
+  if (isRouteRootMatch(location.pathname, publicBottomNavRouteRoots)) {
+    return <BottomNav />;
+  }
+
+  if (isProtectedBottomNavRoute(location.pathname) && user && !isLoading) {
+    return <BottomNav />;
+  }
+
+  return null;
+}
+
 const App = ({
   initialLocation = "/",
   dehydratedState,
@@ -251,6 +304,7 @@ const App = ({
                           <Route path="*" element={<NotFound />} />
                         </RouteTransition>
                       </Suspense>
+                      <MobileBottomNav />
                     </AppRouter>
                   </MotionConfig>
                 </TooltipProvider>

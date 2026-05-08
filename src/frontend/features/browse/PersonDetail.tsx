@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
-import BottomNav from "@/frontend/components/BottomNav";
 import MediaImage from "@/frontend/components/MediaImage";
 import { Button } from "@/frontend/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/frontend/components/ui/scroll-area";
@@ -309,12 +308,15 @@ export default function PersonDetail() {
 
   if (!person) {
     return (
-      <div className="app-page flex items-center justify-center px-4">
-        <div className="empty-state max-w-md">
-          <p className="text-xl text-muted-foreground mb-4">Person not found</p>
-          <Button onClick={() => navigate("/home")} className="bg-primary hover:bg-primary/90">
-            Go Home
-          </Button>
+      <div className="app-page pb-20 md:pb-0">
+        <Header />
+        <div className="flex min-h-screen items-center justify-center px-4 pt-24">
+          <div className="empty-state max-w-md">
+            <p className="text-xl text-muted-foreground mb-4">Person not found</p>
+            <Button onClick={() => navigate("/home")} className="bg-primary hover:bg-primary/90">
+              Go Home
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -530,7 +532,6 @@ export default function PersonDetail() {
       </main>
 
       <Footer />
-      <BottomNav />
     </div>
   );
 }

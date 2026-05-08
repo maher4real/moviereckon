@@ -3,7 +3,6 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
-import BottomNav from "@/frontend/components/BottomNav";
 import MediaImage from "@/frontend/components/MediaImage";
 import { Button } from "@/frontend/components/ui/button";
 import { ArrowLeft, Play, Star, Calendar, Tag, Users, Film, User } from "lucide-react";
@@ -240,7 +239,6 @@ export default function TheaterDetail() {
       </main>
 
       <Footer />
-      <BottomNav />
     </div>
   );
 }

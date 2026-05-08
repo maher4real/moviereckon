@@ -171,7 +171,7 @@ export default function ContentCarousel({
       {title && (
         <div className="mb-3 flex min-w-0 items-center justify-between gap-3 md:mb-4">
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className="h-8 w-1 rounded-full bg-primary shadow-lg shadow-primary/25 shrink-0" />
+            <div className="brand-gradient-bar h-8 w-1 shrink-0 rounded-full shadow-lg shadow-primary/25" />
             {Icon && <Icon className="w-5 h-5 text-primary shrink-0" />}
             <h2 className="min-w-0 truncate text-lg font-bold tracking-tight md:text-xl">{title}</h2>
           </div>

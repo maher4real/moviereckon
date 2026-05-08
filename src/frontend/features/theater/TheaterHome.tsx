@@ -2,7 +2,6 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
-import BottomNav from "@/frontend/components/BottomNav";
 import { Button } from "@/frontend/components/ui/button";
 import { Play, Star, Settings, Film, HardDrive, Video } from "lucide-react";
 import { useAuth } from "@/frontend/hooks/useAuth";
@@ -218,7 +217,6 @@ export default function TheaterHome() {
       </main>
 
       <Footer />
-      <BottomNav />
     </div>
   );
 }

@@ -17,7 +17,6 @@ import {
 } from "@/shared/lib/tmdb";
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
-import BottomNav from "@/frontend/components/BottomNav";
 import {
   AppPageSkeleton,
   PosterGridSkeleton,
@@ -563,7 +562,6 @@ export default function Series() {
       </main>
 
       <Footer />
-      <BottomNav />
     </div>
   );
 }

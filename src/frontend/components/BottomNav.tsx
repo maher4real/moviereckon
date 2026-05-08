@@ -20,7 +20,11 @@ export default function BottomNav() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-background/95 backdrop-blur-md border-t border-border safe-area-bottom">
+    <nav
+      aria-label="Primary mobile navigation"
+      data-bottom-nav="true"
+      className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-background/95 backdrop-blur-md border-t border-border safe-area-bottom"
+    >
       <div className="flex items-center justify-around h-16 px-1">
         {navItems.map((item) => {
           const active = isActive(item.href);

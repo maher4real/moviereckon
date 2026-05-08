@@ -1,4 +1,3 @@
-import BottomNav from "@/frontend/components/BottomNav";
 import Footer from "@/frontend/components/Footer";
 import Header from "@/frontend/components/Header";
 import { BadgeInfo, BookCheck, FileText, HelpCircle, Mail, MessageSquare } from "lucide-react";
@@ -268,7 +267,6 @@ export default function InfoPage({ page }: InfoPageProps) {
       </main>
 
       <Footer />
-      <BottomNav />
     </div>
   );
 }

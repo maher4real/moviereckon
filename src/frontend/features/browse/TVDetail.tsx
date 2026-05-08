@@ -24,7 +24,6 @@ import {
 } from "@/shared/lib/tmdb";
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
-import BottomNav from "@/frontend/components/BottomNav";
 import ContentCarousel from "@/frontend/components/ContentCarousel";
 import WhereToWatch from "@/frontend/components/WhereToWatch";
 import CastList from "@/frontend/components/CastList";
@@ -584,17 +583,20 @@ export default function TVDetail() {
 
   if (tvError || !tvShow) {
     return (
-      <div className="app-page flex items-center justify-center px-4">
-        <div className="empty-state max-w-md">
-          <p className="text-xl text-muted-foreground mb-2">
-            {tvError ? "Failed to load TV show" : "TV Show not found"}
-          </p>
-          {tvError && (
-            <p className="text-sm text-muted-foreground mb-4">Check your connection and try again.</p>
-          )}
-          <Button onClick={() => navigate(-1)} className="bg-primary hover:bg-primary/90">
-            Go Back
-          </Button>
+      <div className="app-page pb-20 md:pb-0">
+        <Header />
+        <div className="flex min-h-screen items-center justify-center px-4 pt-24">
+          <div className="empty-state max-w-md">
+            <p className="text-xl text-muted-foreground mb-2">
+              {tvError ? "Failed to load TV show" : "TV Show not found"}
+            </p>
+            {tvError && (
+              <p className="text-sm text-muted-foreground mb-4">Check your connection and try again.</p>
+            )}
+            <Button onClick={() => navigate(-1)} className="bg-primary hover:bg-primary/90">
+              Go Back
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -1143,7 +1145,6 @@ export default function TVDetail() {
       </Dialog>
 
       <Footer />
-      <BottomNav />
     </div>
   );
 }

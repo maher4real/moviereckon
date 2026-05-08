@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
-import BottomNav from "@/frontend/components/BottomNav";
 import { Button } from "@/frontend/components/ui/button";
 import { Input } from "@/frontend/components/ui/input";
 import {
@@ -315,7 +314,6 @@ export default function TheaterAdmin() {
           </div>
         </main>
         <Footer />
-        <BottomNav />
       </div>
     );
   }
@@ -426,7 +424,6 @@ export default function TheaterAdmin() {
         </div>
       </main>
       <Footer />
-      <BottomNav />
     </div>
   );
 }

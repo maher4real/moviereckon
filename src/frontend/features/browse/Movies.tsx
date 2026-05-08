@@ -19,7 +19,6 @@ import {
 import type { TMDBResponse } from "@/shared/lib/tmdb";
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
-import BottomNav from "@/frontend/components/BottomNav";
 import {
   AppPageSkeleton,
   PosterGridSkeleton,
@@ -499,7 +498,6 @@ export default function Movies() {
       </main>
 
       <Footer />
-      <BottomNav />
     </div>
   );
 }

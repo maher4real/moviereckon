@@ -17,7 +17,6 @@ import {
 } from "@/shared/lib/tmdb";
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
-import BottomNav from "@/frontend/components/BottomNav";
 import MediaImage from "@/frontend/components/MediaImage";
 import { AppPageSkeleton, PosterGridSkeleton } from "@/frontend/components/AppSkeletons";
 import { Input } from "@/frontend/components/ui/input";
@@ -380,7 +379,6 @@ export default function Search() {
       </main>
 
       <Footer />
-      <BottomNav />
     </div>
   );
 }

@@ -128,7 +128,7 @@ export default function HeroBanner({
                 >
                   <Button
                     size="lg"
-                    className="bg-primary hover:bg-primary/90 glow-primary font-semibold text-primary-foreground"
+                    className="brand-primary-button font-semibold"
                     onClick={() =>
                       navigate(`/movie/${movie.id}`, { state: { from: fromPath, autoPlayTrailer: true } })
                     }
@@ -171,7 +171,7 @@ export default function HeroBanner({
               className={cn(
                 "h-2 rounded-full transition-colors duration-300",
                 index === currentIndex
-                  ? "bg-primary"
+                  ? "bg-primary shadow-[0_0_16px_hsl(var(--brand-orange)/0.28)]"
                   : "bg-foreground/30 hover:bg-foreground/50"
               )}
               aria-label={`Go to slide ${index + 1}`}

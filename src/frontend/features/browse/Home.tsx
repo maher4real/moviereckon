@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, memo, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import { useUserData } from "@/frontend/hooks/useUserData";
 import { useRecommendations } from "@/frontend/hooks/useRecommendations";
@@ -16,14 +17,15 @@ import {
   getNowPlayingMovies,
   getUpcomingMovies,
   getUpcomingTVShows,
+  getPosterUrl,
   Movie,
   TVShow,
 } from "@/shared/lib/tmdb";
 import Header from "@/frontend/components/Header";
-import BottomNav from "@/frontend/components/BottomNav";
 import HeroBanner from "@/frontend/components/HeroBanner";
 import ContentCarousel from "@/frontend/components/ContentCarousel";
 import Footer from "@/frontend/components/Footer";
+import MediaImage from "@/frontend/components/MediaImage";
 import {
   Sparkles,
   ArrowRight,
@@ -51,6 +53,25 @@ type HomeUpcomingData = {
   tvShows: TVShow[];
 };
 
+type ArrivalCard = {
+  id: string;
+  title: string;
+  src: string;
+};
+
+const ARRIVAL_CARD_COUNT = 9;
+const ARRIVAL_FLIGHTS = [
+  { fromX: -560, fromY: 280, toX: -330, toY: 104, fromRotate: -22, toRotate: -10, delay: 0.02 },
+  { fromX: -420, fromY: 340, toX: -238, toY: 56, fromRotate: 18, toRotate: 7, delay: 0.09 },
+  { fromX: -240, fromY: 400, toX: -146, toY: 92, fromRotate: -14, toRotate: -4, delay: 0.15 },
+  { fromX: -70, fromY: 360, toX: -48, toY: 42, fromRotate: 10, toRotate: 3, delay: 0.2 },
+  { fromX: 80, fromY: 420, toX: 46, toY: 104, fromRotate: -8, toRotate: -2, delay: 0.26 },
+  { fromX: 250, fromY: 350, toX: 144, toY: 52, fromRotate: 16, toRotate: 5, delay: 0.31 },
+  { fromX: 430, fromY: 290, toX: 238, toY: 96, fromRotate: -18, toRotate: -6, delay: 0.36 },
+  { fromX: 540, fromY: 200, toX: 326, toY: 42, fromRotate: 20, toRotate: 8, delay: 0.42 },
+  { fromX: 0, fromY: 520, toX: 0, toY: 136, fromRotate: 0, toRotate: 0, delay: 0.48 },
+] as const;
+
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timeoutId = window.setTimeout(() => {
@@ -70,6 +91,124 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   });
 }
 
+function getMediaTitle(item: Movie | TVShow): string {
+  return "title" in item ? item.title : item.name;
+}
+
+function buildArrivalCards(items: (Movie | TVShow)[]): ArrivalCard[] {
+  const seen = new Set<string>();
+  const cards: ArrivalCard[] = [];
+
+  for (const item of items) {
+    const itemType = "title" in item ? "movie" : "tv";
+    const key = `${itemType}:${item.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    cards.push({
+      id: key,
+      title: getMediaTitle(item),
+      src: getPosterUrl(item.poster_path || null, "medium"),
+    });
+
+    if (cards.length >= ARRIVAL_CARD_COUNT) break;
+  }
+
+  while (cards.length < ARRIVAL_CARD_COUNT) {
+    const index = cards.length;
+    cards.push({
+      id: `fallback-arrival-${index}`,
+      title: "MovieReckon",
+      src: "/fallbacks/poster.svg",
+    });
+  }
+
+  return cards;
+}
+
+function HomeArrivalAnimation({
+  active,
+  items,
+}: {
+  active: boolean;
+  items: (Movie | TVShow)[];
+}) {
+  const cards = useMemo(() => buildArrivalCards(items), [items]);
+
+  return (
+    <AnimatePresence>
+      {active && (
+        <motion.div
+          aria-hidden="true"
+          data-home-arrival="true"
+          className="pointer-events-none absolute inset-x-0 top-0 z-40 h-screen overflow-hidden"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <motion.div
+            className="absolute inset-0"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 0.9, 0.62, 0] }}
+            transition={{ duration: 1.65, times: [0, 0.25, 0.72, 1], ease: "easeOut" }}
+          >
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_58%,hsl(var(--primary)/0.22),transparent_24rem),radial-gradient(circle_at_46%_62%,hsl(var(--brand-orange)/0.2),transparent_32rem)]" />
+            <div className="absolute inset-x-[-12%] top-[52%] h-28 -rotate-3 bg-[linear-gradient(90deg,transparent,hsl(var(--primary)/0.22),hsl(var(--brand-orange)/0.18),transparent)] blur-xl" />
+          </motion.div>
+
+          <div className="absolute left-1/2 top-[54%]">
+            {cards.map((card, index) => {
+              const flight = ARRIVAL_FLIGHTS[index % ARRIVAL_FLIGHTS.length];
+
+              return (
+                <motion.div
+                  key={card.id}
+                  className="absolute w-[clamp(68px,11vw,124px)] origin-center"
+                  initial={{
+                    opacity: 0,
+                    x: flight.fromX,
+                    y: flight.fromY,
+                    rotate: flight.fromRotate,
+                    scale: 0.7,
+                    filter: "blur(8px)",
+                  }}
+                  animate={{
+                    opacity: [0, 1, 1, 0],
+                    x: [flight.fromX, flight.toX, flight.toX * 0.34, 0],
+                    y: [flight.fromY, flight.toY, 24, -20],
+                    rotate: [flight.fromRotate, flight.toRotate, 0, 0],
+                    scale: [0.7, 1, 0.86, 0.56],
+                    filter: ["blur(8px)", "blur(0px)", "blur(0px)", "blur(5px)"],
+                  }}
+                  transition={{
+                    duration: 1.52,
+                    delay: flight.delay,
+                    times: [0, 0.42, 0.78, 1],
+                    ease: [0.16, 1, 0.3, 1],
+                  }}
+                >
+                  <div className="relative aspect-[2/3] overflow-hidden rounded-lg border border-white/18 bg-card shadow-[0_24px_70px_hsl(0_0%_0%/0.58),0_0_34px_hsl(var(--brand-orange)/0.16)]">
+                    <MediaImage
+                      src={card.src}
+                      alt=""
+                      aria-hidden="true"
+                      className="h-full w-full object-cover"
+                      fallbackSrc="/fallbacks/poster.svg"
+                      loading={index < 4 ? "eager" : "lazy"}
+                    />
+                    <div className="absolute inset-0 bg-[linear-gradient(160deg,hsl(var(--primary)/0.14),transparent_34%,hsl(var(--brand-orange)/0.18))]" />
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 export default function Home() {
   const { user, profile } = useAuth();
   const { watchHistory, isLoading: dataLoading } = useUserData();
@@ -80,11 +219,15 @@ export default function Home() {
     explanationById,
   } = useRecommendations();
   const navigate = useNavigate();
+  const shouldReduceHomeMotion = useReducedMotion();
   const [heroIndex, setHeroIndex] = useState(0);
   const [loadSecondaryShelves, setLoadSecondaryShelves] = useState(false);
   const [loadTertiaryShelves, setLoadTertiaryShelves] = useState(false);
   const [isHeroVisualReady, setIsHeroVisualReady] = useState(false);
+  const [showHomeArrival, setShowHomeArrival] = useState(false);
   const hasAnnouncedHeroReadyRef = useRef(false);
+  const hasRunHomeArrivalRef = useRef(false);
+  const homeArrivalHideTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -362,6 +505,29 @@ export default function Home() {
     });
   }, [watchHistory]);
 
+  const homeArrivalItems = useMemo<(Movie | TVShow)[]>(
+    () => [
+      ...(reckonItems as (Movie | TVShow)[]),
+      ...heroMovies,
+      ...filteredNowPlaying,
+      ...filteredUpcoming,
+      ...recentlyWatched,
+      ...(bollywoodData?.results || []),
+      ...(hollywoodData?.results || []),
+      ...(tvShowsData?.results || []),
+    ],
+    [
+      bollywoodData,
+      filteredNowPlaying,
+      filteredUpcoming,
+      heroMovies,
+      hollywoodData,
+      reckonItems,
+      recentlyWatched,
+      tvShowsData,
+    ],
+  );
+
   const handleDotClick = useCallback((index: number) => {
     setHeroIndex(index);
   }, []);
@@ -373,12 +539,44 @@ export default function Home() {
     announceHomeHeroReady();
   }, []);
 
+  const startHomeArrival = useCallback(() => {
+    if (shouldReduceHomeMotion || hasRunHomeArrivalRef.current) return;
+
+    hasRunHomeArrivalRef.current = true;
+    setShowHomeArrival(true);
+    homeArrivalHideTimerRef.current = window.setTimeout(() => {
+      homeArrivalHideTimerRef.current = null;
+      setShowHomeArrival(false);
+    }, 1780);
+  }, [shouldReduceHomeMotion]);
+
+  useEffect(() => {
+    if (shouldReduceHomeMotion || hasRunHomeArrivalRef.current) return;
+
+    if (isHeroVisualReady || !trendingLoading) {
+      startHomeArrival();
+      return;
+    }
+
+    const fallbackStartId = window.setTimeout(startHomeArrival, 700);
+    return () => window.clearTimeout(fallbackStartId);
+  }, [isHeroVisualReady, shouldReduceHomeMotion, startHomeArrival, trendingLoading]);
+
+  useEffect(() => {
+    return () => {
+      if (homeArrivalHideTimerRef.current !== null) {
+        window.clearTimeout(homeArrivalHideTimerRef.current);
+      }
+    };
+  }, []);
+
   const secondaryShelvesPending = !loadSecondaryShelves;
   const tertiaryShelvesPending = !loadTertiaryShelves;
 
   return (
-    <div className="app-page pb-20 md:pb-0">
+    <div className="app-page relative overflow-x-hidden pb-20 md:pb-0">
       <Header />
+      <HomeArrivalAnimation active={showHomeArrival} items={homeArrivalItems} />
 
       {/* Hero Banner */}
       <HeroBanner
@@ -391,12 +589,21 @@ export default function Home() {
       />
 
       {/* Content Sections */}
-      <main className="relative z-10 -mt-20 md:-mt-24 pt-6 md:pt-8 pb-20">
+      <motion.main
+        initial={shouldReduceHomeMotion ? false : { opacity: 0.78, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{
+          delay: showHomeArrival && !shouldReduceHomeMotion ? 0.24 : 0,
+          duration: 0.58,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+        className="relative z-10 -mt-20 pb-20 pt-6 md:-mt-24 md:pt-8"
+      >
         <div className="space-y-10">
 
           {/* Reckon - Personalized Recommendations */}
           {reckonItems.length > 0 && (
-            <section className="surface-panel mx-2 overflow-hidden border-primary/25 bg-linear-to-b from-primary/10 via-card/45 to-transparent md:mx-4">
+            <section className="surface-panel brand-warm-surface mx-2 overflow-hidden border-primary/25 md:mx-4">
               <div className="px-4 md:px-6 pt-5 pb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="rounded-lg border border-primary/25 bg-primary/10 p-1.5">
@@ -559,10 +766,9 @@ export default function Home() {
           />
 
         </div>
-      </main>
+      </motion.main>
 
       <Footer />
-      <BottomNav />
     </div>
   );
 }

@@ -18,7 +18,6 @@ import {
 } from "@/shared/lib/tmdb";
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
-import BottomNav from "@/frontend/components/BottomNav";
 import {
   AppPageSkeleton,
   UpcomingTimelineSkeleton,
@@ -923,7 +922,6 @@ export default function Upcoming() {
       </main>
 
       <Footer />
-      <BottomNav />
     </div>
   );
 }

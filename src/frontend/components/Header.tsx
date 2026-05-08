@@ -124,6 +124,7 @@ export default function Header() {
               size="icon"
               onClick={() => navigate("/search")}
               className="text-muted-foreground hover:text-foreground"
+              aria-label="Open search"
             >
               <Search className="w-5 h-5" />
             </Button>
@@ -150,6 +151,9 @@ export default function Header() {
               size="icon"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="md:hidden text-muted-foreground hover:text-foreground"
+              aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="mobile-header-menu"
             >
               {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </Button>
@@ -161,6 +165,7 @@ export default function Header() {
       <AnimatePresence initial={false}>
         {isMobileMenuOpen && (
           <motion.div
+            id="mobile-header-menu"
             key="mobile-header-menu"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
