@@ -629,7 +629,7 @@
 
   /* Safe area for bottom nav on iOS */
   .safe-area-bottom {
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
   }
 
   /* Action button consistent styling */
