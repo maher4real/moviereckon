@@ -26,6 +26,10 @@ export default function LiquidGlassCard({
   ...props
 }: LiquidGlassCardProps) {
   const [hydrated, setHydrated] = useState(false);
+  const resolvedContentClassName = cn(
+    contentClassName,
+    height == null && "liquid-glass-auto-content",
+  );
 
   useEffect(() => {
     setHydrated(true);
@@ -44,7 +48,7 @@ export default function LiquidGlassCard({
         backgroundColor={backgroundColor}
         backgroundOpacity={backgroundOpacity}
         className={className}
-        contentClassName={contentClassName}
+        contentClassName={resolvedContentClassName}
       >
         {children}
       </GlassCard>
@@ -65,7 +69,7 @@ export default function LiquidGlassCard({
         backdropFilter: `blur(${blur}px) saturate(1.25)`,
       }}
     >
-      <div className={contentClassName}>{children}</div>
+      <div className={resolvedContentClassName}>{children}</div>
     </div>
   );
 }

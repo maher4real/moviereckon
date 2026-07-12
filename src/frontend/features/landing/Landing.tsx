@@ -452,7 +452,7 @@ export default function Landing() {
                   padding="0"
                   flexibility={0}
                   className="landing-liquid-full shadow-[0_30px_90px_rgba(0,0,0,0.55)]"
-                  contentClassName="p-4 sm:p-5"
+                  contentClassName="landing-hero-recommendation-content"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
@@ -763,7 +763,7 @@ export default function Landing() {
               padding="0"
               flexibility={0}
               className="landing-liquid-full relative"
-              contentClassName="relative grid gap-10 p-7 sm:p-12 lg:grid-cols-[1fr_auto] lg:items-end lg:p-16"
+              contentClassName="landing-final-cta-content relative grid gap-10 lg:grid-cols-[1fr_auto] lg:items-end"
             >
               <div className="max-w-4xl">
                 <p className="landing-kicker">Tonight starts here</p>

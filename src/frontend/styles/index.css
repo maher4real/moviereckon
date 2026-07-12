@@ -282,6 +282,36 @@
     max-width: 100%;
   }
 
+  .liquid-glass-auto-content {
+    height: auto !important;
+    min-height: min-content;
+    overflow: visible !important;
+  }
+
+  .landing-hero-recommendation-content {
+    padding: 1rem !important;
+  }
+
+  .landing-final-cta-content {
+    padding: 1.75rem !important;
+  }
+
+  @media (min-width: 40rem) {
+    .landing-hero-recommendation-content {
+      padding: 1.25rem !important;
+    }
+
+    .landing-final-cta-content {
+      padding: 3rem !important;
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .landing-final-cta-content {
+      padding: 4rem !important;
+    }
+  }
+
   .landing-rule-grid {
     background-image:
       linear-gradient(90deg, hsl(var(--foreground) / 0.035) 1px, transparent 1px),
