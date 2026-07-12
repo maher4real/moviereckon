@@ -1,6 +1,6 @@
 import type { VercelRequest } from "@vercel/node";
 import { createHash } from "crypto";
-import { getRedisKey, isRedisConfigured, runRedisCommand } from "./redis-rest.js";
+import { connectToDatabase } from "./mongodb.js";
 
 type RateBucket = {
   count: number;
@@ -18,6 +18,33 @@ export type RateLimitResult = {
   retryAfterSeconds: number;
   source: "global" | "local";
 };
+
+type RateLimitBucket = {
+  _id: string;
+  count: number;
+  expires_at: Date;
+  updated_at: Date;
+};
+
+export class RateLimitUnavailableError extends Error {
+  readonly statusCode = 503;
+  readonly retryAfterSeconds = 30;
+
+  constructor() {
+    super("Rate limiting is temporarily unavailable");
+    this.name = "RateLimitUnavailableError";
+  }
+}
+
+export function handleRateLimitUnavailable(
+  error: unknown,
+  response: { setHeader(name: string, value: string): unknown; status(code: number): { json(body: unknown): unknown } },
+): boolean {
+  if (!(error instanceof RateLimitUnavailableError)) return false;
+  response.setHeader("Retry-After", String(error.retryAfterSeconds));
+  response.status(error.statusCode).json({ error: error.message });
+  return true;
+}
 
 export function getClientIp(req: VercelRequest): string {
   const forwardedFor = req.headers["x-forwarded-for"];
@@ -44,45 +71,63 @@ function normalizeMaxRequests(maxRequests: number): number {
   return Math.max(1, Math.floor(maxRequests));
 }
 
-function toRedisRateLimitKey(rawKey: string): string {
-  const trimmed = rawKey.trim().slice(0, 600);
-  const safePrefix = trimmed.replace(/[^a-zA-Z0-9:_-]/g, "").slice(0, 48) || "key";
-  const digest = createHash("sha256").update(trimmed).digest("hex").slice(0, 20);
-  return getRedisKey(`rate-limit:${safePrefix}:${digest}`);
+function getBucketId(key: string): string {
+  return createHash("sha256").update(key.trim().slice(0, 600)).digest("hex");
 }
 
-async function consumeDistributedRateLimit(
+async function consumeMongoRateLimit(
   key: string,
   maxRequests: number,
   windowMs: number,
-): Promise<RateLimitResult | null> {
-  const redisKey = toRedisRateLimitKey(key);
-  const incrementResult = await runRedisCommand<number>(["INCR", redisKey]);
+): Promise<RateLimitResult> {
+  try {
+    const { db } = await connectToDatabase();
+    const collection = db.collection<RateLimitBucket>("rate_limit_buckets");
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + windowMs);
+    const id = getBucketId(key);
 
-  if (!incrementResult.ok || incrementResult.result === null) {
-    return null;
-  }
+    const reset = await collection.updateOne(
+      { _id: id, expires_at: { $lte: now } },
+      { $set: { count: 1, expires_at: expiresAt, updated_at: now } },
+    );
+    if (reset.matchedCount > 0) {
+      return { allowed: true, retryAfterSeconds: 0, source: "global" };
+    }
 
-  const count = Number(incrementResult.result);
-  if (!Number.isFinite(count) || count <= 0) {
-    return null;
-  }
+    let bucket = await collection.findOneAndUpdate(
+      { _id: id, expires_at: { $gt: now } },
+      { $inc: { count: 1 }, $set: { updated_at: now } },
+      { returnDocument: "after" },
+    );
 
-  if (count === 1) {
-    await runRedisCommand(["PEXPIRE", redisKey, windowMs]);
-  }
+    if (!bucket) {
+      try {
+        await collection.insertOne({ _id: id, count: 1, expires_at: expiresAt, updated_at: now });
+        bucket = { _id: id, count: 1, expires_at: expiresAt, updated_at: now };
+      } catch (error) {
+        if (!(error && typeof error === "object" && "code" in error && error.code === 11000)) {
+          throw error;
+        }
+        bucket = await collection.findOneAndUpdate(
+          { _id: id, expires_at: { $gt: now } },
+          { $inc: { count: 1 }, $set: { updated_at: now } },
+          { returnDocument: "after" },
+        );
+      }
+    }
 
-  if (count > maxRequests) {
-    const ttlResult = await runRedisCommand<number>(["PTTL", redisKey]);
-    const retryAfterMs = ttlResult.ok && ttlResult.result !== null ? Number(ttlResult.result) : windowMs;
+    if (!bucket) throw new Error("rate_limit_bucket_race");
+    const retryAfterSeconds = Math.max(1, Math.ceil((bucket.expires_at.getTime() - now.getTime()) / 1000));
     return {
-      allowed: false,
-      retryAfterSeconds: Math.max(1, Math.ceil(Math.max(retryAfterMs, 0) / 1000)),
+      allowed: bucket.count <= maxRequests,
+      retryAfterSeconds: bucket.count <= maxRequests ? 0 : retryAfterSeconds,
       source: "global",
     };
+  } catch (error) {
+    if (error instanceof RateLimitUnavailableError) throw error;
+    throw new RateLimitUnavailableError();
   }
-
-  return { allowed: true, retryAfterSeconds: 0, source: "global" };
 }
 
 function consumeLocalRateLimit(key: string, maxRequests: number, windowMs: number): RateLimitResult {
@@ -130,17 +175,9 @@ export async function consumeRateLimit(
   const normalizedMaxRequests = normalizeMaxRequests(maxRequests);
   const normalizedWindowMs = normalizeWindowMs(windowMs);
 
-  if (isRedisConfigured()) {
-    const distributed = await consumeDistributedRateLimit(
-      key,
-      normalizedMaxRequests,
-      normalizedWindowMs,
-    );
-    if (distributed) {
-      return distributed;
-    }
+  if (process.env.NODE_ENV === "production") {
+    return consumeMongoRateLimit(key, normalizedMaxRequests, normalizedWindowMs);
   }
-
   return consumeLocalRateLimit(key, normalizedMaxRequests, normalizedWindowMs);
 }
 

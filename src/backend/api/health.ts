@@ -41,9 +41,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await db.command({ ping: 1 });
     const latency = Date.now() - start;
 
+    const productionSecurityReady =
+      process.env.NODE_ENV !== "production" ||
+      (process.env.RBAC_ENFORCE_DB !== "false" &&
+        process.env.SESSION_BINDING_STRICT !== "false" &&
+        Boolean(process.env.REFRESH_TOKEN_PEPPER?.trim()) &&
+        process.env.SECURITY_TELEMETRY_ENABLED !== "false");
+
+    if (!productionSecurityReady) {
+      return res.status(503).json({
+        status: "unhealthy",
+        error: "Production security controls are not configured",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     return res.status(200).json({
       status: "healthy",
       latency_ms: latency,
+      rate_limit: "local-memory",
+      security_telemetry: process.env.SECURITY_TELEMETRY_ENABLED !== "false",
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

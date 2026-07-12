@@ -13,7 +13,11 @@ import {
   isTrustedRequestOrigin,
 } from "./lib/cors.js";
 import { emitSecurityEvent } from "./lib/abuse-telemetry.js";
-import { consumeRateLimit, getClientIp } from "./lib/rate-limit.js";
+import {
+  consumeRateLimit,
+  getClientIp,
+  RateLimitUnavailableError,
+} from "./lib/rate-limit.js";
 
 installGlobalSafeLogging();
 
@@ -100,6 +104,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     return theaterHandler(req, res);
   } catch (error) {
+    if (error instanceof RateLimitUnavailableError) throw error;
     console.error("Theater router error:", error);
     return res.status(500).json({ error: "Internal server error" });
   }

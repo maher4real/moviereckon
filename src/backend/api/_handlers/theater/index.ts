@@ -8,22 +8,11 @@
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
-import jwt from "jsonwebtoken";
+import { getUserFromRequest, userHasRoleAtLeast } from "../../lib/auth.js";
 
-const JWT_SECRET = process.env.JWT_SECRET!;
-
-function isAdminRequest(req: VercelRequest): boolean {
-  // Check regular user JWT (role === "admin")
-  // Also accept the dedicated admin session token (iss === "moviereckon-admin")
-  const authHeader = (req.headers["authorization"] as string) || "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  if (!token) return false;
-  try {
-    const payload = jwt.verify(token, JWT_SECRET) as Record<string, unknown>;
-    return payload.role === "admin";
-  } catch {
-    return false;
-  }
+async function isAdminRequest(req: VercelRequest): Promise<boolean> {
+  const user = await getUserFromRequest(req);
+  return user ? userHasRoleAtLeast(user, "admin") : false;
 }
 
 export interface TheaterCastMember {
@@ -48,50 +37,55 @@ export interface TheaterMovie {
 }
 
 function detectVideoSource(url: string): "youtube" | "gdrive" | "dailymotion" | null {
-  if (!url) return null;
-  if (url.includes("youtube.com") || url.includes("youtu.be")) return "youtube";
-  if (url.includes("drive.google.com")) return "gdrive";
-  if (url.includes("dailymotion.com") || url.includes("dai.ly") || url.includes("geo.dailymotion.com")) return "dailymotion";
-  return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.port) return null;
+    const host = parsed.hostname.toLowerCase();
+    if (["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"].includes(host)) {
+      return getEmbedUrl(url, "youtube") ? "youtube" : null;
+    }
+    if (host === "drive.google.com") return getEmbedUrl(url, "gdrive") ? "gdrive" : null;
+    if (["dailymotion.com", "www.dailymotion.com", "dai.ly", "geo.dailymotion.com"].includes(host)) {
+      return getEmbedUrl(url, "dailymotion") ? "dailymotion" : null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function getEmbedUrl(videoUrl: string, source: "youtube" | "gdrive" | "dailymotion"): string {
-  if (source === "gdrive") {
-    // https://drive.google.com/file/d/FILE_ID/view → preview
-    const match = videoUrl.match(/\/file\/d\/([^/]+)/);
-    if (match) return `https://drive.google.com/file/d/${match[1]}/preview`;
-    return videoUrl;
-  }
-  if (source === "dailymotion") {
-    try {
-      if (videoUrl.includes("geo.dailymotion.com/player.html")) {
-        return videoUrl;
-      }
-      if (videoUrl.includes("dai.ly/")) {
-        const id = videoUrl.split("dai.ly/")[1]?.split("?")[0];
-        if (id) return `https://geo.dailymotion.com/player.html?video=${id}`;
-      }
-      const url = new URL(videoUrl);
-      const pathId = url.pathname.split("/video/")[1]?.split("_")[0];
-      if (pathId) return `https://geo.dailymotion.com/player.html?video=${pathId}`;
-    } catch {
-      // fall through
-    }
-    return videoUrl;
-  }
-  // YouTube: extract video id
   try {
-    if (videoUrl.includes("youtu.be/")) {
-      const id = videoUrl.split("youtu.be/")[1]?.split("?")[0];
-      return `https://www.youtube.com/embed/${id}`;
+    const parsed = new URL(videoUrl);
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.port) return "";
+    const host = parsed.hostname.toLowerCase();
+    const validId = (value: string | null | undefined) =>
+      value && /^[a-zA-Z0-9_-]{6,128}$/.test(value) ? value : null;
+
+    if (source === "gdrive" && host === "drive.google.com") {
+      const id = validId(/^\/file\/d\/([^/]+)/.exec(parsed.pathname)?.[1]);
+      return id ? `https://drive.google.com/file/d/${id}/preview` : "";
     }
-    const url = new URL(videoUrl);
-    const id = url.searchParams.get("v");
-    if (id) return `https://www.youtube.com/embed/${id}`;
+    if (source === "dailymotion" && ["dailymotion.com", "www.dailymotion.com", "dai.ly", "geo.dailymotion.com"].includes(host)) {
+      const id = host === "dai.ly"
+        ? validId(parsed.pathname.split("/").filter(Boolean)[0])
+        : host === "geo.dailymotion.com"
+          ? validId(parsed.searchParams.get("video"))
+          : validId(/^\/video\/([^_/?]+)/.exec(parsed.pathname)?.[1]);
+      return id ? `https://geo.dailymotion.com/player.html?video=${id}` : "";
+    }
+    if (source === "youtube" && ["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"].includes(host)) {
+      const id = host === "youtu.be"
+        ? validId(parsed.pathname.split("/").filter(Boolean)[0])
+        : parsed.pathname.startsWith("/embed/")
+          ? validId(parsed.pathname.split("/")[2])
+          : validId(parsed.searchParams.get("v"));
+      return id ? `https://www.youtube.com/embed/${id}` : "";
+    }
   } catch {
-    // fall through
+    return "";
   }
-  return videoUrl;
+  return "";
 }
 
 function sanitizeString(val: unknown, maxLen: number): string {
@@ -106,7 +100,7 @@ function sanitizeCast(val: unknown): TheaterCastMember[] {
     .map((m) => ({
       name: sanitizeString((m as Record<string, unknown>).name, 100),
       role: sanitizeString((m as Record<string, unknown>).role, 100),
-      photo: sanitizeString((m as Record<string, unknown>).photo, 8_000_000),
+      photo: sanitizeString((m as Record<string, unknown>).photo, 2048),
     }))
     .filter((m) => m.name.length > 0);
 }
@@ -138,14 +132,14 @@ export default async function theaterHandler(req: VercelRequest, res: VercelResp
   }
 
   // All write operations require admin token
-  if (!isAdminRequest(req)) return res.status(403).json({ error: "Admin access required" });
+  if (!(await isAdminRequest(req))) return res.status(403).json({ error: "Admin access required" });
 
   // ── POST /api/theater ─────────────────────────────────────────────────────
   if (method === "POST" && !movieId) {
     const body = req.body as Record<string, unknown>;
     const title = sanitizeString(body.title, 200);
     const description = sanitizeString(body.description, 5000);
-    const thumbnail = sanitizeString(body.thumbnail, 8_000_000);
+    const thumbnail = sanitizeString(body.thumbnail, 2048);
     const genre = sanitizeString(body.genre, 100);
     const year = Number(body.year);
     const rating = Math.min(10, Math.max(0, Number(body.rating)));
@@ -192,7 +186,7 @@ export default async function theaterHandler(req: VercelRequest, res: VercelResp
 
     if (typeof body.title === "string") updates.title = sanitizeString(body.title, 200);
     if (typeof body.description === "string") updates.description = sanitizeString(body.description, 5000);
-    if (typeof body.thumbnail === "string") updates.thumbnail = sanitizeString(body.thumbnail, 500);
+    if (typeof body.thumbnail === "string") updates.thumbnail = sanitizeString(body.thumbnail, 2048);
     if (typeof body.genre === "string") updates.genre = sanitizeString(body.genre, 100);
     if (body.year !== undefined) updates.year = Number(body.year);
     if (body.rating !== undefined) updates.rating = Math.min(10, Math.max(0, Number(body.rating)));

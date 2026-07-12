@@ -155,6 +155,6 @@ describe("MovieDetail", () => {
   it("shows a share action in the movie detail action row", () => {
     render(<MovieDetail />);
 
-    expect(screen.getByRole("button", { name: /share/i })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /share/i })).toHaveLength(2);
   });
 });

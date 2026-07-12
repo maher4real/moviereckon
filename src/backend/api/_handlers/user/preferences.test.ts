@@ -76,7 +76,11 @@ describe("user preferences endpoint", () => {
 
   it("does not duplicate preference fields across $set and $setOnInsert", async () => {
     const now = new Date().toISOString();
-    const updateOne = vi.fn(async () => ({ acknowledged: true }));
+    const updateOne = vi.fn(
+      async (_filter: unknown, _update: Record<string, Record<string, unknown>>) => ({
+        acknowledged: true,
+      }),
+    );
     const findOne = vi.fn(async () => ({
       _id: { toString: () => "pref-1" },
       user_id: "user-1",
@@ -107,14 +111,16 @@ describe("user preferences endpoint", () => {
       res,
     );
 
-    const update = updateOne.mock.calls[0][1];
+    expect(updateOne).toHaveBeenCalledOnce();
+    const update = updateOne.mock.calls[0]?.[1];
+    expect(update).toBeDefined();
 
     expect(res.statusCode).toBe(200);
-    expect(update.$set).toMatchObject({
+    expect(update?.$set).toMatchObject({
       preferred_languages: ["en", "hi"],
       preferred_genres: [28, 35],
     });
-    expect(update.$setOnInsert).not.toHaveProperty("preferred_languages");
-    expect(update.$setOnInsert).not.toHaveProperty("preferred_genres");
+    expect(update?.$setOnInsert).not.toHaveProperty("preferred_languages");
+    expect(update?.$setOnInsert).not.toHaveProperty("preferred_genres");
   });
 });

@@ -19,11 +19,6 @@ import { connectToDatabase } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
 import {
-  getRedisKey,
-  isRedisConfigured,
-  runRedisCommand,
-} from "../../lib/redis-rest.js";
-import {
   isOpenAIConfigured,
   embedTexts,
   cosineSimilarity,
@@ -54,8 +49,6 @@ const MAX_IP_REQUESTS = 30;
 const MAX_USER_REQUESTS = 15;
 const RATE_WINDOW_MS = 5 * 60 * 1000;
 
-const EMBED_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days — movie metadata stable
-const RESULT_CACHE_TTL_SECONDS = 60 * 60; // 1 hour — longer cache = faster hits, often sufficient
 
 const MAX_HISTORY_SEEDS = 30;
 const MAX_LIKED_SEEDS = 20;
@@ -115,6 +108,30 @@ const EMPTY_PAYLOAD: AIRecommendationsPayload = {
   explanationById: {},
   isAIRanked: true,
 };
+
+type LocalCacheEntry<T> = { value: T; expiresAt: number };
+const embeddingCache = new Map<string, LocalCacheEntry<number[]>>();
+const resultCache = new Map<string, LocalCacheEntry<AIRecommendationsPayload>>();
+const EMBEDDING_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const RESULT_CACHE_TTL_MS = 60 * 60 * 1000;
+const MAX_EMBEDDING_CACHE_ENTRIES = 2_000;
+const MAX_RESULT_CACHE_ENTRIES = 500;
+
+function setBoundedCacheEntry<T>(
+  cache: Map<string, LocalCacheEntry<T>>,
+  key: string,
+  value: T,
+  ttlMs: number,
+  maxEntries: number,
+) {
+  cache.delete(key);
+  cache.set(key, { value, expiresAt: Date.now() + ttlMs });
+  while (cache.size > maxEntries) {
+    const oldestKey = cache.keys().next().value as string | undefined;
+    if (!oldestKey) break;
+    cache.delete(oldestKey);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Genre / Language maps
@@ -360,33 +377,25 @@ function scoreCandidate(
 }
 
 // ---------------------------------------------------------------------------
-// Redis helpers
+// Bounded process-local cache. Serverless instances do not share entries.
 // ---------------------------------------------------------------------------
 
 /**
- * Batch-fetch multiple embedding vectors in a single MGET round trip.
- * Returns a map of key → vector (only populated for cache hits).
+ * Return unexpired embedding hits from current instance.
  */
 async function getManyEmbeddings(
   keys: string[],
 ): Promise<Map<string, number[]>> {
+  const now = Date.now();
   const result = new Map<string, number[]>();
-  if (!isRedisConfigured() || !keys.length) return result;
-  const prefixedKeys = keys.map(getRedisKey);
-  const res = await runRedisCommand<(string | null)[]>([
-    "MGET",
-    ...prefixedKeys,
-  ]);
-  if (!res.ok || !Array.isArray(res.result)) return result;
-  for (let i = 0; i < keys.length; i++) {
-    const raw = res.result[i];
-    if (raw) {
-      try {
-        result.set(keys[i], JSON.parse(raw) as number[]);
-      } catch {
-        /* skip */
-      }
+  for (const key of keys) {
+    const entry = embeddingCache.get(key);
+    if (!entry) continue;
+    if (entry.expiresAt <= now) {
+      embeddingCache.delete(key);
+      continue;
     }
+    result.set(key, entry.value);
   }
   return result;
 }
@@ -395,41 +404,38 @@ async function setCachedEmbedding(
   key: string,
   vector: number[],
 ): Promise<void> {
-  if (!isRedisConfigured()) return;
-  await runRedisCommand([
-    "SET",
-    getRedisKey(key),
-    JSON.stringify(vector),
-    "EX",
-    EMBED_TTL_SECONDS,
-  ]);
+  setBoundedCacheEntry(
+    embeddingCache,
+    key,
+    vector,
+    EMBEDDING_CACHE_TTL_MS,
+    MAX_EMBEDDING_CACHE_ENTRIES,
+  );
 }
 
 async function getCachedResult(
   key: string,
 ): Promise<AIRecommendationsPayload | null> {
-  if (!isRedisConfigured()) return null;
-  const result = await runRedisCommand<string>(["GET", getRedisKey(key)]);
-  if (!result.ok || !result.result) return null;
-  try {
-    return JSON.parse(result.result) as AIRecommendationsPayload;
-  } catch {
+  const entry = resultCache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    resultCache.delete(key);
     return null;
   }
+  return entry.value;
 }
 
 async function setCachedResult(
   key: string,
   payload: AIRecommendationsPayload,
 ): Promise<void> {
-  if (!isRedisConfigured()) return;
-  await runRedisCommand([
-    "SET",
-    getRedisKey(key),
-    JSON.stringify(payload),
-    "EX",
-    RESULT_CACHE_TTL_SECONDS,
-  ]);
+  setBoundedCacheEntry(
+    resultCache,
+    key,
+    payload,
+    RESULT_CACHE_TTL_MS,
+    MAX_RESULT_CACHE_ENTRIES,
+  );
 }
 
 // ---------------------------------------------------------------------------

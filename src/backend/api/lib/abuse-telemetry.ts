@@ -2,7 +2,6 @@ import type { VercelRequest } from "@vercel/node";
 import { createHash } from "crypto";
 import { connectToDatabase } from "./mongodb.js";
 import { getClientIp } from "./rate-limit.js";
-import { getRedisKey, isRedisConfigured, runRedisCommand } from "./redis-rest.js";
 
 type SecurityEventOutcome = "blocked" | "error" | "allowed";
 
@@ -68,18 +67,6 @@ function getIpHash(req: VercelRequest | undefined): string {
   return createHash("sha256").update(ip).digest("hex").slice(0, 16);
 }
 
-async function writeRedisAggregate(
-  bucketStartMs: number,
-  field: string,
-): Promise<boolean> {
-  const key = getRedisKey(`security-events:agg:${bucketStartMs}`);
-  const increment = await runRedisCommand(["HINCRBY", key, field, 1]);
-  if (!increment.ok) return false;
-
-  await runRedisCommand(["PEXPIRE", key, 7 * 24 * 60 * 60 * 1000]);
-  return true;
-}
-
 async function writeMongoAggregate(
   bucketStartMs: number,
   field: string,
@@ -142,14 +129,6 @@ export async function recordSecurityEvent(event: SecurityEvent): Promise<void> {
   const field = `${type}|${outcome}|${route}|${reason}`;
 
   try {
-    if (isRedisConfigured()) {
-      const wroteRedis = await writeRedisAggregate(bucketStartMs, field);
-      if (wroteRedis) {
-        await writeMongoRawEvent(event);
-        return;
-      }
-    }
-
     await writeMongoAggregate(bucketStartMs, field, { ...event, route });
     await writeMongoRawEvent({ ...event, route });
   } catch (error) {

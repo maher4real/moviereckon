@@ -27,7 +27,7 @@ import {
   isTrustedRequestOrigin,
 } from "./lib/cors.js";
 import { emitSecurityEvent } from "./lib/abuse-telemetry.js";
-import { consumeRateLimit, getClientIp } from "./lib/rate-limit.js";
+import { consumeRateLimit, getClientIp, RateLimitUnavailableError } from "./lib/rate-limit.js";
 
 installGlobalSafeLogging();
 
@@ -155,6 +155,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).json({ error: `User route not found: ${route}` });
     }
   } catch (error) {
+    if (error instanceof RateLimitUnavailableError) throw error;
     console.error("User router error:", error);
     return res.status(500).json({ error: "Internal server error" });
   }

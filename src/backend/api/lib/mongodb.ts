@@ -172,6 +172,14 @@ async function ensureMongoIndexes(db: Db): Promise<void> {
       name: "security_events_ttl_created_at",
     });
 
+    await createIndexSafe(db, "rate_limit_buckets", { expires_at: 1 }, {
+      expireAfterSeconds: 0,
+      name: "rate_limit_buckets_ttl_expires_at",
+    });
+    await createIndexSafe(db, "rate_limit_buckets", { updated_at: -1 }, {
+      name: "rate_limit_buckets_updated_desc",
+    });
+
     await createIndexSafe(db, "theater_movies", { createdAt: -1 }, {
       name: "theater_movies_created_desc",
     });

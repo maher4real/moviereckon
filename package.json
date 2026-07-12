@@ -7,6 +7,8 @@
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "build:dev": "next build --webpack",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run lint && npm run typecheck && npm test && npm run build",
     "lint": "eslint .",
     "preview": "next start",
     "start": "next start",
@@ -14,6 +16,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@better-auth/mongo-adapter": "^1.6.23",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -49,11 +52,11 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@vercel/analytics": "^1.6.1",
     "@vercel/blob": "^2.3.2",
-    "@vercel/node": "^5.6.22",
     "@vercel/speed-insights": "^1.3.1",
-    "axios": "^1.13.5",
+    "axios": "^1.18.1",
     "baseline-browser-mapping": "^2.10.0",
     "bcryptjs": "^3.0.3",
+    "better-auth": "^1.6.23",
     "caniuse-lite": "^1.0.30001770",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -67,13 +70,13 @@
     "motion": "^12.38.0",
     "next": "^16.1.7",
     "next-themes": "^0.4.6",
-    "nodemailer": "^8.0.4",
+    "nodemailer": "^9.0.3",
     "react": "^19.2.4",
     "react-day-picker": "^9.13.2",
     "react-dom": "^19.2.4",
     "react-hook-form": "^7.71.2",
     "react-resizable-panels": "^4.6.4",
-    "react-router-dom": "^7.13.0",
+    "react-router-dom": "^7.18.1",
     "recharts": "^3.7.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
@@ -91,6 +94,7 @@
     "@types/nodemailer": "^8.0.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@vercel/node": "^5.8.23",
     "@vitejs/plugin-react-swc": "^4.2.3",
     "autoprefixer": "^10.4.24",
     "eslint": "^9.39.3",
@@ -103,7 +107,11 @@
     "tailwindcss": "^4.2.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.0",
-    "vite": "^7.3.1",
-    "vitest": "^4.0.18"
+    "vite": "^7.3.6",
+    "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "esbuild": "0.28.1",
+    "postcss": "$postcss"
   }
 }

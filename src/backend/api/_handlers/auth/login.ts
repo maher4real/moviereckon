@@ -26,6 +26,7 @@ import {
   sanitizeSingleLineText,
 } from "../../lib/input.js";
 import { isEmailVerificationSatisfied } from "../../lib/email-auth.js";
+import { wasForwardingPolicyVerified } from "../../lib/auth-forwarding-policy.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -41,14 +42,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         fallback: "",
         collapseWhitespace: false,
       }) || "";
+    const forwardingPolicyVerified = wasForwardingPolicyVerified(req, "login");
 
     const clientIp = getClientIp(req);
-    const ipRateLimit = await consumeRateLimit(
+    const ipRateLimit = forwardingPolicyVerified
+      ? { allowed: true, retryAfterSeconds: 0, source: "global" as const }
+      : await consumeRateLimit(
       `auth:login:ip:${clientIp}`,
       25,
       15 * 60 * 1000,
     );
-    const emailRateLimit = await consumeRateLimit(
+    const emailRateLimit = forwardingPolicyVerified
+      ? { allowed: true, retryAfterSeconds: 0, source: "global" as const }
+      : await consumeRateLimit(
       `auth:login:email:${email || "missing"}`,
       12,
       15 * 60 * 1000,
@@ -81,7 +87,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: "Email and password are required" });
     }
 
-    const captchaResult = await verifyCaptchaToken(req, captchaToken, "login");
+    const captchaResult = forwardingPolicyVerified
+      ? {
+          ok: true,
+          error: null,
+          reason: null,
+          errorCodes: [],
+          responseAction: "login",
+          responseHostname: null,
+          challengeTs: null,
+        }
+      : await verifyCaptchaToken(req, captchaToken, "login");
     if (!captchaResult.ok) {
       emitSecurityEvent({
         type: "captcha_failed",

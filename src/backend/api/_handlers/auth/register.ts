@@ -34,6 +34,7 @@ import {
 } from "../../lib/email-auth.js";
 import { getPasswordValidationError } from "../../lib/password-policy.js";
 import { sendVerificationEmail } from "../../lib/email.js";
+import { wasForwardingPolicyVerified } from "../../lib/auth-forwarding-policy.js";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,24}$/;
@@ -79,9 +80,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         fallback: "",
         collapseWhitespace: false,
       }) || "";
+    const forwardingPolicyVerified = wasForwardingPolicyVerified(req, "register");
 
     const clientIp = getClientIp(req);
-    const ipRateLimit = await consumeRateLimit(
+    const ipRateLimit = forwardingPolicyVerified
+      ? { allowed: true, retryAfterSeconds: 0, source: "global" as const }
+      : await consumeRateLimit(
       `auth:register:ip:${clientIp}`,
       8,
       30 * 60 * 1000,
@@ -136,7 +140,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? null
       : createEmailToken("verify-email");
 
-    const captchaResult = await verifyCaptchaToken(req, captchaToken, "signup");
+    const captchaResult = forwardingPolicyVerified
+      ? {
+          ok: true,
+          error: null,
+          reason: null,
+          errorCodes: [],
+          responseAction: "signup",
+          responseHostname: null,
+          challengeTs: null,
+        }
+      : await verifyCaptchaToken(req, captchaToken, "signup");
     if (!captchaResult.ok) {
       emitSecurityEvent({
         type: "captcha_failed",

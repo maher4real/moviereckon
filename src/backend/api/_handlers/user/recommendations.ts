@@ -8,7 +8,6 @@ import { connectToDatabase } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
 import { emitSecurityEvent } from "../../lib/abuse-telemetry.js";
-import { getRedisKey, isRedisConfigured, runRedisCommand } from "../../lib/redis-rest.js";
 import type { Movie, TVShow } from "@/shared/lib/tmdb";
 import {
   discoverServerMovies,
@@ -169,7 +168,6 @@ interface RecommendationCacheEntry {
 }
 
 const recommendationsCache = new Map<string, RecommendationCacheEntry>();
-const RECOMMENDATIONS_CACHE_VERSION = "v4";
 
 const WEIGHTS = {
   LIKED: 1.5,
@@ -494,76 +492,6 @@ function getCacheMapKey(userId: string, revision: string): string {
   return `${userId}:${getRevisionDigest(revision)}`;
 }
 
-function getRecommendationsRedisKey(userId: string, revision: string): string {
-  const userDigest = createHash("sha256").update(userId).digest("hex").slice(0, 24);
-  const revisionDigest = getRevisionDigest(revision);
-  return getRedisKey(
-    `recommendations:${RECOMMENDATIONS_CACHE_VERSION}:${userDigest}:${revisionDigest}`,
-  );
-}
-
-function isValidRecommendationsPayload(value: unknown): value is RecommendationsPayload {
-  if (!value || typeof value !== "object") return false;
-  const payload = value as RecommendationsPayload;
-  return Array.isArray(payload.items) && typeof payload.explanationById === "object";
-}
-
-function toCacheEntry(value: unknown): RecommendationCacheEntry | null {
-  if (!value || typeof value !== "object") return null;
-  const parsed = value as Partial<RecommendationCacheEntry>;
-  if (
-    typeof parsed.userId !== "string" ||
-    typeof parsed.revision !== "string" ||
-    !isValidRecommendationsPayload(parsed.payload) ||
-    typeof parsed.expiresAt !== "number" ||
-    typeof parsed.staleUntil !== "number" ||
-    typeof parsed.updatedAt !== "number"
-  ) {
-    return null;
-  }
-
-  return {
-    userId: parsed.userId,
-    revision: parsed.revision,
-    payload: parsed.payload,
-    expiresAt: parsed.expiresAt,
-    staleUntil: parsed.staleUntil,
-    updatedAt: parsed.updatedAt,
-  };
-}
-
-async function readDistributedCacheEntry(
-  userId: string,
-  revision: string,
-): Promise<RecommendationCacheEntry | null> {
-  if (!isRedisConfigured()) return null;
-
-  const response = await runRedisCommand<string>([
-    "GET",
-    getRecommendationsRedisKey(userId, revision),
-  ]);
-  if (!response.ok || !response.result) return null;
-
-  try {
-    const parsed = JSON.parse(response.result);
-    return toCacheEntry(parsed);
-  } catch {
-    return null;
-  }
-}
-
-async function writeDistributedCacheEntry(entry: RecommendationCacheEntry): Promise<void> {
-  if (!isRedisConfigured()) return;
-
-  await runRedisCommand([
-    "SET",
-    getRecommendationsRedisKey(entry.userId, entry.revision),
-    JSON.stringify(entry),
-    "PX",
-    CACHE_STALE_TTL_MS,
-  ]);
-}
-
 async function readCachedPayload(
   userId: string,
   revision: string,
@@ -575,13 +503,7 @@ async function readCachedPayload(
     return local.payload;
   }
 
-  const distributed = await readDistributedCacheEntry(userId, revision);
-  if (!distributed) return null;
-
-  recommendationsCache.set(cacheKey, distributed);
-  if (distributed.revision !== revision) return null;
-  if (distributed.expiresAt <= now) return null;
-  return distributed.payload;
+  return null;
 }
 
 async function readLatestUserPayload(
@@ -597,12 +519,6 @@ async function readLatestUserPayload(
     if (mode === "stale" && local.staleUntil > now) return local.payload;
   }
 
-  const distributed = await readDistributedCacheEntry(userId, revision);
-  if (!distributed) return null;
-  recommendationsCache.set(cacheKey, distributed);
-  if (distributed.revision !== revision) return null;
-  if (mode === "fresh" && distributed.expiresAt > now) return distributed.payload;
-  if (mode === "stale" && distributed.staleUntil > now) return distributed.payload;
   return null;
 }
 
@@ -622,7 +538,6 @@ async function writeCachedPayload(
   };
   recommendationsCache.set(getCacheMapKey(userId, revision), entry);
   cleanupCache(now);
-  await writeDistributedCacheEntry(entry);
 }
 
 function filterCandidatesForRequestContext(

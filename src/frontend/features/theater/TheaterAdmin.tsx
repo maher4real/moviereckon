@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { toast } from "sonner";
-import { getAdminToken, clearAdminToken } from "@/frontend/features/admin/AdminLogin";
+import { useAuth } from "@/frontend/hooks/useAuth";
 
 interface TheaterCastMember { name: string; role: string; photo: string; }
 
@@ -43,13 +43,12 @@ const EMPTY_FORM = {
 type FormState = typeof EMPTY_FORM;
 type View = "list" | "form";
 
-function apiFetch(path: string, token: string, options?: RequestInit) {
+function apiFetch(path: string, options?: RequestInit) {
   return fetch(path, {
     ...options,
     headers: {
       "Content-Type": "application/json",
       "x-requested-with": "XMLHttpRequest",
-      Authorization: `Bearer ${token}`,
       ...(options?.headers || {}),
     },
     credentials: "include",
@@ -71,31 +70,24 @@ async function fetchMovies(): Promise<TheaterMovie[]> {
 export default function TheaterAdmin() {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [token, setToken] = useState<string | null>(null);
+  const { user, signOut } = useAuth();
   const [view, setView] = useState<View>("list");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
-  useEffect(() => {
-    const t = getAdminToken();
-    if (!t) navigate("/admin", { replace: true });
-    else setToken(t);
-  }, [navigate]);
-
   const { data: movies = [], isLoading } = useQuery({
     queryKey: ["theater-movies"],
     queryFn: fetchMovies,
     staleTime: 1000 * 60 * 2,
-    enabled: !!token,
+    enabled: user?.role === "admin",
   });
 
   const saveMutation = useMutation({
     mutationFn: async (data: FormState & { id?: string }) => {
       const { id, ...body } = data;
-      if (!token) throw new Error("Not authenticated");
-      if (id) return apiFetch(`/api/theater/${id}`, token, { method: "PUT", body: JSON.stringify(body) });
-      return apiFetch("/api/theater", token, { method: "POST", body: JSON.stringify(body) });
+      if (id) return apiFetch(`/api/theater/${id}`, { method: "PUT", body: JSON.stringify(body) });
+      return apiFetch("/api/theater", { method: "POST", body: JSON.stringify(body) });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["theater-movies"] });
@@ -109,8 +101,7 @@ export default function TheaterAdmin() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => {
-      if (!token) throw new Error("Not authenticated");
-      return apiFetch(`/api/theater/${id}`, token, { method: "DELETE" });
+      return apiFetch(`/api/theater/${id}`, { method: "DELETE" });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["theater-movies"] });
@@ -135,7 +126,7 @@ export default function TheaterAdmin() {
     setForm((f) => { const cast = [...f.cast]; cast[i] = { ...cast[i], [field]: val }; return { ...f, cast }; });
   const removeCast = (i: number) => setForm((f) => ({ ...f, cast: f.cast.filter((_, idx) => idx !== i) }));
 
-  if (!token) return null;
+  if (user?.role !== "admin") return null;
 
   if (view === "form") {
     return (
@@ -339,7 +330,7 @@ export default function TheaterAdmin() {
               <Button onClick={openAdd} className="gap-2 btn-primary">
                 <Plus className="w-4 h-4" /> Add Movie
               </Button>
-              <Button variant="ghost" size="icon" onClick={() => { clearAdminToken(); navigate("/admin", { replace: true }); }} className="text-muted-foreground hover:text-destructive" title="Sign out">
+              <Button variant="ghost" size="icon" onClick={() => { void signOut().then(() => navigate("/", { replace: true })); }} className="text-muted-foreground hover:text-destructive" title="Sign out">
                 <LogOut className="w-4 h-4" />
               </Button>
             </div>

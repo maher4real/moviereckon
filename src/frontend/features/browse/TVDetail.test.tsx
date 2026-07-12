@@ -171,6 +171,6 @@ describe("TVDetail", () => {
   it("shows a share action in the TV detail action row", () => {
     render(<TVDetail />);
 
-    expect(screen.getByRole("button", { name: /share/i })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /share/i })).toHaveLength(2);
   });
 });

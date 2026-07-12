@@ -1,13 +1,21 @@
 /**
  * POST /api/theater/upload
  * Upload a theater image (poster or cast photo) to Vercel Blob.
- * Requires admin JWT in Authorization header.
+ * Requires authenticated admin cookie session.
  */
 import type { NextApiRequest, NextApiResponse } from "next";
-import jwt from "jsonwebtoken";
 import { put } from "@vercel/blob";
+import { getUserFromRequest, userHasRoleAtLeast } from "@/backend/api/lib/auth";
+import {
+  hasAjaxHeader,
+  isTrustedRequestOrigin,
+} from "@/backend/api/lib/cors";
+import {
+  consumeRateLimit,
+  getClientIp,
+  handleRateLimitUnavailable,
+} from "@/backend/api/lib/rate-limit";
 
-const JWT_SECRET = process.env.JWT_SECRET ?? "";
 const MAX_BYTES = 5_000_000; // 5 MB
 const ALLOWED_TYPES: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -19,19 +27,15 @@ const ALLOWED_TYPES: Record<string, string> = {
 const DATA_URL_RE =
   /^data:(image\/(?:png|jpe?g|webp|gif));base64,([A-Za-z0-9+/=]+)$/i;
 
-function verifyAdminToken(req: NextApiRequest): boolean {
-  if (JWT_SECRET.length < 32) return false;
-  const auth = req.headers["authorization"] || "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
-  if (!token) return false;
-  try {
-    const payload = jwt.verify(token, JWT_SECRET, {
-      issuer: "moviereckon-admin",
-    }) as Record<string, unknown>;
-    return payload.role === "admin";
-  } catch {
-    return false;
+export function detectImageMime(buffer: Buffer): string | null {
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return "image/jpeg";
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
+  if (buffer.length >= 6) {
+    const signature = buffer.subarray(0, 6).toString("ascii");
+    if (signature === "GIF87a" || signature === "GIF89a") return "image/gif";
   }
+  if (buffer.length >= 12 && buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP") return "image/webp";
+  return null;
 }
 
 export const config = {
@@ -46,7 +50,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   res.setHeader("Cache-Control", "no-store");
 
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-  if (!verifyAdminToken(req)) return res.status(403).json({ error: "Admin access required" });
+  if (!isTrustedRequestOrigin(req as never, { allowRefererFallback: true })) {
+    return res.status(403).json({ error: "Invalid request origin" });
+  }
+  if (!hasAjaxHeader(req as never)) {
+    return res.status(403).json({ error: "Missing required request header" });
+  }
+
+  let rateLimit;
+  try {
+    rateLimit = await consumeRateLimit(
+      `theater:upload:${getClientIp(req as never)}`,
+      20,
+      15 * 60 * 1000,
+    );
+  } catch (error) {
+    if (handleRateLimitUnavailable(error, res as never)) return;
+    throw error;
+  }
+  if (!rateLimit.allowed) {
+    res.setHeader("Retry-After", String(rateLimit.retryAfterSeconds));
+    return res.status(429).json({ error: "Too many uploads. Please wait." });
+  }
+
+  const user = await getUserFromRequest(req);
+  if (!user || !(await userHasRoleAtLeast(user, "admin"))) {
+    return res.status(403).json({ error: "Admin access required" });
+  }
 
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     return res.status(503).json({ error: "Blob storage is not configured" });
@@ -79,6 +109,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (buffer.byteLength === 0 || buffer.byteLength > MAX_BYTES) {
     return res.status(400).json({ error: "Image must be between 1 byte and 5 MB" });
+  }
+  if (detectImageMime(buffer) !== mimeType) {
+    return res.status(400).json({ error: "Image content does not match its declared format" });
   }
 
   const safeBase = String(filename)

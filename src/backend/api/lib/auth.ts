@@ -12,6 +12,7 @@ import {
 } from "./cookies.js";
 import { isEmailVerificationSatisfied } from "./email-auth.js";
 import type { Db } from "mongodb";
+import { getConfiguredAuthBaseURL } from "./auth-base-url.js";
 
 function getJwtSecret(): string {
   const value = process.env.JWT_SECRET;
@@ -266,6 +267,85 @@ export function getDeviceIdFromRequest(request: RequestLike): string | null {
   return getCookieValue(cookieHeader, DEVICE_ID_COOKIE_NAME);
 }
 
+function getSingleHeader(headers: RequestLike["headers"], name: string): string | null {
+  if (isFetchLikeHeaders(headers)) {
+    return headers.get(name) || headers.get(name.toLowerCase()) || null;
+  }
+
+  const record = headers as Record<string, string | string[] | undefined>;
+  const raw = record[name] ?? record[name.toLowerCase()] ?? record[name.toUpperCase()];
+  if (raw == null) return null;
+  if (Array.isArray(raw)) return raw[0] || null;
+  return raw;
+}
+
+async function getBetterAuthSessionUser(
+  request: RequestLike,
+): Promise<{ id: string; email: string; username: string; role: unknown } | null> {
+  const cookieHeader = getHeaderValue(request.headers, "cookie") ?? undefined;
+  const authorizationHeader = getSingleHeader(request.headers, "authorization");
+
+  if (!cookieHeader && !authorizationHeader) return null;
+
+  const headers = new Headers();
+  if (cookieHeader) headers.set("cookie", cookieHeader);
+  if (authorizationHeader) headers.set("authorization", authorizationHeader);
+  const authBaseURL = getConfiguredAuthBaseURL();
+  headers.set("origin", authBaseURL);
+
+  const response = await fetch(`${authBaseURL}/api/better-auth/get-session`, {
+    method: "GET",
+    headers,
+  });
+
+  if (!response.ok) return null;
+
+  const payload = await response.json().catch(() => null);
+  if (!payload || typeof payload !== "object") return null;
+
+  const user = (payload as { user?: unknown }).user;
+  if (!user || typeof user !== "object") return null;
+
+  const normalized = user as Record<string, unknown>;
+  const additionalFields =
+    normalized.additionalFields && typeof normalized.additionalFields === "object"
+      ? (normalized.additionalFields as Record<string, unknown>)
+      : null;
+
+  const id =
+    typeof normalized.id === "string"
+      ? normalized.id
+      : typeof normalized.userId === "string"
+        ? normalized.userId
+        : typeof (normalized._id as unknown) === "string"
+          ? String(normalized._id)
+        : null;
+  const email =
+    typeof normalized.email === "string"
+      ? normalized.email
+      : null;
+  const username =
+    typeof normalized.username === "string"
+      ? normalized.username
+      : typeof normalized.name === "string"
+        ? normalized.name
+        : null;
+
+  if (!id || !email || !username) return null;
+
+  return {
+    id,
+    email,
+    username,
+    role:
+      typeof normalized.role === "string"
+        ? normalized.role
+        : typeof additionalFields?.role === "string"
+          ? additionalFields.role
+          : "user",
+  };
+}
+
 export async function pruneRefreshTokensForUser(
   db: Db,
   userId: string,
@@ -299,7 +379,35 @@ export async function getUserFromRequest(request: RequestLike): Promise<UserPayl
   const cookieToken = getCookieValue(cookieHeader, ACCESS_TOKEN_COOKIE_NAME);
 
   const token = headerToken || cookieToken;
-  if (!token) return null;
+  if (!token) {
+    const betterAuthSession = await getBetterAuthSessionUser(request);
+    if (!betterAuthSession || !ObjectId.isValid(betterAuthSession.id)) return null;
+
+    const { db } = await connectToDatabase();
+    const user = await db.collection("users").findOne(
+      { _id: new ObjectId(betterAuthSession.id) },
+      {
+        projection: {
+          email: 1,
+          username: 1,
+          role: 1,
+          emailVerified: 1,
+          email_verified: 1,
+        },
+      },
+    );
+
+    if (!user || !isEmailVerificationSatisfied(user)) {
+      return null;
+    }
+
+    return {
+      id: user._id.toString(),
+      email: user.email || betterAuthSession.email,
+      username: user.username || betterAuthSession.username,
+      role: normalizeUserRole(user.role || betterAuthSession.role),
+    };
+  }
 
   const payload = verifyAccessToken(token);
   if (!payload || !ObjectId.isValid(payload.id)) return null;

@@ -53,7 +53,6 @@ const routeLoaders = {
   theaterDetail: () => import("@/frontend/features/theater/TheaterDetail"),
   theaterPlayer: () => import("@/frontend/features/theater/TheaterPlayer"),
   theaterAdmin: () => import("@/frontend/features/theater/TheaterAdmin"),
-  adminLogin: () => import("@/frontend/features/admin/AdminLogin"),
   verifyEmail: () => import("@/frontend/features/auth/VerifyEmail"),
   forgotPassword: () => import("@/frontend/features/auth/ForgotPassword"),
   resetPassword: () => import("@/frontend/features/auth/ResetPassword"),
@@ -75,7 +74,6 @@ const TheaterHome = lazy(routeLoaders.theaterHome);
 const TheaterDetail = lazy(routeLoaders.theaterDetail);
 const TheaterPlayer = lazy(routeLoaders.theaterPlayer);
 const TheaterAdmin = lazy(routeLoaders.theaterAdmin);
-const AdminLogin = lazy(routeLoaders.adminLogin);
 const VerifyEmail = lazy(routeLoaders.verifyEmail);
 const ForgotPassword = lazy(routeLoaders.forgotPassword);
 const ResetPassword = lazy(routeLoaders.resetPassword);
@@ -302,11 +300,10 @@ const App = ({
                           <Route path="/faq" element={<InfoPage page="faq" />} />
                           <Route path="/terms" element={<InfoPage page="terms" />} />
                           <Route path="/privacy" element={<InfoPage page="privacy" />} />
-                          {/* Admin login - public, no auth required */}
-                          <Route path="/admin" element={<AdminLogin />} />
+                          <Route path="/admin" element={<Navigate to="/theater/admin" replace />} />
                           {/* Theater Mode routes */}
                           <Route path="/theater" element={<ProtectedRoute><TheaterHome /></ProtectedRoute>} />
-                          <Route path="/theater/admin" element={<ProtectedRoute><TheaterAdmin /></ProtectedRoute>} />
+                          <Route path="/theater/admin" element={<ProtectedRoute requiredRole="admin"><TheaterAdmin /></ProtectedRoute>} />
                           <Route path="/theater/:id" element={<ProtectedRoute><TheaterDetail /></ProtectedRoute>} />
                           <Route path="/theater/:id/play" element={<ProtectedRoute><TheaterPlayer /></ProtectedRoute>} />
                           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

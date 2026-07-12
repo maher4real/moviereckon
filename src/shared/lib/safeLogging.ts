@@ -16,13 +16,13 @@ const REDACTED = "[REDACTED]";
 const OMITTED = "[OMITTED]";
 const TRUNCATED = "[TRUNCATED]";
 const SENSITIVE_KEY_PATTERN =
-  /(?:^|[_-])(access[_-]?token|api[_-]?key|apikey|auth|authorization|blob|captcha|client[_-]?secret|cookie|credential|jwt|key|mongodb(?:[_-]?uri)?|pass|password|private|redis|refresh[_-]?token|secret|session|set-cookie|smtp|token|turnstile)(?:$|[_-])/i;
+  /(?:^|[_-])(access[_-]?token|api[_-]?key|apikey|auth|authorization|blob|captcha|client[_-]?secret|cookie|credential|jwt|key|mongodb(?:[_-]?uri)?|pass|password|private|refresh[_-]?token|secret|session|set-cookie|smtp|token|turnstile)(?:$|[_-])/i;
 const VISUAL_MEDIA_KEY_PATTERN =
   /(?:^|[_-])(avatar|backdrop|banner|cover|icon|image|img|logo|photo|picture|poster|screenshot|src|still|thumbnail)(?:$|[_-])/i;
 const SENSITIVE_QUERY_PARAM_PATTERN =
   /^(access[_-]?token|api[_-]?key|apikey|authorization|client[_-]?secret|code|cookie|jwt|pass|password|refresh[_-]?token|secret|session|set-cookie|token)$/i;
 const SENSITIVE_ASSIGNMENT_PATTERN =
-  /(\b(?:access[_-]?token|api[_-]?key|apikey|authorization|blob[_-]?read[_-]?write[_-]?token|client[_-]?secret|cookie|google[_-]?client[_-]?secret|jwt[_-]?secret|mongodb[_-]?uri|pass(?:word)?|refresh[_-]?token|secret|set-cookie|smtp[_-]?(?:pass|user)|token|turnstile[_-]?secret[_-]?key|upstash[_-]?redis[_-]?rest[_-]?token)\b\s*[:=]\s*["']?)([^"',;\s]+)/gi;
+  /(\b(?:access[_-]?token|api[_-]?key|apikey|authorization|blob[_-]?read[_-]?write[_-]?token|client[_-]?secret|cookie|google[_-]?client[_-]?secret|jwt[_-]?secret|mongodb[_-]?uri|pass(?:word)?|refresh[_-]?token|secret|set-cookie|smtp[_-]?(?:pass|user)|token|turnstile[_-]?secret[_-]?key)\b\s*[:=]\s*["']?)([^"',;\s]+)/gi;
 const VISUAL_MEDIA_ASSIGNMENT_PATTERN =
   /(\b(?:avatar(?:_url)?|backdrop(?:_path|_url)?|banner(?:_url)?|cover(?:_url)?|icon(?:_url)?|image(?:_url)?|img|logo(?:_url)?|photo(?:_url)?|picture(?:_url)?|poster(?:_path|_url)?|screenshot(?:_url)?|src|still(?:_path|_url)?|thumbnail(?:_url)?)\b\s*[:=]\s*["']?)([^"',;\s]+)/gi;
 const SENSITIVE_HEADER_PATTERN =

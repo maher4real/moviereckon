@@ -220,7 +220,8 @@ Optional auth/email variables:
 
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
-- `APP_URL`
+- `APP_URL` (canonical HTTPS application origin in production)
+- `BETTER_AUTH_URL` (preferred explicit server-only Better Auth origin)
 - `SMTP_HOST`
 - `SMTP_PORT`
 - `SMTP_SECURE`
@@ -236,6 +237,27 @@ Optional auth/email variables:
 - `SESSION_COOKIE_SAMESITE`
 - `BLOB_READ_WRITE_TOKEN` (required for Vercel Blob-backed avatar uploads)
 - `CORS_ORIGIN`
+
+### Production Security Requirements
+
+Production uses bounded per-instance in-memory rate limiting. Set:
+
+- `RBAC_ENFORCE_DB=true`
+- `SESSION_BINDING_STRICT=true`
+- `REFRESH_TOKEN_PEPPER` to a separate random value of at least 32 characters
+- `SECURITY_TELEMETRY_ENABLED=true`
+
+`GET /api/health` returns `503` in production when required security controls are missing.
+
+Theater administration uses the normal HttpOnly user session and the current
+database-backed `admin` role. There is no separate admin password or browser-stored
+admin bearer token. Bootstrap an initial administrator with `ADMIN_EMAILS`, then
+manage the persisted user role in MongoDB.
+
+During the Better Auth migration, `/api/better-auth/*` remains the provider-native
+namespace and `/api/auth/*` remains the compatibility contract used by the current
+frontend. Keep both enabled until login, registration, session, logout, email, and
+OAuth smoke tests pass in the deployed environment.
 
 ## Local Development
 
