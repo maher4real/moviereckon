@@ -2,7 +2,7 @@
  * Auth Hook - MongoDB Backend Only
  * No fallback to other services
  */
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, useCallback, ReactNode } from "react";
 import * as mongoClient from "@/frontend/lib/mongodbClient";
 import { useToast } from "@/frontend/hooks/use-toast";
 import { disableGoogleAutoSelect } from "@/frontend/lib/googleIdentity";
@@ -94,6 +94,7 @@ export function AuthProvider({
   // Start at 0 so the overlay doesn't auto-fire on cold start.
   // It only runs when triggerAuthTransition() is called explicitly (sign-in / sign-out).
   const [authTransitionRunId, setAuthTransitionRunId] = useState(0);
+  const authGenerationRef = useRef(0);
   const { toast } = useToast();
 
   const triggerAuthTransition = useCallback(() => {
@@ -105,16 +106,20 @@ export function AuthProvider({
   // wait for it. On success: refreshes user data. On failure: clears cache
   // so ProtectedRoute immediately redirects the user to the auth page.
   const initAuth = useCallback(async () => {
+    const generation = authGenerationRef.current;
     try {
       const currentUser = await mongoClient.getCurrentUser();
+      if (generation !== authGenerationRef.current) return;
       if (currentUser) {
         setUser(currentUser);
         setProfile(mapUserToProfile(currentUser));
       } else {
         // Access cookie may be expired; try refresh cookie flow.
         const refreshed = await mongoClient.refreshAccessToken();
+        if (generation !== authGenerationRef.current) return;
         if (refreshed) {
           const refreshedUser = await mongoClient.getCurrentUser();
+          if (generation !== authGenerationRef.current) return;
           if (refreshedUser) {
             setUser(refreshedUser);
             setProfile(mapUserToProfile(refreshedUser));
@@ -319,16 +324,20 @@ export function AuthProvider({
 
   // Sign Out
   const signOut = async () => {
+    // Invalidate any in-flight startup session check before it can restore
+    // user state after logout.
+    authGenerationRef.current += 1;
     disableGoogleAutoSelect();
+    mongoClient.clearTokens();
     setUser(null);
     setProfile(null);
+
+    await mongoClient.logout({ keepalive: true });
 
     toast({
       title: "Signed out",
       description: "You've been signed out successfully.",
     });
-
-    void mongoClient.logout({ keepalive: true });
   };
 
   // Update Profile

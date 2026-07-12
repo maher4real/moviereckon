@@ -56,6 +56,7 @@ const routeLoaders = {
   verifyEmail: () => import("@/frontend/features/auth/VerifyEmail"),
   forgotPassword: () => import("@/frontend/features/auth/ForgotPassword"),
   resetPassword: () => import("@/frontend/features/auth/ResetPassword"),
+  landing: () => import("@/frontend/features/landing/Landing"),
 } as const;
 
 const Upcoming = lazy(routeLoaders.upcoming);
@@ -77,6 +78,7 @@ const TheaterAdmin = lazy(routeLoaders.theaterAdmin);
 const VerifyEmail = lazy(routeLoaders.verifyEmail);
 const ForgotPassword = lazy(routeLoaders.forgotPassword);
 const ResetPassword = lazy(routeLoaders.resetPassword);
+const Landing = lazy(routeLoaders.landing);
 
 function useIdleRoutePreload(enabled: boolean) {
   useEffect(() => {
@@ -267,7 +269,7 @@ const App = ({
                       <Suspense fallback={<CenteredAppSkeleton />}>
                         <RouteTransition>
                           {/* Public routes */}
-                          <Route path="/" element={<Auth />} />
+                          <Route path="/" element={<Landing />} />
                           <Route path="/auth" element={<Auth />} />
                           <Route path="/verify-email" element={<VerifyEmail />} />
                           <Route path="/forgot-password" element={<ForgotPassword />} />

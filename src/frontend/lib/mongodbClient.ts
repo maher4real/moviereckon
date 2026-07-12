@@ -62,12 +62,7 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}): Promi
 
   // Handle access-cookie refresh if unauthorized — deduplicated
   if (response.status === 401) {
-    if (!refreshPromise) {
-      refreshPromise = refreshAccessToken().finally(() => {
-        refreshPromise = null;
-      });
-    }
-    const refreshed = await refreshPromise;
+    const refreshed = await refreshAccessToken();
     if (refreshed) {
       return fetch(`${MONGODB_API_URL}${endpoint}`, {
         ...options,
@@ -666,18 +661,35 @@ export async function signInWithGoogleCredential(credential: string): Promise<{
 }
 
 export async function logout(options: { keepalive?: boolean } = {}): Promise<void> {
+  // A refresh response can set fresh cookies. Let any in-flight refresh finish
+  // first so the logout response is guaranteed to be the final cookie update.
+  if (refreshPromise) {
+    await refreshPromise;
+  }
   clearTokens();
 
+  const requestOptions: RequestInit = {
+    method: "POST",
+    headers: {
+      "X-Requested-With": "XMLHttpRequest",
+    },
+    credentials: "include",
+    keepalive: options.keepalive === true,
+    cache: "no-store",
+  };
+
   try {
-    await fetch(`${MONGODB_API_URL}/api/auth/logout`, {
-      method: "POST",
-      headers: {
-        "X-Requested-With": "XMLHttpRequest",
-      },
-      credentials: "include",
-      keepalive: options.keepalive === true,
-      cache: "no-store",
-    });
+    // Clear both session systems. The legacy endpoint owns the app's access
+    // and refresh cookies; Better Auth can also be accepted by the backend
+    // and therefore must be signed out explicitly.
+    const [logoutResponse] = await Promise.all([
+      fetch(`${MONGODB_API_URL}/api/auth/logout`, requestOptions),
+      fetch(`${MONGODB_API_URL}/api/better-auth/sign-out`, requestOptions).catch(() => null),
+    ]);
+
+    if (!logoutResponse.ok) {
+      throw new Error(`Logout failed with status ${logoutResponse.status}`);
+    }
 
     // Legacy fallback (disabled for security):
     // const refreshToken = getRefreshToken();
@@ -688,12 +700,13 @@ export async function logout(options: { keepalive?: boolean } = {}): Promise<voi
     //     body: JSON.stringify({ refreshToken }),
     //   });
     // }
-  } catch {
-    // Ignore errors during logout
+  } catch (error) {
+    console.error("Logout error:", error);
+    throw error;
   }
 }
 
-export async function refreshAccessToken(): Promise<boolean> {
+async function performAccessTokenRefresh(): Promise<boolean> {
   try {
     const response = await fetch(`${MONGODB_API_URL}/api/auth/refresh`, {
       method: "POST",
@@ -727,6 +740,16 @@ export async function refreshAccessToken(): Promise<boolean> {
     clearTokens();
     return false;
   }
+}
+
+export function refreshAccessToken(): Promise<boolean> {
+  if (!refreshPromise) {
+    refreshPromise = performAccessTokenRefresh().finally(() => {
+      refreshPromise = null;
+    });
+  }
+
+  return refreshPromise;
 }
 
 export async function getCurrentUser(): Promise<MongoUser | null> {

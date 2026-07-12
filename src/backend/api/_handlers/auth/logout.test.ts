@@ -110,4 +110,22 @@ describe("logout handler", () => {
     const rules = enforceRequestRateLimitMock.mock.calls[0]?.[0]?.rules || [];
     expect(rules).toHaveLength(1);
   });
+
+  it("clears session cookies even when logout is rate limited", async () => {
+    enforceRequestRateLimitMock.mockResolvedValue(true);
+    const { default: handler } = await import("./logout.js");
+    const response = createResponse();
+
+    await handler(
+      {
+        method: "POST",
+        body: { all_devices: false },
+        headers: { cookie: "refresh_token=abc" },
+      } as never,
+      response as never,
+    );
+
+    expect(clearAuthCookiesMock).toHaveBeenCalledOnce();
+    expect(connectToDatabaseMock).not.toHaveBeenCalled();
+  });
 });

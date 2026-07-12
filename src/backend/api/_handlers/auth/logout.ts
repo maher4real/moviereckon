@@ -19,6 +19,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    // Always expire browser cookies, including when rate limiting or database
+    // cleanup prevents server-side token revocation from completing.
+    clearAuthCookies(res);
+
     const user = await getUserFromRequest(req);
     const clientIp = getClientIp(req);
     const rules = [
@@ -77,8 +81,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { db } = await connectToDatabase();
       await db.collection("refresh_tokens").deleteMany({ user_id: user.id });
     }
-
-    clearAuthCookies(res);
 
     if (allDevices && !user) {
       return res.status(401).json({ error: "Authentication required for all-device logout" });
