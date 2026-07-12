@@ -66,7 +66,7 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex items-center gap-3 p-2 rounded-xl",
+        "flex items-center gap-1.5 p-1.5 rounded-xl sm:gap-3 sm:p-2",
         "bg-card border border-border",
         "motion-safe:transition-colors duration-200",
         "hover:bg-accent/30",
@@ -84,7 +84,7 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
           "text-muted-foreground hover:text-foreground",
           "motion-safe:transition-colors duration-150",
           "flex items-center justify-center",
-          "min-h-11 min-w-11 md:min-h-0 md:min-w-0 md:p-1",
+          "min-h-9 min-w-9 sm:min-h-11 sm:min-w-11 md:min-h-0 md:min-w-0 md:p-1",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md",
         )}
         aria-label="Drag to reorder"
@@ -95,7 +95,7 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
       {/* Poster + title — clickable area to open detail */}
       <button
         onClick={handleOpenDetail}
-        className="flex items-center gap-3 flex-1 min-w-0 text-left group/link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
+        className="flex min-w-0 flex-1 items-center gap-2 text-left group/link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg sm:gap-3"
         aria-label={`Open ${item.title}`}
       >
         <div className="shrink-0 w-10 h-14 rounded-lg overflow-hidden bg-muted">
@@ -129,7 +129,7 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
       </button>
 
       {/* Actions */}
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex shrink-0 items-center gap-0.5 sm:gap-2">
         <Tooltip>
           <TooltipTrigger asChild>
             <button
@@ -137,7 +137,7 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
               className={cn(
                 "cursor-pointer rounded-lg",
                 "flex items-center justify-center",
-                "min-h-11 min-w-11 md:min-h-8 md:min-w-8",
+                "min-h-9 min-w-9 sm:min-h-11 sm:min-w-11 md:min-h-8 md:min-w-8",
                 "motion-safe:transition-colors duration-150",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 item.watched
@@ -161,7 +161,7 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
               className={cn(
                 "cursor-pointer rounded-lg",
                 "flex items-center justify-center",
-                "min-h-11 min-w-11 md:min-h-8 md:min-w-8",
+                "min-h-9 min-w-9 sm:min-h-11 sm:min-w-11 md:min-h-8 md:min-w-8",
                 "motion-safe:transition-colors duration-150",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 "text-muted-foreground hover:text-destructive hover:bg-destructive/10",
@@ -340,7 +340,7 @@ export default function WatchlistPanel() {
   };
 
   const panelHeader = (
-    <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-border">
+    <div className="flex items-center justify-between gap-3 border-b border-border px-4 pt-4 pb-3 sm:px-5 sm:pt-5 sm:pb-4">
       <div className="flex items-center gap-2.5">
         <ListVideo className="h-5 w-5 text-primary shrink-0" />
         <span className="font-semibold text-base">Watchlist</span>
@@ -354,8 +354,8 @@ export default function WatchlistPanel() {
   );
 
   const panelBody = (
-    <ScrollArea className="h-96 md:h-110 w-full">
-      <div className="px-5 pt-4 pb-6">
+    <ScrollArea className="h-[min(24rem,calc(100dvh-12rem))] w-full md:h-110">
+      <div className="px-3 pt-3 pb-4 sm:px-5 sm:pt-4 sm:pb-6">
         <WatchlistContent />
       </div>
     </ScrollArea>
@@ -397,8 +397,8 @@ export default function WatchlistPanel() {
                 onDrop={isMobile ? undefined : handleDrop}
                 size="icon"
                 className={cn(
-                  "group fixed z-40 rounded-full cursor-pointer overflow-visible",
-                  "bottom-20 right-4 size-15",
+                  "group fixed z-[60] rounded-full cursor-pointer overflow-visible",
+                  "bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] right-3 size-14",
                   "md:bottom-6 md:right-6 md:size-16",
                   "border border-primary/35 bg-primary text-primary-foreground",
                   "shadow-[0_16px_40px_hsl(var(--primary)/0.38)]",
@@ -461,8 +461,9 @@ export default function WatchlistPanel() {
         <PopoverContent 
           side="top" 
           align="end" 
-          sideOffset={20}
-          className="w-[calc(100vw-2rem)] sm:w-96 md:w-100 p-0 rounded-2xl shadow-2xl border-border bg-card/95 backdrop-blur-md overflow-hidden"
+          sideOffset={12}
+          collisionPadding={12}
+          className="z-[60] w-[calc(100vw-1.5rem)] max-w-100 p-0 rounded-2xl shadow-2xl border-border bg-card/95 backdrop-blur-md overflow-hidden sm:w-96 md:w-100"
         >
           {panelHeader}
           {panelBody}

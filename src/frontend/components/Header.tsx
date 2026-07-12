@@ -173,9 +173,9 @@ export default function Header() {
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className="overflow-hidden border-t border-primary/15 bg-[linear-gradient(180deg,hsl(var(--background)/0.98),hsl(var(--card)/0.9))] backdrop-blur-md md:hidden"
+            className="max-h-[calc(100dvh-4rem)] overflow-x-hidden overflow-y-auto overscroll-contain border-t border-primary/15 bg-[linear-gradient(180deg,hsl(var(--background)/0.98),hsl(var(--card)/0.9))] backdrop-blur-md md:hidden"
           >
-            <nav className="container mx-auto px-4 py-4 flex flex-col gap-2">
+            <nav className="container mx-auto flex flex-col gap-2 px-4 pt-4 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]">
               {navLinks.map((link) => {
                 const active = isActive(link.href);
 

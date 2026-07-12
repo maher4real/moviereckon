@@ -17,18 +17,23 @@ import {
 import { enforceRequestRateLimit, hashRateLimitValue } from "../../lib/request-rate-limit.js";
 import { getClientIp } from "../../lib/rate-limit.js";
 
+function isGoogleOneTapEnabled(): boolean {
+  return process.env.GOOGLE_ONE_TAP_ENABLED?.trim().toLowerCase() === "true";
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "GET") {
+    const enabled = isGoogleOneTapEnabled();
     const clientId = getGoogleOAuthClientId();
-    const nonce = clientId ? createGoogleOneTapNonce() : null;
+    const nonce = enabled && clientId ? createGoogleOneTapNonce() : null;
     if (nonce) {
       setGoogleOneTapNonceCookie(res, nonce);
     } else {
       clearGoogleOneTapNonceCookie(res);
     }
     return res.status(200).json({
-      enabled: clientId.length > 0,
-      client_id: clientId || null,
+      enabled: enabled && clientId.length > 0,
+      client_id: enabled && clientId ? clientId : null,
       nonce,
     });
   }
@@ -38,6 +43,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    if (!isGoogleOneTapEnabled()) {
+      clearGoogleOneTapNonceCookie(res);
+      return res.status(404).json({
+        error: "Google One Tap is not enabled",
+        code: "google_one_tap_disabled",
+      });
+    }
+
     const credential =
       sanitizeSingleLineText(req.body?.credential, 6_000, {
         fallback: "",

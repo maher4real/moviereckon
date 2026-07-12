@@ -26,10 +26,10 @@ export default function BottomNav() {
       initial={{ opacity: 0, y: 22, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: "spring", stiffness: 360, damping: 32 }}
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-50 px-3 safe-area-bottom md:hidden"
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-50 px-2 safe-area-bottom sm:px-3 md:hidden"
     >
       <div className="pointer-events-auto mx-auto max-w-[31rem] rounded-[1.75rem] border border-primary/20 bg-[linear-gradient(180deg,hsl(var(--card)/0.94),hsl(var(--background)/0.96)),radial-gradient(circle_at_50%_-10%,hsl(var(--primary)/0.20),transparent_18rem)] p-1.5 shadow-[0_18px_48px_hsl(var(--background)/0.82),0_0_30px_hsl(var(--primary)/0.15)] backdrop-blur-xl">
-        <div className="grid h-14 grid-cols-6 items-center gap-1">
+        <div className="grid h-14 grid-cols-6 items-center gap-0.5 sm:gap-1">
           {navItems.map((item) => {
             const active = isActive(item.href);
             return (
@@ -38,7 +38,7 @@ export default function BottomNav() {
                 to={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "relative flex h-full min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-[1.25rem] px-1 transition-colors duration-200",
+                  "relative flex h-full min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-[1.25rem] px-0.5 transition-colors duration-200 sm:px-1",
                   active
                     ? "text-primary"
                     : "text-muted-foreground hover:text-foreground"
