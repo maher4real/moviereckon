@@ -7,15 +7,28 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import {
   ArrowRight,
   Bookmark,
+  CalendarDays,
   Check,
   ChevronRight,
   Clapperboard,
   Clock3,
   Compass,
+  Eye,
+  Film,
+  Heart,
+  Languages,
+  ListVideo,
+  MessageCircle,
+  MonitorPlay,
   Play,
   Quote,
+  Search,
+  Share2,
+  SlidersHorizontal,
   Sparkles,
   Star,
+  Tv,
+  UserRound,
   WandSparkles,
 } from "lucide-react";
 import { useReducedMotion } from "motion/react";
@@ -93,6 +106,76 @@ const heroPositions = [
 ] as const;
 
 const tasteBadges = ["Neo-noir", "Slow burn", "Smart sci-fi", "Dark comedy"] as const;
+
+const platformFeatures = [
+  {
+    icon: Sparkles,
+    title: "AI-powered Reckon",
+    description: "Personalized movie and series picks shaped by languages, genres, moods and the way your taste changes.",
+    meta: "Personalized discovery",
+  },
+  {
+    icon: Search,
+    title: "One intelligent search",
+    description: "Search movies, television and people from one fast surface, with filters that keep broad ideas useful.",
+    meta: "Movies · TV · People",
+  },
+  {
+    icon: Tv,
+    title: "Movies and series",
+    description: "Browse dedicated catalogues across Hollywood, Bollywood, television, trending titles and enduring favourites.",
+    meta: "Global catalogues",
+  },
+  {
+    icon: CalendarDays,
+    title: "Upcoming radar",
+    description: "Keep theatrical and streaming releases on your horizon with a focused upcoming discovery view.",
+    meta: "Plan the next watch",
+  },
+  {
+    icon: Film,
+    title: "Details worth opening",
+    description: "Explore cast, trailers, ratings, synopsis, related titles and the context that makes a choice easier.",
+    meta: "Rich title pages",
+  },
+  {
+    icon: MonitorPlay,
+    title: "Where to watch",
+    description: "Move from deciding to watching with regional provider availability collected on each title page.",
+    meta: "Streaming availability",
+  },
+  {
+    icon: ListVideo,
+    title: "Watchlist and history",
+    description: "Save, reorder and manage your queue while watched, liked and skipped signals make future picks sharper.",
+    meta: "Your living queue",
+  },
+  {
+    icon: MessageCircle,
+    title: "Reviews and reactions",
+    description: "Rate titles, leave reviews, react, share discoveries and compare notes with the MovieReckon community.",
+    meta: "A social layer",
+  },
+  {
+    icon: UserRound,
+    title: "A taste profile",
+    description: "Keep preferences, activity and recommendations connected to one profile that becomes more useful over time.",
+    meta: "Made personal",
+  },
+  {
+    icon: Clapperboard,
+    title: "MovieReckon Theater",
+    description: "Step into a dedicated cinema catalogue with title pages and an immersive, distraction-free player.",
+    meta: "Watch inside Reckon",
+  },
+] as const;
+
+const productSignals = [
+  { icon: Languages, label: "Language-aware" },
+  { icon: Heart, label: "Learns your reactions" },
+  { icon: Eye, label: "Tracks watched titles" },
+  { icon: Share2, label: "Built to share" },
+] as const;
 
 function PosterFrame({
   poster,
@@ -208,6 +291,7 @@ export default function Landing() {
   const heroPosters = posters.slice(0, 5);
   const railPosters = posters.slice(2, 12);
   const recommendation = posters[0];
+  const theaterPoster = posters[1] || recommendation;
 
   useEffect(() => {
     if (reduceMotion || !landingRef.current) return;
@@ -249,6 +333,17 @@ export default function Landing() {
         ease: "none",
         scrollTrigger: { trigger: landingRef.current, start: "top top", end: "bottom bottom", scrub: 2 },
       });
+
+      gsap.utils.toArray<HTMLElement>("[data-reveal]").forEach((element) => {
+        gsap.from(element, {
+          autoAlpha: 0,
+          y: 28,
+          duration: 0.75,
+          ease: "power3.out",
+          immediateRender: false,
+          scrollTrigger: { trigger: element, start: "top 88%", once: true },
+        });
+      });
     }, landingRef);
 
     return () => context.revert();
@@ -269,8 +364,9 @@ export default function Landing() {
           </Link>
           <nav aria-label="Landing page navigation" className="hidden items-center gap-7 md:flex">
             <a className="landing-nav-link" href="#discover">Discover</a>
-            <a className="landing-nav-link" href="#stories">Stories</a>
+            <a className="landing-nav-link" href="#platform">Features</a>
             <a className="landing-nav-link" href="#how-it-works">How it works</a>
+            <a className="landing-nav-link" href="#theater">Theater</a>
           </nav>
           <Button asChild size="sm" className="rounded-full px-4 shadow-[0_0_25px_hsl(var(--primary)/0.18)]">
             <Link to={destination}>
@@ -429,6 +525,102 @@ export default function Landing() {
           </div>
         </section>
 
+        <section id="platform" className="landing-content-section scroll-mt-20 px-4 py-20 sm:px-6 sm:py-28 lg:px-8 lg:py-36" aria-labelledby="platform-title">
+          <div className="mx-auto max-w-7xl">
+            <div data-reveal className="grid gap-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-end">
+              <div>
+                <p className="landing-kicker">The whole night, in one place</p>
+                <p className="mt-4 max-w-sm text-sm leading-6 text-white/45">Discovery is only useful when it leads somewhere. MovieReckon connects the search, the decision, the conversation and the watch.</p>
+              </div>
+              <h2 id="platform-title" className="text-balance text-4xl font-black leading-[0.96] tracking-[-0.055em] sm:text-6xl lg:text-7xl">More than a recommender.<br />A complete screen companion.</h2>
+            </div>
+
+            <div data-reveal className="landing-app-shell mt-14 overflow-hidden rounded-[1.75rem] sm:rounded-[2rem]">
+              <div className="flex items-center gap-3 border-b border-white/[0.08] bg-black/35 px-4 py-3 sm:px-6">
+                <div className="hidden gap-1.5 sm:flex" aria-hidden="true">
+                  <span className="size-2 rounded-full bg-primary/70" />
+                  <span className="size-2 rounded-full bg-white/15" />
+                  <span className="size-2 rounded-full bg-white/15" />
+                </div>
+                <div className="mx-auto flex h-9 w-full max-w-xl items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-4 text-xs text-white/38">
+                  <Search className="size-3.5 text-primary" aria-hidden="true" /> Search a title, person, mood or genre
+                </div>
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-primary/10 text-primary"><UserRound className="size-3.5" aria-hidden="true" /></div>
+              </div>
+
+              <div className="grid min-h-[36rem] lg:grid-cols-[1fr_19rem]">
+                <div className="min-w-0 p-5 sm:p-8">
+                  <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Your discovery desk</p>
+                      <h3 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">A quieter way through the catalogue.</h3>
+                    </div>
+                    <div className="flex max-w-full gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+                      {["For you", "Movies", "Series", "Bollywood", "Upcoming"].map((filter, index) => (
+                        <span key={filter} className={cn("shrink-0 rounded-full border px-3 py-1.5 text-[10px] font-semibold", index === 0 ? "border-primary/40 bg-primary text-white" : "border-white/10 bg-white/[0.035] text-white/48")}>{filter}</span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+                    {posters.slice(0, 4).map((poster, index) => (
+                      <figure key={`desk-${poster.id}`} className={cn("group relative aspect-[2/3] overflow-hidden rounded-xl border border-white/10 bg-card", index === 0 && "shadow-[0_20px_55px_hsl(var(--primary)/0.15)]")}>
+                        <MediaImage src={poster.src} alt={`${poster.title} result poster`} className="size-full object-cover saturate-75 transition-[filter,transform] duration-500 group-hover:scale-[1.03] group-hover:saturate-100" width={240} height={360} fallbackSrc="/fallbacks/poster.svg" />
+                        <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black via-black/85 to-transparent px-3 pb-3 pt-12">
+                          <div className="flex items-center justify-between gap-2"><p className="truncate text-xs font-semibold text-white">{poster.title}</p><span className="shrink-0 text-[9px] font-bold text-[#f6c453]">{94 - index * 3}%</span></div>
+                        </div>
+                      </figure>
+                    ))}
+                  </div>
+
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    {productSignals.map((signal) => (
+                      <span key={signal.label} className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.025] px-3 py-2 text-[10px] font-medium text-white/45"><signal.icon className="size-3 text-primary" aria-hidden="true" />{signal.label}</span>
+                    ))}
+                  </div>
+                </div>
+
+                <aside className="border-t border-white/[0.08] bg-black/28 p-5 sm:p-7 lg:border-l lg:border-t-0" aria-label="Example MovieReckon watchlist and taste signals">
+                  <div className="flex items-center justify-between">
+                    <div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Your watchlist</p><p className="mt-1 text-sm font-semibold">Ready when you are</p></div>
+                    <span className="rounded-full bg-white/[0.05] px-2 py-1 text-[10px] text-white/40">12 saved</span>
+                  </div>
+                  <div className="mt-6 space-y-3">
+                    {posters.slice(4, 7).map((poster, index) => (
+                      <div key={`queue-${poster.id}`} className="flex items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] p-2.5">
+                        <MediaImage src={poster.src} alt="" className="h-14 w-10 shrink-0 rounded-md object-cover" width={80} height={112} fallbackSrc="/fallbacks/poster.svg" />
+                        <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{poster.title}</p><p className="mt-1 text-[10px] text-white/35">{index === 0 ? "High match" : index === 1 ? "Saved yesterday" : "Because you liked noir"}</p></div>
+                        <Bookmark className="size-3.5 fill-primary text-primary" aria-hidden="true" />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-7 rounded-2xl border border-primary/18 bg-primary/[0.07] p-4">
+                    <div className="flex items-center gap-2 text-xs font-bold text-primary"><Sparkles className="size-3.5" aria-hidden="true" />Taste is getting sharper</div>
+                    <p className="mt-2 text-xs leading-5 text-white/42">Your likes, skips and watched titles quietly improve what Reckon shows next.</p>
+                    <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/[0.07]"><div className="h-full w-[78%] rounded-full bg-linear-to-r from-primary to-[#ff5364]" /></div>
+                  </div>
+                </aside>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {platformFeatures.map((feature, index) => (
+                <article key={feature.title} data-reveal className={cn("landing-feature-card group flex min-h-60 flex-col p-5 sm:p-6", (index === 0 || index === 9) && "lg:col-span-2")}>
+                  <div className="flex items-start justify-between gap-4">
+                    <span className="flex size-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-primary transition-[transform,border-color,background-color] duration-500 group-hover:-translate-y-1 group-hover:border-primary/35 group-hover:bg-primary/10"><feature.icon className="size-4.5" aria-hidden="true" /></span>
+                    <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/24">{String(index + 1).padStart(2, "0")}</span>
+                  </div>
+                  <div className="mt-auto pt-10">
+                    <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-primary/75">{feature.meta}</p>
+                    <h3 className="mt-2 text-lg font-bold tracking-tight">{feature.title}</h3>
+                    <p className="mt-2 text-xs leading-5 text-white/44">{feature.description}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
         <section id="how-it-works" className="scroll-mt-20 px-4 py-20 sm:px-6 sm:py-28 lg:px-8 lg:py-36">
           <div className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-[0.82fr_1.18fr] lg:gap-24">
             <div className="flex flex-col items-start lg:sticky lg:top-28 lg:self-start">
@@ -488,7 +680,70 @@ export default function Landing() {
           </div>
         </section>
 
-        <section className="px-4 pb-20 sm:px-6 sm:pb-28 lg:px-8">
+        <section id="theater" className="landing-content-section scroll-mt-20 border-y border-white/[0.07] bg-white/[0.018] px-4 py-20 sm:px-6 sm:py-28 lg:px-8 lg:py-36" aria-labelledby="theater-title">
+          <div className="mx-auto max-w-7xl">
+            <div data-reveal className="flex flex-col justify-between gap-8 lg:flex-row lg:items-end">
+              <div>
+                <p className="landing-kicker">MovieReckon Theater</p>
+                <h2 id="theater-title" className="mt-5 max-w-4xl text-balance text-4xl font-black leading-[0.94] tracking-[-0.055em] sm:text-6xl lg:text-7xl">When the choice is made,<br />stay for the picture.</h2>
+              </div>
+              <p className="max-w-md text-pretty text-sm leading-6 text-white/45">A dedicated cinema catalogue, rich title pages and a focused player turn MovieReckon from a discovery tool into a place to watch.</p>
+            </div>
+
+            <div data-reveal className="mt-12 grid overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#070707] shadow-[0_40px_110px_rgba(0,0,0,0.55)] lg:grid-cols-[1fr_19rem]">
+              <div className="relative min-h-[24rem] overflow-hidden sm:min-h-[34rem]">
+                <MediaImage src={theaterPoster.src} alt={`${theaterPoster.title} cinematic theater preview`} className="absolute inset-0 size-full object-cover saturate-50" width={1100} height={680} fallbackSrc="/fallbacks/poster.svg" />
+                <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.45),transparent_34%,rgba(0,0,0,0.92)),linear-gradient(90deg,rgba(0,0,0,0.5),transparent_65%)]" />
+                <div className="absolute inset-x-0 top-0 flex items-center justify-between p-5 sm:p-7">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/40 px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.18em] text-white/65 backdrop-blur-xl"><Clapperboard className="size-3 text-primary" aria-hidden="true" />Now in Theater</span>
+                  <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-white/35">Immersive player</span>
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Link to={destination} aria-label="Open MovieReckon Theater" className="group flex size-18 items-center justify-center rounded-full border border-white/25 bg-black/42 text-white shadow-[0_0_55px_hsl(var(--primary)/0.3)] backdrop-blur-xl transition-[transform,background-color,border-color] hover:scale-105 hover:border-primary/60 hover:bg-primary sm:size-22">
+                    <Play className="ml-1 size-7 fill-current sm:size-8" aria-hidden="true" />
+                  </Link>
+                </div>
+                <div className="absolute inset-x-0 bottom-0 p-5 sm:p-8">
+                  <div className="mb-5 h-1 overflow-hidden rounded-full bg-white/15"><div className="h-full w-[36%] rounded-full bg-primary" /></div>
+                  <div className="flex items-end justify-between gap-5">
+                    <div className="min-w-0"><p className="text-[9px] font-bold uppercase tracking-[0.2em] text-primary">Featured presentation</p><h3 className="mt-1 truncate text-xl font-bold sm:text-3xl">{theaterPoster.title}</h3></div>
+                    <div className="hidden items-center gap-3 text-white/55 sm:flex"><SlidersHorizontal className="size-4" aria-hidden="true" /><MonitorPlay className="size-5" aria-hidden="true" /></div>
+                  </div>
+                </div>
+              </div>
+
+              <aside className="border-t border-white/[0.08] p-5 sm:p-7 lg:border-l lg:border-t-0" aria-label="More titles in MovieReckon Theater">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Tonight's program</p>
+                <p className="mt-2 text-sm text-white/40">Curated features ready to play.</p>
+                <div className="mt-6 space-y-3">
+                  {posters.slice(2, 6).map((poster, index) => (
+                    <div key={`theater-${poster.id}`} className={cn("group flex items-center gap-3 rounded-xl border p-2.5 transition-[border-color,background-color]", index === 0 ? "border-primary/25 bg-primary/[0.07]" : "border-white/[0.07] bg-white/[0.02] hover:border-white/15 hover:bg-white/[0.04]")}>
+                      <MediaImage src={poster.src} alt="" className="h-16 w-11 shrink-0 rounded-md object-cover saturate-75" width={88} height={128} fallbackSrc="/fallbacks/poster.svg" />
+                      <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{poster.title}</p><p className="mt-1 text-[9px] uppercase tracking-[0.13em] text-white/30">{index === 0 ? "Up next" : `${98 + index * 11} min`}</p></div>
+                      <Play className="size-3 fill-current text-primary opacity-70" aria-hidden="true" />
+                    </div>
+                  ))}
+                </div>
+                <Button asChild variant="outline" className="mt-6 w-full rounded-full border-white/12 bg-white/[0.03] text-xs hover:bg-white/[0.07]"><Link to={destination}>Enter Theater<ArrowRight data-icon="inline-end" /></Link></Button>
+              </aside>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              {[
+                { icon: Star, title: "Rate what moved you", copy: "Leave a star rating and a thoughtful review while the credits are still rolling." },
+                { icon: MessageCircle, title: "Read the room", copy: "See public reviews and reactions from people who made the same choice." },
+                { icon: Share2, title: "Pass the story on", copy: "Share a title directly and turn a solitary discovery into the next group-watch." },
+              ].map((item) => (
+                <article key={item.title} data-reveal className="landing-feature-card flex items-start gap-4 p-5 sm:p-6">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-primary"><item.icon className="size-4" aria-hidden="true" /></span>
+                  <div><h3 className="text-sm font-bold">{item.title}</h3><p className="mt-2 text-xs leading-5 text-white/42">{item.copy}</p></div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
           <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-primary/20 p-1 shadow-[0_45px_120px_hsl(var(--primary)/0.12)]">
             <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_72%_30%,hsl(var(--primary)/0.34),transparent_33%),linear-gradient(135deg,#130609,#050505_72%)]" />
             <LiquidGlassCard
