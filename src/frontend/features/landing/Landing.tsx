@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { motion, useReducedMotion } from "motion/react";
+import { useReducedMotion } from "motion/react";
+import { gsap } from "gsap";
+import LiquidGlassCard from "@/frontend/components/LiquidGlassCard";
 import {
   ArrowRight,
   Bookmark,
@@ -116,6 +118,7 @@ function PosterFrame({ poster, featured = false }: { poster: LandingPoster; feat
 export default function Landing() {
   const { user } = useAuth();
   const reduceMotion = useReducedMotion();
+  const landingRef = useRef<HTMLDivElement>(null);
 
   const { data: trendingMovies } = useQuery({
     queryKey: ["landing-trending-movies"],
@@ -185,8 +188,37 @@ export default function Landing() {
   const heroPosters = posters.slice(0, 5);
   const railPosters = posters.slice(3, 12);
 
+  useEffect(() => {
+    if (reduceMotion || !landingRef.current) return;
+
+    const context = gsap.context(() => {
+      const timeline = gsap.timeline({ defaults: { ease: "power3.out" } });
+
+      timeline
+        .fromTo(
+          "[data-gsap='hero-copy']",
+          { autoAlpha: 0, y: 28 },
+          { autoAlpha: 1, y: 0, duration: 0.7 },
+        )
+        .fromTo(
+          "[data-gsap='hero-poster']",
+          { autoAlpha: 0, y: 36 },
+          { autoAlpha: 1, y: 0, duration: 0.6, stagger: 0.08 },
+          "-=0.42",
+        )
+        .fromTo(
+          "[data-gsap='hero-glass']",
+          { autoAlpha: 0, y: 16 },
+          { autoAlpha: 1, y: 0, duration: 0.45 },
+          "-=0.24",
+        );
+    }, landingRef);
+
+    return () => context.revert();
+  }, [reduceMotion]);
+
   return (
-    <div className="min-h-screen overflow-hidden bg-background text-foreground">
+    <div ref={landingRef} className="min-h-screen overflow-hidden bg-background text-foreground">
       <a
         href="#landing-main"
         className="fixed left-4 top-4 z-50 -translate-y-24 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-transform focus:translate-y-0"
@@ -195,7 +227,7 @@ export default function Landing() {
       </a>
 
       <header className="fixed inset-x-0 top-0 z-40 px-3 pt-3 sm:px-5 sm:pt-4">
-        <div className="mx-auto flex h-15 max-w-6xl items-center justify-between rounded-2xl border bg-background/82 px-3 shadow-2xl backdrop-blur-xl sm:px-5">
+        <div className="mx-auto flex h-15 max-w-6xl items-center justify-between rounded-2xl border border-white/12 bg-background/72 px-3 shadow-[0_18px_60px_hsl(var(--background)/0.55)] backdrop-blur-2xl sm:px-5">
           <Link to="/" aria-label="MovieReckon home" className="shrink-0">
             <BrandLogo size="sm" />
           </Link>
@@ -230,10 +262,8 @@ export default function Landing() {
           </div>
 
           <div className="relative mx-auto grid w-full max-w-6xl items-center gap-14 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8">
-            <motion.div
-              initial={reduceMotion ? false : { opacity: 0, y: 24 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+            <div
+              data-gsap="hero-copy"
               className="flex max-w-3xl flex-col items-start gap-7"
             >
               <Badge variant="outline" className="gap-2 rounded-full px-3 py-1 text-muted-foreground [&_svg]:size-3.5">
@@ -276,12 +306,9 @@ export default function Landing() {
                   </span>
                 ))}
               </div>
-            </motion.div>
+            </div>
 
-            <motion.div
-              initial={reduceMotion ? false : { opacity: 0, x: 28 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.7, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+            <div
               className="relative mx-auto flex h-[25rem] w-full max-w-xl items-center justify-center sm:h-[32rem]"
               aria-label="A selection of trending titles"
             >
@@ -294,21 +321,43 @@ export default function Landing() {
                   "right-[1%] top-[24%] rotate-10",
                 ];
                 return (
-                  <div key={poster.id} className={cn("absolute", positions[index] || positions[0])}>
+                  <div
+                    key={poster.id}
+                    data-gsap="hero-poster"
+                    className={cn("absolute", positions[index] || positions[0])}
+                  >
                     <PosterFrame poster={poster} featured={index === 2} />
                   </div>
                 );
               })}
-              <div className="absolute bottom-2 left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 rounded-2xl border bg-background/88 px-4 py-3 shadow-2xl backdrop-blur-xl">
-                <div className="flex size-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                  <Sparkles className="size-4" aria-hidden="true" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">Reckon says</p>
-                  <p className="truncate text-sm font-semibold">This one fits tonight.</p>
-                </div>
+              <div data-gsap="hero-glass" className="absolute bottom-2 left-1/2 z-20 -translate-x-1/2">
+                <LiquidGlassCard
+                  blur={16}
+                  distortion={18}
+                  chromaticAberration={1}
+                  borderRadius={18}
+                  borderColor="white"
+                  borderOpacity={0.24}
+                  backgroundColor="#09090b"
+                  backgroundOpacity={0.72}
+                  innerLightColor="#ffffff"
+                  innerLightOpacity={0.16}
+                  outerLightColor="#e11d48"
+                  outerLightOpacity={0.14}
+                  padding="12px 16px"
+                  flexibility={0}
+                  contentClassName="flex items-center gap-3"
+                >
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                    <Sparkles className="size-4" aria-hidden="true" />
+                  </div>
+                  <div className="min-w-0 pr-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">Reckon says</p>
+                    <p className="whitespace-nowrap text-sm font-semibold text-white">This one fits tonight.</p>
+                  </div>
+                </LiquidGlassCard>
               </div>
-            </motion.div>
+            </div>
           </div>
         </section>
 
@@ -323,7 +372,7 @@ export default function Landing() {
 
             <div id="features" className="grid scroll-mt-24 gap-4 md:grid-cols-3">
               {featureCards.map((feature) => (
-                <Card key={feature.title} className="flex min-h-72 flex-col overflow-hidden">
+                <Card key={feature.title} className="flex min-h-72 flex-col overflow-hidden border-white/10 bg-card/68 shadow-[0_24px_70px_hsl(var(--background)/0.38)] backdrop-blur-xl transition-[border-color,background-color,box-shadow] duration-200 hover:border-primary/35 hover:bg-card/82 hover:shadow-[0_28px_80px_hsl(var(--primary)/0.12)]">
                   <CardHeader className="gap-5">
                     <div className="flex size-11 items-center justify-center rounded-xl border bg-primary/10 text-primary">
                       <feature.icon className="size-5" aria-hidden="true" />
@@ -377,7 +426,7 @@ export default function Landing() {
             <ol className="flex flex-col gap-4">
               {journeySteps.map((step) => (
                 <li key={step.number}>
-                  <Card className="overflow-hidden">
+                  <Card className="overflow-hidden border-white/10 bg-card/68 shadow-xl backdrop-blur-xl transition-[border-color,background-color] duration-200 hover:border-primary/30 hover:bg-card/82">
                     <CardHeader className="grid gap-5 sm:grid-cols-[5rem_1fr] sm:items-start">
                       <span className="text-5xl font-black tracking-[-0.06em] text-primary">{step.number}</span>
                       <div className="flex flex-col gap-2">

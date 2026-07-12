@@ -229,7 +229,7 @@ function FirstTimeSetup({
   saving: boolean;
 }) {
   return (
-    <div className="surface-panel mb-6 border-primary/30 bg-linear-to-br from-primary/10 via-card/60 to-primary/5 px-6 py-8">
+    <div className="surface-panel glass-detail-panel mb-6 border-primary/30 bg-linear-to-br from-primary/10 via-card/60 to-primary/5 px-6 py-8">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="text-center mb-6">
@@ -952,7 +952,7 @@ export default function Reckon() {
               saving={setupSaving}
             />
           ) : !hasPreferences && !reckonLoading ? (
-            <div className="surface-panel mb-5 flex items-center gap-3 border-primary/25 bg-linear-to-r from-primary/10 to-primary/5 px-4 py-3.5">
+            <div className="surface-panel glass-detail-panel mb-5 flex items-center gap-3 border-primary/25 bg-linear-to-r from-primary/10 to-primary/5 px-4 py-3.5">
               <span className="section-glass-icon" aria-hidden="true">
                 <Sparkles className="h-4 w-4" />
               </span>

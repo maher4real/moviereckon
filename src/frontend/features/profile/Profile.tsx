@@ -194,7 +194,7 @@ export default function Profile() {
 
       <main className="page-main">
         <div className="container mx-auto px-4 space-y-7">
-          <section className="surface-panel relative overflow-hidden bg-linear-to-br from-card via-card to-primary/10 p-5 md:p-7">
+          <section className="surface-panel glass-detail-panel relative overflow-hidden bg-linear-to-br from-card via-card to-primary/10 p-5 md:p-7">
             <div className="absolute inset-0 opacity-25 [background-image:repeating-linear-gradient(90deg,transparent_0,transparent_62px,hsl(var(--foreground)/0.05)_63px,hsl(var(--foreground)/0.05)_64px)]" />
 
             <div className="relative flex flex-col gap-6">

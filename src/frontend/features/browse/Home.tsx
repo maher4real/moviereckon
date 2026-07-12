@@ -683,7 +683,7 @@ export default function Home() {
 
           {/* Reckon - Personalized Recommendations */}
           {reckonItems.length > 0 && (
-            <section className="surface-panel brand-warm-surface mx-2 overflow-hidden border-primary/25 md:mx-4">
+            <section className="surface-panel glass-detail-panel brand-warm-surface mx-2 overflow-hidden border-primary/25 md:mx-4">
               <div className="px-4 md:px-6 pt-5 pb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <span className="section-glass-icon h-9 w-9" aria-hidden="true">

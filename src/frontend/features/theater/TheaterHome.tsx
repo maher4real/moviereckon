@@ -76,7 +76,7 @@ export default function TheaterHome() {
       <main className="pt-24 pb-20 md:pb-0">
 
         {/* ── Cinematic page header ── */}
-        <div className="relative overflow-hidden border-b border-white/5"
+        <div className="glass-detail-panel relative overflow-hidden rounded-none border-x-0 border-t-0 border-white/10"
           style={{ background: "linear-gradient(160deg, hsl(0 79% 8%) 0%, hsl(0 0% 4%) 60%)" }}>
           <div className="absolute inset-0 pointer-events-none"
             style={{ background: "linear-gradient(90deg, transparent 0%, hsl(var(--primary) / 0.08) 100%)" }} />

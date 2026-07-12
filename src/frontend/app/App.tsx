@@ -29,6 +29,7 @@ import WatchlistPanel from "@/frontend/components/WatchlistPanel";
 import ErrorBoundary from "@/frontend/components/ErrorBoundary";
 import StartupSoundManager from "@/frontend/components/StartupSoundManager";
 import AuthTransitionOverlay from "@/frontend/components/AuthTransitionOverlay";
+import GlassPageFrame from "@/frontend/components/GlassPageFrame";
 import { CenteredAppSkeleton } from "@/frontend/components/AppSkeletons";
 import BottomNav from "@/frontend/components/BottomNav";
 import type { MongoUser } from "@/frontend/lib/mongodbClient";
@@ -118,6 +119,16 @@ function AuthenticatedRoutePreload() {
   const { user, isLoading } = useAuth();
   useIdleRoutePreload(Boolean(user) && !isLoading);
   return null;
+}
+
+function LandingRoute() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <CenteredAppSkeleton />;
+  }
+
+  return user ? <Navigate to="/home" replace /> : <Landing />;
 }
 
 function ShortContentRedirect({ contentType }: { contentType: "movie" | "tv" }) {
@@ -267,9 +278,10 @@ const App = ({
                       <AuthTransitionOverlay />
                       <WatchlistPanel />
                       <Suspense fallback={<CenteredAppSkeleton />}>
-                        <RouteTransition>
+                        <GlassPageFrame>
+                          <RouteTransition>
                           {/* Public routes */}
-                          <Route path="/" element={<Landing />} />
+                          <Route path="/" element={<LandingRoute />} />
                           <Route path="/auth" element={<Auth />} />
                           <Route path="/verify-email" element={<VerifyEmail />} />
                           <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -310,7 +322,8 @@ const App = ({
                           <Route path="/theater/:id/play" element={<ProtectedRoute><TheaterPlayer /></ProtectedRoute>} />
                           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                           <Route path="*" element={<NotFound />} />
-                        </RouteTransition>
+                          </RouteTransition>
+                        </GlassPageFrame>
                       </Suspense>
                       <MobileBottomNav />
                     </AppRouter>

@@ -254,7 +254,7 @@ export default function Search() {
         <div className="container mx-auto px-4">
           {/* Search Input */}
           <div className="max-w-2xl mx-auto mb-8">
-            <div className="surface-panel relative p-2">
+            <div className="surface-panel glass-detail-panel relative p-2">
               <SearchIcon className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <Input
                 type="text"
@@ -299,7 +299,7 @@ export default function Search() {
             // Recent Searches
             <div className="mx-auto max-w-2xl space-y-8">
               {recentSearches.length > 0 && (
-                <div className="surface-panel p-4">
+                <div className="surface-panel glass-detail-panel p-4">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="flex items-center gap-2.5 text-lg font-semibold">
                       <span className="section-glass-icon" aria-hidden="true">
@@ -328,7 +328,7 @@ export default function Search() {
               )}
 
               {/* Trending Suggestions */}
-              <div className="surface-panel p-4">
+              <div className="surface-panel glass-detail-panel p-4">
                 <h2 className="mb-4 flex items-center gap-2.5 text-lg font-semibold">
                   <span className="section-glass-icon" aria-hidden="true">
                     <TrendingUp className="h-4 w-4" />

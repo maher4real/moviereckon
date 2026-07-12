@@ -263,20 +263,30 @@
   }
 
   .surface-panel {
-    @apply rounded-lg border border-primary/15 shadow-xl shadow-black/20 backdrop-blur-md;
+    @apply rounded-xl border border-white/10 shadow-xl shadow-black/20 backdrop-blur-xl;
     background:
-      linear-gradient(145deg, hsl(var(--primary) / 0.09), transparent 34%),
-      linear-gradient(180deg, hsl(var(--card) / 0.82), hsl(var(--card) / 0.58));
+      linear-gradient(135deg, hsl(var(--foreground) / 0.045), transparent 30%),
+      radial-gradient(circle at 88% 10%, hsl(var(--primary) / 0.13), transparent 20rem),
+      linear-gradient(180deg, hsl(var(--card) / 0.86), hsl(var(--card) / 0.62));
     box-shadow:
-      0 18px 48px hsl(0 0% 0% / 0.24),
-      inset 0 1px 0 hsl(var(--foreground) / 0.04);
+      0 20px 54px hsl(0 0% 0% / 0.28),
+      inset 0 1px 0 hsl(var(--foreground) / 0.08);
+  }
+
+  .glass-detail-panel {
+    @apply rounded-xl border border-white/10 bg-card/72 shadow-[0_20px_56px_hsl(0_0%_0%/0.24),inset_0_1px_0_hsl(var(--foreground)/0.06)] backdrop-blur-xl;
+    background:
+      linear-gradient(135deg, hsl(var(--foreground) / 0.045), transparent 30%),
+      radial-gradient(circle at 88% 12%, hsl(var(--primary) / 0.14), transparent 18rem),
+      hsl(var(--card) / 0.72);
   }
 
   .filter-panel {
-    @apply mb-6 rounded-lg border border-primary/15 p-3 shadow-lg shadow-black/20 backdrop-blur-md;
+    @apply mb-6 rounded-xl border border-white/10 p-3 shadow-lg shadow-black/20 backdrop-blur-xl;
     background:
-      linear-gradient(135deg, hsl(var(--primary) / 0.08), transparent 42%),
-      hsl(var(--card) / 0.56);
+      linear-gradient(135deg, hsl(var(--foreground) / 0.04), transparent 34%),
+      radial-gradient(circle at 88% 20%, hsl(var(--primary) / 0.12), transparent 15rem),
+      hsl(var(--card) / 0.64);
   }
 
   .filter-row {
@@ -514,6 +524,22 @@
       0 18px 42px hsl(0 0% 0% / 0.46),
       0 0 0 1px hsl(var(--primary) / 0.14),
       0 0 28px hsl(var(--brand-red-bright) / 0.12);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fade-up,
+    .play-pulse,
+    .brand-logo-shine::after {
+      animation: none !important;
+    }
+
+    .fade-up,
+    .fade-up-1,
+    .fade-up-2,
+    .fade-up-3,
+    .fade-up-4 {
+      opacity: 1 !important;
+    }
   }
 
   .group:hover .poster-card img,

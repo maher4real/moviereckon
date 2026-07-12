@@ -8,8 +8,28 @@ vi.mock("@tanstack/react-query", () => ({
   useQuery: vi.fn(() => ({ data: undefined })),
 }));
 
+vi.mock("motion/react", () => ({
+  useReducedMotion: () => true,
+}));
+
 vi.mock("@/frontend/hooks/useAuth", () => ({
   useAuth: () => ({ user: authenticated ? { id: "user-1" } : null }),
+}));
+
+vi.mock("@/frontend/components/LiquidGlassCard", () => ({
+  default: ({
+    children,
+    className,
+    contentClassName,
+  }: {
+    children: React.ReactNode;
+    className?: string;
+    contentClassName?: string;
+  }) => (
+    <div className={className}>
+      <div className={contentClassName}>{children}</div>
+    </div>
+  ),
 }));
 
 vi.mock("@/frontend/components/MediaImage", () => ({
