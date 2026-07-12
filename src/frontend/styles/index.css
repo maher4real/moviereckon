@@ -170,6 +170,113 @@
 }
 
 @layer components {
+  .landing-cinema {
+    position: relative;
+    isolation: isolate;
+    background:
+      radial-gradient(circle at 12% 2%, hsl(var(--primary) / 0.12), transparent 30rem),
+      linear-gradient(180deg, hsl(0 0% 3%), hsl(var(--background)) 42%, hsl(0 0% 2%));
+  }
+
+  .landing-kicker {
+    @apply text-[10px] font-bold uppercase tracking-[0.24em] text-primary sm:text-[11px];
+  }
+
+  .landing-nav-link {
+    @apply relative rounded-sm py-2 text-xs font-semibold uppercase tracking-[0.14em] text-white/45 transition-colors duration-300 hover:text-white;
+  }
+
+  .landing-nav-link::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 1px;
+    background: hsl(var(--primary));
+    transform: scaleX(0);
+    transform-origin: right;
+    transition: transform 300ms var(--ease-fluid);
+  }
+
+  .landing-nav-link:hover::after,
+  .landing-nav-link:focus-visible::after {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+
+  .landing-glass-card {
+    border: 1px solid hsl(var(--foreground) / 0.09);
+    border-radius: 1.25rem;
+    background:
+      linear-gradient(145deg, hsl(var(--foreground) / 0.055), transparent 42%),
+      radial-gradient(circle at 92% 8%, hsl(var(--primary) / 0.09), transparent 18rem),
+      hsl(var(--card) / 0.62);
+    box-shadow:
+      0 24px 70px hsl(0 0% 0% / 0.3),
+      inset 0 1px 0 hsl(var(--foreground) / 0.055);
+    -webkit-backdrop-filter: blur(18px) saturate(1.15);
+    backdrop-filter: blur(18px) saturate(1.15);
+    transition:
+      border-color 500ms var(--ease-fluid),
+      background-color 500ms var(--ease-fluid),
+      box-shadow 500ms var(--ease-fluid),
+      transform 500ms var(--ease-fluid);
+  }
+
+  .landing-glass-card:hover {
+    border-color: hsl(var(--primary) / 0.3);
+    box-shadow:
+      0 30px 90px hsl(0 0% 0% / 0.38),
+      0 0 48px hsl(var(--primary) / 0.08),
+      inset 0 1px 0 hsl(var(--foreground) / 0.09);
+  }
+
+  .landing-liquid-full {
+    width: 100% !important;
+    max-width: 100%;
+  }
+
+  .landing-rule-grid {
+    background-image:
+      linear-gradient(90deg, hsl(var(--foreground) / 0.035) 1px, transparent 1px),
+      linear-gradient(hsl(var(--foreground) / 0.025) 1px, transparent 1px);
+    background-size: 6rem 6rem;
+    -webkit-mask-image: linear-gradient(to bottom, black, transparent 88%);
+    mask-image: linear-gradient(to bottom, black, transparent 88%);
+  }
+
+  .landing-vignette {
+    background:
+      linear-gradient(90deg, hsl(var(--background) / 0.62), transparent 43%, hsl(var(--background) / 0.08) 72%, hsl(var(--background) / 0.48)),
+      linear-gradient(180deg, hsl(var(--background) / 0.24), transparent 38%, hsl(var(--background)) 100%);
+  }
+
+  .landing-grain {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.9'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 180px 180px;
+  }
+
+  .landing-poster-rail {
+    overscroll-behavior-inline: contain;
+    scrollbar-color: hsl(var(--primary) / 0.45) transparent;
+    scrollbar-width: thin;
+  }
+
+  .landing-poster-rail::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .landing-poster-rail::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .landing-poster-rail::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: hsl(var(--primary) / 0.45);
+  }
+
   .app-page {
     @apply min-h-screen bg-background text-foreground;
     background:
@@ -732,6 +839,21 @@
       animation-duration: 0.01ms;
       animation-iteration-count: 1;
     }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-cinema *,
+  .landing-cinema *::before,
+  .landing-cinema *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .landing-grain {
+    transform: none !important;
   }
 }
 
