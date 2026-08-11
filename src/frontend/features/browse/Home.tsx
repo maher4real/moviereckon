@@ -39,12 +39,30 @@ import {
 } from "lucide-react";
 import { announceHomeHeroReady } from "@/frontend/lib/startupSound";
 import { cn, formatLocalDate, isAnimeLike } from "@/shared/lib/utils";
+import { TMDB_FALLBACK_POSTERS } from "@/shared/lib/tmdbFallbacks";
 
 // Memoized carousel for performance
 const MemoizedCarousel = memo(ContentCarousel);
 const HOME_UPCOMING_PAGES = [1, 2, 3] as const;
 const HOME_UPCOMING_TV_PAGES = [1, 2] as const;
 const HOME_UPCOMING_TIMEOUT_MS = 8000;
+
+const HOME_FALLBACK_MOVIES: Movie[] = TMDB_FALLBACK_POSTERS.map((poster, index) => ({
+  id: -(index + 1),
+  title: poster.title,
+  original_title: poster.title,
+  overview: "",
+  poster_path: poster.path,
+  backdrop_path: null,
+  release_date: "",
+  vote_average: 0,
+  vote_count: 0,
+  popularity: 0,
+  genre_ids: [],
+  original_language: "en",
+  adult: false,
+  video: false,
+}));
 
 type HomeUpcomingData = {
   movies: Movie[];
@@ -388,7 +406,7 @@ export default function Home() {
     [],
   );
 
-  const { data: trendingMovies, isLoading: trendingLoading } = useQuery({
+  const { data: trendingMovies } = useQuery({
     queryKey: ["trending-movies"],
     queryFn: () => getTrendingMovies("week"),
     ...queryConfig,
@@ -588,10 +606,13 @@ export default function Home() {
 
   // Hero movies (top 5 trending)
   const heroMovies = useMemo(
-    () => filteredTrendingMovies.slice(0, 5),
+    () => (filteredTrendingMovies.length > 0 ? filteredTrendingMovies : HOME_FALLBACK_MOVIES).slice(0, 5),
     [filteredTrendingMovies],
   );
-  const currentHeroMovie = heroMovies[heroIndex];
+  const currentHeroMovie = heroMovies[heroIndex % heroMovies.length];
+  const trendingShelfItems = filteredTrendingMovies.length > 0
+    ? filteredTrendingMovies
+    : HOME_FALLBACK_MOVIES;
 
   // Auto-rotate hero banner
   useEffect(() => {
@@ -661,7 +682,7 @@ export default function Home() {
           {/* Hero Banner */}
           <HeroBanner
             movie={currentHeroMovie}
-            isLoading={trendingLoading}
+            isLoading={false}
             currentIndex={heroIndex}
             totalSlides={heroMovies.length}
             onDotClick={handleDotClick}
@@ -750,8 +771,8 @@ export default function Home() {
           <MemoizedCarousel
             title="Trending Now"
             icon={TrendingUp}
-            items={filteredTrendingMovies as (Movie | TVShow)[]}
-            isLoading={trendingLoading}
+            items={trendingShelfItems as (Movie | TVShow)[]}
+            isLoading={false}
             type="movie"
             viewAllHref="/movies?category=trending"
             priorityImages={reckonItems.length === 0}

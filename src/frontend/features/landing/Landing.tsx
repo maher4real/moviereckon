@@ -356,14 +356,14 @@ export default function Landing() {
         Skip to content
       </a>
 
-      <div data-parallax="grain" aria-hidden="true" className="landing-grain pointer-events-none fixed inset-0 z-[60] scale-110 opacity-[0.035]" />
+      <div data-parallax="grain" aria-hidden="true" className="landing-grain pointer-events-none fixed inset-0 z-[60] scale-x-110 opacity-[0.035]" />
 
       <header className="fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-5 sm:pt-4">
         <div className="mx-auto flex h-15 max-w-7xl items-center justify-between rounded-2xl border border-white/12 bg-black/62 px-3 shadow-[0_18px_60px_rgba(0,0,0,0.48)] backdrop-blur-2xl sm:px-5">
           <Link to="/" aria-label="MovieReckon home" className="shrink-0 rounded-sm">
             <BrandLogo size="sm" />
           </Link>
-          <nav aria-label="Landing page navigation" className="hidden items-center gap-7 md:flex">
+          <nav aria-label="Landing page navigation" className="hidden items-center gap-7 lg:flex">
             <a className="landing-nav-link" href="#discover">Discover</a>
             <a className="landing-nav-link" href="#platform">Features</a>
             <a className="landing-nav-link" href="#how-it-works">How it works</a>
@@ -388,7 +388,7 @@ export default function Landing() {
           <div aria-hidden="true" className="landing-vignette absolute inset-0" />
           <div aria-hidden="true" className="landing-rule-grid absolute inset-0 opacity-40" />
 
-          <div className="relative mx-auto grid w-full max-w-7xl items-center gap-14 lg:grid-cols-[0.94fr_1.06fr] lg:gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+          <div className="relative mx-auto grid w-full max-w-7xl items-center gap-10 lg:grid-cols-[0.94fr_1.06fr] lg:gap-4 xl:grid-cols-[0.9fr_1.1fr]">
             <div className="relative z-20 flex max-w-3xl flex-col items-start gap-7 lg:pr-4">
               <div data-hero="eyebrow" className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.24em] text-white/60">
                 <span className="h-px w-8 bg-primary" />
@@ -397,7 +397,7 @@ export default function Landing() {
 
               <h1 data-hero="headline" className="max-w-4xl text-[clamp(3.65rem,8.5vw,8.4rem)] font-black leading-[0.79] tracking-[-0.072em]">
                 <span className="block">Stop scrolling.</span>
-                <span className="mt-[0.12em] block bg-[image:var(--brand-gradient)] bg-clip-text pb-[0.08em] text-transparent">Start watching.</span>
+                <span className="mt-[0.12em] block pb-[0.08em] text-primary drop-shadow-[0_16px_36px_hsl(var(--primary)/0.16)]">Start watching.</span>
               </h1>
 
               <p data-hero="copy" className="max-w-xl text-pretty text-base leading-7 text-white/62 sm:text-lg sm:leading-8">
@@ -427,7 +427,7 @@ export default function Landing() {
               </div>
             </div>
 
-            <div className="relative mx-auto h-[29rem] w-full max-w-2xl sm:h-[39rem] lg:h-[43rem]" aria-label="A layered selection of trending movie and television posters">
+            <div className="relative mx-auto h-[26rem] w-full max-w-2xl sm:h-[39rem] lg:h-[43rem]" aria-label="A layered selection of trending movie and television posters">
               <div aria-hidden="true" className="absolute left-1/2 top-1/2 h-3/4 w-3/4 -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary/15 bg-primary/8 blur-2xl" />
               {heroPosters.map((poster, index) => (
                 <div key={poster.id} data-parallax="poster" className={cn("absolute will-change-transform", heroPositions[index] || heroPositions[0])}>
@@ -622,7 +622,7 @@ export default function Landing() {
           </div>
         </section>
 
-        <section id="how-it-works" className="scroll-mt-20 px-4 py-20 sm:px-6 sm:py-28 lg:px-8 lg:py-36">
+        <section id="how-it-works" className="landing-section-band scroll-mt-20 px-4 py-20 sm:px-6 sm:py-28 lg:px-8 lg:py-36">
           <div className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-[0.82fr_1.18fr] lg:gap-24">
             <div className="flex flex-col items-start lg:sticky lg:top-28 lg:self-start">
               <p className="landing-kicker">How it works</p>

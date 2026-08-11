@@ -84,13 +84,14 @@ export default function Header() {
           <Link
             to="/home"
             data-brand-logo-anchor="true"
+            aria-label="MovieReckon home"
             className="relative z-10 inline-flex shrink-0 items-center transition-opacity hover:opacity-80"
           >
             <BrandLogo size="sm" labelClassName="hidden lg:inline" />
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex min-w-0 flex-1 items-center justify-center gap-3 lg:gap-6 px-3 lg:px-6">
+          <nav className="hidden min-w-0 flex-1 items-center justify-center gap-3 px-3 lg:flex lg:gap-6 lg:px-6">
             {navLinks.map((link) => {
               const active = isActive(link.href);
 
@@ -152,7 +153,7 @@ export default function Header() {
               variant="ghost"
               size="icon"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground lg:hidden"
               aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
               aria-expanded={isMobileMenuOpen}
               aria-controls="mobile-header-menu"
@@ -173,7 +174,7 @@ export default function Header() {
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className="max-h-[calc(100dvh-4rem)] overflow-x-hidden overflow-y-auto overscroll-contain border-t border-primary/15 bg-[linear-gradient(180deg,hsl(var(--background)/0.98),hsl(var(--card)/0.9))] backdrop-blur-md md:hidden"
+            className="max-h-[calc(100dvh-4rem)] overflow-x-hidden overflow-y-auto overscroll-contain border-t border-primary/15 bg-[linear-gradient(180deg,hsl(var(--background)/0.98),hsl(var(--card)/0.9))] backdrop-blur-md lg:hidden"
           >
             <nav className="container mx-auto flex flex-col gap-2 px-4 pt-4 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]">
               {navLinks.map((link) => {

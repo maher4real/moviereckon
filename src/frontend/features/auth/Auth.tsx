@@ -9,6 +9,7 @@ import {
   getBollywoodMovies,
   getPosterUrl,
 } from "@/shared/lib/tmdb";
+import { TMDB_FALLBACK_POSTERS } from "@/shared/lib/tmdbFallbacks";
 import BrandLogo from "@/frontend/components/BrandLogo";
 import TurnstileCaptcha from "@/frontend/components/TurnstileCaptcha";
 import { Alert, AlertDescription, AlertTitle } from "@/frontend/components/ui/alert";
@@ -179,10 +180,18 @@ export default function Auth() {
       return [...mixed].sort(() => Math.random() - 0.5);
     }
 
-    return Array.from({ length: 36 }, (_, index) => ({
+    const fallbackPosters = TMDB_FALLBACK_POSTERS.map((poster, index) => ({
       id: `fallback-${index}`,
-      src: "/fallbacks/poster.svg",
+      src: getPosterUrl(poster.path, "small"),
     }));
+
+    return Array.from({ length: 36 }, (_, index) => {
+      const poster = fallbackPosters[index % fallbackPosters.length];
+      return {
+        id: `${poster.id}-${index}`,
+        src: poster.src,
+      };
+    });
   }, [bollywoodData, trendingMovies, trendingTV]);
 
   const posterRows = useMemo(() => {
