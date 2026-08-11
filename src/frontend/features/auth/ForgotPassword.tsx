@@ -83,7 +83,7 @@ export default function ForgotPassword() {
         ) : null}
 
         <div className="space-y-2">
-          <Label htmlFor="forgot-email" className="text-sm font-medium">
+          <Label htmlFor="forgot-email" className="text-xs font-semibold tracking-wide text-foreground/75">
             Email address
           </Label>
           <div className="relative">
@@ -97,7 +97,7 @@ export default function ForgotPassword() {
                 setEmail(event.target.value);
                 if (error) setError("");
               }}
-              className="h-12 rounded-xl border-white/15 bg-background/80 pl-10"
+              className="h-12 rounded-xl border-border/50 bg-background/60 pl-10 text-sm transition-colors duration-150 focus-visible:border-primary/50 focus-visible:ring-primary/20"
               autoComplete="email"
             />
           </div>
@@ -115,7 +115,7 @@ export default function ForgotPassword() {
 
         <Button
           type="submit"
-          className="auth-submit-btn brand-primary-button h-12 w-full rounded-xl font-semibold hover:brightness-110"
+          className="auth-submit-btn brand-primary-button h-12 w-full rounded-xl text-base font-semibold shadow-lg shadow-primary/35 transition-all hover:brightness-110"
           disabled={isSubmitting}
         >
           {isSubmitting ? (

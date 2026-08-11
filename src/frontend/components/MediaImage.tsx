@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { ImgHTMLAttributes, useEffect, useMemo, useState } from "react";
 import { cn } from "@/shared/lib/utils";
+import { buildTmdbImageProxyResponsiveSource } from "@/shared/lib/tmdbImageProxy";
 
 interface MediaImageProps
   extends Omit<ImgHTMLAttributes<HTMLImageElement>, "src" | "srcSet"> {
@@ -155,8 +156,11 @@ export default function MediaImage({
   }, [fadeIn]);
 
   const responsiveSource = useMemo(() => {
-    if (srcSet || !resolvedSrc || resolvedSrc.startsWith("/")) return null;
-    return buildTmdbResponsiveSource(resolvedSrc);
+    if (srcSet || !resolvedSrc) return null;
+    return (
+      buildTmdbImageProxyResponsiveSource(resolvedSrc) ??
+      buildTmdbResponsiveSource(resolvedSrc)
+    );
   }, [resolvedSrc, srcSet]);
   const shouldUseNativeImg = useMemo(
     () => shouldUseNativeImageElement(resolvedSrc, srcSet),

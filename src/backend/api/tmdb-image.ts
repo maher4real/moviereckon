@@ -35,12 +35,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const kindParam = Array.isArray(req.query.kind) ? req.query.kind[0] : req.query.kind;
   const refParam = Array.isArray(req.query.ref) ? req.query.ref[0] : req.query.ref;
   const sizeParam = Array.isArray(req.query.size) ? req.query.size[0] : req.query.size;
+
+  if (typeof kindParam !== "string" || !isTmdbImageKind(kindParam)) {
+    return res.status(400).json({ error: "Invalid image kind" });
+  }
+
+  if (typeof refParam !== "string" || refParam.trim().length === 0 || refParam.length > 512) {
+    return res.status(400).json({ error: "Invalid image ref" });
+  }
+
   const clientIp = getClientIp(req);
-  const ipRateLimit = await consumeRateLimit(
-    `tmdb-image:ip:${clientIp}`,
-    IMAGE_PROXY_IP_LIMIT_MAX,
-    IMAGE_PROXY_IP_LIMIT_WINDOW_MS,
-  );
+  const [ipRateLimit, assetRateLimit] = await Promise.all([
+    consumeRateLimit(
+      `tmdb-image:ip:${clientIp}`,
+      IMAGE_PROXY_IP_LIMIT_MAX,
+      IMAGE_PROXY_IP_LIMIT_WINDOW_MS,
+    ),
+    consumeRateLimit(
+      `tmdb-image:asset:${clientIp}:${kindParam}:${hashImageRef(`${sizeParam || "default"}:${refParam}`)}`,
+      IMAGE_PROXY_ASSET_LIMIT_MAX,
+      IMAGE_PROXY_ASSET_LIMIT_WINDOW_MS,
+    ),
+  ]);
 
   if (!ipRateLimit.allowed) {
     emitSecurityEvent({
@@ -58,19 +74,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(429).json({ error: "Too many image requests. Please try again later." });
   }
 
-  if (typeof kindParam !== "string" || !isTmdbImageKind(kindParam)) {
-    return res.status(400).json({ error: "Invalid image kind" });
-  }
-
-  if (typeof refParam !== "string" || refParam.trim().length === 0 || refParam.length > 512) {
-    return res.status(400).json({ error: "Invalid image ref" });
-  }
-
-  const assetRateLimit = await consumeRateLimit(
-    `tmdb-image:asset:${clientIp}:${kindParam}:${hashImageRef(`${sizeParam || "default"}:${refParam}`)}`,
-    IMAGE_PROXY_ASSET_LIMIT_MAX,
-    IMAGE_PROXY_ASSET_LIMIT_WINDOW_MS,
-  );
   if (!assetRateLimit.allowed) {
     emitSecurityEvent({
       type: "rate_limit_blocked",

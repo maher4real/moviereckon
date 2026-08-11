@@ -24,9 +24,9 @@ export default function AuthScreenShell({
   return (
     <div className="app-page relative min-h-screen overflow-hidden px-4 py-10">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute inset-0 bg-[linear-gradient(135deg,hsl(var(--primary)/0.16),transparent_32%),linear-gradient(225deg,hsl(var(--secondary)/0.14),transparent_34%)]" />
-        <div className="absolute inset-0 bg-linear-to-br from-background via-background/95 to-background/90" />
-        <div className="absolute inset-0 opacity-35 [background-image:repeating-linear-gradient(90deg,transparent_0,transparent_46px,hsl(var(--foreground)/0.04)_47px,hsl(var(--foreground)/0.04)_48px)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_22%,hsl(var(--secondary)/0.22),transparent_42%),radial-gradient(circle_at_84%_74%,hsl(var(--primary)/0.26),transparent_45%)]" />
+        <div className="absolute inset-0 bg-linear-to-br from-background/70 via-background/45 to-background/65" />
+        <div className="absolute inset-0 opacity-30 [background-image:repeating-linear-gradient(90deg,transparent_0,transparent_54px,hsl(var(--foreground)/0.04)_55px,hsl(var(--foreground)/0.04)_56px)]" />
       </div>
 
       <div className="relative z-10 mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-lg items-center justify-center">

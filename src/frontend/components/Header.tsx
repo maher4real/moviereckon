@@ -70,15 +70,15 @@ export default function Header() {
       : undefined;
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 px-2 pt-2 transition-all duration-300 sm:px-4 sm:pt-3">
-      <div
-        className={cn(
-          "container mx-auto rounded-2xl border px-3 transition-[background-color,border-color,box-shadow] duration-300 sm:px-4",
-          isScrolled
-            ? "border-primary/22 bg-[linear-gradient(145deg,hsl(var(--foreground)/0.07),transparent_35%),hsl(var(--background)/0.88)] shadow-[0_18px_52px_hsl(0_0%_0%/0.34),inset_0_1px_0_hsl(var(--foreground)/0.08)] backdrop-blur-2xl"
-            : "border-white/8 bg-background/50 shadow-[0_12px_36px_hsl(0_0%_0%/0.12)] backdrop-blur-xl",
-        )}
-      >
+    <header
+      className={cn(
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+        isScrolled
+          ? "border-b border-primary/15 bg-[linear-gradient(180deg,hsl(var(--background)/0.97),hsl(var(--background)/0.9)),radial-gradient(circle_at_50%_0%,hsl(var(--primary)/0.18),transparent_32rem)] shadow-[0_14px_42px_hsl(0_0%_0%/0.28)] backdrop-blur-md"
+          : "bg-[linear-gradient(180deg,hsl(var(--background)/0.86),hsl(var(--background)/0.34)_58%,transparent)]",
+      )}
+    >
+      <div className="container mx-auto px-3 sm:px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link

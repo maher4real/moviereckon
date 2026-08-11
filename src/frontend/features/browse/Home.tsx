@@ -716,7 +716,7 @@ export default function Home() {
                 type="mixed"
                 viewAllHref="/reckon"
                 showViewAllCard={false}
-                priorityImages={!currentHeroMovie}
+                priorityImages
                 recommendationExplanations={explanationById}
               />
             </section>
@@ -754,7 +754,7 @@ export default function Home() {
             isLoading={trendingLoading}
             type="movie"
             viewAllHref="/movies?category=trending"
-            priorityImages={!currentHeroMovie && reckonItems.length === 0}
+            priorityImages={reckonItems.length === 0}
           />
 
           {/* Continue Watching */}

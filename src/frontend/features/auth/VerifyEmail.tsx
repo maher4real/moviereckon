@@ -73,7 +73,7 @@ export default function VerifyEmail() {
         <div className="flex flex-col gap-3 sm:flex-row">
           <Button
             type="button"
-            className="auth-submit-btn brand-primary-button h-11 flex-1 rounded-xl font-semibold hover:brightness-110"
+            className="auth-submit-btn brand-primary-button h-11 flex-1 rounded-xl text-base font-semibold shadow-lg shadow-primary/35 transition-all hover:brightness-110"
             onClick={() => navigate("/auth?email_verified=1")}
           >
             Go to sign in

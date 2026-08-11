@@ -100,7 +100,7 @@ export default function ResetPassword() {
         {!successMessage ? (
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="reset-password" className="text-sm font-medium">
+              <Label htmlFor="reset-password" className="text-xs font-semibold tracking-wide text-foreground/75">
                 New password
               </Label>
               <div className="relative">
@@ -114,7 +114,7 @@ export default function ResetPassword() {
                     setPassword(event.target.value);
                     if (error) setError("");
                   }}
-                  className="h-12 rounded-xl border-white/15 bg-background/80 pl-10 pr-10"
+                  className="h-12 rounded-xl border-border/50 bg-background/60 pl-10 pr-10 text-sm transition-colors duration-150 focus-visible:border-primary/50 focus-visible:ring-primary/20"
                   autoComplete="new-password"
                 />
                 <button
@@ -129,7 +129,7 @@ export default function ResetPassword() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="reset-password-confirm" className="text-sm font-medium">
+              <Label htmlFor="reset-password-confirm" className="text-xs font-semibold tracking-wide text-foreground/75">
                 Confirm new password
               </Label>
               <Input
@@ -141,14 +141,14 @@ export default function ResetPassword() {
                   setConfirmPassword(event.target.value);
                   if (error) setError("");
                 }}
-                className="h-12 rounded-xl border-white/15 bg-background/80"
+                className="h-12 rounded-xl border-border/50 bg-background/60 text-sm transition-colors duration-150 focus-visible:border-primary/50 focus-visible:ring-primary/20"
                 autoComplete="new-password"
               />
             </div>
 
             <Button
               type="submit"
-              className="auth-submit-btn brand-primary-button h-12 w-full rounded-xl font-semibold hover:brightness-110"
+              className="auth-submit-btn brand-primary-button h-12 w-full rounded-xl text-base font-semibold shadow-lg shadow-primary/35 transition-all hover:brightness-110"
               disabled={isSubmitting || !email || !token}
             >
               {isSubmitting ? (

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildTmdbImageProxyUrl,
+  buildTmdbImageProxyResponsiveSource,
   decodeTmdbImageRef,
   encodeTmdbImageRef,
   resolveTmdbImageSourceUrl,
@@ -32,5 +33,20 @@ describe("tmdb image proxy urls", () => {
         size: "w500",
       }),
     ).toBe("https://image.tmdb.org/t/p/w500/poster-file.jpg");
+  });
+
+  it("builds responsive proxy sources so small cards do not download w342", () => {
+    const proxyUrl = buildTmdbImageProxyUrl({
+      path: "/poster-file.jpg",
+      kind: "poster",
+      size: "w342",
+    });
+    const source = buildTmdbImageProxyResponsiveSource(proxyUrl || "");
+
+    expect(source?.srcSet).toContain("size=w185");
+    expect(source?.srcSet).toContain("185w");
+    expect(source?.srcSet).toContain("size=w500");
+    expect(source?.srcSet).not.toContain("size=original");
+    expect(source?.sizes).toContain("44vw");
   });
 });

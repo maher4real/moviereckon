@@ -34,7 +34,9 @@ const INITIAL_VISIBLE_MOBILE = 10;
 const INITIAL_VISIBLE_DESKTOP = 18;
 const LOAD_STEP_MOBILE = 8;
 const LOAD_STEP_DESKTOP = 12;
+const PRIORITY_POSTER_COUNT = 6;
 const POSTER_CARD_WIDTH_CLASS = "w-[29vw] min-w-[105px] max-w-[140px] sm:w-[130px] md:w-[150px] lg:w-[170px] xl:w-[190px]";
+const POSTER_CARD_SIZES = "(max-width: 639px) 29vw, (max-width: 767px) 130px, (max-width: 1023px) 150px, (max-width: 1279px) 170px, 190px";
 
 function getInitialVisibleCount(): number {
   if (typeof window === "undefined") return INITIAL_VISIBLE_DESKTOP;
@@ -232,7 +234,10 @@ export default function ContentCarousel({
               {visibleItems.map((item, index) => {
                 const itemType = getItemType(item);
                 const explanation = recommendationExplanations?.[`${itemType}_${item.id}`];
-                const isPriorityPoster = priorityImages && index < 6;
+                // Only the first visible shelf opts into eager loading. Other
+                // shelves stay lazy so the home page does not request every
+                // poster before the user reaches it.
+                const isPriorityPoster = priorityImages && index < PRIORITY_POSTER_COUNT;
 
                 return (
                   <motion.button
@@ -252,6 +257,7 @@ export default function ContentCarousel({
                         src={getPosterUrl(item.poster_path, "medium")}
                         alt={getTitle(item)}
                         className="w-full h-full object-cover"
+                        sizes={POSTER_CARD_SIZES}
                         loading={isPriorityPoster ? "eager" : "lazy"}
                         fetchPriority={isPriorityPoster ? "high" : "auto"}
                         priority={isPriorityPoster}

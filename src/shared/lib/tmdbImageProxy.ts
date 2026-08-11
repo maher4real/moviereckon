@@ -12,6 +12,45 @@ export const TMDB_IMAGE_SIZE_MAP = {
 
 export type TmdbImageKind = keyof typeof TMDB_IMAGE_SIZE_MAP;
 
+const TMDB_IMAGE_WIDTH_HINTS: Record<string, number> = {
+  w45: 45,
+  w92: 92,
+  w154: 154,
+  w185: 185,
+  w300: 300,
+  w342: 342,
+  w500: 500,
+  w780: 780,
+  w1280: 1280,
+  h632: 632,
+};
+
+const TMDB_IMAGE_RESPONSIVE_GROUPS: Record<
+  TmdbImageKind,
+  { tokens: readonly string[]; defaultSizes: string }
+> = {
+  poster: {
+    tokens: ["w185", "w342", "w500"],
+    defaultSizes: "(max-width: 640px) 44vw, (max-width: 1024px) 24vw, 200px",
+  },
+  backdrop: {
+    tokens: ["w300", "w780", "w1280"],
+    defaultSizes: "100vw",
+  },
+  profile: {
+    tokens: ["w45", "w185", "h632"],
+    defaultSizes: "(max-width: 640px) 26vw, 120px",
+  },
+  still: {
+    tokens: ["w185", "w300", "w500"],
+    defaultSizes: "(max-width: 640px) 70vw, 360px",
+  },
+  provider: {
+    tokens: ["w45", "w92", "w154", "w185"],
+    defaultSizes: "92px",
+  },
+};
+
 const TMDB_IMAGE_DEFAULT_SIZE: Record<TmdbImageKind, string> = {
   poster: "w342",
   backdrop: "w1280",
@@ -85,6 +124,43 @@ export function buildTmdbImageProxyUrl(params: {
   const base = params.apiBase || "";
 
   return `${base}${TMDB_IMAGE_PROXY_ROUTE}?kind=${params.kind}&size=${normalizedSize}&ref=${encodeURIComponent(ref)}`;
+}
+
+export function buildTmdbImageProxyResponsiveSource(
+  src: string,
+): { srcSet: string; sizes: string } | null {
+  if (!src) return null;
+
+  try {
+    const isAbsoluteUrl = /^https?:\/\//i.test(src);
+    const url = new URL(src, "https://moviereckon.invalid");
+    if (!url.pathname.endsWith(TMDB_IMAGE_PROXY_ROUTE)) return null;
+
+    const kind = url.searchParams.get("kind");
+    const ref = url.searchParams.get("ref");
+    if (!kind || !isTmdbImageKind(kind) || !ref) return null;
+
+    const group = TMDB_IMAGE_RESPONSIVE_GROUPS[kind];
+    const srcSet = group.tokens
+      .map((token) => {
+        const width = TMDB_IMAGE_WIDTH_HINTS[token];
+        if (!width) return null;
+
+        const candidate = new URL(url.toString());
+        candidate.searchParams.set("size", token);
+        const candidateUrl = isAbsoluteUrl
+          ? candidate.toString()
+          : `${candidate.pathname}${candidate.search}`;
+        return `${candidateUrl} ${width}w`;
+      })
+      .filter((value): value is string => value !== null)
+      .join(", ");
+
+    if (!srcSet) return null;
+    return { srcSet, sizes: group.defaultSizes };
+  } catch {
+    return null;
+  }
 }
 
 export function resolveTmdbImageSourceUrl(params: {
