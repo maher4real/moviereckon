@@ -46,6 +46,7 @@ import {
   getTrendingMovies,
   getTrendingTVShows,
 } from "@/shared/lib/tmdb";
+import { TMDB_FALLBACK_POSTERS } from "@/shared/lib/tmdbFallbacks";
 import { cn } from "@/shared/lib/utils";
 
 type LandingPoster = {
@@ -278,11 +279,11 @@ export default function Landing() {
 
     if (mixed.length > 0) return mixed;
 
-    return Array.from({ length: 12 }, (_, index) => ({
+    return TMDB_FALLBACK_POSTERS.map((poster, index) => ({
       id: `fallback-${index}`,
-      src: "/fallbacks/poster.svg",
-      title: "Your next discovery",
-      eyebrow: index % 2 === 0 ? "MovieReckon pick" : "Made for your mood",
+      src: getPosterUrl(poster.path, "medium"),
+      title: poster.title,
+      eyebrow: poster.eyebrow,
     }));
   }, [bollywood, trendingMovies, trendingTV]);
 

@@ -11,6 +11,7 @@ import {
   getTrendingMovies,
   getTrendingTVShows,
 } from "@/shared/lib/tmdb";
+import { TMDB_FALLBACK_POSTERS } from "@/shared/lib/tmdbFallbacks";
 import { cn } from "@/shared/lib/utils";
 
 type OverlayPhase = "hidden" | "center" | "moving" | "fading";
@@ -132,9 +133,9 @@ export default function AuthTransitionOverlay() {
 
     if (mixed.length > 0) return mixed;
 
-    return Array.from({ length: 24 }, (_, index) => ({
+    return TMDB_FALLBACK_POSTERS.map((poster, index) => ({
       id: `overlay-fallback-${index}`,
-      src: "/fallbacks/poster.svg",
+      src: getPosterUrl(poster.path, "small"),
     }));
   }, [bollywoodData, trendingMovies, trendingTV]);
 
