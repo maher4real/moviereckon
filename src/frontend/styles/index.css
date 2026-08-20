@@ -1,5 +1,6 @@
 @config "../../../tailwind.config.ts";
 @import "tailwindcss";
+@import "lenis/dist/lenis.css";
 
 /* MovieReckon - cinematic streaming interface */
 
@@ -112,6 +113,10 @@
     background: hsl(var(--background));
     scrollbar-gutter: stable;
     overscroll-behavior-y: none;
+  }
+
+  html.lenis.lenis-smooth {
+    scroll-behavior: auto !important;
   }
 
   body {

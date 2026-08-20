@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import Lenis from "lenis";
 import {
   ArrowRight,
   Bookmark,
@@ -298,6 +299,18 @@ export default function Landing() {
     if (reduceMotion || !landingRef.current) return;
 
     gsap.registerPlugin(ScrollTrigger);
+    const lenis = new Lenis({
+      anchors: true,
+      autoRaf: false,
+      smoothWheel: true,
+      stopInertiaOnNavigate: true,
+    });
+    const raf = (time: number) => lenis.raf(time * 1000);
+
+    lenis.on("scroll", ScrollTrigger.update);
+    gsap.ticker.add(raf);
+    gsap.ticker.lagSmoothing(0);
+
     const context = gsap.context(() => {
       const timeline = gsap.timeline({ defaults: { ease: "power3.out" } });
 
@@ -347,7 +360,12 @@ export default function Landing() {
       });
     }, landingRef);
 
-    return () => context.revert();
+    return () => {
+      context.revert();
+      lenis.destroy();
+      gsap.ticker.remove(raf);
+      gsap.ticker.lagSmoothing(500, 33);
+    };
   }, [reduceMotion]);
 
   return (
@@ -510,7 +528,7 @@ export default function Landing() {
               </div>
               <p className="max-w-sm text-sm leading-6 text-white/45">Drag the rail and cross genres, languages and formats without losing what makes a title right for you.</p>
             </div>
-            <div className="landing-poster-rail mt-10 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-6 pt-3 sm:gap-5 sm:px-8 lg:px-12">
+            <div data-lenis-prevent className="landing-poster-rail mt-10 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-6 pt-3 sm:gap-5 sm:px-8 lg:px-12">
               {railPosters.map((poster, index) => (
                 <div key={poster.id} className={cn("shrink-0", index % 3 === 1 && "mt-8")}>
                   <PosterFrame poster={poster} rail />
@@ -556,7 +574,7 @@ export default function Landing() {
                       <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Your discovery desk</p>
                       <h3 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">A quieter way through the catalogue.</h3>
                     </div>
-                    <div className="flex max-w-full gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+                    <div data-lenis-prevent className="flex max-w-full gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
                       {["For you", "Movies", "Series", "Bollywood", "Upcoming"].map((filter, index) => (
                         <span key={filter} className={cn("shrink-0 rounded-full border px-3 py-1.5 text-[10px] font-semibold", index === 0 ? "border-primary/40 bg-primary text-white" : "border-white/10 bg-white/[0.035] text-white/48")}>{filter}</span>
                       ))}
