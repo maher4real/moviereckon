@@ -1,4 +1,4 @@
-import type { VercelResponse } from "@vercel/node";
+import type { VercelResponse } from "./http";
 
 export const ACCESS_TOKEN_COOKIE_NAME = "moviereckon_access";
 export const REFRESH_TOKEN_COOKIE_NAME = "moviereckon_refresh";

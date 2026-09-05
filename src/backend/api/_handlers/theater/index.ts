@@ -6,7 +6,7 @@
  * PUT    /api/theater/:id    → update movie (admin only)
  * DELETE /api/theater/:id    → delete movie (admin only)
  */
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "../../lib/http";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import { getUserFromRequest, userHasRoleAtLeast } from "../../lib/auth.js";
 

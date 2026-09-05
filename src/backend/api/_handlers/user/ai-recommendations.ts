@@ -14,7 +14,7 @@
  *  - Richer taste profile passed to GPT for more specific explanations
  *  - Smarter cache key: uses latest activity timestamp, not just counts
  */
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "../../lib/http";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
@@ -747,7 +747,7 @@ async function buildAIRecommendations(
 export default async function aiRecommendationsHandler(
   req: VercelRequest,
   res: VercelResponse,
-): Promise<VercelResponse> {
+): Promise<void> {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }

@@ -1,9 +1,11 @@
 import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, CircleX, Medal, Rocket, Timer } from "lucide-react";
+import { CheckCircle2, CircleX, Clock3, Medal, Rocket, Timer } from "lucide-react";
 import { Button } from "@/frontend/components/ui/button";
+import { ToastAction } from "@/frontend/components/ui/toast";
 import * as mongoClient from "@/frontend/lib/mongodbClient";
 import { useUserData } from "@/frontend/hooks/useUserData";
+import { useToast } from "@/frontend/hooks/use-toast";
 import { cn } from "@/shared/lib/utils";
 
 interface FeedbackButtonsProps {
@@ -43,9 +45,15 @@ const FEEDBACK_OPTIONS: FeedbackOption[] = [
   },
   {
     value: "skip",
-    label: "Skip",
-    hint: "Not worth your time.",
+    label: "Not for me",
+    hint: "Keep this title out of future picks.",
     icon: CircleX,
+  },
+  {
+    value: "not_now",
+    label: "Not now",
+    hint: "Hide it for a little while.",
+    icon: Clock3,
   },
 ];
 
@@ -54,6 +62,7 @@ const EMPTY_COUNTS: Record<mongoClient.FeedbackType, number> = {
   one_time_watch: 0,
   must_watch: 0,
   skip: 0,
+  not_now: 0,
 };
 
 export default function FeedbackButtons({
@@ -66,6 +75,7 @@ export default function FeedbackButtons({
 }: FeedbackButtonsProps) {
   const queryClient = useQueryClient();
   const { setFeedback, getFeedback } = useUserData();
+  const { toast } = useToast();
 
   const queryKey = useMemo(
     () => ["content-feedback", contentType, contentId],
@@ -83,7 +93,8 @@ export default function FeedbackButtons({
 
   const feedbackMutation = useMutation({
     mutationFn: async (feedbackType: mongoClient.FeedbackType) => {
-      await setFeedback({
+      const previous = getFeedback(contentId, contentType);
+      const result = await setFeedback({
         content_id: contentId,
         content_type: contentType,
         feedback_type: feedbackType,
@@ -92,9 +103,52 @@ export default function FeedbackButtons({
         genres,
         language,
       });
+      return { feedbackType, previous, result };
     },
-    onSuccess: async () => {
+    onSuccess: async ({ feedbackType, previous, result }) => {
       await queryClient.invalidateQueries({ queryKey });
+      if (!result.ok) return;
+      toast({
+        title: result.action === "removed" ? "Feedback removed" : "Feedback saved",
+        description: result.action === "removed"
+          ? "This title is available in your feedback again."
+          : "Your recommendations will use this choice.",
+        action: (
+          <ToastAction
+            altText="Undo feedback"
+            onClick={() => {
+              void (async () => {
+                const current = getFeedback(contentId, contentType);
+                if (current) {
+                  await setFeedback({
+                    content_id: contentId,
+                    content_type: contentType,
+                    feedback_type: current,
+                    title,
+                    poster_path: posterPath,
+                    genres,
+                    language,
+                  });
+                }
+                if (previous && previous !== current) {
+                  await setFeedback({
+                    content_id: contentId,
+                    content_type: contentType,
+                    feedback_type: previous,
+                    title,
+                    poster_path: posterPath,
+                    genres,
+                    language,
+                  });
+                }
+                await queryClient.invalidateQueries({ queryKey });
+              })();
+            }}
+          >
+            Undo
+          </ToastAction>
+        ),
+      });
     },
   });
 

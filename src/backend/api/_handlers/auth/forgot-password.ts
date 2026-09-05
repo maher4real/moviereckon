@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "../../lib/http";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
 import { verifyCaptchaToken } from "../../lib/captcha.js";

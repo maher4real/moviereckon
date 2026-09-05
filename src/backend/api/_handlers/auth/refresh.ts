@@ -2,7 +2,7 @@
  * POST /api/auth/refresh
  * Refresh access token using refresh token
  */
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "../../lib/http";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import {
   generateDeviceId,

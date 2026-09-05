@@ -2,7 +2,7 @@
  * GET /api/health
  * Health check endpoint - verifies MongoDB connection
  */
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "./lib/http";
 import { installGlobalSafeLogging } from "@/shared/lib/safeLogging";
 import { connectToDatabase } from "./lib/mongodb.js";
 import { applyApiCors, applyDefaultSecurityHeaders } from "./lib/cors.js";

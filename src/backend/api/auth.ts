@@ -6,7 +6,7 @@
  * /api/auth/verify-email, /api/auth/resend-verification, /api/auth/forgot-password,
  * /api/auth/reset-password
  */
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "./lib/http";
 import { installGlobalSafeLogging } from "@/shared/lib/safeLogging";
 import availabilityHandler from "./_handlers/auth/availability.js";
 import loginHandler from "./_handlers/auth/login.js";

@@ -2,7 +2,7 @@
  * GET /api/auth/google-callback
  * Handle Google OAuth callback, create/login user, and issue app session cookies.
  */
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "../../lib/http";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import { getCookieValue } from "../../lib/cookies.js";
 import {

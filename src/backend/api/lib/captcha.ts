@@ -1,4 +1,4 @@
-import type { VercelRequest } from "@vercel/node";
+import type { VercelRequest } from "./http";
 import { randomUUID } from "crypto";
 import { getClientIp } from "./rate-limit.js";
 

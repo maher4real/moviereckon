@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "./http";
 import { randomBytes } from "crypto";
 import jwt from "jsonwebtoken";
 import { getCookieValue } from "./cookies.js";

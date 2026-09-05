@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  serverExternalPackages: ["@grpc/grpc-js", "@grpc/proto-loader"],
   images: {
     formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 86400,

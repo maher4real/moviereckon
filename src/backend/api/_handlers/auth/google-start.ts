@@ -3,7 +3,7 @@
  * Redirect browser to Google OAuth consent screen
  */
 import { randomBytes } from "crypto";
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "../../lib/http";
 import {
   buildAuthErrorRedirectPath,
   buildGoogleAuthorizationUrl,

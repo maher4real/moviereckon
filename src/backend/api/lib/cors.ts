@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "./http";
 
 const DEFAULT_ALLOWED_ORIGINS_PROD = ["https://moviereckon.vercel.app"];
 

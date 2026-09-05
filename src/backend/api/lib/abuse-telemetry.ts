@@ -1,4 +1,4 @@
-import type { VercelRequest } from "@vercel/node";
+import type { VercelRequest } from "./http";
 import { createHash } from "crypto";
 import { connectToDatabase } from "./mongodb.js";
 import { getClientIp } from "./rate-limit.js";

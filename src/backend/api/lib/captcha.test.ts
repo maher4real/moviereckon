@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { VercelRequest } from "@vercel/node";
+import type { VercelRequest } from "./http";
 import { verifyCaptchaToken } from "./captcha.js";
 
 const fetchMock = vi.fn();

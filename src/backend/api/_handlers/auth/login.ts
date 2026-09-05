@@ -2,7 +2,7 @@
  * POST /api/auth/login
  * Authenticate user and return JWT tokens
  */
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "../../lib/http";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import {
   comparePassword,

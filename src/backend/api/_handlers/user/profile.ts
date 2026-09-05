@@ -2,7 +2,7 @@
  * GET/PUT /api/user/profile
  * Manage user profile
  */
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "../../lib/http";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import { getUserFromRequest, normalizeUserRole } from "../../lib/auth.js";
 import { deleteManagedAvatarBlob } from "../../lib/blob.js";

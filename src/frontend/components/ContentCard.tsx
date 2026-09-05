@@ -38,7 +38,7 @@ function ContentCardComponent({
   const navigate = useNavigate();
   const location = useLocation();
   const { isWatched, addToWatchHistory } = useUserData();
-  const { isInWatchlist, toggleItem: toggleWatchlist } = useWatchlist();
+  const { isInWatchlist, toggleItem: toggleWatchlist, setStatus: setWatchlistStatus } = useWatchlist();
   const isMobile = useIsMobile();
   const posterRef = useRef<HTMLDivElement>(null);
   const [watchAnimating, setWatchAnimating] = useState(false);
@@ -72,6 +72,9 @@ function ContentCardComponent({
         genres: item.genre_ids || [],
         language: item.original_language || "en",
       });
+      if (bookmarked && typeof setWatchlistStatus === "function") {
+        await setWatchlistStatus(item.id, contentType, "completed").catch(() => undefined);
+      }
     }
   };
 

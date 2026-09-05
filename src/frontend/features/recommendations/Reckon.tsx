@@ -6,7 +6,9 @@ import React, {
   useRef,
   useCallback,
 } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRecommendations } from "@/frontend/hooks/useRecommendations";
+import { useAuth } from "@/frontend/hooks/useAuth";
 import { useUserData } from "@/frontend/hooks/useUserData";
 import { Movie, TVShow } from "@/shared/lib/tmdb";
 import * as mongoClient from "@/frontend/lib/mongodbClient";
@@ -45,6 +47,8 @@ import {
   Globe,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
+import PickTonight from "./PickTonight";
+import YourTastePanel, { type TasteSignal } from "./YourTastePanel";
 
 type ContentTypeFilter = "all" | "movie" | "tv";
 type RecommendationTypeFilter =
@@ -90,7 +94,6 @@ const RECOMMENDATION_TYPES: {
 ];
 
 const INITIAL_VISIBLE_ITEMS = 48;
-const LOAD_MORE_BATCH = 32;
 
 const GENRE_MAP: Record<number, string> = {
   28: "Action",
@@ -579,16 +582,26 @@ function PreferencesSheet({
 // ---------------------------------------------------------------------------
 
 export default function Reckon() {
-  const {
-    items: recommendations,
-    isLoading: reckonLoading,
-    isRefreshing,
-    isPersonalized,
-    explanationById,
-    refreshRecommendations,
-  } = useRecommendations();
-  const { preferences, updatePreferences } = useUserData();
+  const { user } = useAuth();
+  const { preferences, updatePreferences, setFeedback } = useUserData();
+  const queryClient = useQueryClient();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const tastePreferencesKey = [
+    ...(preferences?.preferred_genres || []),
+    "|",
+    ...(preferences?.preferred_languages || []),
+  ].join(",");
+  const tasteQueryKey = useMemo(
+    () => ["recommendation-taste", user?.id || "anonymous", tastePreferencesKey] as const,
+    [tastePreferencesKey, user?.id],
+  );
+  const { data: tasteSnapshot, refetch: refetchTaste } = useQuery({
+    queryKey: tasteQueryKey,
+    queryFn: () => mongoClient.fetchRecommendationTasteSnapshot(),
+    enabled: Boolean(user),
+    staleTime: 60_000,
+  });
+  const tasteProfile = tasteSnapshot?.profile || null;
 
   const [contentTypeFilter, setContentTypeFilter] =
     useState<ContentTypeFilter>("all");
@@ -598,12 +611,24 @@ export default function Reckon() {
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [selectedGenre, setSelectedGenre] = useState<string>("all");
   const [selectedLanguage, setSelectedLanguage] = useState<string>("all");
-  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_ITEMS);
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [skippedSetup, setSkippedSetup] = useState(false);
   const [setupLangs, setSetupLangs] = useState<string[]>([]);
   const [setupGenres, setSetupGenres] = useState<number[]>([]);
   const [setupSaving, setSetupSaving] = useState(false);
+  const [explorationMode, setExplorationMode] = useState<mongoClient.TasteExplorationMode>("familiar");
+
+  useEffect(() => {
+    if (tasteSnapshot?.controls.explorationMode) {
+      setExplorationMode(tasteSnapshot.controls.explorationMode);
+    }
+  }, [tasteSnapshot?.controls.explorationMode]);
+
+  const applyTasteSnapshot = useCallback((snapshot: mongoClient.RecommendationTasteSnapshot | null) => {
+    if (!snapshot) return;
+    setExplorationMode(snapshot.controls.explorationMode);
+    queryClient.setQueryData(tasteQueryKey, snapshot);
+  }, [queryClient, tasteQueryKey]);
   const toggleSetupLang = (l: string) =>
     setSetupLangs((prev) =>
       prev.includes(l) ? prev.filter((x) => x !== l) : [...prev, l],
@@ -614,6 +639,76 @@ export default function Reckon() {
       prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g],
     );
 
+  const {
+    items: recommendations,
+    isLoading: reckonLoading,
+    isRefreshing,
+    isFetchingNextPage,
+    hasMore: hasMoreFromServer,
+    state: recommendationsState,
+    hasError: recommendationsHasError,
+    errorCode: recommendationsErrorCode,
+    isPersonalized,
+    explanationById,
+    fetchNextPage,
+    refreshRecommendations,
+    retryRecommendations,
+    feedMode,
+  } = useRecommendations({
+    contentType: contentTypeFilter,
+    recommendationType: recTypeFilter,
+    genre: selectedGenre,
+    language: selectedLanguage,
+    sort: sortField,
+    sortOrder,
+    exploration: explorationMode,
+  });
+
+  const handleExplorationChange = useCallback(async (mode: mongoClient.TasteExplorationMode) => {
+    if (feedMode === "legacy") return;
+    const snapshot = await mongoClient.updateRecommendationTasteControls({ explorationMode: mode });
+    if (!snapshot) throw new Error("taste_controls_update_failed");
+    applyTasteSnapshot(snapshot);
+    await refreshRecommendations();
+  }, [applyTasteSnapshot, feedMode, refreshRecommendations]);
+
+  const handleForgetLearning = useCallback(async (key: string, excluded: boolean) => {
+    const snapshot = await mongoClient.updateRecommendationTasteControls(
+      excluded ? { restoreLearningKey: key } : { excludeLearningKey: key },
+    );
+    if (!snapshot) throw new Error("taste_learning_update_failed");
+    applyTasteSnapshot(snapshot);
+    await refreshRecommendations();
+  }, [applyTasteSnapshot, refreshRecommendations]);
+
+  const handleResetLearned = useCallback(async () => {
+    const snapshot = await mongoClient.resetRecommendationTaste();
+    if (!snapshot) throw new Error("taste_reset_failed");
+    applyTasteSnapshot(snapshot);
+    await refreshRecommendations();
+  }, [applyTasteSnapshot, refreshRecommendations]);
+
+  const handleTitleSignal = useCallback(async (item: Movie | TVShow, signal: TasteSignal) => {
+    const contentType = "title" in item ? "movie" : "tv";
+    const title = "title" in item ? item.title : item.name;
+    const result = await setFeedback({
+      content_id: item.id,
+      content_type: contentType,
+      feedback_type: signal === "positive" ? "give_it_a_go" : "skip",
+      title,
+      poster_path: item.poster_path,
+      genres: item.genre_ids || [],
+      language: item.original_language || "en",
+    });
+    if (result.ok) {
+      queryClient.invalidateQueries({ queryKey: tasteQueryKey });
+      const refreshed = await refetchTaste();
+      applyTasteSnapshot(refreshed.data || null);
+      await refreshRecommendations();
+    }
+    return result;
+  }, [applyTasteSnapshot, queryClient, refetchTaste, refreshRecommendations, setFeedback, tasteQueryKey]);
+
   const saveSetup = useCallback(async () => {
     setSetupSaving(true);
     try {
@@ -621,11 +716,12 @@ export default function Reckon() {
         preferred_languages: setupLangs,
         preferred_genres: setupGenres,
       });
+      await refetchTaste();
       await refreshRecommendations();
     } finally {
       setSetupSaving(false);
     }
-  }, [updatePreferences, setupLangs, setupGenres, refreshRecommendations]);
+  }, [refetchTaste, refreshRecommendations, setupGenres, setupLangs, updatePreferences]);
   const [extraItems, setExtraItems] = useState<(Movie | TVShow)[]>([]);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [moreExhausted, setMoreExhausted] = useState(false);
@@ -651,33 +747,28 @@ export default function Reckon() {
     (preferences?.preferred_genres?.length ?? 0) > 0;
 
   const handlePreferencesSaved = useCallback(() => {
+    void refetchTaste();
     void refreshRecommendations();
-  }, [refreshRecommendations]);
+  }, [refetchTaste, refreshRecommendations]);
 
   const showFirstTimeSetup =
     !hasPreferences && !reckonLoading && preferences !== null && !skippedSetup;
 
   const availableGenres = useMemo(() => {
-    const genres = new Set<number>();
-    [...recommendations, ...extraItems].forEach((item) => {
-      item.genre_ids?.forEach((g) => genres.add(g));
-    });
+    const genres = new Set<number>(Object.keys(GENRE_MAP).map(Number));
     preferences?.preferred_genres?.forEach((g) => genres.add(g));
     return Array.from(genres)
       .filter((g) => GENRE_MAP[g])
       .sort((a, b) => GENRE_MAP[a].localeCompare(GENRE_MAP[b]));
-  }, [recommendations, extraItems, preferences]);
+  }, [preferences]);
 
   const availableLanguages = useMemo(() => {
-    const langs = new Set<string>();
-    [...recommendations, ...extraItems].forEach((item) => {
-      if (item.original_language) langs.add(item.original_language);
-    });
+    const langs = new Set<string>(Object.keys(LANGUAGE_MAP));
     preferences?.preferred_languages?.forEach((l) => langs.add(l));
     return Array.from(langs)
       .filter((l) => LANGUAGE_MAP[l])
       .sort((a, b) => LANGUAGE_MAP[a].localeCompare(LANGUAGE_MAP[b]));
-  }, [recommendations, extraItems, preferences]);
+  }, [preferences]);
 
   const processedItems = useMemo(() => {
     // Merge extra discovered items, dedup by id+type
@@ -697,33 +788,6 @@ export default function Reckon() {
       filtered = filtered.filter(
         (item) => "first_air_date" in item && !("title" in item),
       );
-    }
-
-    if (recTypeFilter !== "all") {
-      const now = new Date().getTime();
-      const oneMonthAgo = now - 30 * 24 * 60 * 60 * 1000;
-
-      switch (recTypeFilter) {
-        case "trending":
-          filtered = filtered.filter((item) => (item.popularity || 0) > 50);
-          break;
-        case "highrated":
-          filtered = filtered.filter((item) => (item.vote_average || 0) >= 8.0);
-          break;
-        case "popular":
-          filtered = filtered.filter((item) => (item.popularity || 0) >= 100);
-          break;
-        case "newreleases":
-          filtered = filtered.filter((item) => {
-            const releaseDate =
-              "release_date" in item
-                ? (item as Movie).release_date
-                : (item as TVShow).first_air_date;
-            const itemDate = releaseDate ? new Date(releaseDate).getTime() : 0;
-            return itemDate > oneMonthAgo;
-          });
-          break;
-      }
     }
 
     if (selectedGenre !== "all") {
@@ -766,17 +830,13 @@ export default function Reckon() {
     recommendations,
     extraItems,
     contentTypeFilter,
-    recTypeFilter,
     selectedGenre,
     selectedLanguage,
     sortField,
     sortOrder,
   ]);
 
-  const visibleItems = useMemo(
-    () => processedItems.slice(0, visibleCount),
-    [processedItems, visibleCount],
-  );
+  const visibleItems = processedItems;
 
   const fetchMoreLikeThis = useCallback(async () => {
     if (isFetchingMore) return;
@@ -786,12 +846,21 @@ export default function Reckon() {
     const excludedKeys = Array.from(
       new Set(currentItems.map(getRecommendationKey)),
     );
-    const seedKeys = visibleItems.slice(0, 10).map(getRecommendationKey);
-    const fallbackSeedKeys = currentItems.slice(0, 10).map(getRecommendationKey);
+    const seedKeys = (tasteProfile?.clusters || [])
+      .flatMap((cluster) => cluster.evidence)
+      .filter((evidence) => ["liked", "must_watch", "give_it_a_go"].includes(evidence.signal))
+      .map((evidence) => evidence.key)
+      .filter((key, index, keys) => keys.indexOf(key) === index)
+      .slice(0, 10);
+    if (seedKeys.length === 0) {
+      setMoreExhausted(true);
+      setIsFetchingMore(false);
+      return;
+    }
 
     try {
       const payload = await mongoClient.fetchMoreLikeThisRecommendations({
-        seedKeys: seedKeys.length ? seedKeys : fallbackSeedKeys,
+        seedKeys,
         excludedKeys,
         genre: selectedGenre,
         language: selectedLanguage,
@@ -816,40 +885,27 @@ export default function Reckon() {
     isFetchingMore,
     recommendations,
     extraItems,
-    visibleItems,
     selectedGenre,
     selectedLanguage,
     contentTypeFilter,
+    tasteProfile,
   ]);
 
-  const hasMore = visibleCount < processedItems.length;
-
-  useEffect(() => {
-    setVisibleCount(INITIAL_VISIBLE_ITEMS);
-  }, [
-    contentTypeFilter,
-    recTypeFilter,
-    selectedGenre,
-    selectedLanguage,
-    sortField,
-    sortOrder,
-  ]);
+  const hasMore = hasMoreFromServer;
 
   useEffect(() => {
     const node = loadMoreRef.current;
-    if (!node || !hasMore) return;
+    if (!node || !hasMore || recommendationsHasError || recommendationsState === "retryable") return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (!entries[0]?.isIntersecting) return;
-        setVisibleCount((prev) =>
-          Math.min(prev + LOAD_MORE_BATCH, processedItems.length),
-        );
+        if (!isFetchingNextPage) void fetchNextPage();
       },
       { rootMargin: "500px 0px" },
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [hasMore, processedItems.length, visibleItems.length]);
+  }, [fetchNextPage, hasMore, isFetchingNextPage, processedItems.length, recommendationsHasError, recommendationsState]);
 
   const toggleSortOrder = () =>
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -975,6 +1031,18 @@ export default function Reckon() {
             </div>
           ) : null}
 
+          <YourTastePanel
+            snapshot={tasteSnapshot || null}
+            feedMode={feedMode}
+            onEditPreferences={() => setPrefsOpen(true)}
+            onExplorationChange={handleExplorationChange}
+            onForgetLearning={handleForgetLearning}
+            onResetLearned={handleResetLearned}
+            onTitleSignal={handleTitleSignal}
+          />
+
+          <PickTonight items={recommendations} explanationById={explanationById} />
+
           {/* Content type + rec type filter rows */}
           <div className="flex flex-col gap-3 mb-6">
             <div className="filter-panel mb-0">
@@ -1013,14 +1081,18 @@ export default function Reckon() {
               <div className="filter-row">
               {RECOMMENDATION_TYPES.map((t) => {
                 const active = recTypeFilter === t.id;
+                const unavailableInLegacy = feedMode === "legacy" && t.id !== "all";
                 return (
                   <button
                     key={t.id}
                     type="button"
-                    onClick={() => setRecTypeFilter(t.id)}
-                    title={t.description}
+                    onClick={() => {
+                      if (!unavailableInLegacy) setRecTypeFilter(t.id);
+                    }}
+                    disabled={unavailableInLegacy}
+                    title={unavailableInLegacy ? "Available when the durable recommendation feed is enabled" : t.description}
                     className={cn(
-                      "filter-chip flex items-center gap-1.5",
+                      "filter-chip flex items-center gap-1.5 disabled:cursor-not-allowed disabled:opacity-45",
                       active && "filter-chip-active",
                     )}
                   >
@@ -1030,6 +1102,11 @@ export default function Reckon() {
                 );
               })}
               </div>
+              {feedMode === "legacy" && (
+                <p className="px-3 pb-2 text-xs text-muted-foreground">
+                  Trending, rating, popularity, and new-release modes are available with the durable feed.
+                </p>
+              )}
             </div>
           </div>
 
@@ -1134,17 +1211,31 @@ export default function Reckon() {
 
               <div ref={loadMoreRef} className="h-12 w-full" />
 
-              {hasMore && (
+              {recommendationsHasError ? (
+                <div className="flex flex-col items-center gap-2 py-6" role="alert">
+                  <p className="text-xs text-muted-foreground">
+                    {recommendationsState === "retryable" && recommendationsErrorCode !== "SESSION_EXPIRED"
+                      ? "More recommendations could not load. Your current picks are still available."
+                      : "Your recommendation session expired. Restart to continue."}
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => void retryRecommendations()}
+                    disabled={isRefreshing}
+                    className="gap-2"
+                  >
+                    <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+                    {isRefreshing ? "Retrying…" : recommendationsErrorCode === "SESSION_EXPIRED" ? "Restart feed" : "Retry"}
+                  </Button>
+                </div>
+              ) : hasMore && (
                 <div className="flex justify-center py-3">
                   <Button
                     variant="outline"
-                    onClick={() =>
-                      setVisibleCount((prev) =>
-                        Math.min(prev + LOAD_MORE_BATCH, processedItems.length),
-                      )
-                    }
+                    onClick={() => void fetchNextPage()}
+                    disabled={isFetchingNextPage}
                   >
-                    Load More
+                    {isFetchingNextPage ? "Loading…" : "Load More"}
                   </Button>
                 </div>
               )}
@@ -1152,7 +1243,9 @@ export default function Reckon() {
               {!hasMore && canFetchMore && (
                 <div className="flex flex-col items-center gap-2 py-6">
                   <p className="text-xs text-muted-foreground">
-                    {selectedLanguage !== "all" && selectedGenre !== "all"
+                    {recommendationsState === "retryable"
+                      ? "Recommendations are temporarily unavailable"
+                      : selectedLanguage !== "all" && selectedGenre !== "all"
                       ? `More ${GENRE_MAP[Number(selectedGenre)] || "content"} in ${LANGUAGE_MAP[selectedLanguage] || selectedLanguage}`
                       : selectedLanguage !== "all"
                         ? `More content in ${LANGUAGE_MAP[selectedLanguage] || selectedLanguage}`
@@ -1164,7 +1257,11 @@ export default function Reckon() {
                   </p>
                   <Button
                     variant="outline"
-                    onClick={() => void fetchMoreLikeThis()}
+                    onClick={() =>
+                      recommendationsState === "retryable"
+                        ? void refreshRecommendations()
+                        : void fetchMoreLikeThis()
+                    }
                     disabled={isFetchingMore}
                     className="gap-2 border-primary/30 text-primary hover:bg-primary/10"
                   >
@@ -1174,11 +1271,33 @@ export default function Reckon() {
                         isFetchingMore && "animate-spin",
                       )}
                     />
-                    {isFetchingMore ? "Fetching…" : "Show More Like This"}
+                    {isFetchingMore
+                      ? "Fetching…"
+                      : recommendationsState === "retryable"
+                        ? "Retry"
+                        : "Show More Like This"}
                   </Button>
                 </div>
               )}
             </>
+          ) : recommendationsHasError ? (
+            <div className="empty-state">
+              <RefreshCw className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-xl font-semibold mb-2">Recommendations could not load</h3>
+              <p className="text-muted-foreground mb-4">Your feed is still available to retry.</p>
+              <Button onClick={() => void retryRecommendations()} disabled={isRefreshing}>
+                {isRefreshing ? "Retrying…" : "Retry"}
+              </Button>
+            </div>
+          ) : hasMore ? (
+            <div className="empty-state">
+              <div ref={loadMoreRef} className="h-12 w-full" />
+              <RefreshCw className={cn("w-12 h-12 text-muted-foreground mx-auto mb-4", isFetchingNextPage && "animate-spin")} />
+              <h3 className="text-xl font-semibold mb-2">Loading more recommendations</h3>
+              <Button variant="outline" onClick={() => void fetchNextPage()} disabled={isFetchingNextPage}>
+                {isFetchingNextPage ? "Loading…" : "Load More"}
+              </Button>
+            </div>
           ) : (
             <div className="empty-state">
               <Sparkles className="w-16 h-16 text-muted-foreground mx-auto mb-4" />

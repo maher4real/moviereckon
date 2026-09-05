@@ -25,8 +25,9 @@ import { Bookmark, GripVertical, Check, Trash2, BookMarked, ExternalLink, ListVi
 import { Button } from "@/frontend/components/ui/button";
 import { ScrollArea } from "@/frontend/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/frontend/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/frontend/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/frontend/components/ui/tooltip";
-import { useWatchlist, type WatchlistItem } from "@/frontend/hooks/useWatchlist";
+import { getWatchlistStatus, useWatchlist, type WatchlistItem, type WatchlistStatus } from "@/frontend/hooks/useWatchlist";
 import { useIsMobile } from "@/frontend/hooks/use-mobile";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import MediaImage from "@/frontend/components/MediaImage";
@@ -37,7 +38,8 @@ import { cn } from "@/shared/lib/utils";
 
 function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
   const navigate = useNavigate();
-  const { removeItem, markWatched } = useWatchlist();
+  const { removeItem, markWatched, setStatus } = useWatchlist();
+  const status = getWatchlistStatus(item);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.id });
 
@@ -49,12 +51,18 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
 
   const handleMarkWatched = (e: React.MouseEvent) => {
     e.stopPropagation();
-    markWatched(item.content_id, item.content_type, !item.watched);
+    void markWatched(item.content_id, item.content_type, !item.watched).catch(() => undefined);
   };
 
   const handleRemove = (e: React.MouseEvent) => {
     e.stopPropagation();
-    removeItem(item.content_id, item.content_type);
+    void removeItem(item.content_id, item.content_type).catch(() => undefined);
+  };
+
+  const handleStatusChange = (value: string) => {
+    const nextStatus = value as WatchlistStatus;
+    if (nextStatus === status) return;
+    void setStatus(item.content_id, item.content_type, nextStatus).catch(() => undefined);
   };
 
   const handleOpenDetail = () => {
@@ -123,6 +131,7 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
             <p className="text-xs text-muted-foreground capitalize">
               {item.content_type === "tv" ? "Series" : "Movie"}
             </p>
+            <span className="text-[10px] text-muted-foreground/70">• {status}</span>
             <ExternalLink className="h-2.5 w-2.5 text-muted-foreground/50 group-hover/link:text-primary/60 motion-safe:transition-colors" />
           </div>
         </div>
@@ -130,6 +139,20 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
 
       {/* Actions */}
       <div className="flex shrink-0 items-center gap-0.5 sm:gap-2">
+        <Select value={status} onValueChange={handleStatusChange}>
+          <SelectTrigger
+            className="h-8 w-22.5 px-2 text-[11px] capitalize sm:w-25"
+            aria-label={`Set status for ${item.title}`}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="bg-popover border-border">
+            <SelectItem value="saved">Saved</SelectItem>
+            <SelectItem value="watching">Watching</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="dropped">Dropped</SelectItem>
+          </SelectContent>
+        </Select>
         <Tooltip>
           <TooltipTrigger asChild>
             <button
@@ -194,7 +217,7 @@ function WatchlistContent() {
     if (!over || active.id === over.id) return;
     const oldIndex = items.findIndex((i) => i.id === active.id);
     const newIndex = items.findIndex((i) => i.id === over.id);
-    reorder(arrayMove(items, oldIndex, newIndex));
+    void reorder(arrayMove(items, oldIndex, newIndex)).catch(() => undefined);
   };
 
   if (isLoading) {
@@ -227,8 +250,8 @@ function WatchlistContent() {
     );
   }
 
-  const unwatched = items.filter((i) => !i.watched);
-  const watched = items.filter((i) => i.watched);
+  const unwatched = items.filter((i) => getWatchlistStatus(i) !== "completed");
+  const watched = items.filter((i) => getWatchlistStatus(i) === "completed");
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

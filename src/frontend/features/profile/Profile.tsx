@@ -1,15 +1,27 @@
-import { memo, useEffect, useMemo } from "react";
+import { memo, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Footer from "@/frontend/components/Footer";
 import Header from "@/frontend/components/Header";
 import { AppPageSkeleton } from "@/frontend/components/AppSkeletons";
 import MediaImage from "@/frontend/components/MediaImage";
 import { Avatar, AvatarFallback, AvatarImage } from "@/frontend/components/ui/avatar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/frontend/components/ui/alert-dialog";
 import { Badge } from "@/frontend/components/ui/badge";
 import { Button } from "@/frontend/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/frontend/components/ui/card";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import { useUserData } from "@/frontend/hooks/useUserData";
+import { getWatchlistStatus, useWatchlist } from "@/frontend/hooks/useWatchlist";
+import * as mongoClient from "@/frontend/lib/mongodbClient";
 import { getInitials, normalizeAvatarValue } from "@/frontend/lib/profileEditor";
 import { getPosterUrl } from "@/shared/lib/tmdb";
 import {
@@ -56,6 +68,7 @@ const ActivityListItem = memo(function ActivityListItem({
         type="button"
         onClick={onOpen}
         className="h-16 w-11 shrink-0 overflow-hidden rounded-md border border-border/60"
+        aria-label={`Open ${item.title}`}
       >
         <MediaImage
           src={getPosterUrl(item.poster_path, "small")}
@@ -72,6 +85,7 @@ const ActivityListItem = memo(function ActivityListItem({
             type="button"
             onClick={onOpen}
             className="line-clamp-1 text-left text-sm font-medium transition-colors hover:text-primary"
+            aria-label={`Open ${item.title}`}
           >
             {item.title}
           </button>
@@ -94,6 +108,7 @@ const ActivityListItem = memo(function ActivityListItem({
           size="sm"
           onClick={onOpen}
           className="h-8 px-2"
+          aria-label={`Open ${item.title}`}
         >
           <ArrowUpRight className="h-3.5 w-3.5" />
         </Button>
@@ -104,6 +119,7 @@ const ActivityListItem = memo(function ActivityListItem({
             size="sm"
             onClick={onRemove}
             className="h-8 px-2 text-destructive hover:text-destructive"
+            aria-label={`Remove ${item.title} from history`}
           >
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
@@ -126,8 +142,12 @@ export default function Profile() {
     removeFromWatchHistory,
     clearHistory,
   } = useUserData();
+  const { items: watchlistItems } = useWatchlist();
   const navigate = useNavigate();
   const location = useLocation();
+  const [privacyBusy, setPrivacyBusy] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [privacyError, setPrivacyError] = useState<string | null>(null);
 
   const displayName = profile?.username || user?.username || "User";
   const avatarUrl = normalizeAvatarValue(profile?.avatar_url || "") || null;
@@ -150,6 +170,14 @@ export default function Profile() {
     return { movies, tvShows, activeThisWeek, likes: likedItems.length };
   }, [likedItems, watchHistory]);
 
+  const libraryStats = useMemo(() => {
+    const counts = { saved: 0, watching: 0, completed: 0, dropped: 0 };
+    watchlistItems.forEach((item) => {
+      counts[getWatchlistStatus(item)] += 1;
+    });
+    return counts;
+  }, [watchlistItems]);
+
   const fromPath = `${location.pathname}${location.search}${location.hash}`;
   const handleItemClick = (id: number, type: "movie" | "tv") => {
     navigate(`/${type}/${id}`, { state: { from: fromPath } });
@@ -158,6 +186,44 @@ export default function Profile() {
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
+  };
+
+  const handleExport = async () => {
+    setPrivacyBusy(true);
+    setPrivacyError(null);
+    try {
+      const data = await mongoClient.exportUserData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `moviereckon-data-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to export your data.";
+      setPrivacyError(message);
+    } finally {
+      setPrivacyBusy(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setPrivacyBusy(true);
+    setPrivacyError(null);
+    try {
+      await mongoClient.deleteAccount();
+      await signOut().catch(() => undefined);
+      setDeleteDialogOpen(false);
+      navigate("/");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to delete your account.";
+      setPrivacyError(message);
+    } finally {
+      setPrivacyBusy(false);
+    }
   };
 
   const activityHistory = useMemo<ActivityItem[]>(
@@ -290,6 +356,77 @@ export default function Profile() {
               </div>
             </div>
           </section>
+
+          <Card className="surface-panel bg-card/70">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2">
+                <UserRound className="h-5 w-5 text-primary" />
+                Your Data &amp; Library
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Download a copy of your MovieReckon activity or permanently delete your account and its private data.
+              </p>
+              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground" aria-label="Library status counts">
+                <span className="rounded-md bg-muted/60 px-2 py-1">Saved {libraryStats.saved}</span>
+                <span className="rounded-md bg-muted/60 px-2 py-1">Watching {libraryStats.watching}</span>
+                <span className="rounded-md bg-muted/60 px-2 py-1">Completed {libraryStats.completed}</span>
+                <span className="rounded-md bg-muted/60 px-2 py-1">Dropped {libraryStats.dropped}</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline" onClick={handleExport} disabled={privacyBusy}>
+                  Download My Data
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setPrivacyError(null);
+                    setDeleteDialogOpen(true);
+                  }}
+                  disabled={privacyBusy}
+                >
+                  Delete Account
+                </Button>
+              </div>
+              {privacyError ? (
+                <p role="alert" className="text-sm text-destructive">{privacyError}</p>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <AlertDialog
+            open={deleteDialogOpen}
+            onOpenChange={(open) => {
+              if (!privacyBusy) setDeleteDialogOpen(open);
+            }}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete your account permanently?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This removes your profile, library, history, preferences, feedback, taste profile, and recommendation data. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              {privacyError ? (
+                <p role="alert" className="text-sm text-destructive">{privacyError}</p>
+              ) : null}
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={privacyBusy}>Keep my account</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={privacyBusy}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void handleDeleteAccount();
+                  }}
+                >
+                  {privacyBusy ? "Deleting…" : "Delete permanently"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
             <Card className="surface-panel bg-card/70">

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle2,
+  Clock3,
   CircleX,
   Globe,
   Medal,
@@ -70,6 +71,7 @@ const FEEDBACK_OPTIONS: FeedbackOption[] = [
   { value: "one_time_watch", label: "One-time watch", icon: Timer, color: "text-primary bg-primary/10 border-primary/30" },
   { value: "must_watch", label: "Must Watch", icon: Medal, color: "text-emerald-400 bg-emerald-400/10 border-emerald-400/30" },
   { value: "skip", label: "Skip", icon: CircleX, color: "text-rose-400 bg-rose-400/10 border-rose-400/30" },
+  { value: "not_now", label: "Not now", icon: Clock3, color: "text-amber-400 bg-amber-400/10 border-amber-400/30" },
 ];
 
 function formatTimestamp(value: string) {

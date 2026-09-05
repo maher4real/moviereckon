@@ -2,11 +2,12 @@
  * GET/POST/DELETE /api/user/watch-history
  * Manage user watch history
  */
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "../../lib/http";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
 import { sanitizeLanguageCode, sanitizeSingleLineText } from "../../lib/input.js";
 import { enforceRequestRateLimit } from "../../lib/request-rate-limit.js";
+import { markTasteProfileStale } from "@/backend/services/recommendationTaste";
 
 type ContentType = "movie" | "tv";
 type Database = Awaited<ReturnType<typeof connectToDatabase>>["db"];
@@ -236,9 +237,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const item = result;
 
       // Update user preferences based on this watch
-      if (language || genres.length > 0) {
-        await updateUserPreferences(db, user.id, language ?? undefined, genres);
-      }
+      // Watching is retained as neutral history/exclusion evidence. It does
+      // not manufacture an inferred preference or a positive taste signal.
+      await markTasteProfileStale(db, user.id).catch((error) => {
+        console.error("Failed to mark taste profile stale:", error);
+      });
 
       return res.status(200).json({
         data: {
@@ -269,6 +272,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         user_id: user.id,
         content_id: contentId,
         content_type: contentType,
+      });
+      await markTasteProfileStale(db, user.id).catch((error) => {
+        console.error("Failed to mark taste profile stale:", error);
       });
 
       return res.status(200).json({ message: "Removed from watch history" });

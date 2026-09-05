@@ -116,6 +116,10 @@ async function ensureMongoIndexes(db: Db): Promise<void> {
     await createIndexSafe(db, "watchlist", { user_id: 1, position: 1 }, {
       name: "watchlist_user_position",
     });
+    await createIndexSafe(db, "account_lifecycle", { user_id: 1 }, {
+      unique: true,
+      name: "account_lifecycle_user_id_unique",
+    });
 
     await createIndexSafe(db, "content_feedback", { user_id: 1, content_id: 1, content_type: 1 }, {
       unique: true,
@@ -185,6 +189,43 @@ async function ensureMongoIndexes(db: Db): Promise<void> {
     });
     await createIndexSafe(db, "theater_movies", { genre: 1 }, {
       name: "theater_movies_genre",
+    });
+
+    // Recommendation v2 is durable state, so its indexes are provisioned with
+    // the rest of the deployment schema instead of on a user-facing request.
+    await createIndexSafe(db, "user_taste_profiles", { user_id: 1 }, {
+      unique: true,
+      name: "user_taste_profiles_user_id_unique",
+    });
+    await createIndexSafe(db, "recommendation_sessions", { session_id: 1, user_id: 1 }, {
+      unique: true,
+      name: "recommendation_sessions_session_user_unique",
+    });
+    await createIndexSafe(db, "recommendation_sessions", { expires_at: 1 }, {
+      expireAfterSeconds: 0,
+      name: "recommendation_sessions_ttl_expires_at",
+    });
+    await createIndexSafe(db, "recommendation_batches", { session_id: 1, page: 1 }, {
+      unique: true,
+      name: "recommendation_batches_session_page_unique",
+    });
+    await createIndexSafe(db, "recommendation_batches", { user_id: 1, expires_at: -1 }, {
+      name: "recommendation_batches_user_expires_desc",
+    });
+    await createIndexSafe(db, "recommendation_batches", { expires_at: 1 }, {
+      expireAfterSeconds: 0,
+      name: "recommendation_batches_ttl_expires_at",
+    });
+    await createIndexSafe(db, "recommendation_deliveries", { session_id: 1, content_key: 1 }, {
+      unique: true,
+      name: "recommendation_deliveries_session_content_unique",
+    });
+    await createIndexSafe(db, "recommendation_deliveries", { user_id: 1, expires_at: -1 }, {
+      name: "recommendation_deliveries_user_expires_desc",
+    });
+    await createIndexSafe(db, "recommendation_deliveries", { expires_at: 1 }, {
+      expireAfterSeconds: 0,
+      name: "recommendation_deliveries_ttl_expires_at",
     });
   })();
 

@@ -1,5 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from "crypto";
-import type { VercelRequest } from "@vercel/node";
+import type { VercelRequest } from "./http";
 
 const EMAIL_TOKEN_TTL_MS = 60 * 60 * 1000;
 const EMAIL_TOKEN_SIZE_BYTES = 32;

@@ -2,7 +2,7 @@
  * GET /api/user/recommendations
  * Build personalized recommendations server-side to avoid client fan-out requests.
  */
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "../../lib/http";
 import { createHash } from "crypto";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";

@@ -74,27 +74,25 @@ export function AuthProvider({
   authResolved = false,
 }: AuthProviderProps) {
 
-  // Stale-while-revalidate: seed from SSR prop first, then from the
-  // sessionStorage cache written by mongodbClient after every login.
-  // This lets returning users see their app instantly without a network
-  // round-trip, while initAuth() validates the session in the background.
+  // Seed from the SSR prop during render. Reading sessionStorage here would
+  // make the server render anonymous while the first client render contains a
+  // cached user, which causes a hydration mismatch and a protected-route flash.
   const [user, setUser] = useState<mongoClient.MongoUser | null>(
-    () => initialUser ?? mongoClient.getStoredUser() ?? null,
+    () => initialUser ?? null,
   );
-  const [profile, setProfile] = useState<Profile | null>(() => {
-    const seed = initialUser ?? mongoClient.getStoredUser();
-    return seed ? mapUserToProfile(seed) : null;
-  });
-  // Skip the loading gate if we already have a trusted cached user — the UI
-  // renders immediately and initAuth() updates state silently in the background.
-  const [isLoading, setIsLoading] = useState(
-    !authResolved && !initialUser && !mongoClient.getStoredUser(),
+  const [profile, setProfile] = useState<Profile | null>(() =>
+    initialUser ? mapUserToProfile(initialUser) : null,
   );
+  // Keep the loading gate through hydration and session validation. The cache
+  // is restored in an effect below, after the server and client first renders
+  // have matched.
+  const [isLoading, setIsLoading] = useState(!authResolved && !initialUser);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   // Start at 0 so the overlay doesn't auto-fire on cold start.
   // It only runs when triggerAuthTransition() is called explicitly (sign-in / sign-out).
   const [authTransitionRunId, setAuthTransitionRunId] = useState(0);
   const authGenerationRef = useRef(0);
+  const cacheRestoredRef = useRef(false);
   const { toast } = useToast();
 
   const triggerAuthTransition = useCallback(() => {
@@ -143,6 +141,18 @@ export function AuthProvider({
       setIsLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    // When the server explicitly resolved this request as anonymous, its
+    // result is authoritative. A stale browser cache must not resurrect a
+    // protected identity after hydration.
+    if (cacheRestoredRef.current || initialUser || authResolved) return;
+    cacheRestoredRef.current = true;
+    const cachedUser = mongoClient.getStoredUser();
+    if (!cachedUser) return;
+    setUser(cachedUser);
+    setProfile(mapUserToProfile(cachedUser));
+  }, [authResolved, initialUser]);
 
   useEffect(() => {
     if (authResolved) return;

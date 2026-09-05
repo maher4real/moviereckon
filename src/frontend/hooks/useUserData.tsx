@@ -35,6 +35,8 @@ export interface LikedItem {
   content_type: "movie" | "tv";
   title: string;
   poster_path: string | null;
+  genres?: number[];
+  language?: string;
   liked_at: string;
 }
 
@@ -61,6 +63,7 @@ export interface FeedbackItem {
   language: string;
   created_at: string;
   updated_at: string;
+  suppress_until?: string | null;
 }
 
 interface UserDataContextType {
@@ -82,7 +85,8 @@ interface UserDataContextType {
     poster_path?: string | null;
     genres?: number[];
     language?: string;
-  }) => Promise<void>;
+  }) => Promise<mongoClient.FeedbackMutationResult>;
+  removeFeedback: (contentId: number, contentType: "movie" | "tv") => Promise<mongoClient.FeedbackMutationResult>;
   getFeedback: (contentId: number, contentType: "movie" | "tv") => FeedbackType | null;
   getRecentlyWatched: (limit?: number) => WatchedItem[];
   getTopGenres: (limit?: number) => number[];
@@ -148,7 +152,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       new Map(
         feedbackItems.map((entry) => [
           getContentKey(entry.content_id, entry.content_type),
-          entry.feedback_type,
+          entry,
         ]),
       ),
     [feedbackItems],
@@ -351,6 +355,8 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
             content_type: item.content_type,
             title: item.title,
             poster_path: item.poster_path,
+            genres: item.genres || [],
+            language: item.language || "en",
             liked_at: optimisticTimestamp,
           },
           ...remaining,
@@ -429,18 +435,27 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       poster_path?: string | null;
       genres?: number[];
       language?: string;
-    }) => {
+    }): Promise<mongoClient.FeedbackMutationResult> => {
       const userId = getUserId();
-      if (!userId) return;
+      if (!userId) return { ok: false, action: "removed" as const, data: null };
 
       try {
         const result = await mongoClient.setContentFeedback(item);
+
+        if (!result.ok) {
+          toast({
+            variant: "destructive",
+            title: "Feedback unavailable",
+            description: "Your feedback could not be saved. Please try again.",
+          });
+          return result;
+        }
 
         if (result.action === "removed") {
           setFeedbackItems((prev) =>
             splitEntriesByContent(prev, item.content_id, item.content_type).remaining
           );
-          return;
+          return result;
         }
 
         if (result.data) {
@@ -453,6 +468,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
             return [result.data as FeedbackItem, ...remaining];
           });
         }
+        return result;
       } catch (error) {
         console.error("Error setting feedback:", error);
         toast({
@@ -460,6 +476,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
           title: "Error",
           description: "Failed to update feedback",
         });
+        return { ok: false, action: "removed" as const, data: null };
       }
     },
     [getUserId, toast]
@@ -467,9 +484,36 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
 
   const getFeedback = useCallback(
     (contentId: number, contentType: "movie" | "tv") => {
-      return feedbackLookup.get(getContentKey(contentId, contentType)) || null;
+      const feedback = feedbackLookup.get(getContentKey(contentId, contentType));
+      if (
+        feedback?.feedback_type === "not_now" &&
+        feedback.suppress_until &&
+        Number.isFinite(Date.parse(feedback.suppress_until)) &&
+        Date.parse(feedback.suppress_until) <= Date.now()
+      ) {
+        return null;
+      }
+      return feedback?.feedback_type || null;
     },
     [feedbackLookup]
+  );
+
+  const removeFeedback = useCallback(
+    async (contentId: number, contentType: "movie" | "tv"): Promise<mongoClient.FeedbackMutationResult> => {
+      if (!getUserId()) return { ok: false, action: "removed", data: null };
+      const result = await mongoClient.removeContentFeedback(contentId, contentType);
+      if (result.ok) {
+        setFeedbackItems((prev) => splitEntriesByContent(prev, contentId, contentType).remaining);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Feedback unavailable",
+          description: "Your feedback could not be updated. Please try again.",
+        });
+      }
+      return result;
+    },
+    [getUserId, toast],
   );
 
   // Get Recently Watched
@@ -561,6 +605,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
         toggleLike,
         isLiked,
         setFeedback,
+        removeFeedback,
         getFeedback,
         getRecentlyWatched,
         getTopGenres,

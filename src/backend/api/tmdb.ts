@@ -2,7 +2,7 @@
  * GET|POST /api/tmdb
  * Server-side TMDB proxy to avoid client-side provider key exposure.
  */
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "./lib/http";
 import { installGlobalSafeLogging } from "@/shared/lib/safeLogging";
 import {
   applyApiCors,
@@ -29,6 +29,7 @@ const ALLOWED_ENDPOINT_PATTERNS = [
   /^\/person\/\d+\/combined_credits$/,
   /^\/search\/(movie|tv|multi)$/,
   /^\/genre\/(movie|tv)\/list$/,
+  /^\/watch\/providers\/(movie|tv)$/,
 ];
 
 const FORBIDDEN_QUERY_PARAMS = new Set(["api_key"]);
@@ -46,6 +47,13 @@ function getCacheProfile(endpoint: string): { sMaxAge: number; staleWhileRevalid
   // Genre/config lists rarely change — cache aggressively.
   if (/^\/genre\//.test(endpoint)) {
     return { sMaxAge: 86400, staleWhileRevalidate: 86400 };
+  }
+
+  // Provider catalogs are region-aware but change much more slowly than
+  // title search results. The title-level watch/providers endpoint below
+  // retains its shorter metadata profile.
+  if (/^\/watch\/providers\//.test(endpoint)) {
+    return { sMaxAge: 21600, staleWhileRevalidate: 86400 };
   }
 
   // Detailed metadata (credits, keywords, providers) changes infrequently.

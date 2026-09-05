@@ -1,10 +1,9 @@
 import { useState, useEffect, useMemo, useCallback, memo } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import {
-  searchMulti,
   getTrendingMovies,
   getTrendingTVShows,
   Movie,
@@ -18,17 +17,24 @@ import {
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
 import MediaImage from "@/frontend/components/MediaImage";
-import { AppPageSkeleton, PosterGridSkeleton } from "@/frontend/components/AppSkeletons";
+import { PosterGridSkeleton } from "@/frontend/components/AppSkeletons";
 import { Input } from "@/frontend/components/ui/input";
 import { Button } from "@/frontend/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/frontend/components/ui/tabs";
 import { Search as SearchIcon, X, Clock, TrendingUp, Play, Star } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
+import {
+  fetchSearchPage,
+  flattenSearchPages,
+  getNextSearchPageParam,
+  getSearchQueryKey,
+  parseSearchUrlState,
+  serializeSearchUrlState,
+  SearchFilterType,
+} from "./searchQuery";
 
 const RECENT_SEARCHES_KEY = "moviereckon_recent_searches";
 const MAX_RECENT_SEARCHES = 10;
-
-type FilterType = "all" | "movie" | "tv" | "person";
 
 function isPersonResult(item: MultiSearchResult): item is PersonSearchResult {
   return (item as PersonSearchResult).media_type === "person";
@@ -136,13 +142,52 @@ const ResultCard = memo(({ item, onClick }: { item: MultiSearchResult; onClick: 
 ResultCard.displayName = "ResultCard";
 
 export default function Search() {
-  const { user } = useAuth();
+  useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [query, setQuery] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchParamString = searchParams.toString();
+  const urlState = useMemo(
+    () => parseSearchUrlState(new URLSearchParams(searchParamString)),
+    [searchParamString],
+  );
+  const [query, setQuery] = useState(urlState.query);
   const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [filterType, setFilterType] = useState<FilterType>("all");
+  const filterType = urlState.filterType;
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const normalizedQuery = query.trim();
+  const hasSearchQuery = normalizedQuery.length >= 2;
+  const isDebouncing = normalizedQuery !== debouncedQuery;
+
+  useEffect(() => {
+    setQuery(urlState.query);
+  }, [urlState.query]);
+
+  const updateQuery = useCallback(
+    (value: string) => {
+      setQuery(value);
+      setSearchParams(
+        serializeSearchUrlState(new URLSearchParams(searchParamString), {
+          query: value,
+          filterType,
+        }),
+        { replace: true },
+      );
+    },
+    [filterType, searchParamString, setSearchParams],
+  );
+
+  const updateFilterType = useCallback(
+    (value: string) => {
+      setSearchParams(
+        serializeSearchUrlState(new URLSearchParams(searchParamString), {
+          query,
+          filterType: value as SearchFilterType,
+        }),
+      );
+    },
+    [query, searchParamString, setSearchParams],
+  );
 
   // Load recent searches
   useEffect(() => {
@@ -165,11 +210,26 @@ export default function Search() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  // Search query
-  const { data: searchResults, isLoading } = useQuery({
-    queryKey: ["search", debouncedQuery],
-    queryFn: () => searchMulti(debouncedQuery),
+  // Search query. The selected type is part of the cache key and the upstream
+  // endpoint so a tab never filters a mixed first page locally.
+  const {
+    data: searchData,
+    error: searchError,
+    isError: isSearchError,
+    isLoading: isSearchLoading,
+    isPending: isSearchPending,
+    isFetchNextPageError,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+    refetch,
+  } = useInfiniteQuery({
+    queryKey: getSearchQueryKey(debouncedQuery, filterType),
+    queryFn: ({ pageParam, signal }) =>
+      fetchSearchPage(filterType, debouncedQuery, pageParam, signal),
     enabled: debouncedQuery.length >= 2,
+    initialPageParam: 1,
+    getNextPageParam: getNextSearchPageParam,
     staleTime: 1000 * 60 * 5,
   });
 
@@ -198,11 +258,15 @@ export default function Search() {
     staleTime: 1000 * 60 * 30,
   });
 
-  // Filter results
-  const filteredResults = useMemo(() => {
-    if (!searchResults?.results) return [];
+  const searchResults = useMemo(
+    () => flattenSearchPages(searchData?.pages || []),
+    [searchData],
+  );
 
-    return searchResults.results.filter((item) => {
+  // Keep a defensive type check for mixed results from the all tab. The
+  // filtered tabs already receive type-specific results from TMDB.
+  const filteredResults = useMemo(() => {
+    return searchResults.filter((item) => {
       if (filterType === "all") return true;
       if (filterType === "movie") return isMovieResult(item);
       if (filterType === "tv") return isTVResult(item);
@@ -210,6 +274,11 @@ export default function Search() {
       return true;
     });
   }, [searchResults, filterType]);
+
+  const searchErrorMessage =
+    searchError instanceof Error && searchError.message
+      ? searchError.message
+      : "Search is temporarily unavailable. Please try again.";
 
   // Save to recent searches
   const saveRecentSearch = useCallback((searchTerm: string) => {
@@ -243,8 +312,8 @@ export default function Search() {
   }, [navigate, debouncedQuery, saveRecentSearch, location.pathname, location.search, location.hash]);
 
   const handleRecentSearchClick = useCallback((searchTerm: string) => {
-    setQuery(searchTerm);
-  }, []);
+    updateQuery(searchTerm);
+  }, [updateQuery]);
 
   return (
     <div className="app-page flex flex-col pb-20 md:pb-0">
@@ -260,7 +329,7 @@ export default function Search() {
                 type="text"
                 placeholder="Search movies, TV shows, cast..."
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => updateQuery(e.target.value)}
                 className="h-14 border-border/60 bg-background/60 pl-12 pr-12 text-base shadow-none transition-colors focus:border-primary md:text-lg"
                 autoFocus
               />
@@ -268,7 +337,7 @@ export default function Search() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => setQuery("")}
+                  onClick={() => updateQuery("")}
                   className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full"
                   aria-label="Clear search"
                 >
@@ -278,10 +347,10 @@ export default function Search() {
             </div>
 
             {/* Filter Tabs */}
-            {debouncedQuery && (
+            {hasSearchQuery && (
               <Tabs
                 value={filterType}
-                onValueChange={(value) => setFilterType(value as FilterType)}
+                onValueChange={updateFilterType}
                 className="mt-4"
               >
                 <TabsList className="border border-border/70 bg-card/70">
@@ -295,7 +364,7 @@ export default function Search() {
           </div>
 
           {/* Content */}
-          {!debouncedQuery ? (
+          {!normalizedQuery ? (
             // Recent Searches
             <div className="mx-auto max-w-2xl space-y-8">
               {recentSearches.length > 0 && (
@@ -342,7 +411,7 @@ export default function Search() {
                         key={suggestion}
                         variant="outline"
                         size="sm"
-                        onClick={() => setQuery(suggestion)}
+                        onClick={() => updateQuery(suggestion)}
                         className="filter-chip"
                       >
                         {suggestion}
@@ -356,28 +425,76 @@ export default function Search() {
                 </div>
               </div>
             </div>
-          ) : isLoading ? (
+          ) : !hasSearchQuery ? (
+            <div className="empty-state mx-auto max-w-2xl">
+              <p className="text-xl text-muted-foreground mb-2">
+                Keep typing to search
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Enter at least 2 characters.
+              </p>
+            </div>
+          ) : isDebouncing || isSearchLoading || (isSearchPending && !searchData) ? (
             // Loading State
-            <PosterGridSkeleton count={12} />
+            <div aria-busy="true" aria-label="Loading search results">
+              <PosterGridSkeleton count={12} />
+            </div>
+          ) : isSearchError && filteredResults.length === 0 ? (
+            <div className="empty-state mx-auto max-w-2xl" role="alert">
+              <p className="text-xl text-muted-foreground mb-2">
+                We couldn&apos;t complete that search.
+              </p>
+              <p className="text-sm text-muted-foreground mb-4">
+                {searchErrorMessage}
+              </p>
+              <Button onClick={() => void refetch()}>Try again</Button>
+            </div>
           ) : filteredResults.length === 0 ? (
             // No Results
             <div className="empty-state mx-auto max-w-2xl">
-              <p className="text-xl text-muted-foreground mb-2">No results found for "{debouncedQuery}"</p>
+              <p className="text-xl text-muted-foreground mb-2">No results found for &quot;{normalizedQuery}&quot;</p>
               <p className="text-sm text-muted-foreground">
                 Try searching for something else
               </p>
             </div>
           ) : (
             // Results Grid
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-              {filteredResults.map((item) => (
-                <ResultCard
-                  key={`${item.id}-${isPersonResult(item) ? "person" : isTVResult(item) ? "tv" : "movie"}`}
-                  item={item}
-                  onClick={() => handleItemClick(item)}
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                {filteredResults.map((item) => (
+                  <ResultCard
+                    key={`${item.id}-${isPersonResult(item) ? "person" : isTVResult(item) ? "tv" : "movie"}`}
+                    item={item}
+                    onClick={() => handleItemClick(item)}
+                  />
+                ))}
+              </div>
+
+              {isSearchError && !isFetchNextPageError && (
+                <div className="mt-8 flex flex-col items-center gap-3" role="alert">
+                  <p className="text-sm text-muted-foreground">{searchErrorMessage}</p>
+                  <Button onClick={() => void refetch()}>Try again</Button>
+                </div>
+              )}
+
+              {isFetchNextPageError && (
+                <div className="mt-8 flex flex-col items-center gap-3" role="alert">
+                  <p className="text-sm text-muted-foreground">{searchErrorMessage}</p>
+                  <Button onClick={() => void fetchNextPage()}>Try again</Button>
+                </div>
+              )}
+
+              {hasNextPage && !isSearchError && (
+                <div className="mt-8 flex justify-center">
+                  <Button
+                    onClick={() => void fetchNextPage()}
+                    disabled={isFetchingNextPage}
+                  >
+                    {isFetchingNextPage ? "Loading more..." : "Load more results"}
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </main>

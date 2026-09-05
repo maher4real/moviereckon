@@ -256,7 +256,7 @@ export function explainRecommendation(
   const candidateItem = toContentItem(candidateItemInput);
 
   if (!seedItem || !candidateItem) {
-    return [{ label: "Strong match" }];
+    return [{ label: "Discovery pick" }];
   }
 
   const reasons: RecommendationReason[] = [];
@@ -309,13 +309,7 @@ export function explainRecommendation(
     reasons.push({ label: "Popular with viewers" });
   }
 
-  if (reasons.length === 0) {
-    reasons.push({ label: "Strong overall content match" });
-  }
-
-  if (reasons.length < 2) {
-    reasons.push({ label: "Aligned with your preferences" });
-  }
+  if (reasons.length === 0) reasons.push({ label: "Discovery pick" });
 
   return reasons.slice(0, 3);
 }

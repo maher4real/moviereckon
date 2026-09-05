@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import nodemailer, { type Transporter } from "nodemailer";
 
 type SendEmailInput = {
   to: string;
@@ -31,7 +31,7 @@ type MailerConfig = {
   replyTo: string | null;
 };
 
-let cachedTransporter: nodemailer.Transporter | null = null;
+let cachedTransporter: Transporter | null = null;
 let cachedConfigKey: string | null = null;
 let cachedVerifyPromise: Promise<void> | null = null;
 
@@ -80,7 +80,7 @@ function getMailerConfig(): MailerConfig {
   };
 }
 
-function getTransporter(): nodemailer.Transporter {
+function getTransporter(): Transporter {
   const config = getMailerConfig();
   const configKey = JSON.stringify(config);
 
@@ -220,10 +220,7 @@ async function sendEmail(input: SendEmailInput): Promise<void> {
       ? " Verify that SMTP_FROM_EMAIL uses a verified sender domain for MailerSend."
       : "";
     const message = `SMTP delivery failed.${providerHint}`;
-    if (error instanceof Error) {
-      throw new Error(message);
-    }
-    throw new Error(message);
+    throw new Error(message, { cause: error });
   }
 }
 

@@ -2,7 +2,7 @@
  * POST /api/auth/register
  * Register a new user
  */
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "../../lib/http";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import {
   generateDeviceId,

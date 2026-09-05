@@ -1,146 +1,189 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useCallback, useMemo, useState } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { useAuth } from "./useAuth";
-import { useUserData } from "./useUserData";
-import type { Movie, TVShow } from "@/shared/lib/tmdb";
 import * as mongoClient from "@/frontend/lib/mongodbClient";
-import {
-  getRecommendationRotationBucket,
-  reorderDynamicRecommendations,
-} from "@/frontend/lib/dynamicRecommendations";
+import type { Movie, TVShow } from "@/shared/lib/tmdb";
 
 type RecommendationExplanation = mongoClient.RecommendationExplanation;
 
-const RECOMMENDATION_ROTATION_POLL_MS = 60 * 1000;
-const RECOMMENDATION_REFETCH_INTERVAL_MS = 3 * 60 * 1000;
+export interface RecommendationHookOptions {
+  contentType?: "all" | "movie" | "tv";
+  recommendationType?: "all" | "trending" | "highrated" | "popular" | "newreleases";
+  genre?: string;
+  language?: string;
+  sort?: "relevance" | "popularity" | "rating" | "release_date";
+  sortOrder?: "asc" | "desc";
+  exploration?: "familiar" | "adventurous";
+}
+
+// Roll out the durable feed explicitly. Production and unset environments
+// keep the legacy endpoint; setting NEXT_PUBLIC_RECOMMENDATIONS_V2=true opts
+// into v2. There is deliberately no silent v2-to-legacy fallback because
+// doing so would drop strict filters and invalidate cursor semantics.
+export const RECOMMENDATIONS_V2_ENABLED = process.env.NEXT_PUBLIC_RECOMMENDATIONS_V2 === "true";
 
 interface RecommendationResult {
   items: (Movie | TVShow)[];
   isLoading: boolean;
   isRefreshing: boolean;
+  isFetchingNextPage: boolean;
+  hasError: boolean;
+  errorCode?: string;
+  hasMore: boolean;
+  state: "ready" | "retryable" | "exhausted";
+  profileVersion: number;
+  feedSessionId: string;
   isPersonalized: boolean;
   explanationById: Record<string, RecommendationExplanation>;
+  fetchNextPage: () => Promise<unknown>;
   refreshRecommendations: () => Promise<void>;
+  retryRecommendations: () => Promise<unknown>;
+  feedMode: "legacy" | "v2";
 }
 
-function getLatestTimestamp<T>(
-  items: T[],
-  resolver: (item: T) => string | undefined,
-): string {
-  if (!items.length) return "";
-  const value = resolver(items[0]);
-  return typeof value === "string" ? value : "";
-}
-
-export function useRecommendations(): RecommendationResult {
+export function useRecommendations(options: RecommendationHookOptions = {}): RecommendationResult {
   const { user } = useAuth();
-  const {
-    watchHistory,
-    likedItems,
-    feedbackItems,
-    preferences,
-    isLoading: userDataLoading,
-  } = useUserData();
-  const [manualRotationSeed, setManualRotationSeed] = useState(0);
-  const [rotationBucket, setRotationBucket] = useState(() =>
-    getRecommendationRotationBucket(),
-  );
+  const [refreshSeed, setRefreshSeed] = useState(0);
+  const contentType = options.contentType || "all";
+  const recommendationType = options.recommendationType || "all";
+  const genre = options.genre || "all";
+  const language = options.language || "all";
+  const sort = options.sort || "relevance";
+  const sortOrder = options.sortOrder || "desc";
+  const exploration = options.exploration || "familiar";
+  const feedMode = RECOMMENDATIONS_V2_ENABLED ? "v2" : "legacy";
 
-  const preferenceFingerprint = useMemo(
-    () =>
-      [
-        [...(preferences?.preferred_genres || [])]
-          .sort((a, b) => a - b)
-          .join(","),
-        [...(preferences?.preferred_languages || [])].sort().join(","),
-      ].join("|"),
-    [preferences],
-  );
-
-  const personalizationRevision = useMemo(() => {
-    const historyPart = `${watchHistory.length}:${getLatestTimestamp(watchHistory, (item) => item.watched_at)}`;
-    const likedPart = `${likedItems.length}:${getLatestTimestamp(likedItems, (item) => item.liked_at)}`;
-    const feedbackPart = `${feedbackItems.length}:${getLatestTimestamp(feedbackItems, (item) => item.updated_at)}`;
-    return `${historyPart}|${likedPart}|${feedbackPart}|${preferenceFingerprint}`;
-  }, [feedbackItems, likedItems, preferenceFingerprint, watchHistory]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return undefined;
-
-    const syncRotationBucket = () => {
-      setRotationBucket((current) => {
-        const next = getRecommendationRotationBucket();
-        return current === next ? current : next;
-      });
-    };
-
-    syncRotationBucket();
-    const timer = window.setInterval(
-      syncRotationBucket,
-      RECOMMENDATION_ROTATION_POLL_MS,
-    );
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const rotationKey = useMemo(
-    () => `${personalizationRevision}:${rotationBucket}:${manualRotationSeed}`,
-    [manualRotationSeed, personalizationRevision, rotationBucket],
-  );
-
-  const { data, isLoading, fetchStatus } = useQuery({
+  const query = useInfiniteQuery({
     queryKey: [
-      "recommendations-feed-v5",
-      personalizationRevision,
-      rotationBucket,
-      manualRotationSeed,
+      `recommendations-feed-${feedMode}`,
+      user?.id || "anonymous",
+      refreshSeed,
+      contentType,
+      recommendationType,
+      genre,
+      language,
+      sort,
+      sortOrder,
+      exploration,
     ],
-    queryFn: () =>
-      mongoClient.fetchRecommendationsFeed({ variant: rotationKey }),
-    enabled: Boolean(user) && !userDataLoading,
-    staleTime: 1000 * 60 * 5,
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam, signal }) => {
+      if (feedMode === "v2") {
+        return mongoClient.fetchRecommendationsPage({
+          cursor: pageParam,
+          limit: 24,
+          contentType,
+          recommendationType,
+          genre,
+          language,
+          sort,
+          sortOrder,
+          exploration,
+          signal,
+        });
+      }
+      const payload = await mongoClient.fetchRecommendationsFeed({
+        contentType,
+        recommendationType,
+        genre,
+        language,
+        sort,
+      });
+      return {
+        items: payload.items,
+        explanationById: payload.explanationById,
+        nextCursor: null,
+        hasMore: false,
+        state: "exhausted" as const,
+        profileVersion: 0,
+        feedSessionId: "legacy",
+        isPersonalized: payload.isPersonalized,
+      };
+    },
+    getNextPageParam: (lastPage) =>
+      lastPage.hasMore && lastPage.nextCursor ? lastPage.nextCursor : undefined,
+    enabled: Boolean(user),
+    staleTime: 1000 * 60 * 10,
     gcTime: 1000 * 60 * 60,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
-    refetchInterval: user ? RECOMMENDATION_REFETCH_INTERVAL_MS : false,
-    placeholderData: (previousData) => previousData,
   });
 
-  const hasResolvedItems = Boolean(data && Array.isArray(data.items));
-
-  const items = useMemo(
-    () =>
-      reorderDynamicRecommendations(
-        data?.items || [],
-        data?.explanationById || {},
-        rotationKey,
-      ),
-    [data?.items, data?.explanationById, rotationKey],
+  const queryPages = query.data?.pages;
+  const pages = useMemo(() => queryPages || [], [queryPages]);
+  const rawItems = useMemo(
+    () => pages.flatMap((page) => page.items),
+    [pages],
   );
+  const explanationById = useMemo(
+    () =>
+      pages.reduce<Record<string, RecommendationExplanation>>((result, page) => {
+        Object.assign(result, page.explanationById);
+        return result;
+      }, {}),
+    [pages],
+  );
+  // The server stores ranked page order. Preserve it when pages append so
+  // returning from a detail view never reshuffles cards already seen.
+  const items = rawItems;
+  const latestPage = pages[pages.length - 1];
+  const hasResolvedItems = pages.length > 0;
+  const queryFetchNextPage = query.fetchNextPage;
+  const queryHasError = query.isError;
+  const queryError = query.error as { code?: string; status?: number } | null;
+  const shouldRestartSession = queryError?.status === 410 ||
+    queryError?.code === "SESSION_EXPIRED";
 
   const refreshRecommendations = useCallback(async () => {
     if (!user) return;
-    setManualRotationSeed((current) => current + 1);
+    setRefreshSeed((current) => current + 1);
   }, [user]);
+
+  const fetchNextPage = useCallback(() => queryFetchNextPage(), [queryFetchNextPage]);
+  const retryRecommendations = useCallback(async () => {
+    if (!shouldRestartSession && queryHasError && hasResolvedItems && latestPage?.nextCursor) {
+      return queryFetchNextPage();
+    }
+    await refreshRecommendations();
+  }, [hasResolvedItems, latestPage?.nextCursor, queryFetchNextPage, queryHasError, refreshRecommendations, shouldRestartSession]);
 
   if (!user) {
     return {
       items: [],
       isLoading: false,
       isRefreshing: false,
+      isFetchingNextPage: false,
+      hasError: false,
+      errorCode: undefined,
+      hasMore: false,
+      state: "exhausted",
+      profileVersion: 0,
+      feedSessionId: "",
       isPersonalized: false,
       explanationById: {},
-      refreshRecommendations: async () => {},
+      fetchNextPage: async () => undefined,
+      refreshRecommendations: async () => undefined,
+      retryRecommendations: async () => undefined,
+      feedMode,
     };
   }
 
   return {
     items,
-    isLoading:
-      userDataLoading ||
-      (!hasResolvedItems && (isLoading || fetchStatus === "fetching")),
-    isRefreshing: hasResolvedItems && fetchStatus === "fetching",
-    isPersonalized: data?.isPersonalized === true,
-    explanationById: data?.explanationById || {},
+    isLoading: !hasResolvedItems && query.isLoading,
+    isRefreshing: hasResolvedItems && query.isFetching && !query.isFetchingNextPage,
+    isFetchingNextPage: query.isFetchingNextPage,
+    hasError: queryHasError,
+    errorCode: queryError?.code,
+    hasMore: queryHasError ? Boolean(latestPage?.nextCursor) : latestPage?.hasMore === true,
+    state: queryHasError ? "retryable" : latestPage?.state || "ready",
+    profileVersion: latestPage?.profileVersion || 0,
+    feedSessionId: latestPage?.feedSessionId || "",
+    isPersonalized: latestPage?.isPersonalized === true,
+    explanationById,
+    fetchNextPage,
     refreshRecommendations,
+    retryRecommendations,
+    feedMode,
   };
 }

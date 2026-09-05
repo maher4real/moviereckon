@@ -162,6 +162,8 @@ export interface LikedItem {
   content_type: "movie" | "tv";
   title: string;
   poster_path: string | null;
+  genres?: number[];
+  language?: string;
   liked_at: string;
 }
 
@@ -172,9 +174,22 @@ export interface WatchlistItem {
   content_type: "movie" | "tv";
   title: string;
   poster_path: string | null;
+  genres?: number[];
+  language?: string;
   added_at: string;
   position: number;
   watched: boolean;
+  /** New explicit library state; optional for legacy cached/watchlist rows. */
+  status?: WatchlistStatus;
+}
+
+export type WatchlistStatus = "saved" | "watching" | "completed" | "dropped";
+
+export interface PersonalDataExport {
+  schema_version: 1;
+  exported_at: string;
+  profile: Record<string, unknown>;
+  data: Record<string, unknown[]>;
 }
 
 export interface UserPreferences {
@@ -186,7 +201,7 @@ export interface UserPreferences {
   inferred_genres?: number[];
 }
 
-export type FeedbackType = "give_it_a_go" | "one_time_watch" | "must_watch" | "skip";
+export type FeedbackType = "give_it_a_go" | "one_time_watch" | "must_watch" | "skip" | "not_now";
 
 export interface FeedbackItem {
   id: string;
@@ -200,6 +215,13 @@ export interface FeedbackItem {
   language: string;
   created_at: string;
   updated_at: string;
+  suppress_until?: string | null;
+}
+
+export interface FeedbackMutationResult {
+  ok: boolean;
+  action: "added" | "updated" | "removed";
+  data: FeedbackItem | null;
 }
 
 export interface FeedbackSummary {
@@ -238,6 +260,81 @@ export interface RecommendationFeedOptions {
   genre?: string;
   language?: string;
   contentType?: "all" | "movie" | "tv";
+  recommendationType?: "all" | "trending" | "highrated" | "popular" | "newreleases";
+  sort?: "relevance" | "popularity" | "rating" | "release_date";
+  exploration?: TasteExplorationMode;
+  limit?: number;
+}
+
+export interface RecommendationFeedPage {
+  items: (Movie | TVShow)[];
+  explanationById: Record<string, RecommendationExplanation>;
+  nextCursor: string | null;
+  hasMore: boolean;
+  state: "ready" | "retryable" | "exhausted";
+  profileVersion: number;
+  feedSessionId: string;
+  isPersonalized: boolean;
+}
+
+export class RecommendationFeedError extends Error {
+  readonly status?: number;
+  readonly code?: string;
+
+  constructor(message: string, details: { status?: number; code?: string } = {}) {
+    super(message);
+    this.name = "RecommendationFeedError";
+    this.status = details.status;
+    this.code = details.code;
+  }
+}
+
+export interface RecommendationTasteProfile {
+  version: number;
+  updatedAt: string;
+  explicit: { genres: number[]; languages: string[] };
+  learned?: { genres: Record<string, number>; languages: Record<string, number> };
+  inferred: { genres: Record<string, number>; languages: Record<string, number> };
+  negative?: { genres: Record<string, number>; languages: Record<string, number> };
+  clusters: Array<{
+    id: string;
+    contentType: "movie" | "tv" | "mixed";
+    genreIds: number[];
+    weight: number;
+    evidence: Array<{ key: string; title: string; contentType: "movie" | "tv"; signal: string; weight: number }>;
+  }>;
+  evidence?: Array<{
+    key: string;
+    title: string;
+    contentType: "movie" | "tv";
+    signal: string;
+    weight: number;
+    genreIds?: number[];
+    language?: string;
+  }>;
+  excludedEvidence?: Array<{
+    key: string;
+    title: string;
+    contentType: "movie" | "tv";
+    signal: string;
+    genreIds?: number[];
+    language?: string;
+    occurredAt?: string;
+  }>;
+}
+
+export type TasteExplorationMode = "familiar" | "adventurous";
+
+export interface RecommendationTasteControls {
+  explorationMode: TasteExplorationMode;
+  resetAt: string | null;
+  excludedLearningKeys: string[];
+  revision: number;
+}
+
+export interface RecommendationTasteSnapshot {
+  profile: RecommendationTasteProfile;
+  controls: RecommendationTasteControls;
 }
 
 export interface CommentItem {
@@ -872,6 +969,11 @@ export async function fetchRecommendationsFeed(
     if (options?.contentType && options.contentType !== "all") {
       query.set("content_type", options.contentType);
     }
+    if (options?.recommendationType && options.recommendationType !== "all") {
+      query.set("recommendation_type", options.recommendationType);
+    }
+    if (options?.sort && options.sort !== "relevance") query.set("sort", options.sort);
+    if (options?.limit) query.set("limit", String(options.limit));
 
     const endpoint = query.size > 0
       ? `/api/user/recommendations?${query.toString()}`
@@ -900,6 +1002,125 @@ export async function fetchRecommendationsFeed(
   }
 }
 
+export async function fetchRecommendationsPage(
+  options: {
+    cursor?: string | null;
+    limit?: number;
+    genre?: string;
+    language?: string;
+    contentType?: "all" | "movie" | "tv";
+    recommendationType?: "all" | "trending" | "highrated" | "popular" | "newreleases";
+    sort?: "relevance" | "popularity" | "rating" | "release_date";
+    sortOrder?: "asc" | "desc";
+    exploration?: TasteExplorationMode;
+    signal?: AbortSignal;
+  } = {},
+): Promise<RecommendationFeedPage> {
+  const query = new URLSearchParams();
+  if (options.cursor) query.set("cursor", options.cursor);
+  if (options.limit) query.set("limit", String(options.limit));
+  if (options.genre && options.genre !== "all") query.set("genre", options.genre);
+  if (options.language && options.language !== "all") query.set("language", options.language);
+  if (options.contentType && options.contentType !== "all") query.set("content_type", options.contentType);
+  if (options.recommendationType && options.recommendationType !== "all") {
+    query.set("recommendation_type", options.recommendationType);
+  }
+  if (options.sort && options.sort !== "relevance") query.set("sort", options.sort);
+  if (options.sortOrder && options.sortOrder !== "desc") query.set("sort_order", options.sortOrder);
+  if (options.exploration && options.exploration !== "familiar") query.set("exploration", options.exploration);
+  const response = await fetchWithAuth(`/api/user/recommendations/v2?${query.toString()}`, {
+    signal: options.signal,
+  });
+  const body = await response.json().catch(() => null);
+  const page = body?.data as Partial<RecommendationFeedPage> | undefined;
+  if (!response.ok) {
+    const error = new RecommendationFeedError(
+      typeof body?.error === "string" ? body.error : `Recommendation request failed (${response.status})`,
+      {
+        status: response.status,
+        code: typeof body?.code === "string" ? body.code : undefined,
+      },
+    );
+    throw error;
+  }
+  if (!page || !Array.isArray(page.items)) {
+    throw new RecommendationFeedError("Recommendation response was malformed", { code: "MALFORMED_RESPONSE" });
+  }
+  return {
+    items: page.items,
+    explanationById: page.explanationById && typeof page.explanationById === "object" ? page.explanationById : {},
+    nextCursor: typeof page.nextCursor === "string" ? page.nextCursor : null,
+    hasMore: page.hasMore === true,
+    state: page.state === "ready" || page.state === "exhausted" ? page.state : "retryable",
+    profileVersion: Number.isFinite(Number(page.profileVersion)) ? Number(page.profileVersion) : 0,
+    feedSessionId: typeof page.feedSessionId === "string" ? page.feedSessionId : "",
+    isPersonalized: page.isPersonalized === true,
+  };
+}
+
+export async function fetchRecommendationTasteProfile(): Promise<RecommendationTasteProfile | null> {
+  try {
+    const response = await fetchWithAuth("/api/user/recommendations/v2/profile");
+    if (!response.ok) return null;
+    const body = await response.json().catch(() => null);
+    return body?.data || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchRecommendationTasteSnapshot(): Promise<RecommendationTasteSnapshot | null> {
+  try {
+    const response = await fetchWithAuth("/api/user/taste");
+    if (!response.ok) return null;
+    const body = await response.json().catch(() => null);
+    const data = body?.data as Partial<RecommendationTasteSnapshot> | undefined;
+    if (!data?.profile || !data.controls) return null;
+    return {
+      profile: data.profile as RecommendationTasteProfile,
+      controls: data.controls as RecommendationTasteControls,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function updateRecommendationTasteControls(input: {
+  explorationMode?: TasteExplorationMode;
+  excludeLearningKey?: string;
+  restoreLearningKey?: string;
+}): Promise<RecommendationTasteSnapshot | null> {
+  try {
+    const response = await fetchWithAuth("/api/user/taste", {
+      method: "PUT",
+      body: JSON.stringify({
+        exploration_mode: input.explorationMode,
+        exclude_learning_key: input.excludeLearningKey,
+        restore_learning_key: input.restoreLearningKey,
+      }),
+    });
+    if (!response.ok) return null;
+    const body = await response.json().catch(() => null);
+    return body?.data || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function resetRecommendationTaste(): Promise<RecommendationTasteSnapshot | null> {
+  try {
+    const response = await fetchWithAuth("/api/user/taste/reset", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    if (!response.ok) return null;
+    const body = await response.json().catch(() => null);
+    return body?.data || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchMoreLikeThisRecommendations(
   options: Omit<RecommendationFeedOptions, "mode">,
 ): Promise<PersonalizedRecommendationsPayload> {
@@ -917,7 +1138,7 @@ export async function setContentFeedback(item: {
   poster_path?: string | null;
   genres?: number[];
   language?: string;
-}): Promise<{ action: "added" | "updated" | "removed"; data: FeedbackItem | null }> {
+}): Promise<FeedbackMutationResult> {
   try {
     const response = await fetchWithAuth("/api/user/feedback", {
       method: "POST",
@@ -925,13 +1146,29 @@ export async function setContentFeedback(item: {
     });
 
     if (!response.ok) {
-      return { action: "removed", data: null };
+      return { ok: false, action: "removed", data: null };
     }
 
     const data = await response.json();
-    return { action: data.action, data: data.data || null };
+    return { ok: true, action: data.action, data: data.data || null };
   } catch {
-    return { action: "removed", data: null };
+    return { ok: false, action: "removed", data: null };
+  }
+}
+
+/** Remove a feedback signal without relying on the POST endpoint's toggle behavior. */
+export async function removeContentFeedback(
+  contentId: number,
+  contentType: "movie" | "tv",
+): Promise<FeedbackMutationResult> {
+  try {
+    const query = new URLSearchParams({ content_id: String(contentId), content_type: contentType });
+    const response = await fetchWithAuth(`/api/user/feedback?${query.toString()}`, { method: "DELETE" });
+    if (!response.ok) return { ok: false, action: "removed", data: null };
+    await response.json();
+    return { ok: true, action: "removed", data: null };
+  } catch {
+    return { ok: false, action: "removed", data: null };
   }
 }
 
@@ -990,7 +1227,7 @@ export async function postComment(item: {
     return data.data || null;
   } catch (error) {
     if (error instanceof Error) throw error;
-    throw new Error("Unable to post comment");
+    throw error;
   }
 }
 
@@ -1012,7 +1249,7 @@ export async function updateComment(item: {
     return data.data || null;
   } catch (error) {
     if (error instanceof Error) throw error;
-    throw new Error("Unable to update comment");
+    throw error;
   }
 }
 
@@ -1248,6 +1485,49 @@ export async function markWatchlistItemWatched(
   } catch {
     return false;
   }
+}
+
+export async function setWatchlistItemStatus(
+  contentId: number,
+  contentType: "movie" | "tv",
+  status: WatchlistStatus,
+): Promise<{ ok: boolean; data: WatchlistItem | null }> {
+  try {
+    const response = await fetchWithAuth("/api/user/watchlist", {
+      method: "PATCH",
+      body: JSON.stringify({
+        action: "set_status",
+        content_id: contentId,
+        content_type: contentType,
+        status,
+      }),
+    });
+    if (!response.ok) return { ok: false, data: null };
+    const payload = await response.json();
+    return { ok: true, data: payload?.data ?? null };
+  } catch {
+    return { ok: false, data: null };
+  }
+}
+
+// ========== Privacy ==========
+
+export async function exportUserData(): Promise<PersonalDataExport> {
+  const response = await fetchWithAuth("/api/user/export");
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload?.data) {
+    throw new Error(typeof payload?.error === "string" ? payload.error : "Unable to export account data");
+  }
+  return payload.data as PersonalDataExport;
+}
+
+export async function deleteAccount(): Promise<void> {
+  const response = await fetchWithAuth("/api/user/account", { method: "DELETE" });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(typeof payload?.error === "string" ? payload.error : "Unable to delete account");
+  }
+  clearTokens();
 }
 
 // ========== Health Check ==========

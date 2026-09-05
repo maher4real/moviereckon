@@ -2,6 +2,8 @@ import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
+const configDir = import.meta.dirname;
+
 export default defineConfig({
   plugins: [react()],
   test: {
@@ -12,8 +14,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
-      "server-only": path.resolve(__dirname, "./src/test/mocks/server-only.ts"),
+      "@": path.resolve(configDir, "./src"),
+      "server-only": path.resolve(configDir, "./src/test/mocks/server-only.ts"),
     },
   },
 });

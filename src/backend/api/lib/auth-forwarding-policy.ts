@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "./http";
 import { verifyCaptchaToken } from "./captcha.js";
 import { consumeRateLimit, getClientIp } from "./rate-limit.js";
 import { emitSecurityEvent } from "./abuse-telemetry.js";

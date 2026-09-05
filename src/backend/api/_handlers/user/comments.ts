@@ -2,7 +2,7 @@
  * GET/POST/PUT/DELETE /api/user/comments
  * Manage content comments
  */
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "../../lib/http";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import { getUserFromRequest, userHasRoleAtLeast } from "../../lib/auth.js";
 import { sanitizeMultiLineText } from "../../lib/input.js";

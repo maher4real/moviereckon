@@ -560,8 +560,13 @@ function baseFallbackRanking(
           ...(preferenceSignals.languageBoost > 0
             ? [{ label: "Matches preferred language" } as RecommendationReason]
             : []),
-          { label: "Highly rated" },
-          { label: "Popular pick" },
+          ...(qualityComponent >= 0.45
+            ? [{ label: "Highly rated" } as RecommendationReason]
+            : []),
+          ...(popularityComponent >= 0.25
+            ? [{ label: "Popular with viewers" } as RecommendationReason]
+            : []),
+          { label: "Discovery pick" } as RecommendationReason,
         ].slice(0, 3) as RecommendationReason[],
         scoreBreakdown,
         seedKey: null,

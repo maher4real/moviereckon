@@ -2,13 +2,15 @@
  * GET/POST/DELETE/PATCH /api/user/watchlist
  * Manage user watchlist (bucket list of movies/series)
  */
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "../../lib/http";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
 import { sanitizeSingleLineText } from "../../lib/input.js";
 import { enforceRequestRateLimit } from "../../lib/request-rate-limit.js";
+import { markTasteProfileStale } from "@/backend/services/recommendationTaste";
 
 type ContentType = "movie" | "tv";
+export type WatchlistStatus = "saved" | "watching" | "completed" | "dropped";
 
 interface WatchlistDoc {
   _id?: ObjectId;
@@ -17,9 +19,38 @@ interface WatchlistDoc {
   content_type: ContentType;
   title: string;
   poster_path: string | null;
+  genres?: number[];
+  language?: string;
   added_at: string;
   position: number;
   watched: boolean;
+  status?: WatchlistStatus;
+}
+
+function normalizeStatus(value: unknown, watched = false): WatchlistStatus {
+  if (value === "saved" || value === "watching" || value === "completed" || value === "dropped") {
+    return value;
+  }
+  return watched ? "completed" : "saved";
+}
+
+function itemResponse(item: WatchlistDoc) {
+  const status = normalizeStatus(item.status, item.watched);
+  return {
+    id: item._id!.toString(),
+    user_id: item.user_id,
+    content_id: item.content_id,
+    content_type: item.content_type,
+    title: item.title,
+    poster_path: item.poster_path,
+    genres: item.genres || [],
+    language: item.language || "en",
+    added_at: item.added_at,
+    position: item.position,
+    status,
+    // Keep the old field in responses for clients that have not migrated yet.
+    watched: status === "completed",
+  };
 }
 
 function normalizeContentType(value: unknown): ContentType | null {
@@ -40,6 +71,16 @@ function normalizeRequiredString(value: unknown, maxLength: number): string | nu
 function normalizeOptionalString(value: unknown, maxLength: number): string | null {
   if (value === undefined || value === null || value === "") return null;
   return sanitizeSingleLineText(value, maxLength);
+}
+
+function normalizeGenres(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map(Number).filter((entry) => Number.isInteger(entry) && entry > 0))].slice(0, 24);
+}
+
+function normalizeLanguage(value: unknown): string | null {
+  const normalized = normalizeOptionalString(value, 8)?.toLowerCase();
+  return normalized && /^[a-z]{2,3}$/.test(normalized) ? normalized : null;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -80,6 +121,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { db } = await connectToDatabase();
   const col = db.collection<WatchlistDoc>("watchlist");
+  const invalidateTaste = () => markTasteProfileStale(db, user.id).catch((error) => {
+    console.error("Failed to mark taste profile stale:", error);
+  });
 
   try {
     if (method === "GET") {
@@ -93,9 +137,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               content_type: 1,
               title: 1,
               poster_path: 1,
+              genres: 1,
+              language: 1,
               added_at: 1,
               position: 1,
               watched: 1,
+              status: 1,
             },
           },
         )
@@ -103,17 +150,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .toArray();
 
       return res.status(200).json({
-        data: items.map((item) => ({
-          id: item._id!.toString(),
-          user_id: item.user_id,
-          content_id: item.content_id,
-          content_type: item.content_type,
-          title: item.title,
-          poster_path: item.poster_path,
-          added_at: item.added_at,
-          position: item.position,
-          watched: item.watched,
-        })),
+        data: items.map(itemResponse),
       });
     }
 
@@ -123,6 +160,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const contentType = normalizeContentType(body.content_type);
       const title = normalizeRequiredString(body.title, 220);
       const posterPath = normalizeOptionalString(body.poster_path, 300);
+      const itemGenres = normalizeGenres(body.genres);
+      const itemLanguage = normalizeLanguage(body.language);
 
       if (!contentId || !contentType || !title) {
         return res.status(400).json({ error: "content_id, content_type, and title are required" });
@@ -133,6 +172,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Toggle: remove if already in watchlist
       const removed = await col.deleteOne(filter);
       if (removed.deletedCount === 1) {
+        await invalidateTaste();
         return res.status(200).json({ message: "Removed from watchlist", action: "removed", data: null });
       }
 
@@ -148,10 +188,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ...filter,
         title,
         poster_path: posterPath,
+        genres: itemGenres,
+        ...(itemLanguage ? { language: itemLanguage } : {}),
         added_at: now,
         position,
         watched: false,
+        status: "saved",
       });
+      await invalidateTaste();
 
       return res.status(201).json({
         message: "Added to watchlist",
@@ -163,8 +207,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           content_type: contentType,
           title,
           poster_path: posterPath,
+          genres: itemGenres,
+          language: itemLanguage || "en",
           added_at: now,
           position,
+          status: "saved" as const,
           watched: false,
         },
       });
@@ -180,6 +227,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       await col.deleteOne({ user_id: user.id, content_id: contentId, content_type: contentType });
+      await invalidateTaste();
       return res.status(200).json({ message: "Removed from watchlist" });
     }
 
@@ -204,6 +252,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (bulkOps.length > 0) {
           await col.bulkWrite(bulkOps);
+          await invalidateTaste();
         }
         return res.status(200).json({ message: "Reordered" });
       }
@@ -219,9 +268,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         await col.updateOne(
           { user_id: user.id, content_id: contentId, content_type: contentType },
-          { $set: { watched } },
+          { $set: { watched, status: watched ? "completed" : "saved" } },
         );
+        await invalidateTaste();
         return res.status(200).json({ message: watched ? "Marked as watched" : "Marked as unwatched" });
+      }
+
+      if (action === "set_status") {
+        const contentId = normalizeContentId(body.content_id);
+        const contentType = normalizeContentType(body.content_type);
+        const status = normalizeStatus(body.status, false);
+        const isValidStatus = body.status === "saved" || body.status === "watching" ||
+          body.status === "completed" || body.status === "dropped";
+
+        if (!contentId || !contentType || !isValidStatus) {
+          return res.status(400).json({
+            error: "content_id, content_type, and a valid status are required",
+          });
+        }
+
+        const updated = await col.findOneAndUpdate(
+          { user_id: user.id, content_id: contentId, content_type: contentType },
+          { $set: { status, watched: status === "completed" } },
+          { returnDocument: "after" },
+        );
+        if (!updated) {
+          return res.status(404).json({ error: "Watchlist item not found" });
+        }
+        await invalidateTaste();
+        return res.status(200).json({
+          message: "Watchlist status updated",
+          data: itemResponse(updated as WatchlistDoc),
+        });
       }
 
       return res.status(400).json({ error: "Unknown patch action" });

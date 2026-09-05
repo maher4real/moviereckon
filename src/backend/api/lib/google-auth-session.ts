@@ -1,5 +1,5 @@
 import { randomBytes } from "crypto";
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "./http";
 import type { Db } from "mongodb";
 import {
   generateDeviceId,

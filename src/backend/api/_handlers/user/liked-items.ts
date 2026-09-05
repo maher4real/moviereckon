@@ -2,11 +2,12 @@
  * GET/POST/DELETE /api/user/liked-items
  * Manage user liked items
  */
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "../../lib/http";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
 import { sanitizeSingleLineText } from "../../lib/input.js";
 import { enforceRequestRateLimit } from "../../lib/request-rate-limit.js";
+import { markTasteProfileStale } from "@/backend/services/recommendationTaste";
 
 type ContentType = "movie" | "tv";
 const DEFAULT_PAGE_SIZE = 200;
@@ -19,6 +20,8 @@ interface LikedItemDoc {
   content_type: ContentType;
   title: string;
   poster_path: string | null;
+  genres?: number[];
+  language?: string;
   liked_at: string;
 }
 
@@ -40,6 +43,16 @@ function normalizeRequiredString(value: unknown, maxLength: number): string | nu
 function normalizeOptionalString(value: unknown, maxLength: number): string | null {
   if (value === undefined || value === null || value === "") return null;
   return sanitizeSingleLineText(value, maxLength);
+}
+
+function normalizeGenres(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map(Number).filter((entry) => Number.isInteger(entry) && entry > 0))].slice(0, 24);
+}
+
+function normalizeLanguage(value: unknown): string | null {
+  const normalized = normalizeOptionalString(value, 8)?.toLowerCase();
+  return normalized && /^[a-z]{2,3}$/.test(normalized) ? normalized : null;
 }
 
 function getQueryParam(req: VercelRequest, key: string): string | undefined {
@@ -113,6 +126,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { db } = await connectToDatabase();
   const likedItemsCollection = db.collection<LikedItemDoc>("liked_items");
+  const invalidateTaste = () => markTasteProfileStale(db, user.id).catch((error) => {
+    console.error("Failed to mark taste profile stale:", error);
+  });
 
   try {
     // GET - Fetch liked items
@@ -137,6 +153,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             content_type: 1,
             title: 1,
             poster_path: 1,
+            genres: 1,
+            language: 1,
             liked_at: 1,
           },
         })
@@ -158,6 +176,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           content_type: item.content_type,
           title: item.title,
           poster_path: item.poster_path,
+          genres: item.genres || [],
+          language: item.language || "en",
           liked_at: item.liked_at,
         })),
       };
@@ -180,6 +200,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const contentType = normalizeContentType(body.content_type);
       const title = normalizeRequiredString(body.title, 220);
       const posterPath = normalizeOptionalString(body.poster_path, 300);
+      const itemGenres = normalizeGenres(body.genres);
+      const itemLanguage = normalizeLanguage(body.language);
 
       if (!contentId || !contentType || !title) {
         return res.status(400).json({ error: "content_id, content_type, and title are required" });
@@ -195,6 +217,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Toggle off first. With a unique index in place, this avoids a read-before-write race.
       const removed = await collection.deleteOne(filter);
       if (removed.deletedCount === 1) {
+        await invalidateTaste();
         return res.status(200).json({ message: "Unliked", action: "removed", data: null });
       }
 
@@ -205,8 +228,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ...filter,
           title,
           poster_path: posterPath,
+          genres: itemGenres,
+          ...(itemLanguage ? { language: itemLanguage } : {}),
           liked_at: now,
         });
+        await invalidateTaste();
 
         return res.status(201).json({
           message: "Liked",
@@ -218,6 +244,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             content_type: contentType,
             title,
             poster_path: posterPath,
+            genres: itemGenres,
+            language: itemLanguage || "en",
             liked_at: now,
           },
         });
@@ -229,6 +257,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Concurrent toggle edge-case: if another request inserted first, treat as removed when possible.
         const retryRemove = await collection.deleteOne(filter);
         if (retryRemove.deletedCount === 1) {
+          await invalidateTaste();
           return res.status(200).json({ message: "Unliked", action: "removed", data: null });
         }
 
@@ -239,11 +268,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             content_type: 1,
             title: 1,
             poster_path: 1,
+            genres: 1,
+            language: 1,
             liked_at: 1,
           },
         });
 
         if (existing) {
+          await invalidateTaste();
           return res.status(200).json({
             message: "Liked",
             action: "added",
@@ -254,6 +286,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               content_type: existing.content_type,
               title: existing.title,
               poster_path: existing.poster_path || null,
+              genres: existing.genres || [],
+              language: existing.language || "en",
               liked_at: existing.liked_at,
             },
           });
@@ -278,6 +312,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         content_id: contentId,
         content_type: contentType,
       });
+      await invalidateTaste();
 
       return res.status(200).json({ message: "Unliked" });
     }

@@ -3,7 +3,7 @@
  * Check whether signup email or username is already taken
  * Rate-limited to prevent username/email enumeration attacks
  */
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "../../lib/http";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
 import { emitSecurityEvent } from "../../lib/abuse-telemetry.js";

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getSeriesCardTagLabel, getSeriesWatchProviderFilter } from "./Series";
 
-const REQUESTED_TRUSTED_PROVIDER_IDS = "8|119|122|220|337|15|350|192|237";
+const REQUESTED_TRUSTED_PROVIDER_IDS = "8|119|122|220|337|350|192|237|232";
 
 describe("getSeriesCardTagLabel", () => {
   it("does not show an Indian OTT poster tag for the Indian category", () => {
@@ -28,33 +28,27 @@ describe("getSeriesCardTagLabel", () => {
     });
   });
 
-  it("limits the Hindi language filter to trusted India OTT providers by default", () => {
+  it("does not infer a viewing country from the original language", () => {
     expect(
       getSeriesWatchProviderFilter({
         category: "all",
         ottFilter: "all",
         selectedLanguage: "hi",
       }),
-    ).toEqual({
-      with_watch_providers: REQUESTED_TRUSTED_PROVIDER_IDS,
-      watch_region: "IN",
-      "vote_count.gte": 20,
-      "vote_average.gte": 5,
-    });
+    ).toEqual({});
   });
 
-  it("uses the India provider region when Hindi is combined with a selected OTT", () => {
+  it("uses the explicitly selected provider region", () => {
     expect(
       getSeriesWatchProviderFilter({
         category: "all",
         ottFilter: "8",
         selectedLanguage: "hi",
+        watchRegion: "IN",
       }),
     ).toEqual({
       with_watch_providers: "8",
       watch_region: "IN",
-      "vote_count.gte": 20,
-      "vote_average.gte": 5,
     });
   });
 });

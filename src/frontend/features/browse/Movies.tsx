@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, memo, useRef } from "react";
+import { useEffect, useMemo, memo, useRef } from "react";
 import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
@@ -14,7 +14,6 @@ import {
   Genre,
   getPosterUrl,
   getLanguageBadgeClass,
-  DiscoverFilters,
 } from "@/shared/lib/tmdb";
 import type { TMDBResponse } from "@/shared/lib/tmdb";
 import Header from "@/frontend/components/Header";
@@ -29,9 +28,19 @@ import { Button } from "@/frontend/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/frontend/components/ui/select";
 import { cn, formatLocalDate, isAnimeLike } from "@/shared/lib/utils";
 import { Clapperboard, Film, Globe, Languages, Play, Star, TrendingUp } from "lucide-react";
+import {
+  buildMovieDiscoverFilters,
+  getMovieBrowseQueryKey,
+  isMovieSpecialCategory,
+  normalizeMovieBrowseState,
+  parseMovieBrowseState,
+  serializeMovieBrowseState,
+  type MovieBrowseState,
+  type MovieCategory,
+  type MovieSortOption,
+} from "./browseFilterState";
 
-type MovieCategory = "all" | "now_playing" | "trending" | "bollywood" | "hollywood";
-type SortOption = "popularity.desc" | "vote_average.desc" | "release_date.desc" | "revenue.desc";
+type SortOption = MovieSortOption;
 
 interface MoviePage {
   results: Movie[];
@@ -59,6 +68,7 @@ const BOLLYWOOD_LANGUAGE_OPTIONS = [
 ];
 const BOLLYWOOD_LANGUAGE_CODES = ["hi", "gu", "ta", "te", "kn"] as const;
 const BOLLYWOOD_LANGUAGE_SET: ReadonlySet<string> = new Set(BOLLYWOOD_LANGUAGE_CODES);
+const TMDB_PAGE_SIZE = 20;
 
 const MOVIE_CATEGORY_OPTIONS = [
   { value: "all", label: "All Movies", Icon: Film },
@@ -122,18 +132,27 @@ export default function Movies() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
-
-  const [category, setCategory] = useState<MovieCategory>(
-    (searchParams.get("category") as MovieCategory) || "all"
+  const searchParamString = searchParams.toString();
+  const movieState = useMemo(
+    () => parseMovieBrowseState(new URLSearchParams(searchParamString)),
+    [searchParamString],
   );
-  const [selectedGenre, setSelectedGenre] = useState<string>(searchParams.get("genre") || "");
-  const [selectedYear, setSelectedYear] = useState<string>(searchParams.get("year") || "");
-  const [bollywoodLanguage, setBollywoodLanguage] = useState<string>(searchParams.get("lang") || "hi");
-  const [sortBy, setSortBy] = useState<SortOption>(
-    (searchParams.get("sort") as SortOption) || "popularity.desc"
+  const { category, selectedGenre, selectedYear, bollywoodLanguage, sortBy } = movieState;
+  const isSpecialCategory = isMovieSpecialCategory(category);
+  const canonicalSearchParamString = useMemo(
+    () => serializeMovieBrowseState(new URLSearchParams(searchParamString), movieState).toString(),
+    [movieState, searchParamString],
   );
 
-  const effectiveBollywoodLanguage = category === "bollywood" ? bollywoodLanguage : "all";
+  useEffect(() => {
+    if (canonicalSearchParamString === searchParamString) return;
+    setSearchParams(new URLSearchParams(canonicalSearchParamString), { replace: true });
+  }, [canonicalSearchParamString, searchParamString, setSearchParams]);
+
+  const updateMovieState = (changes: Partial<MovieBrowseState>) => {
+    const nextState = normalizeMovieBrowseState({ ...movieState, ...changes });
+    setSearchParams(serializeMovieBrowseState(searchParams, nextState));
+  };
 
   const { data: genres } = useQuery({
     queryKey: ["movie-genres"],
@@ -149,7 +168,7 @@ export default function Movies() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery<MoviePage>({
-    queryKey: ["movies-infinite", category, selectedGenre, selectedYear, effectiveBollywoodLanguage, sortBy],
+    queryKey: getMovieBrowseQueryKey(movieState),
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
       const page = Number(pageParam) || 1;
@@ -161,26 +180,35 @@ export default function Movies() {
       }
 
       if (category === "bollywood" && bollywoodLanguage === "all") {
-        const languageResponses = await Promise.allSettled(
-          BOLLYWOOD_LANGUAGE_CODES.map((language) =>
-            discoverMovies({
-              page,
-              sort_by: sortBy,
-              with_genres: selectedGenre || undefined,
-              with_original_language: language,
-              region: "IN",
-              "primary_release_date.gte": selectedYear ? `${selectedYear}-01-01` : undefined,
-              "primary_release_date.lte": selectedYear ? `${selectedYear}-12-31` : undefined,
-            }),
-          ),
+        // A per-language page is not globally ordered after the five source
+        // pages are merged. Fetch the cumulative source pages needed for this
+        // page, sort the combined set, and then slice the requested global
+        // page so Back/Next never reorders titles under one sort label.
+        const sourcePages = await Promise.all(
+          BOLLYWOOD_LANGUAGE_CODES.map(async (language) => {
+            const responses = await Promise.allSettled(
+              Array.from({ length: page }, (_, index) =>
+                discoverMovies({
+                  page: index + 1,
+                  sort_by: sortBy,
+                  with_genres: selectedGenre || undefined,
+                  with_original_language: language,
+                  region: "IN",
+                  "primary_release_date.gte": selectedYear ? `${selectedYear}-01-01` : undefined,
+                  "primary_release_date.lte": selectedYear ? `${selectedYear}-12-31` : undefined,
+                }),
+              ),
+            );
+            return { language, responses };
+          }),
         );
 
-        const successfulPages = languageResponses.flatMap((response) =>
-          response.status === "fulfilled" ? [response.value] : [],
+        const successfulPages = sourcePages.flatMap(({ responses }) =>
+          responses.flatMap((response) => (response.status === "fulfilled" ? [response.value] : [])),
         );
 
         if (successfulPages.length === 0) {
-          return { page, results: [], total_pages: 1, total_results: 0 };
+          throw new Error("Unable to load the Bollywood movie sources. Please try again.");
         }
 
         const deduped = new Map<number, Movie>();
@@ -201,14 +229,21 @@ export default function Movies() {
           return b.popularity - a.popularity;
         };
 
+        const totalResults = sourcePages.reduce((total, source) => {
+          const firstSuccessfulPage = source.responses.find(
+            (response): response is PromiseFulfilledResult<TMDBResponse<Movie>> => response.status === "fulfilled",
+          );
+          return total + (firstSuccessfulPage?.value.total_results || 0);
+        }, 0);
+
+        const sortedResults = Array.from(deduped.values()).sort(sortMovies);
+        const pageStart = (page - 1) * TMDB_PAGE_SIZE;
+
         return {
           page,
-          results: Array.from(deduped.values()).sort(sortMovies),
-          total_pages: Math.max(...successfulPages.map((data) => data.total_pages || 1)),
-          total_results: successfulPages.reduce(
-            (total, data) => total + (data.total_results || 0),
-            0,
-          ),
+          results: sortedResults.slice(pageStart, pageStart + TMDB_PAGE_SIZE),
+          total_pages: Math.max(1, Math.ceil(Math.max(totalResults, sortedResults.length) / TMDB_PAGE_SIZE)),
+          total_results: Math.max(totalResults, sortedResults.length),
         };
       }
 
@@ -226,26 +261,10 @@ export default function Movies() {
         return getBollywoodMovies(page);
       }
 
-      const filters: DiscoverFilters = {
-        page,
-        sort_by: sortBy,
-        with_genres: selectedGenre || undefined,
-        "primary_release_date.gte": selectedYear ? `${selectedYear}-01-01` : undefined,
-        "primary_release_date.lte": selectedYear ? `${selectedYear}-12-31` : undefined,
-      };
-
-      if (category === "hollywood") {
-        filters.with_original_language = "en";
-        filters.region = "US";
+      const filters = buildMovieDiscoverFilters(movieState, page);
+      if (!filters) {
+        throw new Error(`Unsupported movie category: ${category}`);
       }
-
-      if (category === "bollywood") {
-        filters.region = "IN";
-        if (bollywoodLanguage !== "all") {
-          filters.with_original_language = bollywoodLanguage;
-        }
-      }
-
       return discoverMovies(filters);
     },
     getNextPageParam: (lastPage) => {
@@ -253,7 +272,6 @@ export default function Movies() {
       return lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined;
     },
     staleTime: 1000 * 60 * 5,
-    placeholderData: (previousData) => previousData,
     enabled: !!user,
   });
 
@@ -261,7 +279,9 @@ export default function Movies() {
     if (!user) return;
 
     void queryClient.prefetchInfiniteQuery({
-      queryKey: ["movies-infinite", "hollywood", "", "all", "popularity.desc"],
+      queryKey: getMovieBrowseQueryKey(
+        normalizeMovieBrowseState({ category: "hollywood" }),
+      ),
       initialPageParam: 1,
       queryFn: async ({ pageParam }) => getHollywoodMovies(Number(pageParam) || 1),
       getNextPageParam: (lastPage: TMDBResponse<Movie>) => {
@@ -272,7 +292,9 @@ export default function Movies() {
     });
 
     void queryClient.prefetchInfiniteQuery({
-      queryKey: ["movies-infinite", "bollywood", "", "hi", "popularity.desc"],
+      queryKey: getMovieBrowseQueryKey(
+        normalizeMovieBrowseState({ category: "bollywood", bollywoodLanguage: "hi" }),
+      ),
       initialPageParam: 1,
       queryFn: async ({ pageParam }) => getBollywoodMovies(Number(pageParam) || 1),
       getNextPageParam: (lastPage: TMDBResponse<Movie>) => {
@@ -322,16 +344,6 @@ export default function Movies() {
   }, [contentData, category, selectedYear, bollywoodLanguage]);
 
   useEffect(() => {
-    const params = new URLSearchParams();
-    if (category !== "all") params.set("category", category);
-    if (selectedGenre) params.set("genre", selectedGenre);
-    if (selectedYear) params.set("year", selectedYear);
-    if (category === "bollywood" && bollywoodLanguage !== "hi") params.set("lang", bollywoodLanguage);
-    if (sortBy !== "popularity.desc") params.set("sort", sortBy);
-    setSearchParams(params, { replace: true });
-  }, [category, selectedGenre, selectedYear, bollywoodLanguage, sortBy, setSearchParams]);
-
-  useEffect(() => {
     const node = loadMoreRef.current;
     if (!node || !hasNextPage) return;
 
@@ -347,8 +359,6 @@ export default function Movies() {
     observer.observe(node);
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage, allMovies.length]);
-
-  const isSpecialCategory = ["now_playing", "trending"].includes(category);
 
   return (
     <div className="app-page flex flex-col pb-20 md:pb-0">
@@ -375,7 +385,7 @@ export default function Movies() {
                   key={cat.value}
                   variant="ghost"
                   size="sm"
-                  onClick={() => setCategory(cat.value)}
+                  onClick={() => updateMovieState({ category: cat.value })}
                   className={cn("filter-chip", active && "filter-chip-active")}
                 >
                   <cat.Icon className="h-4 w-4" />
@@ -389,7 +399,7 @@ export default function Movies() {
           <div className="filter-panel flex flex-wrap gap-3">
             <Select
               value={selectedGenre}
-              onValueChange={(v) => setSelectedGenre(v === "all" ? "" : v)}
+              onValueChange={(v) => updateMovieState({ selectedGenre: v === "all" ? "" : v })}
               disabled={isSpecialCategory}
             >
               <SelectTrigger className="select-surface w-[150px]">
@@ -405,22 +415,25 @@ export default function Movies() {
 
             <Select
               value={sortBy}
-              onValueChange={(v) => setSortBy(v as SortOption)}
+              onValueChange={(v) => updateMovieState({ sortBy: v as SortOption })}
               disabled={isSpecialCategory}
             >
               <SelectTrigger className="select-surface w-[150px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border z-50">
-                {sortOptions.map((opt) => (
+                {sortOptions
+                  .filter((opt) => !(category === "bollywood" && bollywoodLanguage === "all" && opt.value === "revenue.desc"))
+                  .map((opt) => (
                   <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                ))}
+                  ))}
               </SelectContent>
             </Select>
 
             <Select
               value={selectedYear}
-              onValueChange={(v) => setSelectedYear(v === "all" ? "" : v)}
+              onValueChange={(v) => updateMovieState({ selectedYear: v === "all" ? "" : v })}
+              disabled={isSpecialCategory}
             >
               <SelectTrigger className="select-surface w-[150px]">
                 <SelectValue placeholder="All Years" />
@@ -434,7 +447,10 @@ export default function Movies() {
             </Select>
 
             {category === "bollywood" && (
-              <Select value={bollywoodLanguage} onValueChange={setBollywoodLanguage}>
+              <Select
+                value={bollywoodLanguage}
+                onValueChange={(value) => updateMovieState({ bollywoodLanguage: value })}
+              >
                 <SelectTrigger className="select-surface w-[170px]">
                   <SelectValue placeholder="Language" />
                 </SelectTrigger>
@@ -446,6 +462,13 @@ export default function Movies() {
                   ))}
                 </SelectContent>
               </Select>
+            )}
+
+            {isSpecialCategory && (
+              <p className="basis-full text-xs text-muted-foreground">
+                {category === "now_playing" ? "Now Playing" : "Trending"} uses its fixed source ordering and release window;
+                genre, year, and sort are unavailable for this category.
+              </p>
             )}
           </div>
 

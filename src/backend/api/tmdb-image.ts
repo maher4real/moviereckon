@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "./lib/http";
 import { createHash } from "crypto";
 import { installGlobalSafeLogging } from "@/shared/lib/safeLogging";
 import {

@@ -3,8 +3,9 @@
  * Routes: /api/user/watch-history, /api/user/liked-items, /api/user/preferences,
  * /api/user/profile, /api/user/avatar-import, /api/user/avatar-upload, /api/user/clear-history,
  * /api/user/comments, /api/user/feedback, /api/user/recommendations, /api/user/watchlist
+ * /api/user/export, /api/user/account
  */
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "./lib/http";
 import { installGlobalSafeLogging } from "@/shared/lib/safeLogging";
 import watchHistoryHandler from "./_handlers/user/watch-history.js";
 import likedItemsHandler from "./_handlers/user/liked-items.js";
@@ -17,7 +18,10 @@ import clearHistoryHandler from "./_handlers/user/clear-history.js";
 import commentsHandler from "./_handlers/user/comments.js";
 import feedbackHandler from "./_handlers/user/feedback.js";
 import recommendationsHandler from "./_handlers/user/recommendations.js";
+import recommendationsV2Handler from "./_handlers/user/recommendations-v2.js";
+import tasteHandler from "./_handlers/user/taste.js";
 import aiRecommendationsHandler from "./_handlers/user/ai-recommendations.js";
+import privacyHandler from "./_handlers/user/privacy.js";
 import {
   applyApiCors,
   applyDefaultSecurityHeaders,
@@ -123,6 +127,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // pathParts = ['api', 'user', 'watch-history'] etc.
   const routeFromQuery = url.searchParams.get("route") || "";
   const routeFromPath = pathParts[2] || "";
+  const routeVersion = pathParts[3] || url.searchParams.get("version") || "";
   const route = routeFromQuery || routeFromPath;
 
   try {
@@ -145,12 +150,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return commentsHandler(req, res);
       case "feedback":
         return feedbackHandler(req, res);
+      case "taste":
+        return tasteHandler(req, res);
       case "recommendations":
+        if (routeVersion === "v2" || routeVersion === "2") {
+          return recommendationsV2Handler(req, res);
+        }
         return recommendationsHandler(req, res);
       case "ai-recommendations":
         return aiRecommendationsHandler(req, res);
       case "watchlist":
         return watchlistHandler(req, res);
+      case "export":
+      case "privacy":
+        if (method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+        return privacyHandler(req, res);
+      case "account":
+        if (method !== "DELETE") return res.status(405).json({ error: "Method not allowed" });
+        return privacyHandler(req, res);
       default:
         return res.status(404).json({ error: `User route not found: ${route}` });
     }

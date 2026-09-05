@@ -2,7 +2,7 @@
  * DELETE /api/user/clear-history
  * Clear all user history data
  */
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "../../lib/http";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
 import { enforceRequestRateLimit } from "../../lib/request-rate-limit.js";

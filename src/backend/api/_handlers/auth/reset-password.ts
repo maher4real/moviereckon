@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "../../lib/http";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import { clearAuthCookies } from "../../lib/cookies.js";
 import { hashPassword } from "../../lib/auth.js";

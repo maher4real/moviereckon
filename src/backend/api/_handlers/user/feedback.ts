@@ -2,13 +2,14 @@
  * GET/POST /api/user/feedback
  * Manage community feedback signals
  */
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "../../lib/http";
 import { connectToDatabase, ObjectId } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
 import { sanitizeLanguageCode, sanitizeSingleLineText } from "../../lib/input.js";
 import { enforceRequestRateLimit } from "../../lib/request-rate-limit.js";
+import { markTasteProfileStale } from "@/backend/services/recommendationTaste";
 
-const FEEDBACK_TYPES = ["give_it_a_go", "one_time_watch", "must_watch", "skip"] as const;
+const FEEDBACK_TYPES = ["give_it_a_go", "one_time_watch", "must_watch", "skip", "not_now"] as const;
 type FeedbackType = (typeof FEEDBACK_TYPES)[number];
 type ContentType = "movie" | "tv";
 const DEFAULT_PAGE_SIZE = 200;
@@ -26,6 +27,7 @@ interface ContentFeedbackDoc {
   language: string;
   created_at: string;
   updated_at: string;
+  suppress_until?: string | null;
 }
 
 interface ContentFeedbackSummaryDoc {
@@ -50,6 +52,7 @@ function normalizeContentId(value: unknown): number | null {
 }
 
 function normalizeFeedbackType(value: unknown): FeedbackType | null {
+  if (value === "not_for_me") return "skip";
   if (FEEDBACK_TYPES.includes(value as FeedbackType)) return value as FeedbackType;
   return null;
 }
@@ -111,6 +114,7 @@ function emptyCounts(): Record<FeedbackType, number> {
     one_time_watch: 0,
     must_watch: 0,
     skip: 0,
+    not_now: 0,
   };
 }
 
@@ -186,6 +190,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const methodLimits: Record<string, { maxRequests: number; windowMs: number }> = {
     GET: { maxRequests: 140, windowMs: 5 * 60 * 1000 },
     POST: { maxRequests: 120, windowMs: 10 * 60 * 1000 },
+    DELETE: { maxRequests: 120, windowMs: 10 * 60 * 1000 },
   };
   const methodLimit = methodLimits[method];
   if (
@@ -300,6 +305,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             poster_path: 1,
             genres: 1,
             language: 1,
+            suppress_until: 1,
             created_at: 1,
             updated_at: 1,
           },
@@ -325,6 +331,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           poster_path: doc.poster_path || null,
           genres: doc.genres || [],
           language: doc.language || "en",
+          suppress_until: doc.suppress_until || null,
           created_at: doc.created_at,
           updated_at: doc.updated_at,
         })),
@@ -358,12 +365,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const normalizedPosterPath = normalizeOptionalString(body.poster_path, 300, null);
       const normalizedGenres = normalizeGenres(body.genres);
       const normalizedLanguage = normalizeLanguage(body.language);
+      const suppressUntil = feedbackType === "not_now"
+        ? (() => {
+            const requested = typeof body.suppress_until === "string" ? Date.parse(body.suppress_until) : Number.NaN;
+            const maximum = Date.now() + 30 * 24 * 60 * 60 * 1000;
+            return Number.isFinite(requested) && requested > Date.now()
+              ? new Date(Math.min(requested, maximum)).toISOString()
+              : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+          })()
+        : null;
       const key = {
         user_id: user.id,
         content_id: contentId,
         content_type: contentType,
       };
       const now = new Date().toISOString();
+      const invalidateTaste = () => markTasteProfileStale(db, user.id).catch((error) => {
+        console.error("Failed to mark taste profile stale:", error);
+      });
 
       const previousDoc = await feedbackCollection.findOneAndUpdate(
         key,
@@ -374,6 +393,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             poster_path: normalizedPosterPath,
             genres: normalizedGenres,
             language: normalizedLanguage,
+            suppress_until: suppressUntil,
             updated_at: now,
           },
           $setOnInsert: {
@@ -394,6 +414,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const removed = await feedbackCollection.deleteOne({ ...key, feedback_type: feedbackType });
         if (removed.deletedCount === 1) {
           await adjustFeedbackSummary(db, contentId, contentType, { [feedbackType]: -1 });
+          await invalidateTaste();
           return res.status(200).json({ action: "removed", data: null });
         }
       } else if (previousType && previousType !== feedbackType) {
@@ -417,14 +438,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           poster_path: 1,
           genres: 1,
           language: 1,
+          suppress_until: 1,
           created_at: 1,
           updated_at: 1,
         },
       });
 
       if (!updated) {
+        await invalidateTaste();
         return res.status(200).json({ action: "removed", data: null });
       }
+
+      await invalidateTaste();
 
       return res.status(200).json({
         action,
@@ -438,10 +463,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           poster_path: updated.poster_path || null,
           genres: updated.genres || [],
           language: updated.language || "en",
+          suppress_until: updated.suppress_until || null,
           created_at: updated.created_at,
           updated_at: updated.updated_at,
         },
       });
+    }
+
+    if (req.method === "DELETE") {
+      const contentId = normalizeContentId(getQueryParam(req, "content_id"));
+      const contentType = normalizeContentType(getQueryParam(req, "content_type"));
+      if (!contentId || !contentType) {
+        return res.status(400).json({ error: "content_id and valid content_type are required" });
+      }
+
+      const key = { user_id: user.id, content_id: contentId, content_type: contentType };
+      const existing = await feedbackCollection.findOne(key, { projection: { feedback_type: 1 } });
+      const feedbackType = normalizeFeedbackType(existing?.feedback_type);
+      if (!feedbackType) {
+        return res.status(200).json({ action: "removed", data: null });
+      }
+
+      const deleted = await feedbackCollection.deleteOne({ ...key, feedback_type: feedbackType });
+      if (deleted.deletedCount === 1) {
+        await adjustFeedbackSummary(db, contentId, contentType, { [feedbackType]: -1 });
+        await markTasteProfileStale(db, user.id);
+      }
+      return res.status(200).json({ action: "removed", data: null });
     }
 
     return res.status(405).json({ error: "Method not allowed" });

@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "./http";
 import { createHash } from "crypto";
 import { emitSecurityEvent } from "./abuse-telemetry.js";
 import { consumeRateLimit } from "./rate-limit.js";

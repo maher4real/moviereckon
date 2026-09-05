@@ -2,7 +2,7 @@
  * POST /api/auth/logout
  * Invalidate refresh token
  */
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "../../lib/http";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import { getUserFromRequest, hashRefreshToken } from "../../lib/auth.js";
 import {

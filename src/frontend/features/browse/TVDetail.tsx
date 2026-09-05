@@ -169,12 +169,15 @@ export default function TVDetail() {
 
   // Update selected season when TV show loads
   useEffect(() => {
-    if (tvShow?.seasons) {
-      const firstRealSeason = tvShow.seasons.find((s) => s.season_number > 0);
-      if (firstRealSeason) {
-        setSelectedSeason(firstRealSeason.season_number);
+    const availableSeasons = tvShow?.seasons?.filter((s) => s.season_number > 0) ?? [];
+    if (availableSeasons.length === 0) return;
+
+    setSelectedSeason((currentSeason) => {
+      if (availableSeasons.some((season) => season.season_number === currentSeason)) {
+        return currentSeason;
       }
-    }
+      return availableSeasons[0].season_number;
+    });
   }, [tvShow]);
 
   const cast = useMemo(

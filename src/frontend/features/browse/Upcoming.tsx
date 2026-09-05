@@ -9,6 +9,7 @@ import {
   discoverTVShows,
   getMovieGenres,
   getTVGenres,
+  getTVWatchProviderCatalog,
   Movie,
   TVShow,
   Genre,
@@ -28,9 +29,19 @@ import { Button } from "@/frontend/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/frontend/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/frontend/components/ui/card";
 import { cn, formatLocalDate, isAnimeLike } from "@/shared/lib/utils";
-
-type UpcomingSection = "all" | "movies" | "series";
-type MovieSectionFilter = "all" | "bollywood" | "hollywood";
+import {
+  BOLLYWOOD_LANGUAGE_LIST,
+  parseUpcomingFilterState,
+  serializeUpcomingFilterState,
+  normalizeUpcomingFilterState,
+  getUpcomingQueryKey,
+  isValidUpcomingDateKey,
+  UPCOMING_WATCH_REGION_OPTIONS,
+  type MovieSectionFilter,
+  type UpcomingSection,
+  type UpcomingFilterState,
+} from "./upcomingFilterState";
+import { getVerifiedSeriesProviderOptions } from "./browseFilterState";
 
 interface UpcomingPage {
   results: (Movie | TVShow)[];
@@ -43,15 +54,6 @@ const MOVIE_SECTION_OPTIONS: { value: MovieSectionFilter; label: string }[] = [
   { value: "all", label: "All Movies" },
   { value: "bollywood", label: "Bollywood" },
   { value: "hollywood", label: "Hollywood" },
-];
-
-const OTT_OPTIONS = [
-  { value: "all", label: "All OTT" },
-  { value: "8", label: "Netflix" },
-  { value: "9", label: "Prime Video" },
-  { value: "337", label: "Disney+" },
-  { value: "15", label: "Hulu" },
-  { value: "350", label: "Apple TV+" },
 ];
 
 const LANGUAGE_OPTIONS = [
@@ -74,7 +76,6 @@ const BOLLYWOOD_LANGUAGE_OPTIONS = [
   { value: "te", label: "Telugu" },
   { value: "kn", label: "Kannada" },
 ];
-const BOLLYWOOD_LANGUAGE_LIST = ["hi", "gu", "ta", "te", "kn"] as const;
 const BOLLYWOOD_LANGUAGE_CODES = new Set<string>(BOLLYWOOD_LANGUAGE_LIST);
 const CALENDAR_TIMELINE_DAYS = 180;
 
@@ -85,12 +86,11 @@ const getReleaseDate = (item: Movie | TVShow) =>
   isTVShow(item) ? item.first_air_date : item.release_date;
 
 const parseDateKey = (value: string): Date | null => {
+  if (!isValidUpcomingDateKey(value)) return null;
   const [year, month, day] = value.split("-").map(Number);
   if (!year || !month || !day) return null;
   return new Date(year, month - 1, day);
 };
-
-const isValidDateKey = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
 
 const formatDateHeading = (date: Date) =>
   date.toLocaleDateString("en-US", {
@@ -176,22 +176,38 @@ export default function Upcoming() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const calendarLoadMoreRef = useRef<HTMLDivElement | null>(null);
+  const searchParamString = searchParams.toString();
+  const filterState = useMemo(
+    () => parseUpcomingFilterState(new URLSearchParams(searchParamString)),
+    [searchParamString],
+  );
+  const {
+    section,
+    movieSectionFilter,
+    bollywoodLanguage,
+    movieGenre,
+    seriesGenre,
+    seriesOtt,
+    seriesLanguage,
+    watchRegion,
+    selectedFilterDate,
+  } = filterState;
+  const canonicalSearchParamString = useMemo(
+    () => serializeUpcomingFilterState(new URLSearchParams(searchParamString), filterState).toString(),
+    [filterState, searchParamString],
+  );
 
-  const [section, setSection] = useState<UpcomingSection>(
-    (searchParams.get("section") as UpcomingSection) || "all",
-  );
-  const [movieSectionFilter, setMovieSectionFilter] = useState<MovieSectionFilter>(
-    (searchParams.get("movieType") as MovieSectionFilter) || "all",
-  );
-  const [bollywoodLanguage, setBollywoodLanguage] = useState<string>(searchParams.get("bollyLang") || "all");
-  const [movieGenre, setMovieGenre] = useState<string>(searchParams.get("movieGenre") || "");
-  const [seriesGenre, setSeriesGenre] = useState<string>(searchParams.get("seriesGenre") || "");
-  const [seriesOtt, setSeriesOtt] = useState<string>(searchParams.get("ott") || "all");
-  const [seriesLanguage, setSeriesLanguage] = useState<string>(searchParams.get("lang") || "all");
-  const [selectedFilterDate, setSelectedFilterDate] = useState<string>(() => {
-    const dateParam = searchParams.get("date") || "";
-    return isValidDateKey(dateParam) ? dateParam : "all";
-  });
+  useEffect(() => {
+    if (canonicalSearchParamString === searchParamString) return;
+    setSearchParams(new URLSearchParams(canonicalSearchParamString), { replace: true });
+  }, [canonicalSearchParamString, searchParamString, setSearchParams]);
+
+  const updateFilterState = (changes: Partial<UpcomingFilterState>) => {
+    const nextState = normalizeUpcomingFilterState({ ...filterState, ...changes });
+    // Explicit user changes create a history entry so Back/Forward restores
+    // both the controls and the corresponding query cache identity.
+    setSearchParams(serializeUpcomingFilterState(searchParams, nextState));
+  };
   const [calendarGroupLimit, setCalendarGroupLimit] = useState(8);
 
   const { data: movieGenres } = useQuery({
@@ -206,6 +222,18 @@ export default function Upcoming() {
     staleTime: 1000 * 60 * 60,
   });
 
+  const { data: providerCatalog } = useQuery({
+    queryKey: ["tv-watch-provider-catalog", watchRegion],
+    queryFn: ({ signal }) => getTVWatchProviderCatalog(watchRegion, signal),
+    staleTime: 1000 * 60 * 60 * 6,
+    enabled: section === "series",
+  });
+
+  const providerOptions = useMemo(
+    () => getVerifiedSeriesProviderOptions(watchRegion, providerCatalog),
+    [providerCatalog, watchRegion],
+  );
+
   const {
     data: upcomingData,
     isLoading,
@@ -214,17 +242,7 @@ export default function Upcoming() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery<UpcomingPage>({
-    queryKey: [
-      "upcoming-infinite",
-      section,
-      movieSectionFilter,
-      bollywoodLanguage,
-      movieGenre,
-      seriesGenre,
-      seriesOtt,
-      seriesLanguage,
-      selectedFilterDate,
-    ],
+    queryKey: getUpcomingQueryKey(filterState),
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
       const page = Number(pageParam) || 1;
@@ -254,13 +272,21 @@ export default function Upcoming() {
             ),
           );
 
-          const successfulPages = languageResponses.flatMap((response) =>
-            response.status === "fulfilled" ? [response.value] : [],
+          const failedResponse = languageResponses.find(
+            (response): response is PromiseRejectedResult => response.status === "rejected",
           );
-
-          if (successfulPages.length === 0) {
-            return { page, results: [], total_pages: 1, total_results: 0 };
+          if (failedResponse) {
+            throw failedResponse.reason instanceof Error
+              ? failedResponse.reason
+              : new Error("Unable to load all Bollywood release sources");
           }
+
+          const successfulPages = languageResponses.map((response) => {
+            if (response.status !== "fulfilled") {
+              throw new Error("Unable to load all Bollywood release sources");
+            }
+            return response.value;
+          });
 
           const deduped = new Map<number, Movie>();
           successfulPages.forEach((data) => {
@@ -319,7 +345,7 @@ export default function Upcoming() {
 
         if (seriesOtt !== "all") {
           filters.with_watch_providers = seriesOtt;
-          filters.watch_region = "US";
+          filters.watch_region = watchRegion;
         }
 
         return discoverTVShows(filters);
@@ -331,23 +357,13 @@ export default function Upcoming() {
           sort_by: "primary_release_date.asc",
           "primary_release_date.gte": releaseDateGte,
           "primary_release_date.lte": releaseDateLte,
-        }).catch(() => ({
-          page,
-          results: [] as Movie[],
-          total_pages: 1,
-          total_results: 0,
-        })),
+        }),
         discoverTVShows({
           page,
           sort_by: "first_air_date.asc",
           "first_air_date.gte": releaseDateGte,
           "first_air_date.lte": releaseDateLte,
-        }).catch(() => ({
-          page,
-          results: [] as TVShow[],
-          total_pages: 1,
-          total_results: 0,
-        })),
+        }),
       ]);
 
       return {
@@ -440,37 +456,12 @@ export default function Upcoming() {
   ]);
 
   useEffect(() => {
-    const params = new URLSearchParams();
-    if (section !== "all") params.set("section", section);
-    if (movieSectionFilter !== "all") params.set("movieType", movieSectionFilter);
-    if (movieSectionFilter === "bollywood" && bollywoodLanguage !== "all") {
-      params.set("bollyLang", bollywoodLanguage);
-    }
-    if (movieGenre) params.set("movieGenre", movieGenre);
-    if (seriesGenre) params.set("seriesGenre", seriesGenre);
-    if (seriesOtt !== "all") params.set("ott", seriesOtt);
-    if (seriesLanguage !== "all") params.set("lang", seriesLanguage);
-    if (selectedFilterDate !== "all") params.set("date", selectedFilterDate);
-    setSearchParams(params, { replace: true });
-  }, [
-    section,
-    movieSectionFilter,
-    bollywoodLanguage,
-    movieGenre,
-    seriesGenre,
-    seriesOtt,
-    seriesLanguage,
-    selectedFilterDate,
-    setSearchParams,
-  ]);
-
-  useEffect(() => {
     const node = calendarLoadMoreRef.current;
     if (!node || !hasNextPage) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting && !isFetchingNextPage) {
+        if (entries[0]?.isIntersecting && !isFetchingNextPage && !upcomingError) {
           fetchNextPage();
         }
       },
@@ -479,7 +470,7 @@ export default function Upcoming() {
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage, filteredUpcoming.length]);
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage, upcomingError, filteredUpcoming.length]);
 
   const releaseDateKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -575,6 +566,7 @@ export default function Upcoming() {
     seriesGenre,
     seriesOtt,
     seriesLanguage,
+    watchRegion,
     selectedFilterDate,
   ]);
 
@@ -618,7 +610,7 @@ export default function Upcoming() {
                     key={entry.value}
                     variant="ghost"
                     size="sm"
-                    onClick={() => setSection(entry.value as UpcomingSection)}
+                    onClick={() => updateFilterState({ section: entry.value as UpcomingSection })}
                     className={cn("filter-chip", active && "filter-chip-active")}
                   >
                     <entry.Icon className="h-4 w-4" />
@@ -639,7 +631,7 @@ export default function Upcoming() {
                       key={option.value}
                       variant="ghost"
                       size="sm"
-                      onClick={() => setMovieSectionFilter(option.value)}
+                      onClick={() => updateFilterState({ movieSectionFilter: option.value })}
                       className={cn("filter-chip", active && "filter-chip-active")}
                     >
                       {option.label}
@@ -650,7 +642,10 @@ export default function Upcoming() {
 
               <div className="flex gap-3 flex-wrap">
                 {movieSectionFilter === "bollywood" && (
-                  <Select value={bollywoodLanguage} onValueChange={setBollywoodLanguage}>
+                  <Select
+                    value={bollywoodLanguage}
+                    onValueChange={(value) => updateFilterState({ bollywoodLanguage: value })}
+                  >
                     <SelectTrigger className="select-surface w-[170px]">
                       <SelectValue placeholder="Language" />
                     </SelectTrigger>
@@ -666,7 +661,7 @@ export default function Upcoming() {
 
                 <Select
                   value={movieGenre}
-                  onValueChange={(value) => setMovieGenre(value === "all" ? "" : value)}
+                  onValueChange={(value) => updateFilterState({ movieGenre: value === "all" ? "" : value })}
                 >
                   <SelectTrigger className="select-surface w-[170px]">
                     <SelectValue placeholder="Movie Genre" />
@@ -686,12 +681,17 @@ export default function Upcoming() {
 
           {section === "series" && (
             <div className="filter-panel flex flex-wrap gap-3">
-              <Select value={seriesOtt} onValueChange={setSeriesOtt}>
-                <SelectTrigger className="select-surface w-[170px]">
-                  <SelectValue placeholder="OTT Platform" />
+              <Select
+                value={watchRegion}
+                onValueChange={(value) =>
+                  updateFilterState({ watchRegion: value as UpcomingFilterState["watchRegion"] })
+                }
+              >
+                <SelectTrigger aria-label="Watch region" className="select-surface w-[170px]">
+                  <SelectValue placeholder="Watch Region" />
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border z-50">
-                  {OTT_OPTIONS.map((option) => (
+                  {UPCOMING_WATCH_REGION_OPTIONS.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>
@@ -699,7 +699,26 @@ export default function Upcoming() {
                 </SelectContent>
               </Select>
 
-              <Select value={seriesLanguage} onValueChange={setSeriesLanguage}>
+              <Select
+                value={seriesOtt}
+                onValueChange={(value) => updateFilterState({ seriesOtt: value })}
+              >
+                <SelectTrigger className="select-surface w-[170px]">
+                  <SelectValue placeholder="OTT Platform" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border-border z-50">
+                  {providerOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={seriesLanguage}
+                onValueChange={(value) => updateFilterState({ seriesLanguage: value })}
+              >
                 <SelectTrigger className="select-surface w-[170px]">
                   <SelectValue placeholder="Language" />
                 </SelectTrigger>
@@ -714,7 +733,7 @@ export default function Upcoming() {
 
               <Select
                 value={seriesGenre}
-                onValueChange={(value) => setSeriesGenre(value === "all" ? "" : value)}
+                onValueChange={(value) => updateFilterState({ seriesGenre: value === "all" ? "" : value })}
               >
                 <SelectTrigger className="select-surface w-[170px]">
                   <SelectValue placeholder="Series Genre" />
@@ -729,6 +748,13 @@ export default function Upcoming() {
                 </SelectContent>
               </Select>
             </div>
+          )}
+
+          {section === "series" && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Platform choices use TMDB&apos;s catalog for the selected watch region when available, with a curated
+              supported fallback. Availability is title-specific and independent of original language.
+            </p>
           )}
 
           {isLoading ? (
@@ -775,7 +801,7 @@ export default function Upcoming() {
                     <div className="flex w-max items-stretch gap-2">
                       <button
                         type="button"
-                        onClick={() => setSelectedFilterDate("all")}
+                        onClick={() => updateFilterState({ selectedFilterDate: "all" })}
                         className={cn(
                           "min-w-[108px] rounded-lg border px-3 py-2 text-left transition-colors",
                           selectedFilterDate === "all"
@@ -800,7 +826,7 @@ export default function Upcoming() {
                           <button
                             key={`timeline-${entry.dateKey}`}
                             type="button"
-                            onClick={() => setSelectedFilterDate(entry.dateKey)}
+                            onClick={() => updateFilterState({ selectedFilterDate: entry.dateKey })}
                             className={cn(
                               "relative min-w-[98px] rounded-lg border px-3 py-2 text-left transition-colors",
                               isSelected

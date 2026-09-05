@@ -2,7 +2,7 @@
  * POST /api/user/avatar-upload
  * Upload a client-optimized avatar image to Vercel Blob and return a durable URL.
  */
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "../../lib/http";
 import { getUserFromRequest } from "../../lib/auth.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
 import { emitSecurityEvent } from "../../lib/abuse-telemetry.js";

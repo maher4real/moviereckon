@@ -291,6 +291,10 @@ export interface WatchProvider {
   display_priority: number;
 }
 
+export interface WatchProviderCatalog {
+  results: WatchProvider[];
+}
+
 export interface WatchProviders {
   results: {
     [countryCode: string]: {
@@ -339,6 +343,7 @@ type TMDBParams = Record<string, string | number | boolean | undefined>;
 async function fetchTMDB<T>(
   endpoint: string,
   params: TMDBParams = {},
+  signal?: AbortSignal,
 ): Promise<T> {
   const normalizedParams = Object.fromEntries(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== ""),
@@ -354,6 +359,7 @@ async function fetchTMDB<T>(
   let response = await fetch(getUrl, {
     method: "GET",
     headers: { Accept: "application/json" },
+    signal,
   });
 
   // Fallback keeps compatibility for oversized URLs or older deployments.
@@ -365,6 +371,7 @@ async function fetchTMDB<T>(
         "X-Requested-With": "XMLHttpRequest",
       },
       body: JSON.stringify({ endpoint, params: normalizedParams }),
+      signal,
     });
   }
 
@@ -645,6 +652,19 @@ export async function getTVWatchProviders(tvId: number): Promise<WatchProviders>
   return fetchTMDB<WatchProviders>(`/tv/${tvId}/watch/providers`);
 }
 
+/**
+ * Return TMDB's provider catalog for a viewing region. This list describes
+ * services available in the region, while a title's own watch/providers
+ * response is still the source of truth for title-level availability.
+ */
+export async function getTVWatchProviderCatalog(region: string, signal?: AbortSignal): Promise<WatchProvider[]> {
+  const data = await fetchTMDB<WatchProviderCatalog>("/watch/providers/tv", {
+    language: "en-US",
+    watch_region: region,
+  }, signal);
+  return Array.isArray(data.results) ? data.results : [];
+}
+
 export async function getTVShowReviews(tvId: number, page = 1): Promise<TMDBReview[]> {
   const data = await fetchTMDB<TMDBResponse<TMDBReview>>(`/tv/${tvId}/reviews`, { page });
   return data.results || [];
@@ -697,28 +717,52 @@ export function getStillUrl(
 }
 
 // Search
-export async function searchMulti(query: string, page = 1): Promise<TMDBResponse<MultiSearchResult>> {
+export async function searchMulti(
+  query: string,
+  page = 1,
+  signal?: AbortSignal,
+): Promise<TMDBResponse<MultiSearchResult>> {
   return fetchTMDB<TMDBResponse<MultiSearchResult>>("/search/multi", {
     query,
     page,
     include_adult: "false",
-  });
+  }, signal);
 }
 
-export async function searchMovies(query: string, page = 1): Promise<TMDBResponse<Movie>> {
+export async function searchMovies(
+  query: string,
+  page = 1,
+  signal?: AbortSignal,
+): Promise<TMDBResponse<Movie>> {
   return fetchTMDB<TMDBResponse<Movie>>("/search/movie", {
     query,
     page,
     include_adult: "false",
-  });
+  }, signal);
 }
 
-export async function searchTVShows(query: string, page = 1): Promise<TMDBResponse<TVShow>> {
+export async function searchTVShows(
+  query: string,
+  page = 1,
+  signal?: AbortSignal,
+): Promise<TMDBResponse<TVShow>> {
   return fetchTMDB<TMDBResponse<TVShow>>("/search/tv", {
     query,
     page,
     include_adult: "false",
-  });
+  }, signal);
+}
+
+export async function searchPeople(
+  query: string,
+  page = 1,
+  signal?: AbortSignal,
+): Promise<TMDBResponse<PersonSearchResult>> {
+  return fetchTMDB<TMDBResponse<PersonSearchResult>>("/search/person", {
+    query,
+    page,
+    include_adult: "false",
+  }, signal);
 }
 
 // Genres
