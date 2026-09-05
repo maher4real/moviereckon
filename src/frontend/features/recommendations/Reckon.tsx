@@ -1077,22 +1077,18 @@ export default function Reckon() {
               </div>
             </div>
 
-            <div className="filter-panel mb-0">
+            {feedMode === "v2" && <div className="filter-panel mb-0">
               <div className="filter-row">
               {RECOMMENDATION_TYPES.map((t) => {
                 const active = recTypeFilter === t.id;
-                const unavailableInLegacy = feedMode === "legacy" && t.id !== "all";
                 return (
                   <button
                     key={t.id}
                     type="button"
-                    onClick={() => {
-                      if (!unavailableInLegacy) setRecTypeFilter(t.id);
-                    }}
-                    disabled={unavailableInLegacy}
-                    title={unavailableInLegacy ? "Available when the durable recommendation feed is enabled" : t.description}
+                    onClick={() => setRecTypeFilter(t.id)}
+                    title={t.description}
                     className={cn(
-                      "filter-chip flex items-center gap-1.5 disabled:cursor-not-allowed disabled:opacity-45",
+                      "filter-chip flex items-center gap-1.5",
                       active && "filter-chip-active",
                     )}
                   >
@@ -1102,12 +1098,7 @@ export default function Reckon() {
                 );
               })}
               </div>
-              {feedMode === "legacy" && (
-                <p className="px-3 pb-2 text-xs text-muted-foreground">
-                  Trending, rating, popularity, and new-release modes are available with the durable feed.
-                </p>
-              )}
-            </div>
+            </div>}
           </div>
 
           <PreferencesSheet

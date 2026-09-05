@@ -74,7 +74,7 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex items-center gap-1.5 p-1.5 rounded-xl sm:gap-3 sm:p-2",
+        "flex flex-wrap items-center gap-1.5 p-1.5 rounded-xl sm:flex-nowrap sm:gap-3 sm:p-2",
         "bg-card border border-border",
         "motion-safe:transition-colors duration-200",
         "hover:bg-accent/30",
@@ -103,7 +103,7 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
       {/* Poster + title — clickable area to open detail */}
       <button
         onClick={handleOpenDetail}
-        className="flex min-w-0 flex-1 items-center gap-2 text-left group/link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg sm:gap-3"
+      className="flex min-w-0 flex-1 items-center gap-2 text-left group/link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg sm:gap-3"
         aria-label={`Open ${item.title}`}
       >
         <div className="shrink-0 w-10 h-14 rounded-lg overflow-hidden bg-muted">
@@ -138,7 +138,7 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
       </button>
 
       {/* Actions */}
-      <div className="flex shrink-0 items-center gap-0.5 sm:gap-2">
+      <div className="ml-auto flex w-full shrink-0 items-center justify-end gap-0.5 border-t border-border/60 pt-1.5 sm:ml-0 sm:w-auto sm:border-0 sm:pt-0 sm:gap-2">
         <Select value={status} onValueChange={handleStatusChange}>
           <SelectTrigger
             className="h-8 w-22.5 px-2 text-[11px] capitalize sm:w-25"
@@ -146,7 +146,7 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
           >
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="bg-popover border-border">
+          <SelectContent className="z-[70] bg-popover border-border">
             <SelectItem value="saved">Saved</SelectItem>
             <SelectItem value="watching">Watching</SelectItem>
             <SelectItem value="completed">Completed</SelectItem>

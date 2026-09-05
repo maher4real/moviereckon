@@ -369,7 +369,7 @@ export default function YourTastePanel({
         </div>
       )}
 
-      <div className="mt-4 rounded-xl border border-border/70 bg-background/35 p-4">
+      {feedMode === "v2" && <div className="mt-4 rounded-xl border border-border/70 bg-background/35 p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold"><Compass className="h-4 w-4 text-primary" /> Recommendation feel</div>
@@ -378,7 +378,7 @@ export default function YourTastePanel({
           <div className="flex gap-2" role="group" aria-label="Recommendation feel">
             {(["familiar", "adventurous"] as const).map((mode) => {
               const active = controls.explorationMode === mode;
-              const disabled = feedMode === "legacy" || pendingControl === `mode:${mode}`;
+              const disabled = pendingControl === `mode:${mode}`;
               return (
                 <Button
                   key={mode}
@@ -397,8 +397,7 @@ export default function YourTastePanel({
             })}
           </div>
         </div>
-        {feedMode === "legacy" && <p className="mt-3 text-xs text-muted-foreground">This control is available when the durable recommendation feed is enabled.</p>}
-      </div>
+      </div>}
 
       {evidence.length > 0 && (
         <div className="mt-4 rounded-xl border border-border/70 bg-background/35 p-4">

@@ -337,6 +337,17 @@ export default function PickTonight({
             className="h-9 w-20 text-xs"
           />
           <span className="text-xs text-muted-foreground">min</span>
+          {timeInput && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setTimeInput("")}
+              className="h-9 px-2 text-xs"
+            >
+              Clear
+            </Button>
+          )}
         </div>
       </div>
 
