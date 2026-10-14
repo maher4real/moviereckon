@@ -18,10 +18,10 @@ const content: ContentWatchSources = { contentId: 42, contentType: "movie", sour
   provider: "hdhub", sourcePage: "https://source.example/title/", title: "Example", checkedAt: null, links: [link],
 }] };
 
-function Detail({ id, admin = false }: { id: number; admin?: boolean }) {
+function Detail({ id }: { id: number }) {
   const sources = useWatchSources(id, "movie");
   return <>
-    {admin && <FetchWatchLinksButton key={id} contentId={id} contentType="movie" title="Example" />}
+    <FetchWatchLinksButton key={id} contentId={id} contentType="movie" title="Example" />
     <WatchLinksSection heading="Saved players" context={`movie ${id}`} links={contentSourceLinks(sources.data)}
       isLoading={sources.isLoading} isError={sources.isError} />
   </>;
@@ -35,7 +35,7 @@ function provider(client: QueryClient) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.auth.mockReturnValue({ user: { role: "admin" } });
+  mocks.auth.mockReturnValue({ user: { role: "user" } });
   mocks.read.mockResolvedValue(content);
 });
 
@@ -61,12 +61,12 @@ describe("saved source queries", () => {
     client.clear();
   });
 
-  it("updates the detail page immediately after an admin imports links without another lookup", async () => {
+  it("updates the detail page immediately after a regular user fetches links without another lookup", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     mocks.read.mockResolvedValue({ ...content, sources: [] });
     const result: FetchContentSourcesResult = { status: "imported", content, importedPages: 1, errors: 0 };
     mocks.import.mockResolvedValue(result);
-    render(<Detail id={42} admin />, { wrapper: provider(client) });
+    render(<Detail id={42} />, { wrapper: provider(client) });
     await screen.findByText("No watch links available yet.");
     fireEvent.click(screen.getByRole("button", { name: "Fetch links" }));
     await screen.findByText("1 link available for this title.");

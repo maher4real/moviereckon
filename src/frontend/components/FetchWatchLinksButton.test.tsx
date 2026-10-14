@@ -14,7 +14,7 @@ const result: FetchContentSourcesResult = { status: "imported", importedPages: 1
     { ...link, id: "download", label: "1080p HEVC", url: "https://download.example/42", kind: "download", quality: "1080p" }],
 }] } };
 
-beforeEach(() => { vi.clearAllMocks(); mocks.auth.mockReturnValue({ user: { role: "admin" } }); mocks.fetch.mockResolvedValue(result); });
+beforeEach(() => { vi.clearAllMocks(); mocks.auth.mockReturnValue({ user: { role: "user" } }); mocks.fetch.mockResolvedValue(result); });
 
 describe("Fetch links action", () => {
   it("fetches the selected movie and displays separate watch and quality options", async () => {
@@ -50,13 +50,13 @@ describe("Fetch links action", () => {
     expect(mocks.fetch).toHaveBeenLastCalledWith(321, "tv", "https://source.example/show/", expect.any(AbortSignal));
     await screen.findByRole("link", { name: /Player 1/ });
   });
-  it("shows actionable failures and hides the control for non-admins", async () => {
+  it("shows actionable failures and hides the control when signed out", async () => {
     mocks.fetch.mockRejectedValueOnce(new Error("Configure TMDB_API_KEY on the server"));
     const { unmount } = render(<FetchWatchLinksButton contentId={42} contentType="movie" title="Example" />);
     fireEvent.click(screen.getByRole("button", { name: "Fetch links" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("TMDB_API_KEY");
     unmount();
-    mocks.auth.mockReturnValue({ user: { role: "user" } });
+    mocks.auth.mockReturnValue({ user: null });
     render(<FetchWatchLinksButton contentId={42} contentType="movie" title="Example" />);
     expect(screen.queryByRole("button", { name: "Fetch links" })).not.toBeInTheDocument();
   });

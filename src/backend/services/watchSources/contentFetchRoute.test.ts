@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ user: vi.fn(), role: vi.fn(), origin: vi.fn(), ajax: vi.fn(), limit: vi.fn(), fetch: vi.fn() }));
-vi.mock("@/backend/api/lib/auth", () => ({ getUserFromRequest: mocks.user, userHasRoleAtLeast: mocks.role }));
+const mocks = vi.hoisted(() => ({ user: vi.fn(), origin: vi.fn(), ajax: vi.fn(), limit: vi.fn(), fetch: vi.fn() }));
+vi.mock("@/backend/api/lib/auth", () => ({ getUserFromRequest: mocks.user }));
 vi.mock("@/backend/api/lib/cors", () => ({ hasAjaxHeader: mocks.ajax, isTrustedRequestOrigin: mocks.origin }));
 vi.mock("@/backend/api/lib/rate-limit", () => ({ consumeRateLimit: mocks.limit }));
 vi.mock("./contentImport", () => ({ fetchContentSources: mocks.fetch, SourceSelectionError: class extends Error {} }));
@@ -18,8 +18,7 @@ beforeEach(() => {
   vi.stubEnv("TMDB_API_KEY", "configured");
   vi.stubEnv("HDHUB_BASE_URL", "https://new7.hdhub4u.cl");
   vi.stubEnv("WATCH_IMPORTER_ENABLED", "true");
-  mocks.user.mockResolvedValue({ id: "admin", role: "admin" });
-  mocks.role.mockResolvedValue(true);
+  mocks.user.mockResolvedValue({ id: "viewer", role: "user" });
   mocks.origin.mockReturnValue(true);
   mocks.ajax.mockReturnValue(true);
   mocks.limit.mockResolvedValue({ allowed: true });
@@ -28,21 +27,26 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("session-authenticated per-title importing", () => {
-  it("runs for an admin without a cron secret or client bearer token", async () => {
+  it.each(["user", "moderator", "admin"])("runs for a signed-in %s without a cron secret or client bearer token", async (role) => {
+    mocks.user.mockResolvedValue({ id: "viewer", role });
     const response = await POST(request());
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(mocks.role).toHaveBeenCalledWith(expect.objectContaining({ id: "admin" }), "admin");
+    expect(mocks.limit).toHaveBeenCalledWith("watch_source_fetch:viewer", 6, 60_000);
     expect(mocks.fetch).toHaveBeenCalledWith(42, "movie", undefined, expect.anything());
   });
-  it("rejects signed-out users, non-admins and invalid origins", async () => {
+  it("rejects signed-out users, invalid origins and missing AJAX headers", async () => {
     mocks.user.mockResolvedValueOnce(null);
     expect((await POST(request())).status).toBe(401);
-    mocks.role.mockResolvedValueOnce(false);
-    expect((await POST(request())).status).toBe(403);
     mocks.origin.mockReturnValueOnce(false);
     expect((await POST(request())).status).toBe(403);
+    mocks.ajax.mockReturnValueOnce(false);
+    expect((await POST(request())).status).toBe(403);
     expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+  it("fetches the selected series with the same per-title session flow", async () => {
+    expect((await POST(request({ contentId: 321, contentType: "tv" }))).status).toBe(200);
+    expect(mocks.fetch).toHaveBeenCalledWith(321, "tv", undefined, expect.anything());
   });
   it.each([
     { contentId: 42, contentType: "movie", sourceUrl: "https://other.example/post/" },

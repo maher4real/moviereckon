@@ -55,8 +55,8 @@ export default function FetchWatchLinksButton({ contentId, contentType, title }:
     }
   }
 
-  // The API checks the current database role too, including stale client sessions.
-  if (user?.role !== "admin") return null;
+  // Per-title imports use the viewer's session; bulk imports stay cron-protected.
+  if (!user) return null;
   const links = result?.content.sources.flatMap((source) => source.links) || [];
   const groups: Array<{ kind: WatchSourceLink["kind"]; label: string }> = [
     { kind: "watch", label: "Watch links" },

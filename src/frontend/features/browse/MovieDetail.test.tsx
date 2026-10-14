@@ -108,7 +108,7 @@ const movie = {
 };
 
 describe("MovieDetail", () => {
-  it("shows saved movie players to regular users without an import control", () => {
+  it("shows saved movie players and the Fetch links control to regular users", () => {
     const query = mocks.useQuery.getMockImplementation()!;
     mocks.useQuery.mockImplementation((options) => options.queryKey[0] === "watch-sources" ? {
       data: { sources: [{ links: [{ id: "movie-watch", label: "WATCH", url: "https://player.example/movie", host: "player.example",
@@ -118,7 +118,7 @@ describe("MovieDetail", () => {
     render(<MovieDetail />);
     expect(screen.getByRole("region", { name: "Watch movie" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Watch Dune: Part Two/ })).toHaveAttribute("href", "https://player.example/movie");
-    expect(screen.queryByRole("button", { name: "Fetch links" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Fetch links" })).toBeInTheDocument();
   });
 
   it("shows the per-movie Fetch links action for admins", () => {

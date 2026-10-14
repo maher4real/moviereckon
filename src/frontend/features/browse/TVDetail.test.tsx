@@ -139,7 +139,7 @@ describe("TVDetail", () => {
     expect(within(first).getByRole("link", { name: /Watch season 1 episode 1/ })).toHaveAttribute("href", "https://player.example/s1e1");
     expect(within(screen.getByLabelText("Links for season 1 episode 2")).queryByRole("link")).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Season 1 links" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Fetch links" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Fetch links" })).toBeInTheDocument();
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Season 2" }));
     expect(screen.queryByLabelText("Links for season 1 episode 1")).not.toBeInTheDocument();
     expect(within(screen.getByLabelText("Links for season 2 episode 1")).getByRole("link")).toHaveAttribute("href", "https://player.example/s2e1");

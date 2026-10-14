@@ -34,14 +34,14 @@ does not run cron automatically.
 
 ## Run and preview
 
-Signed-in administrators see **Fetch links** in each movie and series detail
+Signed-in users see **Fetch links** in each movie and series detail
 page's action row. Clicking it opens a results dialog and runs an import for
 that TMDB title only. Watch players, download qualities and additional quality
 collections appear separately, including episode/season labels for series.
 
 The button calls `POST /api/watch-sources/fetch` using the existing HttpOnly
-admin session, a trusted Origin and the AJAX header. It never receives the cron
-secret. The server rechecks the current database role and limits each admin to
+user session, a trusted Origin and the AJAX header. It never receives the cron
+secret. The server requires authentication and limits each user to
 six requests per minute. `TMDB_API_KEY` and `MONGODB_URI` are required; `CRON_SECRET`
 is only needed by the scheduled/bearer endpoint below.
 
@@ -110,8 +110,8 @@ Watch movie section. TV shows display episode links on their matching episode
 cards, with separate season options that follow the selected season. Series-wide
 players appear in Watch series. Download and collection options are expandable.
 The page reads one cached snapshot per title rather than making a request for
-every episode. An admin import updates that snapshot in the page immediately.
-Fetch links remains an admin action on the same detail pages; it is not part of
+every episode. Fetching links updates that snapshot in the page immediately.
+Fetch links is available to signed-in users on the same detail pages; it is not part of
 the Cinema admin panel. An embedded playback integration is separate.
 
 ## Matching and persistence

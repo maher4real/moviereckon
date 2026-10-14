@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getUserFromRequest, userHasRoleAtLeast } from "@/backend/api/lib/auth";
+import { getUserFromRequest } from "@/backend/api/lib/auth";
 import { hasAjaxHeader, isTrustedRequestOrigin } from "@/backend/api/lib/cors";
 import { consumeRateLimit } from "@/backend/api/lib/rate-limit";
 import type { VercelRequest } from "@/backend/api/lib/http";
@@ -27,7 +27,6 @@ export async function POST(request: Request) {
   try {
     const user = await getUserFromRequest(request);
     if (!user) return json({ error: "Sign in to fetch links" }, 401);
-    if (!await userHasRoleAtLeast(user, "admin")) return json({ error: "Admin access is required to fetch links" }, 403);
     const limit = await consumeRateLimit(`watch_source_fetch:${user.id}`, 6, 60_000);
     if (!limit.allowed) return json({ error: "Please wait before fetching more links" }, 429, { "Retry-After": String(limit.retryAfterSeconds) });
     if (process.env.WATCH_IMPORTER_ENABLED === "false") return json({ error: "Link importing is disabled" }, 409);
