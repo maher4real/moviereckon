@@ -15,12 +15,20 @@ const mocks = vi.hoisted(() => ({
   getUserFromRequest: vi.fn(),
   discoverServerMovies: vi.fn(),
   discoverServerTVShows: vi.fn(),
+  getServerMovieRecommendations: vi.fn(),
+  getServerSimilarMovies: vi.fn(),
+  getServerTVShowRecommendations: vi.fn(),
+  getServerSimilarTVShows: vi.fn(),
 }));
 vi.mock("@/backend/api/lib/mongodb", () => ({ connectToDatabase: mocks.connectToDatabase }));
 vi.mock("@/backend/api/lib/auth", () => ({ getUserFromRequest: mocks.getUserFromRequest }));
 vi.mock("@/backend/services/tmdbServer", () => ({
   discoverServerMovies: mocks.discoverServerMovies,
   discoverServerTVShows: mocks.discoverServerTVShows,
+  getServerMovieRecommendations: mocks.getServerMovieRecommendations,
+  getServerSimilarMovies: mocks.getServerSimilarMovies,
+  getServerTVShowRecommendations: mocks.getServerTVShowRecommendations,
+  getServerSimilarTVShows: mocks.getServerSimilarTVShows,
 }));
 import handler from "@/backend/api/_handlers/user/recommendations-v2";
 

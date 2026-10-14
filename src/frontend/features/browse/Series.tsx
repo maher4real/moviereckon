@@ -157,7 +157,7 @@ const PosterCard = memo(
           </div>
         )}
       </div>
-      <h3 className="mt-2 font-medium text-sm line-clamp-1 group-hover:text-primary transition-colors">
+      <h3 className="mt-2 break-words text-sm font-medium leading-snug line-clamp-2 group-hover:text-primary transition-colors">
         {item.name}
       </h3>
       <p className="text-xs text-muted-foreground">

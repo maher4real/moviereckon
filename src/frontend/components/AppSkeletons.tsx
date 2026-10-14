@@ -1,5 +1,8 @@
 import BrandLogo from "@/frontend/components/BrandLogo";
+import MediaImage from "@/frontend/components/MediaImage";
 import { Skeleton } from "@/frontend/components/ui/skeleton";
+import { getPosterUrl } from "@/shared/lib/tmdb";
+import { TMDB_FALLBACK_POSTERS } from "@/shared/lib/tmdbFallbacks";
 import { cn } from "@/shared/lib/utils";
 
 interface PosterGridSkeletonProps {
@@ -156,6 +159,11 @@ export function AuthPageSkeleton() {
   );
 }
 
+// Static, API-independent posters so the loading screen is never an empty grid.
+const LOADING_POSTER_SOURCES = TMDB_FALLBACK_POSTERS.map((poster) =>
+  getPosterUrl(poster.path, "small"),
+);
+
 interface LoadingPosterCarouselBackdropProps {
   rowCount?: number;
   postersPerRow?: number;
@@ -187,7 +195,22 @@ function LoadingPosterCarouselBackdrop({
                     key={`loading-poster-tile-${rowIndex}-${posterIndex}`}
                     className="auth-poster-tile"
                   >
-                    <Skeleton className="h-full w-full rounded-none" />
+                    <MediaImage
+                      src={
+                        LOADING_POSTER_SOURCES[
+                          (rowIndex * 2 + posterIndex) %
+                            LOADING_POSTER_SOURCES.length
+                        ]
+                      }
+                      alt=""
+                      aria-hidden="true"
+                      width={146}
+                      height={219}
+                      className="h-full w-full bg-card object-cover"
+                      fallbackSrc="/fallbacks/poster.svg"
+                      loading="eager"
+                      priority={rowIndex === 0 && posterIndex < postersPerRow}
+                    />
                   </div>
                 ),
               )}

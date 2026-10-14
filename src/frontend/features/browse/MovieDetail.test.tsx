@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@tanstack/react-query", () => ({
   useQuery: mocks.useQuery,
+  useQueryClient: () => ({ setQueryData: vi.fn() }),
 }));
 
 vi.mock("react-router-dom", () => ({
@@ -107,6 +108,25 @@ const movie = {
 };
 
 describe("MovieDetail", () => {
+  it("shows saved movie players to regular users without an import control", () => {
+    const query = mocks.useQuery.getMockImplementation()!;
+    mocks.useQuery.mockImplementation((options) => options.queryKey[0] === "watch-sources" ? {
+      data: { sources: [{ links: [{ id: "movie-watch", label: "WATCH", url: "https://player.example/movie", host: "player.example",
+        kind: "watch", scope: "movie", quality: "1080p", codec: "H.264", size: null }] }] },
+      isLoading: false, isError: false,
+    } : query(options));
+    render(<MovieDetail />);
+    expect(screen.getByRole("region", { name: "Watch movie" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Watch Dune: Part Two/ })).toHaveAttribute("href", "https://player.example/movie");
+    expect(screen.queryByRole("button", { name: "Fetch links" })).not.toBeInTheDocument();
+  });
+
+  it("shows the per-movie Fetch links action for admins", () => {
+    mocks.useAuth.mockReturnValue({ user: { id: "admin", role: "admin" } });
+    render(<MovieDetail />);
+    expect(screen.getByRole("button", { name: "Fetch links" })).toBeInTheDocument();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     window.scrollTo = vi.fn();

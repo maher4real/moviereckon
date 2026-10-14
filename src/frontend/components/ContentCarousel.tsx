@@ -292,7 +292,7 @@ export default function ContentCarousel({
                       </div>
                     </div>
 
-                    <h3 className="mt-2 font-medium text-sm line-clamp-1 group-hover/card:text-primary transition-colors">
+                    <h3 className="mt-2 break-words text-sm font-medium leading-snug line-clamp-2 group-hover/card:text-primary transition-colors">
                       {getTitle(item)}
                     </h3>
                     <div className="flex items-center justify-between gap-2">

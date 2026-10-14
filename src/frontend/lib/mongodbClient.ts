@@ -3,7 +3,35 @@
  * Uses MongoDB backend exclusively - no fallback to other services
  */
 import { getPublicMongoApiUrl } from "@/shared/lib/runtimeEnv";
+import type { Era, Mood, Pace, SeedTitle } from "@/shared/lib/recommendation/preferences";
 import type { Movie, TVShow } from "@/shared/lib/tmdb";
+import type { ContentWatchSources, FetchContentSourcesResult, SourceMediaType } from "@/shared/types/watchSources";
+
+export async function getWatchSources(
+  contentId: number, contentType: SourceMediaType, signal?: AbortSignal,
+): Promise<ContentWatchSources> {
+  const query = new URLSearchParams({ contentId: String(contentId), contentType });
+  const response = await fetchWithAuth(`/api/watch-sources?${query}`, { signal });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error("Watch links are temporarily unavailable");
+  if (data?.contentId !== contentId || data?.contentType !== contentType || !Array.isArray(data.sources)) {
+    throw new Error("The watch link response was incomplete");
+  }
+  return data as ContentWatchSources;
+}
+
+export async function fetchWatchLinks(
+  contentId: number, contentType: SourceMediaType, sourceUrl?: string, signal?: AbortSignal,
+): Promise<FetchContentSourcesResult> {
+  const response = await fetchWithAuth("/api/watch-sources/fetch", {
+    method: "POST", signal,
+    body: JSON.stringify({ contentId, contentType, ...(sourceUrl ? { sourceUrl } : {}) }),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(data?.error || "Unable to fetch links right now");
+  if (!data?.content || !Array.isArray(data.content.sources)) throw new Error("The link response was incomplete");
+  return data as FetchContentSourcesResult;
+}
 
 // User cache key (non-sensitive profile data only).
 const USER_KEY = "moviereckon_user";
@@ -199,6 +227,11 @@ export interface UserPreferences {
   preferred_genres: number[];
   inferred_languages?: string[];
   inferred_genres?: number[];
+  disliked_genres?: number[];
+  seed_titles?: SeedTitle[];
+  moods?: Mood[];
+  pace?: Pace | null;
+  eras?: Era[];
 }
 
 export type FeedbackType = "give_it_a_go" | "one_time_watch" | "must_watch" | "skip" | "not_now";

@@ -20,6 +20,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/frontend/components/ui/av
 import { Button } from "@/frontend/components/ui/button";
 import { cn } from "@/shared/lib/utils";
 
+const preloadSearch = () => {
+  void import("@/frontend/features/browse/Search");
+};
+
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -126,7 +130,9 @@ export default function Header() {
               variant="ghost"
               size="icon"
               onClick={() => navigate("/search")}
-              className="text-muted-foreground hover:text-foreground"
+              onPointerEnter={preloadSearch}
+              onFocus={preloadSearch}
+              className="size-11 text-muted-foreground hover:text-foreground"
               aria-label="Open search"
             >
               <Search className="w-5 h-5" />
@@ -137,7 +143,7 @@ export default function Header() {
               variant="ghost"
               size="icon"
               onClick={() => navigate("/profile")}
-            className="h-10 w-10 rounded-full border border-primary/15 bg-background/40 p-0 text-muted-foreground backdrop-blur-sm hover:border-primary/30 hover:bg-primary/10 hover:text-foreground"
+            className="size-11 rounded-full border border-primary/15 bg-background/40 p-0 text-muted-foreground backdrop-blur-sm hover:border-primary/30 hover:bg-primary/10 hover:text-foreground"
               aria-label="Open profile"
             >
               <Avatar className="h-8 w-8">
@@ -153,7 +159,7 @@ export default function Header() {
               variant="ghost"
               size="icon"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="text-muted-foreground hover:text-foreground lg:hidden"
+              className="size-11 text-muted-foreground hover:text-foreground lg:hidden"
               aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
               aria-expanded={isMobileMenuOpen}
               aria-controls="mobile-header-menu"

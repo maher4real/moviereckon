@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, memo, lazy, Suspense } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import { useUserData } from "@/frontend/hooks/useUserData";
 import { useWatchlist } from "@/frontend/hooks/useWatchlist";
+import { useWatchSources } from "@/frontend/hooks/useWatchSources";
+import { contentSourceLinks } from "@/shared/lib/watchSources";
 import {
   getTVShowDetails,
   getTVShowCredits,
@@ -24,12 +26,13 @@ import {
 } from "@/shared/lib/tmdb";
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
-import ContentCarousel from "@/frontend/components/ContentCarousel";
 import WhereToWatch from "@/frontend/components/WhereToWatch";
 import CastList from "@/frontend/components/CastList";
 import MediaImage from "@/frontend/components/MediaImage";
 import ContentReactionButtons from "@/frontend/components/ContentReactionButtons";
 import ShareContentButton from "@/frontend/components/ShareContentButton";
+import FetchWatchLinksButton from "@/frontend/components/FetchWatchLinksButton";
+import { EpisodeWatchLinks, WatchLinksSection } from "@/frontend/components/WatchSourceLinks";
 import { Button } from "@/frontend/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/frontend/components/ui/tabs";
 import {
@@ -56,11 +59,13 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
+import {
+  BACKGROUND_VIDEO_BOOT_DELAY_MS,
+  LazyCommentsSection,
+  MemoizedCarousel,
+  PREVIEW_AUTOPLAY_TIMEOUT_MS,
+} from "./detailShared";
 
-const MemoizedCarousel = memo(ContentCarousel);
-const LazyCommentsSection = lazy(() => import("@/frontend/components/CommentsSection"));
-const PREVIEW_AUTOPLAY_TIMEOUT_MS = 12000;
-const BACKGROUND_VIDEO_BOOT_DELAY_MS = 900;
 const TV_WRITER_JOBS = new Set([
   "Writer",
   "Screenplay",
@@ -98,6 +103,9 @@ export default function TVDetail() {
   const communitySectionRef = useRef<HTMLDivElement>(null);
 
   const tvId = Number(id);
+  const watchSources = useWatchSources(tvId, "tv");
+  const sourceLinks = useMemo(() => contentSourceLinks(watchSources.data), [watchSources.data]);
+  const seriesLinks = sourceLinks.filter((link) => link.scope === "series");
 
   const handleBack = () => {
     const from = (location.state as { from?: string } | null)?.from;
@@ -870,6 +878,7 @@ export default function TVDetail() {
 
             {/* Action Buttons - All using primary brand color */}
             <div className="flex flex-wrap gap-3 mb-8">
+              <FetchWatchLinksButton key={`tv:${tvShow.id}`} contentId={tvShow.id} contentType="tv" title={tvShow.name} />
               {trailerModalKey && (
                 <Button
                   size="lg"
@@ -917,6 +926,12 @@ export default function TVDetail() {
                 {bookmarked ? "Watchlisted" : "Watchlist"}
               </Button>
             </div>
+
+            <WatchLinksSection heading="Watch series" context={tvShow.name} links={seriesLinks}
+              isLoading={watchSources.isLoading} isError={watchSources.isError}
+              onRetry={() => void watchSources.refetch()}
+              emptyMessage={sourceLinks.some((link) => link.kind === "watch" && link.scope !== "series") ?
+                "Choose a season and episode below to open its player." : "No watch links available for this series yet."} />
 
             <div className="mb-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
               <div>
@@ -997,6 +1012,11 @@ export default function TVDetail() {
 
                   {seasons.map((season) => (
                     <TabsContent key={season.season_number} value={String(season.season_number)}>
+                      {sourceLinks.some((link) => link.scope === "season" && link.season === season.season_number) && (
+                        <WatchLinksSection heading={`Season ${season.season_number} links`}
+                          context={`${tvShow.name} season ${season.season_number}`}
+                          links={sourceLinks.filter((link) => link.scope === "season" && link.season === season.season_number)} />
+                      )}
                       {seasonLoading && selectedSeason === season.season_number ? (
                         <div className="space-y-4">
                           {Array.from({ length: 5 }).map((_, i) => (
@@ -1080,6 +1100,10 @@ export default function TVDetail() {
                                   </p>
                                 </div>
                               </div>
+
+                              {!watchSources.isLoading && !watchSources.isError && (
+                                <EpisodeWatchLinks links={sourceLinks} season={season.season_number} episode={episode.episode_number} />
+                              )}
 
                               {/* Expanded Overview */}
                               {expandedEpisode === episode.id && episode.overview && (

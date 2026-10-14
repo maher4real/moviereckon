@@ -19,6 +19,10 @@ import {
 import {
   discoverServerMovies,
   discoverServerTVShows,
+  getServerMovieRecommendations,
+  getServerSimilarMovies,
+  getServerSimilarTVShows,
+  getServerTVShowRecommendations,
 } from "@/backend/services/tmdbServer";
 import type { Movie, TVShow } from "@/shared/lib/tmdb";
 import {
@@ -34,6 +38,19 @@ import {
   getTasteLanguageWeight,
   type TasteProfile,
 } from "@/shared/lib/recommendation/taste";
+import {
+  ERA_LABELS,
+  MOOD_LABELS,
+  coldStartQuality,
+  discoverExclusions,
+  matchedEra,
+  moodGenreSum,
+  paceScore,
+  pickSeedsForPage,
+  preferenceMultiplier,
+  strongestMood,
+  tasteConfidence,
+} from "@/shared/lib/recommendation/coldStart";
 import {
   loadRecommendationExclusions,
   loadRecommendationTaste,
@@ -314,6 +331,8 @@ export function scoreCandidate(
   score: number;
   explanation: FeedExplanation;
 } {
+  const confidence = tasteConfidence(profile);
+  const multiplier = preferenceMultiplier(profile);
   const genre = item.genreIds.reduce((total, genreId) => total + getTasteGenreWeight(profile, genreId), 0);
   const language = getTasteLanguageWeight(profile, item.originalLanguage);
   const negativeGenre = item.genreIds.reduce(
@@ -328,19 +347,39 @@ export function scoreCandidate(
   // exploration simply by repeating the same kind of event.
   const bounded = (value: number, scale: number): number =>
     value > 0 ? 1 - Math.exp(-value / scale) : 0;
-  const boundedGenre = bounded(genre, 4);
-  const boundedLanguage = bounded(language, 3);
+  // With little activity the explicit picks and seeds are all we know, so they
+  // count for more; the multiplier fades to 1 as real activity accumulates.
+  const boundedGenre = bounded(genre * multiplier, 4);
+  const boundedLanguage = bounded(language * multiplier, 3);
   const boundedNegativeGenre = bounded(negativeGenre, 4);
   const boundedNegativeLanguage = bounded(negativeLanguage, 3);
-  const quality = Math.max(0, Math.min(1, item.voteAverage / 10));
+  const dislikedHits = item.genreIds.filter((genreId) =>
+    (profile.explicit.dislikedGenres ?? []).includes(genreId),
+  ).length;
+  const dislikePenalty = dislikedHits > 0 ? 0.3 : 0;
+  const quality = coldStartQuality(item, confidence);
   const popularity = Math.max(0, Math.min(1, Math.log1p(item.popularity) / Math.log1p(500)));
+  const moodSum = moodGenreSum(profile.tone?.moodGenreBoost, item.genreIds);
+  const boundedMood = bounded(moodSum, 1.6);
+  const era = matchedEra(item.year, profile.tone?.eras);
+  const eraBonus = era ? 0.06 : 0;
+  const paceBonus = paceScore(profile.tone?.pace, item.runtime) * 0.04;
+  const seedTag = item.sourceTags.find((tag) => tag.startsWith("seed:"));
+  const seedSourceBonus = seedTag ? 0.08 * (1 + (1 - confidence)) : 0;
   const profileMatch = boundedGenre * 0.46 + boundedLanguage * 0.24;
   const explorationBoost = exploration === "adventurous"
     ? quality * 0.18 + popularity * 0.08 + 0.18
     : quality * 0.1 + popularity * 0.04 + 0.04;
-  const score = profileMatch + explorationBoost -
-    (boundedNegativeGenre * 0.08 + boundedNegativeLanguage * 0.06);
+  const score = profileMatch + explorationBoost + boundedMood * 0.1 + eraBonus + paceBonus + seedSourceBonus -
+    (boundedNegativeGenre * 0.08 + boundedNegativeLanguage * 0.06 + dislikePenalty);
   const reasons: Array<{ label: string; evidence?: string }> = [];
+  const seedKey = seedTag?.slice("seed:".length);
+  const seedTitle = seedKey
+    ? (profile.explicit.seeds ?? []).find(
+        (seed) => `${seed.contentType}_${seed.contentId}` === seedKey,
+      )?.title
+    : undefined;
+  if (seedTitle) reasons.push({ label: `Because you picked ${seedTitle}` });
   const strongestGenre = item.genreIds
     .map((genreId) => ({ genreId, weight: getTasteGenreWeight(profile, genreId) }))
     .sort((left, right) => right.weight - left.weight)[0];
@@ -375,6 +414,9 @@ export function scoreCandidate(
   if (negativeGenre > 0 || negativeLanguage > 0) {
     reasons.push({ label: "Contains a signal you previously rejected" });
   }
+  const topMood = strongestMood(profile.tone?.moods, item.genreIds);
+  if (topMood) reasons.push({ label: `Matches your ${MOOD_LABELS[topMood]} mood` });
+  if (era) reasons.push({ label: `From the ${ERA_LABELS[era]} you like` });
   if (reasons.length === 0) reasons.push({ label: "Exploration pick" });
   return {
     score,
@@ -385,13 +427,13 @@ export function scoreCandidate(
         genre: boundedGenre,
         keywords: 0,
         people: 0,
-        year: 0,
-        runtime: 0,
+        year: eraBonus,
+        runtime: paceBonus,
         quality,
         popularity,
         novelty: 0.1,
         diversityPenalty: 0,
-        preference: boundedGenre + boundedLanguage,
+        preference: boundedGenre + boundedLanguage + boundedMood,
         negativePenalty: boundedNegativeGenre + boundedNegativeLanguage,
       },
       seedTitle: null,
@@ -503,9 +545,21 @@ function toDisplayItem(item: UnifiedContentItem): Movie | TVShow {
   };
 }
 
-function hardFilter(item: UnifiedContentItem, filters: FeedFilters): boolean {
+export function hardFilter(item: UnifiedContentItem, filters: FeedFilters, profile?: TasteProfile): boolean {
   if (filters.contentType !== "all" && item.type !== filters.contentType) return false;
   if (filters.genreId && !item.genreIds.includes(filters.genreId)) return false;
+  // Explicit dislikes hide an item only when its primary genre is disliked and
+  // the person has not asked for that genre. Liked wins over disliked.
+  const disliked = (profile?.explicit.dislikedGenres ?? []).filter(
+    (genreId) => !(profile?.explicit.genres ?? []).includes(genreId),
+  );
+  if (
+    item.primaryGenreId !== null &&
+    disliked.includes(item.primaryGenreId) &&
+    filters.genreId !== item.primaryGenreId
+  ) {
+    return false;
+  }
   if (filters.language && item.originalLanguage !== filters.language) return false;
   const releaseTimestamp = item.releaseDate ? Date.parse(item.releaseDate) : Number.NaN;
   const recentCutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
@@ -607,6 +661,7 @@ async function fetchSource(
             ? type === "movie" ? `primary_release_date.${filters.direction}` : `first_air_date.${filters.direction}`
             : `popularity.${filters.direction}`,
       "vote_count.gte": filters.sort === "rating" ? 40 : undefined,
+      without_genres: discoverExclusions(profile, filters.genreId),
     };
     const response = type === "movie"
       ? await discoverServerMovies(params)
@@ -821,6 +876,38 @@ async function readBatch(
   };
 }
 
+async function fetchSeedCandidates(
+  profile: TasteProfile,
+  page: number,
+  filters: FeedFilters,
+): Promise<Array<{ type: ContentType; seedKey: string; results: unknown[] }>> {
+  const seeds = pickSeedsForPage(profile.explicit.seeds, page).filter(
+    (seed) => filters.contentType === "all" || filters.contentType === seed.contentType,
+  );
+  const settle = async (load: () => Promise<{ results?: unknown[] }>): Promise<unknown[]> => {
+    try {
+      const response = await load();
+      return Array.isArray(response?.results) ? response.results.slice(0, 20) : [];
+    } catch {
+      return [];
+    }
+  };
+  return Promise.all(
+    seeds.map(async (seed) => {
+      const [recommended, similar] = await Promise.all(
+        seed.contentType === "movie"
+          ? [settle(() => getServerMovieRecommendations(seed.contentId)), settle(() => getServerSimilarMovies(seed.contentId))]
+          : [settle(() => getServerTVShowRecommendations(seed.contentId)), settle(() => getServerSimilarTVShows(seed.contentId))],
+      );
+      return {
+        type: seed.contentType,
+        seedKey: `${seed.contentType}_${seed.contentId}`,
+        results: [...recommended, ...similar],
+      };
+    }),
+  );
+}
+
 async function generatePage(
   db: Database,
   session: SessionDoc,
@@ -909,6 +996,26 @@ async function generatePage(
     sourceState[`${source.stream}TotalPages`] = source.totalPages ?? sourceState[`${source.stream}TotalPages`];
   };
 
+  // Seeds add a few well-matched titles per page; they must not fill the page
+  // by themselves or the regular taste/explore streams would never run.
+  const seedCap = Math.max(4, Math.floor(limit / 3));
+  const seedSources = await fetchSeedCandidates(profile, page, filters);
+  const seedLists = seedSources.map((source) =>
+    source.results
+      .map((raw) => normalizeTmdbItem(raw, { typeHint: source.type, sourceTag: `seed:${source.seedKey}` }))
+      .filter((item): item is UnifiedContentItem => item !== null && hardFilter(item, filters, profile)),
+  );
+  let seedsAdded = 0;
+  for (let index = 0; seedsAdded < seedCap && seedLists.some((list) => index < list.length); index += 1) {
+    for (const list of seedLists) {
+      const candidate = list[index];
+      if (!candidate || seedsAdded >= seedCap) continue;
+      if (excludedKeys.has(candidate.key) || candidateMap.has(candidate.key)) continue;
+      candidateMap.set(candidate.key, candidate);
+      seedsAdded += 1;
+    }
+  }
+
   while (attempts < MAX_REFILL_PAGES && candidateMap.size < limit) {
     attempts += 1;
     const requested = await Promise.all(
@@ -933,7 +1040,7 @@ async function generatePage(
           typeHint: source.type,
           sourceTag: `discover:${source.stream}:${source.interestKey || "all"}:p${source.page}`,
         });
-        if (!normalized || !hardFilter(normalized, filters)) return;
+        if (!normalized || !hardFilter(normalized, filters, profile)) return;
         if (excludedKeys.has(normalized.key) || candidateMap.has(normalized.key)) return;
         candidateMap.set(normalized.key, normalized);
       });
@@ -988,6 +1095,7 @@ async function generatePage(
     seenIds: excludedKeys,
     preferredGenres: profile.explicit.genres,
     preferredLanguages: profile.explicit.languages,
+    negativeGenreIds: profile.explicit.dislikedGenres ?? [],
     seedWeights: Object.fromEntries(profile.evidence.map((evidence) => [evidence.key, Math.max(0.25, evidence.weight)])),
     maxCandidates: 500,
     diversificationTopN: Math.min(120, candidateMap.size),

@@ -9,6 +9,10 @@ const mocks = vi.hoisted(() => ({
   getClientIp: vi.fn(),
   discoverServerMovies: vi.fn(),
   discoverServerTVShows: vi.fn(),
+  getServerMovieRecommendations: vi.fn(),
+  getServerSimilarMovies: vi.fn(),
+  getServerTVShowRecommendations: vi.fn(),
+  getServerSimilarTVShows: vi.fn(),
   tasteState: null as any,
   historyKeys: new Set<string>(),
 }));
@@ -29,6 +33,10 @@ vi.mock("../../lib/rate-limit.js", () => ({
 vi.mock("@/backend/services/tmdbServer", () => ({
   discoverServerMovies: mocks.discoverServerMovies,
   discoverServerTVShows: mocks.discoverServerTVShows,
+  getServerMovieRecommendations: mocks.getServerMovieRecommendations,
+  getServerSimilarMovies: mocks.getServerSimilarMovies,
+  getServerTVShowRecommendations: mocks.getServerTVShowRecommendations,
+  getServerSimilarTVShows: mocks.getServerSimilarTVShows,
 }));
 
 vi.mock("@/backend/services/recommendationTaste", () => ({
@@ -248,6 +256,10 @@ describe("recommendations v2 durable protocol", () => {
     mocks.tasteState = { profile: profile(), excludedKeys: new Set<string>(), events: [] };
     mocks.historyKeys = new Set<string>();
     mocks.discoverServerTVShows.mockResolvedValue({ page: 1, total_pages: 1, results: [] });
+    mocks.getServerMovieRecommendations.mockResolvedValue({ page: 1, total_pages: 1, results: [] });
+    mocks.getServerSimilarMovies.mockResolvedValue({ page: 1, total_pages: 1, results: [] });
+    mocks.getServerTVShowRecommendations.mockResolvedValue({ page: 1, total_pages: 1, results: [] });
+    mocks.getServerSimilarTVShows.mockResolvedValue({ page: 1, total_pages: 1, results: [] });
     mocks.discoverServerMovies.mockImplementation(async (params: { page: number }) => ({
       page: params.page,
       total_pages: 30,
@@ -466,4 +478,109 @@ describe("recommendations v2 durable protocol", () => {
     expect(pageData(repaired).items).toHaveLength(24);
     expect(db.collection("recommendation_sessions").documents[0]!.next_page).toBe(3);
   });
+
+  describe("seed retrieval and dislikes", () => {
+    const seededProfile = () => ({
+      ...profile(),
+      explicit: {
+        genres: [],
+        languages: [],
+        dislikedGenres: [27],
+        seeds: [
+          { contentId: 603, contentType: "movie", title: "The Matrix", genres: [878], language: "en" },
+          { contentId: 604, contentType: "tv", title: "Dark Show", genres: [9648], language: "en" },
+        ],
+      },
+      evidence: [
+        { key: "movie_603", contentType: "movie", title: "The Matrix", signal: "seed", weight: 3, language: "en", genreIds: [878] },
+      ],
+    });
+
+    it("adds TMDB similar and recommended titles for the picked seeds, tagged by seed", async () => {
+      mocks.tasteState.profile = seededProfile();
+      mocks.getServerMovieRecommendations.mockResolvedValue({ page: 1, total_pages: 1, results: [{ ...movie(9001), title: "Seed recommended" }] });
+      mocks.getServerSimilarMovies.mockResolvedValue({ page: 1, total_pages: 1, results: [{ ...movie(9002), title: "Seed similar" }] });
+
+      const res = await call("/api/user/recommendations/v2?limit=24&content_type=movie");
+
+      expect(mocks.getServerMovieRecommendations).toHaveBeenCalledWith(603);
+      expect(mocks.getServerSimilarMovies).toHaveBeenCalledWith(603);
+      const ids = pageData(res).items.map((entry) => entry.id);
+      expect(ids).toEqual(expect.arrayContaining([9001, 9002]));
+      const explanation = res.body.data.explanationById;
+      expect(explanation["movie_9001"].reasons.map((r: { label: string }) => r.label)).toContain("Because you picked The Matrix");
+    });
+
+    it("rotates seeds across pages instead of querying all of them every time", async () => {
+      mocks.tasteState.profile = seededProfile();
+      await call("/api/user/recommendations/v2?limit=24&content_type=all");
+      // Two seeds exist (one movie, one series): each is queried once on page 1.
+      expect(mocks.getServerMovieRecommendations).toHaveBeenCalledTimes(1);
+      expect(mocks.getServerTVShowRecommendations).toHaveBeenCalledTimes(1);
+    });
+
+    it("survives failing or junk seed responses", async () => {
+      mocks.tasteState.profile = seededProfile();
+      mocks.getServerMovieRecommendations.mockRejectedValue(new Error("tmdb down"));
+      mocks.getServerSimilarMovies.mockResolvedValue({ page: 1, total_pages: 1, results: [null, 5, { nope: true }] });
+      const res = await call("/api/user/recommendations/v2?limit=24&content_type=movie");
+      expect(res.statusCode).toBe(200);
+      expect(pageData(res).items.length).toBeGreaterThan(0);
+    });
+
+    it("skips seed calls for other content types and when there are no seeds", async () => {
+      mocks.tasteState.profile = seededProfile();
+      await call("/api/user/recommendations/v2?limit=24&content_type=tv");
+      expect(mocks.getServerMovieRecommendations).not.toHaveBeenCalled();
+
+      mocks.getServerMovieRecommendations.mockClear();
+      mocks.tasteState.profile = profile();
+      await call("/api/user/recommendations/v2?limit=24&content_type=movie");
+      expect(mocks.getServerMovieRecommendations).not.toHaveBeenCalled();
+    });
+
+    it("caps seed candidates so normal discovery still runs and fills the page", async () => {
+      mocks.tasteState.profile = {
+        ...seededProfile(),
+        explicit: {
+          genres: [],
+          languages: [],
+          seeds: [
+            { contentId: 603, contentType: "movie", title: "A", genres: [878] },
+            { contentId: 604, contentType: "movie", title: "B", genres: [878] },
+            { contentId: 605, contentType: "movie", title: "C", genres: [878] },
+          ],
+        },
+      };
+      const many = (offset: number) => ({
+        page: 1,
+        total_pages: 1,
+        results: Array.from({ length: 20 }, (_, index) => movie(offset + index)),
+      });
+      mocks.getServerMovieRecommendations.mockImplementation(async (id: number) => many(id * 100));
+      mocks.getServerSimilarMovies.mockImplementation(async (id: number) => many(id * 100 + 50));
+
+      const res = await call("/api/user/recommendations/v2?limit=24&content_type=movie");
+
+      expect(mocks.discoverServerMovies).toHaveBeenCalled();
+      const seedIds = pageData(res).items.map((entry) => entry.id as number).filter((id) => id >= 60000);
+      expect(seedIds.length).toBeLessThanOrEqual(8);
+      expect(pageData(res).items).toHaveLength(24);
+    });
+
+    it("excludes disliked genres from discover queries unless the user filters to one", async () => {
+      mocks.tasteState.profile = seededProfile();
+      await call("/api/user/recommendations/v2?limit=24&content_type=movie");
+      const calls = mocks.discoverServerMovies.mock.calls.map(([params]) => params as { without_genres?: string });
+      expect(calls.length).toBeGreaterThan(0);
+      expect(calls.every((params) => params.without_genres === "27")).toBe(true);
+
+      mocks.discoverServerMovies.mockClear();
+      await call("/api/user/recommendations/v2?limit=24&content_type=movie&genre=27");
+      const filtered = mocks.discoverServerMovies.mock.calls.map(([params]) => params as { without_genres?: string });
+      expect(filtered.length).toBeGreaterThan(0);
+      expect(filtered.every((params) => params.without_genres === undefined)).toBe(true);
+    });
+  });
+
 });

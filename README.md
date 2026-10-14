@@ -149,6 +149,9 @@ Live app: `https://moviereckon.vercel.app/`
 - TMDB API
 - Cloudflare Turnstile (captcha)
 
+The automatic quality/watch-link importer and its content lookup API are described
+in [Watch source importer](docs/watch-source-importer.md).
+
 ## Architecture
 
 This project uses a hybrid approach:
@@ -260,6 +263,14 @@ frontend. Keep both enabled until login, registration, session, logout, email, a
 OAuth smoke tests pass in the deployed environment.
 
 ## Local Development
+
+Use Node.js 22.22.2 or a version supported by `package.json`'s `engines` range.
+The updated jsdom test environment requires this minimum patch version. If you
+use nvm, run `nvm install` and `nvm use`; `.nvmrc` selects Node 22.22.2.
+
+TypeScript stays at 6.0.3 because the current `typescript-eslint` release supports
+versions below 6.1. Node type definitions stay on the maintained 22.x line to
+match the pinned runtime.
 
 1. Install dependencies:
 

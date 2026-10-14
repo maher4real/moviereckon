@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@tanstack/react-query", () => ({
   useInfiniteQuery: mocks.useInfiniteQuery,
   useQuery: mocks.useQuery,
+  keepPreviousData: (previous: unknown) => previous,
 }));
 
 vi.mock("motion/react", () => ({
@@ -129,7 +130,7 @@ describe("Search", () => {
     expect(mocks.searchMovies).toHaveBeenCalledWith("dune", 2, expect.any(AbortSignal));
   });
 
-  it("hides the previous query while a new debounced query is pending", async () => {
+  it("keeps the previous results dimmed while a new debounced query is pending", async () => {
     const movie = {
       id: 10,
       title: "Dune",
@@ -143,11 +144,12 @@ describe("Search", () => {
     const input = screen.getByPlaceholderText("Search movies, TV shows, cast...");
 
     fireEvent.change(input, { target: { value: "dune" } });
-    expect(screen.queryByRole("heading", { name: "Dune" })).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Loading search results")).toHaveAttribute("aria-busy", "true");
+    expect(screen.queryByLabelText("Loading search results")).not.toBeInTheDocument();
+    const heading = screen.getByRole("heading", { name: "Dune" });
+    expect(heading.closest('[aria-busy="true"]')).not.toBeNull();
 
     await finishDebounce();
-    expect(screen.getByRole("heading", { name: "Dune" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Dune" }).closest('[aria-busy="true"]')).toBeNull();
   });
 
   it("offers a retry action when the initial search fails", async () => {

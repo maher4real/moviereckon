@@ -2,12 +2,16 @@ import "server-only";
 
 import {
   buildTasteProfile,
+  profileExtrasSignature,
+  tasteExtrasSignature,
   type TasteContentType,
   type TasteExcludedEvidence,
   type TastePreferences,
   type TasteProfile,
+  type TasteSeed,
   type TasteTitleEvent,
 } from "@/shared/lib/recommendation/taste";
+import { ERAS, MOODS, PACES } from "@/shared/lib/recommendation/preferences";
 import type { connectToDatabase } from "@/backend/api/lib/mongodb";
 import {
   AccountDeletedError,
@@ -112,14 +116,40 @@ function readPreferenceList(value: unknown, max: number): string[] {
   return [...new Set(value.map((entry) => String(entry).trim()).filter(Boolean))].slice(0, max);
 }
 
-function toPreferences(doc: RawDoc | null): TastePreferences {
+export function toPreferences(doc: RawDoc | null): TastePreferences {
   const preferredGenres = Array.isArray(doc?.preferred_genres)
     ? [...new Set(doc.preferred_genres.map(Number).filter((value) => Number.isInteger(value) && value > 0))]
     : [];
   const preferredLanguages = readPreferenceList(doc?.preferred_languages, 10)
     .map((value) => value.toLowerCase())
     .filter((value) => /^[a-z]{2,3}$/.test(value));
-  return { preferredGenres, preferredLanguages };
+  const dislikedGenres = Array.isArray(doc?.disliked_genres)
+    ? [...new Set(doc.disliked_genres.map(Number).filter((value) => Number.isInteger(value) && value > 0))].slice(0, 12)
+    : [];
+  const seedTitles: TasteSeed[] = [];
+  if (Array.isArray(doc?.seed_titles)) {
+    for (const entry of doc.seed_titles as RawDoc[]) {
+      const id = positiveInteger(entry?.content_id);
+      const type = contentType(entry?.content_type);
+      if (!id || !type) continue;
+      const seedLanguage = language(entry.language);
+      seedTitles.push({
+        contentId: id,
+        contentType: type,
+        title: title(entry.title),
+        genres: genres(entry.genres),
+        ...(seedLanguage ? { language: seedLanguage } : {}),
+      });
+    }
+  }
+  const moods = Array.isArray(doc?.moods)
+    ? [...new Set(doc.moods.filter((value): value is (typeof MOODS)[number] => (MOODS as readonly unknown[]).includes(value)))]
+    : [];
+  const eras = Array.isArray(doc?.eras)
+    ? [...new Set(doc.eras.filter((value): value is (typeof ERAS)[number] => (ERAS as readonly unknown[]).includes(value)))]
+    : [];
+  const pace = (PACES as readonly unknown[]).includes(doc?.pace) ? (doc?.pace as (typeof PACES)[number]) : null;
+  return { preferredGenres, preferredLanguages, dislikedGenres, seedTitles, moods, pace, eras };
 }
 
 function controlsFromDocument(doc: RawDoc | null): RecommendationTasteControls {
@@ -266,6 +296,7 @@ function profileFromDocument(doc: RawDoc): TasteProfile | null {
     excludedEvidence: Array.isArray(doc.excludedEvidence)
       ? doc.excludedEvidence as TasteProfile["excludedEvidence"]
       : [],
+    tone: doc.tone ? doc.tone as TasteProfile["tone"] : undefined,
   };
 }
 
@@ -290,13 +321,24 @@ export async function loadRecommendationTaste(
   const exclusionProjection = { content_id: 1, content_type: 1 } as Record<string, 1>;
   const currentPreferencesDoc = await db.collection("user_preferences").findOne(
     { user_id: userId },
-    { projection: { preferred_genres: 1, preferred_languages: 1 } },
+    {
+      projection: {
+        preferred_genres: 1,
+        preferred_languages: 1,
+        disliked_genres: 1,
+        seed_titles: 1,
+        moods: 1,
+        pace: 1,
+        eras: 1,
+      },
+    },
   );
   const currentPreferences = toPreferences((currentPreferencesDoc || null) as RawDoc | null);
   const preferencesMatch = Boolean(
     storedProfile &&
     JSON.stringify(storedProfile.explicit.genres) === JSON.stringify(currentPreferences.preferredGenres) &&
-    JSON.stringify(storedProfile.explicit.languages) === JSON.stringify(currentPreferences.preferredLanguages),
+    JSON.stringify(storedProfile.explicit.languages) === JSON.stringify(currentPreferences.preferredLanguages) &&
+    profileExtrasSignature(storedProfile) === tasteExtrasSignature(currentPreferences),
   );
   const controlsMatch = storedControlsRevision === controls.revision;
 
@@ -478,6 +520,8 @@ export async function loadRecommendationTaste(
         stale: false,
       },
       $setOnInsert: { created_at: new Date().toISOString() },
+      // $set only overwrites fields it names: clear a tone left by older preferences.
+      ...(profile.tone ? {} : { $unset: { tone: "" } }),
     };
     try {
       await assertAccountWriteFence(db, fence);

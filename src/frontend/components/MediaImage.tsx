@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { ImgHTMLAttributes, useEffect, useMemo, useState } from "react";
+import { ImgHTMLAttributes, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/shared/lib/utils";
 import { buildTmdbImageProxyResponsiveSource } from "@/shared/lib/tmdbImageProxy";
 
@@ -143,6 +143,7 @@ export default function MediaImage({
   const normalizedSrc = useMemo(() => src || fallbackSrc, [src, fallbackSrc]);
   const [resolvedSrc, setResolvedSrc] = useState(normalizedSrc);
   const [isLoaded, setIsLoaded] = useState(!fadeIn);
+  const nativeImgRef = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
     setResolvedSrc(normalizedSrc);
@@ -154,6 +155,16 @@ export default function MediaImage({
       setIsLoaded(true);
     }
   }, [fadeIn]);
+
+  // A server-rendered <img> can finish loading before React hydrates, so its
+  // load event is never seen. Without this check a fadeIn image would stay at
+  // opacity 0 forever.
+  useEffect(() => {
+    const element = nativeImgRef.current;
+    if (element?.complete && element.naturalWidth > 0) {
+      setIsLoaded(true);
+    }
+  }, [resolvedSrc]);
 
   const responsiveSource = useMemo(() => {
     if (srcSet || !resolvedSrc) return null;
@@ -213,6 +224,7 @@ export default function MediaImage({
     return (
       <img
         {...imgProps}
+        ref={nativeImgRef}
         alt={alt}
         src={resolvedSrc}
         srcSet={srcSet ?? responsiveSource?.srcSet}

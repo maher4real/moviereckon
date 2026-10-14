@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, memo, lazy, Suspense } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import { useUserData } from "@/frontend/hooks/useUserData";
 import { useWatchlist } from "@/frontend/hooks/useWatchlist";
+import { useWatchSources } from "@/frontend/hooks/useWatchSources";
+import { contentSourceLinks } from "@/shared/lib/watchSources";
 import {
   getMovieDetails,
   getMovieCredits,
@@ -22,12 +24,13 @@ import {
 } from "@/shared/lib/tmdb";
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
-import ContentCarousel from "@/frontend/components/ContentCarousel";
 import WhereToWatch from "@/frontend/components/WhereToWatch";
 import CastList from "@/frontend/components/CastList";
 import MediaImage from "@/frontend/components/MediaImage";
 import ContentReactionButtons from "@/frontend/components/ContentReactionButtons";
 import ShareContentButton from "@/frontend/components/ShareContentButton";
+import FetchWatchLinksButton from "@/frontend/components/FetchWatchLinksButton";
+import { WatchLinksSection } from "@/frontend/components/WatchSourceLinks";
 import { Button } from "@/frontend/components/ui/button";
 import {
   Dialog,
@@ -52,11 +55,13 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
+import {
+  BACKGROUND_VIDEO_BOOT_DELAY_MS,
+  LazyCommentsSection,
+  MemoizedCarousel,
+  PREVIEW_AUTOPLAY_TIMEOUT_MS,
+} from "./detailShared";
 
-const MemoizedCarousel = memo(ContentCarousel);
-const LazyCommentsSection = lazy(() => import("@/frontend/components/CommentsSection"));
-const PREVIEW_AUTOPLAY_TIMEOUT_MS = 12000;
-const BACKGROUND_VIDEO_BOOT_DELAY_MS = 900;
 const MOVIE_WRITER_JOBS = new Set(["Writer", "Screenplay", "Story", "Novel"]);
 const MOVIE_PRODUCER_JOBS = new Set(["Producer", "Executive Producer"]);
 
@@ -82,6 +87,8 @@ export default function MovieDetail() {
   const hasAutoPlayedRef = useRef(false);
 
   const movieId = Number(id);
+  const watchSources = useWatchSources(movieId, "movie");
+  const sourceLinks = useMemo(() => contentSourceLinks(watchSources.data), [watchSources.data]);
 
   const handleBack = () => {
     const from = (location.state as { from?: string } | null)?.from;
@@ -862,6 +869,7 @@ export default function MovieDetail() {
 
             {/* Action Buttons - All using primary brand color */}
             <div className="flex flex-wrap gap-3 mb-8">
+              <FetchWatchLinksButton key={`movie:${movie.id}`} contentId={movie.id} contentType="movie" title={movie.title} />
               {trailerModalKey && (
                 <Button
                   size="lg"
@@ -909,6 +917,10 @@ export default function MovieDetail() {
                 {bookmarked ? "Watchlisted" : "Watchlist"}
               </Button>
             </div>
+
+            <WatchLinksSection heading="Watch movie" context={movie.title} links={sourceLinks}
+              isLoading={watchSources.isLoading} isError={watchSources.isError}
+              onRetry={() => void watchSources.refetch()} />
 
             <div className="mb-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
               <div>

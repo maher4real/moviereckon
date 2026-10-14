@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import TVDetail from "./TVDetail";
 
@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@tanstack/react-query", () => ({
   useQuery: mocks.useQuery,
+  useQueryClient: () => ({ setQueryData: vi.fn() }),
 }));
 
 vi.mock("react-router-dom", () => ({
@@ -116,6 +117,42 @@ const tvShow = {
 };
 
 describe("TVDetail", () => {
+  it("puts players on the matching episode cards and changes season packs with the selected season", () => {
+    const query = mocks.useQuery.getMockImplementation()!;
+    mocks.useQuery.mockImplementation((options) => {
+      if (options.queryKey[0] === "tv") return { data: { ...tvShow, seasons: [tvShow.seasons[0],
+        { ...tvShow.seasons[0], id: 2, name: "Season 2", season_number: 2 }] }, isLoading: false, isError: false };
+      if (options.queryKey[0] === "tv-season") return { data: { episodes: [1, 2].map((episode) => ({
+        id: Number(options.queryKey[2]) * 10 + episode, episode_number: episode, name: `Episode ${episode}`,
+        still_path: null, air_date: null, vote_average: 0, overview: "A test episode", runtime: 40,
+      })) }, isLoading: false };
+      if (options.queryKey[0] === "watch-sources") return { data: { sources: [{ links: [
+        { id: "ep1", label: "WATCH", url: "https://player.example/s1e1", host: "player.example", kind: "watch", scope: "episode", season: 1, episode: 1 },
+        { id: "ep2", label: "WATCH", url: "https://player.example/s2e1", host: "player.example", kind: "watch", scope: "episode", season: 2, episode: 1 },
+        { id: "pack1", label: "720p season pack", url: "https://download.example/s1", host: "download.example", kind: "download", scope: "season", season: 1 },
+        { id: "pack2", label: "1080p season pack", url: "https://download.example/s2", host: "download.example", kind: "download", scope: "season", season: 2 },
+      ] }] }, isLoading: false, isError: false };
+      return query(options);
+    });
+    render(<TVDetail />);
+    const first = screen.getByLabelText("Links for season 1 episode 1");
+    expect(within(first).getByRole("link", { name: /Watch season 1 episode 1/ })).toHaveAttribute("href", "https://player.example/s1e1");
+    expect(within(screen.getByLabelText("Links for season 1 episode 2")).queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Season 1 links" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Fetch links" })).not.toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Season 2" }));
+    expect(screen.queryByLabelText("Links for season 1 episode 1")).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText("Links for season 2 episode 1")).getByRole("link")).toHaveAttribute("href", "https://player.example/s2e1");
+    expect(screen.getByRole("region", { name: "Season 2 links" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Season 1 links" })).not.toBeInTheDocument();
+  });
+
+  it("shows the per-series Fetch links action for admins", () => {
+    mocks.useAuth.mockReturnValue({ user: { id: "admin", role: "admin" } });
+    render(<TVDetail />);
+    expect(screen.getByRole("button", { name: "Fetch links" })).toBeInTheDocument();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     window.scrollTo = vi.fn();

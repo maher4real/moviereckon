@@ -26,14 +26,10 @@ vi.mock("../../lib/mongodb.js", () => ({
 }));
 
 import handler from "./index";
+import { createMockResponse } from "@/test/mockResponse";
 
 function response() {
-  return {
-    statusCode: 200,
-    body: null as unknown,
-    status(code: number) { this.statusCode = code; return this; },
-    json(body: unknown) { this.body = body; return this; },
-  };
+  return createMockResponse() as any;
 }
 
 describe("theater RBAC", () => {

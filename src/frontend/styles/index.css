@@ -6,13 +6,13 @@
 
 @layer base {
   :root {
-    --background: 0 0% 4%;
-    --foreground: 0 0% 98%;
+    --background: 20 6% 4%;
+    --foreground: 20 8% 98%;
 
-    --card: 0 0% 7%;
+    --card: 20 5% 7%;
     --card-foreground: 0 0% 98%;
 
-    --popover: 0 0% 7%;
+    --popover: 20 5% 7%;
     --popover-foreground: 0 0% 98%;
 
     --primary: 357 92% 48%;
@@ -21,8 +21,8 @@
     --secondary: 357 78% 28%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 64%;
+    --muted: 20 5% 15%;
+    --muted-foreground: 20 6% 64%;
 
     --accent: 357 76% 14%;
     --accent-foreground: 0 0% 100%;
@@ -30,8 +30,8 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
+    --border: 20 5% 18%;
+    --input: 20 5% 18%;
     --ring: 357 92% 48%;
 
     --radius: 0.5rem;
@@ -68,17 +68,21 @@
       hsl(var(--background) / 0.92) 100%
     );
     --shadow-glow: 0 0 24px hsl(var(--primary) / 0.34);
+    --page-gradient:
+      radial-gradient(circle at 12% 5%, hsl(var(--primary) / 0.13), transparent 26rem),
+      radial-gradient(circle at 88% 10%, hsl(var(--brand-red-bright) / 0.11), transparent 26rem),
+      linear-gradient(180deg, hsl(20 6% 6% / 0.92), hsl(var(--background)) 34rem);
     --ease-fluid: cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .dark {
-    --background: 0 0% 4%;
-    --foreground: 0 0% 98%;
+    --background: 20 6% 4%;
+    --foreground: 20 8% 98%;
 
-    --card: 0 0% 7%;
+    --card: 20 5% 7%;
     --card-foreground: 0 0% 98%;
 
-    --popover: 0 0% 7%;
+    --popover: 20 5% 7%;
     --popover-foreground: 0 0% 98%;
 
     --primary: 357 92% 48%;
@@ -87,8 +91,8 @@
     --secondary: 357 78% 28%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 64%;
+    --muted: 20 5% 15%;
+    --muted-foreground: 20 6% 64%;
 
     --accent: 357 76% 14%;
     --accent-foreground: 0 0% 100%;
@@ -96,8 +100,8 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
+    --border: 20 5% 18%;
+    --input: 20 5% 18%;
     --ring: 357 92% 48%;
   }
 }
@@ -129,7 +133,7 @@
     background:
       radial-gradient(circle at 10% -8%, hsl(var(--primary) / 0.16), transparent 34rem),
       radial-gradient(circle at 84% 12%, hsl(var(--brand-red-bright) / 0.12), transparent 32rem),
-      linear-gradient(180deg, hsl(0 0% 6%) 0%, hsl(var(--background)) 46%, hsl(0 0% 3%) 100%);
+      linear-gradient(180deg, hsl(20 6% 6%) 0%, hsl(var(--background)) 46%, hsl(20 6% 3%) 100%);
   }
 
   button,
@@ -182,7 +186,7 @@
     isolation: isolate;
     background:
       radial-gradient(circle at 12% 2%, hsl(var(--primary) / 0.12), transparent 30rem),
-      linear-gradient(180deg, hsl(0 0% 3%), hsl(var(--background)) 42%, hsl(0 0% 2%));
+      linear-gradient(180deg, hsl(20 6% 3%), hsl(var(--background)) 42%, hsl(20 6% 2%));
   }
 
   .landing-kicker {
@@ -258,7 +262,7 @@
     background:
       radial-gradient(circle at 84% 8%, hsl(var(--primary) / 0.13), transparent 24rem),
       linear-gradient(145deg, hsl(var(--foreground) / 0.045), transparent 35%),
-      hsl(0 0% 4% / 0.94);
+      hsl(20 6% 4% / 0.94);
     box-shadow:
       0 44px 120px hsl(0 0% 0% / 0.5),
       0 0 0 1px hsl(var(--primary) / 0.035),
@@ -370,10 +374,7 @@
 
   .app-page {
     @apply relative isolate flex min-h-screen flex-col overflow-x-clip bg-background text-foreground;
-    background:
-      radial-gradient(circle at 12% 5%, hsl(var(--primary) / 0.13), transparent 26rem),
-      radial-gradient(circle at 88% 10%, hsl(var(--brand-red-bright) / 0.11), transparent 26rem),
-      linear-gradient(180deg, hsl(0 0% 6% / 0.92), hsl(var(--background)) 34rem);
+    background: var(--page-gradient);
   }
 
   .page-main {
@@ -455,6 +456,14 @@
     @apply text-3xl font-bold tracking-tight md:text-4xl;
   }
 
+  .section-title {
+    @apply text-xl font-bold tracking-tight md:text-2xl;
+  }
+
+  .caption-text {
+    @apply text-xs leading-5 text-muted-foreground;
+  }
+
   .surface-panel {
     @apply rounded-xl border border-white/10 shadow-xl shadow-black/20 backdrop-blur-xl;
     background:
@@ -505,7 +514,7 @@
   }
 
   .content-grid {
-    @apply grid grid-cols-3 gap-3 transition-opacity duration-200 sm:grid-cols-4 sm:gap-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7;
+    @apply grid grid-cols-2 gap-3 transition-opacity duration-200 min-[480px]:grid-cols-3 sm:grid-cols-4 sm:gap-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7;
   }
 
   .empty-state {
@@ -513,6 +522,32 @@
     background:
       radial-gradient(circle at 50% 0%, hsl(var(--primary) / 0.12), transparent 22rem),
       hsl(var(--card) / 0.56);
+  }
+
+  @media (max-width: 639px) {
+    .surface-panel,
+    .glass-detail-panel,
+    .filter-panel,
+    .empty-state,
+    .select-surface,
+    .section-glass-icon,
+    .page-heading-icon {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .surface-panel,
+    .glass-detail-panel,
+    .filter-panel,
+    .empty-state,
+    .select-surface,
+    .section-glass-icon,
+    .page-heading-icon {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
   }
 
   .hero-gradient {

@@ -21,7 +21,7 @@ import {
   useParams,
 } from "react-router-dom";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
-import { AnimatePresence, MotionConfig, motion, useReducedMotion } from "motion/react";
+import { MotionConfig, motion, useReducedMotion } from "motion/react";
 import { AuthProvider, useAuth } from "@/frontend/hooks/useAuth";
 import { UserDataProvider } from "@/frontend/hooks/useUserData";
 import { WatchlistProvider } from "@/frontend/hooks/useWatchlist";
@@ -141,29 +141,18 @@ function RouteTransition({ children }: { children: ReactNode }) {
   const location = useLocation();
   const shouldReduceMotion = useReducedMotion();
 
-  const initialState = shouldReduceMotion
-    ? { opacity: 0 }
-    : { opacity: 0, y: 14, filter: "blur(6px)" };
-  const animateState = shouldReduceMotion
-    ? { opacity: 1 }
-    : { opacity: 1, y: 0, filter: "blur(0px)" };
-  const exitState = shouldReduceMotion
-    ? { opacity: 0 }
-    : { opacity: 0, y: -8, filter: "blur(4px)" };
-
+  // Enter-only animation: no exit phase, so navigation never waits on the
+  // outgoing page.
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      <motion.div
-        key={location.pathname}
-        initial={initialState}
-        animate={animateState}
-        exit={exitState}
-        transition={{ duration: shouldReduceMotion ? 0.01 : 0.28, ease: [0.22, 1, 0.36, 1] }}
-        className="min-h-screen"
-      >
-        <Routes location={location}>{children}</Routes>
-      </motion.div>
-    </AnimatePresence>
+    <motion.div
+      key={location.pathname}
+      initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
+      animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+      transition={{ duration: shouldReduceMotion ? 0.01 : 0.18, ease: [0.22, 1, 0.36, 1] }}
+      className="min-h-screen"
+    >
+      <Routes location={location}>{children}</Routes>
+    </motion.div>
   );
 }
 

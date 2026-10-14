@@ -79,6 +79,7 @@ function getCacheTags(endpoint: string): string[] {
 async function fetchTMDB<T>(
   endpoint: string,
   params: QueryParams = {},
+  timeoutMs?: number,
 ): Promise<T> {
   const apiKey = process.env.TMDB_API_KEY;
   if (!apiKey) {
@@ -95,6 +96,7 @@ async function fetchTMDB<T>(
 
   const response = await fetch(url.toString(), {
     cache: "force-cache",
+    ...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
     next: {
       revalidate: getRevalidateSeconds(endpoint),
       tags: getCacheTags(endpoint),
@@ -199,8 +201,8 @@ export async function getServerTeluguMovies(page = 1): Promise<TMDBResponse<Movi
   });
 }
 
-export async function getServerMovieDetails(movieId: number): Promise<MovieDetails> {
-  return fetchTMDB<MovieDetails>(`/movie/${movieId}`);
+export async function getServerMovieDetails(movieId: number, timeoutMs?: number): Promise<MovieDetails> {
+  return fetchTMDB<MovieDetails>(`/movie/${movieId}`, {}, timeoutMs);
 }
 
 export async function getServerMovieCredits(
@@ -238,8 +240,12 @@ export async function getServerMovieKeywords(movieId: number): Promise<MovieKeyw
   return data.keywords || [];
 }
 
-export async function getServerTVShowDetails(tvId: number): Promise<TVShowDetails> {
-  return fetchTMDB<TVShowDetails>(`/tv/${tvId}`);
+export async function getServerTVShowDetails(tvId: number, timeoutMs?: number): Promise<TVShowDetails> {
+  return fetchTMDB<TVShowDetails>(`/tv/${tvId}`, {}, timeoutMs);
+}
+
+export async function getServerTVExternalIds(tvId: number, timeoutMs?: number): Promise<{ imdb_id: string | null }> {
+  return fetchTMDB<{ imdb_id: string | null }>(`/tv/${tvId}/external_ids`, {}, timeoutMs);
 }
 
 export async function getServerTVShowCredits(

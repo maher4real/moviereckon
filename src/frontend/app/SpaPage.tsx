@@ -32,6 +32,10 @@ import {
   getServerTrendingMovies,
   getServerTrendingTVShows,
 } from "@/backend/services/tmdbServer";
+import {
+  POPULAR_SUGGESTIONS_QUERY_KEY,
+  buildPopularSuggestions,
+} from "@/shared/lib/popularSuggestions";
 import { getUserById, getUserFromRequest } from "@/backend/api/lib/auth";
 
 installGlobalSafeLogging();
@@ -109,40 +113,38 @@ function getShortContentRedirectPath(pathname: string): string | null {
   return null;
 }
 
-async function resolveInitialUser(): Promise<MongoUser | null> {
+const AUTH_COOKIE_PATTERN = /(?:^|;\s*)(?:moviereckon_access|moviereckon_refresh|[^=;\s]*better-auth[^=;\s]*)=/i;
+
+async function resolveInitialUser(): Promise<{
+  user: MongoUser | null;
+  // True when the request carried no session cookie at all, so "anonymous" is
+  // authoritative and the client can skip its /me + refresh round trips.
+  knownAnonymous: boolean;
+}> {
   try {
     const requestHeaders = await headers();
+    const knownAnonymous = !AUTH_COOKIE_PATTERN.test(requestHeaders.get("cookie") ?? "");
+    if (knownAnonymous) return { user: null, knownAnonymous };
+
     const payload = await getUserFromRequest({ headers: requestHeaders });
-    if (!payload) return null;
+    if (!payload) return { user: null, knownAnonymous: false };
     const user = await getUserById(payload.id);
-    return (user as MongoUser | null) ?? null;
+    return { user: (user as MongoUser | null) ?? null, knownAnonymous: false };
   } catch (error) {
     console.error("SSR auth bootstrap failed:", error);
-    return null;
+    return { user: null, knownAnonymous: false };
   }
 }
 
 async function prefetchSearchQueries(queryClient: QueryClient) {
   await queryClient.prefetchQuery({
-    queryKey: ["search-popular-suggestions"],
+    queryKey: POPULAR_SUGGESTIONS_QUERY_KEY,
     queryFn: async () => {
       const [moviesResult, tvResult] = await Promise.allSettled([
         getServerTrendingMovies("week"),
         getServerTrendingTVShows("week"),
       ]);
-
-      const movies = moviesResult.status === "fulfilled" ? moviesResult.value : [];
-      const tvShows = tvResult.status === "fulfilled" ? tvResult.value : [];
-
-      const titleMap = new Map<string, string>();
-      [...movies, ...tvShows].forEach((item) => {
-        const title = "title" in item ? item.title : item.name;
-        const normalized = title?.trim().toLowerCase();
-        if (!title || !normalized || titleMap.has(normalized)) return;
-        titleMap.set(normalized, title);
-      });
-
-      return Array.from(titleMap.values()).slice(0, 12);
+      return buildPopularSuggestions(moviesResult, tvResult);
     },
   });
 }
@@ -493,7 +495,7 @@ export default async function SpaPage({ params, searchParams }: SpaPageProps) {
     redirect(`${shortContentRedirectPath}${queryString}`);
   }
 
-  const initialUser = await resolveInitialUser();
+  const { user: initialUser, knownAnonymous } = await resolveInitialUser();
 
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -513,7 +515,7 @@ export default async function SpaPage({ params, searchParams }: SpaPageProps) {
       initialLocation={`${pathname}${queryString}`}
       dehydratedState={dehydratedState}
       initialUser={initialUser}
-      authResolved={Boolean(initialUser)}
+      authResolved={Boolean(initialUser) || knownAnonymous}
     />
   );
 }

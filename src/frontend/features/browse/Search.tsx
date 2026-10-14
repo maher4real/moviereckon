@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useCallback, memo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import {
@@ -14,6 +14,10 @@ import {
   getProfileUrl,
   getLanguageBadgeClass,
 } from "@/shared/lib/tmdb";
+import {
+  POPULAR_SUGGESTIONS_QUERY_KEY,
+  buildPopularSuggestions,
+} from "@/shared/lib/popularSuggestions";
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
 import MediaImage from "@/frontend/components/MediaImage";
@@ -159,23 +163,19 @@ export default function Search() {
   const hasSearchQuery = normalizedQuery.length >= 2;
   const isDebouncing = normalizedQuery !== debouncedQuery;
 
+  // Last query value this component wrote to the URL, so the URL -> state sync
+  // below ignores our own (debounced, lagging) writes and never clobbers typing.
+  const lastWrittenQueryRef = useRef(urlState.query);
+
   useEffect(() => {
+    if (urlState.query === lastWrittenQueryRef.current) return;
+    lastWrittenQueryRef.current = urlState.query;
     setQuery(urlState.query);
   }, [urlState.query]);
 
-  const updateQuery = useCallback(
-    (value: string) => {
-      setQuery(value);
-      setSearchParams(
-        serializeSearchUrlState(new URLSearchParams(searchParamString), {
-          query: value,
-          filterType,
-        }),
-        { replace: true },
-      );
-    },
-    [filterType, searchParamString, setSearchParams],
-  );
+  const updateQuery = useCallback((value: string) => {
+    setQuery(value);
+  }, []);
 
   const updateFilterType = useCallback(
     (value: string) => {
@@ -210,6 +210,22 @@ export default function Search() {
     return () => clearTimeout(timer);
   }, [query]);
 
+  // Mirror the settled query into the URL (once per pause, not per keystroke).
+  useEffect(() => {
+    if (debouncedQuery !== query.trim()) return; // still typing / initial mount
+    if (debouncedQuery === urlState.query.trim()) return;
+    lastWrittenQueryRef.current = debouncedQuery;
+    setSearchParams(
+      serializeSearchUrlState(new URLSearchParams(searchParamString), {
+        query: debouncedQuery,
+        filterType,
+      }),
+      { replace: true },
+    );
+    // Idempotent: once the URL matches the settled query the guards above
+    // short-circuit, so the full dependency list cannot loop.
+  }, [debouncedQuery, query, urlState.query, searchParamString, filterType, setSearchParams]);
+
   // Search query. The selected type is part of the cache key and the upstream
   // endpoint so a tab never filters a mixed first page locally.
   const {
@@ -218,6 +234,7 @@ export default function Search() {
     isError: isSearchError,
     isLoading: isSearchLoading,
     isPending: isSearchPending,
+    isPlaceholderData,
     isFetchNextPageError,
     hasNextPage,
     isFetchingNextPage,
@@ -230,30 +247,19 @@ export default function Search() {
     enabled: debouncedQuery.length >= 2,
     initialPageParam: 1,
     getNextPageParam: getNextSearchPageParam,
+    placeholderData: keepPreviousData,
     staleTime: 1000 * 60 * 5,
   });
 
   // Dynamic popular search suggestions from TMDB trending content
   const { data: popularSuggestions = [] } = useQuery({
-    queryKey: ["search-popular-suggestions"],
+    queryKey: POPULAR_SUGGESTIONS_QUERY_KEY,
     queryFn: async () => {
       const [moviesResult, tvResult] = await Promise.allSettled([
         getTrendingMovies("week"),
         getTrendingTVShows("week"),
       ]);
-
-      const movies = moviesResult.status === "fulfilled" ? moviesResult.value : [];
-      const tvShows = tvResult.status === "fulfilled" ? tvResult.value : [];
-
-      const titleMap = new Map<string, string>();
-      [...movies, ...tvShows].forEach((item) => {
-        const title = "title" in item ? item.title : item.name;
-        const normalized = title?.trim().toLowerCase();
-        if (!title || !normalized || titleMap.has(normalized)) return;
-        titleMap.set(normalized, title);
-      });
-
-      return Array.from(titleMap.values()).slice(0, 12);
+      return buildPopularSuggestions(moviesResult, tvResult);
     },
     staleTime: 1000 * 60 * 30,
   });
@@ -274,6 +280,11 @@ export default function Search() {
       return true;
     });
   }, [searchResults, filterType]);
+
+  // Keep the previous results on screen (dimmed) while the next query loads so
+  // typing never swaps the whole grid for a skeleton.
+  const isRefreshingResults =
+    filteredResults.length > 0 && (isDebouncing || isPlaceholderData === true);
 
   const searchErrorMessage =
     searchError instanceof Error && searchError.message
@@ -330,6 +341,13 @@ export default function Search() {
                 placeholder="Search movies, TV shows, cast..."
                 value={query}
                 onChange={(e) => updateQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  const submitted = e.currentTarget.value.trim();
+                  if (submitted.length < 2) return;
+                  setDebouncedQuery(submitted);
+                  saveRecentSearch(submitted);
+                }}
                 className="h-14 border-border/60 bg-background/60 pl-12 pr-12 text-base shadow-none transition-colors focus:border-primary md:text-lg"
                 autoFocus
               />
@@ -381,9 +399,9 @@ export default function Search() {
                     </Button>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {recentSearches.map((search, index) => (
+                    {recentSearches.map((search) => (
                       <Button
-                        key={index}
+                        key={search}
                         variant="outline"
                         size="sm"
                         onClick={() => handleRecentSearchClick(search)}
@@ -434,7 +452,8 @@ export default function Search() {
                 Enter at least 2 characters.
               </p>
             </div>
-          ) : isDebouncing || isSearchLoading || (isSearchPending && !searchData) ? (
+          ) : filteredResults.length === 0 &&
+            (isDebouncing || isSearchLoading || (isSearchPending && !searchData)) ? (
             // Loading State
             <div aria-busy="true" aria-label="Loading search results">
               <PosterGridSkeleton count={12} />
@@ -460,7 +479,13 @@ export default function Search() {
           ) : (
             // Results Grid
             <>
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+              <div
+                aria-busy={isRefreshingResults}
+                className={cn(
+                  "grid grid-cols-2 gap-4 transition-opacity duration-200 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6",
+                  isRefreshingResults && "pointer-events-none opacity-60",
+                )}
+              >
                 {filteredResults.map((item) => (
                   <ResultCard
                     key={`${item.id}-${isPersonResult(item) ? "person" : isTVResult(item) ? "tv" : "movie"}`}

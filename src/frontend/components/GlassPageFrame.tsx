@@ -28,10 +28,19 @@ export default function GlassPageFrame({ children }: GlassPageFrameProps) {
       const lens = frameRef.current?.querySelector<HTMLElement>("[data-glass-lens]");
 
       if (page) {
+        const isPhone =
+          typeof window.matchMedia === "function" &&
+          window.matchMedia("(max-width: 767px)").matches;
         gsap.fromTo(
           page,
-          { autoAlpha: 0, y: 14, filter: "blur(3px)" },
-          { autoAlpha: 1, y: 0, filter: "blur(0px)", duration: 0.42, ease: "power3.out" },
+          { autoAlpha: 0, y: 14, ...(isPhone ? {} : { filter: "blur(3px)" }) },
+          {
+            autoAlpha: 1,
+            y: 0,
+            ...(isPhone ? {} : { filter: "blur(0px)" }),
+            duration: 0.42,
+            ease: "power3.out",
+          },
         );
       }
 

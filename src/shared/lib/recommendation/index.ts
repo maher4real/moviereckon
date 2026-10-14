@@ -4,3 +4,5 @@ export * from "./scoring";
 export * from "./candidates";
 export * from "./ranking";
 export * from "./taste";
+export * from "./preferences";
+export * from "./coldStart";

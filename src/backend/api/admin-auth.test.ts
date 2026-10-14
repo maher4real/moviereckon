@@ -8,16 +8,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/backend/api/lib/auth", () => mocks);
 
 import handler from "@/pages/api/admin/auth";
+import { createMockResponse } from "@/test/mockResponse";
 
 function response() {
-  return {
-    statusCode: 200,
-    body: null as unknown,
-    headers: new Map<string, unknown>(),
-    setHeader(name: string, value: unknown) { this.headers.set(name, value); },
-    status(code: number) { this.statusCode = code; return this; },
-    json(body: unknown) { this.body = body; return this; },
-  };
+  return createMockResponse() as any;
 }
 
 describe("admin session endpoint", () => {

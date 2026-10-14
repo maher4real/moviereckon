@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   loadRecommendationSuppressions,
   loadRecommendationTaste,
+  toPreferences,
   updateRecommendationTasteControls,
 } from "./recommendationTaste";
 
@@ -210,5 +211,80 @@ describe("recommendation taste persistence boundaries", () => {
       excludedLearningKey: "movie_42",
       restoreLearningKey: "movie_42",
     })).rejects.toThrow("cannot exclude and restore");
+  });
+});
+
+describe("preference document boundary", () => {
+  it("reads the new fields and sanitizes them", () => {
+    const preferences = toPreferences({
+      preferred_genres: [28],
+      preferred_languages: ["EN"],
+      disliked_genres: [27, "27", -2, "abc"],
+      seed_titles: [
+        { content_id: 603, content_type: "movie", title: "The Matrix", poster_path: "/a.jpg", genres: [28, 878], language: "en" },
+        { content_id: "x", content_type: "movie", title: "Broken" },
+      ],
+      moods: ["dark", "sad"],
+      pace: "fast",
+      eras: ["new", "future"],
+    });
+    expect(preferences).toMatchObject({
+      preferredGenres: [28],
+      preferredLanguages: ["en"],
+      dislikedGenres: [27],
+      moods: ["dark"],
+      pace: "fast",
+      eras: ["new"],
+    });
+    expect(preferences.seedTitles).toEqual([
+      { contentId: 603, contentType: "movie", title: "The Matrix", genres: [28, 878], language: "en" },
+    ]);
+  });
+
+  it("falls back to empty values for legacy documents and missing docs", () => {
+    for (const doc of [null, { preferred_genres: [28], preferred_languages: ["en"] }]) {
+      expect(toPreferences(doc)).toMatchObject({
+        dislikedGenres: [],
+        seedTitles: [],
+        moods: [],
+        pace: null,
+        eras: [],
+      });
+    }
+  });
+});
+
+describe("stored profile soft preferences", () => {
+  function dbWith(preferences: Record<string, unknown>, updates: Array<Record<string, any>>) {
+    const collections: Record<string, any> = {
+      user_taste_profiles: {
+        findOne: vi.fn(async () => null),
+        updateOne: vi.fn(async (_filter: unknown, update: Record<string, any>) => {
+          updates.push(update);
+          return { matchedCount: 0, upsertedCount: 1 };
+        }),
+      },
+      user_preferences: { findOne: vi.fn(async () => preferences) },
+      watch_history: { find: vi.fn(() => cursor([])) },
+      liked_items: { find: vi.fn(() => cursor([])) },
+      watchlist: { find: vi.fn(() => cursor([])) },
+      content_feedback: { find: vi.fn(() => cursor([])) },
+    };
+    return { collection: vi.fn((name: string) => collections[name]) } as any;
+  }
+
+  it("removes a previously stored tone when the soft preferences are cleared", async () => {
+    const updates: Array<Record<string, any>> = [];
+    await loadRecommendationTaste(dbWith({ preferred_genres: [28], preferred_languages: ["en"] }, updates), "user-1");
+    expect(updates).toHaveLength(1);
+    expect(updates[0].$set).not.toHaveProperty("tone");
+    expect(updates[0].$unset).toEqual({ tone: "" });
+  });
+
+  it("stores the tone and does not unset it while soft preferences exist", async () => {
+    const updates: Array<Record<string, any>> = [];
+    await loadRecommendationTaste(dbWith({ preferred_genres: [28], moods: ["dark"] }, updates), "user-1");
+    expect(updates[0].$set.tone).toMatchObject({ moods: ["dark"] });
+    expect(updates[0]).not.toHaveProperty("$unset");
   });
 });

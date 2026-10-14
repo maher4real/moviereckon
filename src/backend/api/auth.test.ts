@@ -48,17 +48,10 @@ vi.mock("./lib/auth-base-url.js", () => ({ getConfiguredAuthBaseURL: vi.fn(() =>
 vi.mock("@/shared/lib/safeLogging", () => ({ installGlobalSafeLogging: vi.fn() }));
 
 import handler from "./auth";
+import { createMockResponse } from "@/test/mockResponse";
 
 function response() {
-  return {
-    statusCode: 200,
-    body: null as unknown,
-    headers: new Map<string, unknown>(),
-    setHeader(name: string, value: unknown) { this.headers.set(name, value); },
-    status(code: number) { this.statusCode = code; return this; },
-    json(body: unknown) { this.body = body; return this; },
-    end() { return this; },
-  };
+  return createMockResponse() as any;
 }
 
 function request(route: string, method = "POST", body: Record<string, unknown> = {}) {

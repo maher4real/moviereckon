@@ -15,6 +15,7 @@ import {
 import { useAuth } from "./useAuth";
 import * as mongoClient from "@/frontend/lib/mongodbClient";
 import { useToast } from "@/frontend/hooks/use-toast";
+import type { Era, Mood, Pace, SeedTitle } from "@/shared/lib/recommendation/preferences";
 
 export interface WatchedItem {
   id: string;
@@ -47,7 +48,25 @@ export interface UserPreferences {
   preferred_genres: number[];
   inferred_languages?: string[];
   inferred_genres?: number[];
+  disliked_genres?: number[];
+  seed_titles?: SeedTitle[];
+  moods?: Mood[];
+  pace?: Pace | null;
+  eras?: Era[];
 }
+
+export type PreferenceUpdate = Partial<
+  Pick<
+    UserPreferences,
+    | "preferred_languages"
+    | "preferred_genres"
+    | "disliked_genres"
+    | "seed_titles"
+    | "moods"
+    | "pace"
+    | "eras"
+  >
+>;
 
 export type FeedbackType = mongoClient.FeedbackType;
 
@@ -92,7 +111,7 @@ interface UserDataContextType {
   getTopGenres: (limit?: number) => number[];
   clearHistory: () => Promise<void>;
   refreshData: () => Promise<void>;
-  updatePreferences: (prefs: { preferred_languages?: string[]; preferred_genres?: number[] }) => Promise<UserPreferences>;
+  updatePreferences: (prefs: PreferenceUpdate) => Promise<UserPreferences>;
 }
 
 const UserDataContext = createContext<UserDataContextType | undefined>(undefined);
@@ -568,7 +587,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
 
   // Update Preferences
   const updatePreferences = useCallback(
-    async (prefs: { preferred_languages?: string[]; preferred_genres?: number[] }) => {
+    async (prefs: PreferenceUpdate) => {
       const userId = getUserId();
       if (!userId) throw new Error("User is not signed in");
       try {

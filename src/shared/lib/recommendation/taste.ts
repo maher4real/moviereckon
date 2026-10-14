@@ -1,3 +1,6 @@
+import { buildMoodGenreBoost } from "./coldStart";
+import type { Era, Mood, Pace } from "./preferences";
+
 export type TasteContentType = "movie" | "tv";
 
 export interface TasteTitleEvent {
@@ -7,12 +10,32 @@ export interface TasteTitleEvent {
   genres?: number[];
   language?: string;
   occurredAt?: string;
-  signal: "watched" | "liked" | "watchlist" | "give_it_a_go" | "one_time_watch" | "must_watch" | "skip";
+  signal: "watched" | "liked" | "watchlist" | "give_it_a_go" | "one_time_watch" | "must_watch" | "skip" | "seed";
+}
+
+export interface TasteSeed {
+  contentId: number;
+  contentType: TasteContentType;
+  title: string;
+  genres: number[];
+  language?: string;
+}
+
+export interface TasteTone {
+  moodGenreBoost: Record<string, number>;
+  moods: Mood[];
+  eras: Era[];
+  pace: Pace | null;
 }
 
 export interface TastePreferences {
   preferredGenres?: number[];
   preferredLanguages?: string[];
+  dislikedGenres?: number[];
+  seedTitles?: TasteSeed[];
+  moods?: Mood[];
+  pace?: Pace | null;
+  eras?: Era[];
 }
 
 export interface TasteEvidence {
@@ -22,7 +45,7 @@ export interface TasteEvidence {
   /** Metadata captured with the activity so seed reconstruction stays honest. */
   genreIds?: number[];
   language?: string;
-  signal: "liked" | "watchlist" | "give_it_a_go" | "one_time_watch" | "must_watch";
+  signal: "liked" | "watchlist" | "give_it_a_go" | "one_time_watch" | "must_watch" | "seed";
   weight: number;
 }
 
@@ -54,6 +77,8 @@ export interface TasteProfile {
   explicit: {
     genres: number[];
     languages: string[];
+    dislikedGenres?: number[];
+    seeds?: TasteSeed[];
   };
   /** Affinities learned from activity only; explicit choices are kept separate. */
   learned: {
@@ -71,6 +96,8 @@ export interface TasteProfile {
   clusters: TasteCluster[];
   evidence: TasteEvidence[];
   excludedEvidence?: TasteExcludedEvidence[];
+  /** Soft preferences (mood, pace, era). Absent for profiles built without them. */
+  tone?: TasteTone;
 }
 
 const SIGNAL_WEIGHT: Record<TasteTitleEvent["signal"], number> = {
@@ -81,6 +108,7 @@ const SIGNAL_WEIGHT: Record<TasteTitleEvent["signal"], number> = {
   one_time_watch: 0.75,
   watchlist: 1,
   skip: -2.5,
+  seed: 3,
 };
 
 function normalizeLanguage(value: string | undefined): string | null {
@@ -127,6 +155,75 @@ function normalizeEvents(events: TasteTitleEvent[]): TasteTitleEvent[] {
     }));
 }
 
+function normalizeDislikedGenres(values: number[] | undefined, preferred: number[]): number[] {
+  return normalizeGenres(values).filter((genreId) => !preferred.includes(genreId)).slice(0, 12);
+}
+
+function normalizeSeeds(values: TasteSeed[] | undefined): TasteSeed[] {
+  if (!Array.isArray(values)) return [];
+  const seen = new Set<string>();
+  const seeds: TasteSeed[] = [];
+  for (const seed of values) {
+    if (!seed || !Number.isInteger(seed.contentId) || seed.contentId <= 0) continue;
+    if (seed.contentType !== "movie" && seed.contentType !== "tv") continue;
+    const key = tasteContentKey(seed.contentType, seed.contentId);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const seedLanguage = normalizeLanguage(seed.language);
+    seeds.push({
+      contentId: seed.contentId,
+      contentType: seed.contentType,
+      title: seed.title?.trim() || "Untitled",
+      genres: normalizeGenres(seed.genres),
+      ...(seedLanguage ? { language: seedLanguage } : {}),
+    });
+    if (seeds.length >= 12) break;
+  }
+  return seeds;
+}
+
+function extrasSignature(
+  disliked: number[],
+  seeds: TasteSeed[],
+  moods: Mood[],
+  pace: Pace | null | undefined,
+  eras: Era[],
+): string {
+  if (disliked.length === 0 && seeds.length === 0 && moods.length === 0 && !pace && eras.length === 0) {
+    return "";
+  }
+  return [
+    `dislikes:${[...disliked].sort((a, b) => a - b).join(",")}`,
+    `seeds:${seeds.map((seed) => tasteContentKey(seed.contentType, seed.contentId)).sort().join(",")}`,
+    `moods:${[...moods].sort().join(",")}`,
+    `pace:${pace || ""}`,
+    `eras:${[...eras].sort().join(",")}`,
+  ].join("|");
+}
+
+/** Signature of the soft/extra preference fields; "" when none are set. */
+export function tasteExtrasSignature(preferences: TastePreferences): string {
+  const preferred = normalizeGenres(preferences.preferredGenres);
+  return extrasSignature(
+    normalizeDislikedGenres(preferences.dislikedGenres, preferred),
+    normalizeSeeds(preferences.seedTitles),
+    [...new Set(preferences.moods ?? [])],
+    preferences.pace,
+    [...new Set(preferences.eras ?? [])],
+  );
+}
+
+/** Same signature computed from a built (or stored) profile. */
+export function profileExtrasSignature(profile: TasteProfile): string {
+  return extrasSignature(
+    profile.explicit.dislikedGenres ?? [],
+    profile.explicit.seeds ?? [],
+    profile.tone?.moods ?? [],
+    profile.tone?.pace,
+    profile.tone?.eras ?? [],
+  );
+}
+
 function fingerprint(
   events: TasteTitleEvent[],
   preferences: TastePreferences,
@@ -147,7 +244,8 @@ function fingerprint(
     .sort();
   const genres = normalizeGenres(preferences.preferredGenres).join(",");
   const languages = normalizeLanguages(preferences.preferredLanguages).join(",");
-  const input = `${normalized.join("|")}|preferences:${genres}|${languages}|time:${now.slice(0, 10)}`;
+  const extras = tasteExtrasSignature(preferences);
+  const input = `${normalized.join("|")}|preferences:${genres}|${languages}|time:${now.slice(0, 10)}${extras ? `|extras:${extras}` : ""}`;
   // Keep the profile builder usable from shared/browser tests without pulling
   // a Node crypto polyfill into the client bundle.
   let hash = 2166136261;
@@ -174,7 +272,16 @@ export function buildTasteProfile(
   previous?: Pick<TasteProfile, "version" | "sourceFingerprint"> | null,
   now = new Date().toISOString(),
 ): TasteProfile {
+  const seedEvents: TasteTitleEvent[] = normalizeSeeds(preferences.seedTitles).map((seed) => ({
+    contentId: seed.contentId,
+    contentType: seed.contentType,
+    title: seed.title,
+    genres: seed.genres,
+    language: seed.language,
+    signal: "seed" as const,
+  }));
   const normalizedEvents = normalizeEvents(events);
+  const normalizedSeedEvents = normalizeEvents(seedEvents);
   const sourceFingerprint = fingerprint(normalizedEvents, preferences, now);
   const version =
     previous && previous.sourceFingerprint === sourceFingerprint
@@ -216,6 +323,17 @@ export function buildTasteProfile(
     }
   }
 
+  // A seed is an explicit "I love this" statement, so it outranks weaker
+  // activity on the same title (watched, saved, one-time watch, give-it-a-go)
+  // but never overrides a skip or a stronger like.
+  for (const seedEvent of normalizedSeedEvents) {
+    const key = tasteContentKey(seedEvent.contentType, seedEvent.contentId);
+    const current = strongestByTitle.get(key);
+    if (!current || (current.weight >= 0 && current.weight < SIGNAL_WEIGHT.seed)) {
+      strongestByTitle.set(key, { ...seedEvent, weight: SIGNAL_WEIGHT.seed });
+    }
+  }
+
   const learnedGenreWeights: Record<string, number> = {};
   const learnedLanguageWeights: Record<string, number> = {};
   const negativeGenreWeights: Record<string, number> = {};
@@ -225,6 +343,10 @@ export function buildTasteProfile(
 
   const explicitGenres = normalizeGenres(preferences.preferredGenres);
   const explicitLanguages = normalizeLanguages(preferences.preferredLanguages);
+  const dislikedGenres = normalizeDislikedGenres(preferences.dislikedGenres, explicitGenres);
+  const seeds = normalizeSeeds(preferences.seedTitles);
+  const moods = [...new Set(preferences.moods ?? [])];
+  const eras = [...new Set(preferences.eras ?? [])];
 
   for (const event of strongestByTitle.values()) {
     if (event.weight < 0) {
@@ -268,6 +390,8 @@ export function buildTasteProfile(
       clusterMap.set(id, existing);
     }
   }
+
+  for (const genreId of dislikedGenres) addWeight(negativeGenreWeights, String(genreId), 3);
 
   for (const genreId of explicitGenres) {
     const id = `preference:genre:${genreId}`;
@@ -313,7 +437,12 @@ export function buildTasteProfile(
     sourceFingerprint,
     updatedAt: now,
     exploration: evidence.length === 0 ? 0.12 : Math.min(0.2, 0.16 + 1 / Math.max(10, evidence.length * 2)),
-    explicit: { genres: explicitGenres, languages: explicitLanguages },
+    explicit: {
+      genres: explicitGenres,
+      languages: explicitLanguages,
+      ...(dislikedGenres.length > 0 ? { dislikedGenres } : {}),
+      ...(seeds.length > 0 ? { seeds } : {}),
+    },
     learned: { genres: learnedGenreWeights, languages: learnedLanguageWeights },
     inferred: { genres: inferredGenres, languages: inferredLanguages },
     negative: { genres: negativeGenreWeights, languages: negativeLanguageWeights },
@@ -325,6 +454,16 @@ export function buildTasteProfile(
         evidence: cluster.evidence.slice(0, 5),
       })),
     evidence: evidence.sort((left, right) => right.weight - left.weight).slice(0, 24),
+    ...(moods.length > 0 || eras.length > 0 || preferences.pace
+      ? {
+          tone: {
+            moodGenreBoost: buildMoodGenreBoost(moods),
+            moods,
+            eras,
+            pace: preferences.pace ?? null,
+          },
+        }
+      : {}),
   };
 }
 

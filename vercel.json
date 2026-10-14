@@ -1,6 +1,9 @@
 {
   "framework": "nextjs",
   "outputDirectory": ".next",
+  "crons": [
+    { "path": "/api/import/watch-sources", "schedule": "0 0 * * *" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

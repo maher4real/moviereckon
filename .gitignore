@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+*.tsbuildinfo
+test-results
 .next
 *.local
 
@@ -37,3 +39,4 @@ AGENTS.md
 CLAUDE.md
 GEMINI.md
 skills-lock.json
+.superpowers/

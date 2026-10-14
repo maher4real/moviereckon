@@ -780,6 +780,7 @@ export async function getTVGenres(): Promise<Genre[]> {
 export interface DiscoverFilters {
   page?: number;
   with_genres?: string;
+  without_genres?: string;
   with_original_language?: string;
   region?: string;
   with_people?: string;
