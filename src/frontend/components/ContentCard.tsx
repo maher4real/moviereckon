@@ -1,8 +1,8 @@
 import { memo, useState, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { motion } from "motion/react";
+import { Link, useLocation } from "react-router-dom";
+import { motion, useReducedMotion } from "motion/react";
 import { Eye, Sparkles, Bookmark, Play, Star } from "lucide-react";
-import { Movie, TVShow, getPosterUrl, getLanguageLabel } from "@/shared/lib/tmdb";
+import { Movie, TVShow, getPosterUrl, getBackdropUrl, getLanguageLabel } from "@/shared/lib/tmdb";
 import { useUserData } from "@/frontend/hooks/useUserData";
 import { useWatchlist } from "@/frontend/hooks/useWatchlist";
 import { useIsMobile } from "@/frontend/hooks/use-mobile";
@@ -24,6 +24,7 @@ interface ContentCardProps {
   item: Movie | TVShow;
   type: "movie" | "tv" | "mixed";
   showActions?: boolean;
+  variant?: "poster" | "landscape";
   recommendationReasons?: RecommendationReason[];
   recommendationSeedTitle?: string | null;
 }
@@ -32,14 +33,15 @@ function ContentCardComponent({
   item,
   type,
   showActions = true,
+  variant = "poster",
   recommendationReasons = [],
   recommendationSeedTitle = null,
 }: ContentCardProps) {
-  const navigate = useNavigate();
   const location = useLocation();
   const { isWatched, addToWatchHistory } = useUserData();
   const { isInWatchlist, toggleItem: toggleWatchlist, setStatus: setWatchlistStatus } = useWatchlist();
   const isMobile = useIsMobile();
+  const reduceMotion = useReducedMotion();
   const posterRef = useRef<HTMLDivElement>(null);
   const [watchAnimating, setWatchAnimating] = useState(false);
   const [bookmarkAnimating, setBookmarkAnimating] = useState(false);
@@ -54,10 +56,7 @@ function ContentCardComponent({
   const watched = isWatched(item.id, contentType);
   const bookmarked = isInWatchlist(item.id, contentType);
 
-  const handleClick = () => {
-    const fromPath = `${location.pathname}${location.search}${location.hash}`;
-    navigate(`/${itemType}/${item.id}`, { state: { from: fromPath } });
-  };
+  const fromPath = `${location.pathname}${location.search}${location.hash}`;
 
   const handleWatched = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -81,7 +80,7 @@ function ContentCardComponent({
   const handleBookmark = async (e: React.MouseEvent) => {
     e.stopPropagation();
     
-    if (!bookmarked && posterRef.current) {
+    if (!bookmarked && posterRef.current && !reduceMotion) {
       // Trigger fly animation before actual state update
       const rect = posterRef.current.getBoundingClientRect();
       const eventDetail: WatchlistFlyEventDetail = {
@@ -141,21 +140,21 @@ function ContentCardComponent({
 
   return (
     <div
-      onClick={handleClick}
       draggable={!isMobile}
       onDragStart={handleDragStart}
-      className="min-w-0 w-full cursor-pointer group/card"
+      className="relative min-w-0 w-full group/card"
     >
       <motion.div
-        whileHover={{ y: -6 }}
-        whileTap={{ scale: 0.985 }}
+        whileHover={reduceMotion ? undefined : { y: -4 }}
+        whileTap={reduceMotion ? undefined : { scale: 0.985 }}
         transition={{ type: "spring", stiffness: 360, damping: 30 }}
-        className="min-w-0 w-full"
+        className="content-card-frame relative min-w-0 w-full"
       >
+      <Link to={`/${itemType}/${item.id}`} state={{ from: fromPath }} aria-label={`View ${title}`} draggable={false} className="absolute inset-0 z-10 rounded-lg" />
       {/* Poster */}
-      <div ref={posterRef} className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
+      <div ref={posterRef} className={cn("relative overflow-hidden rounded-lg poster-card", variant === "landscape" ? "aspect-video" : "aspect-[2/3]")}>
         <MediaImage
-          src={getPosterUrl(item.poster_path, "medium")}
+          src={variant === "landscape" && item.backdrop_path ? getBackdropUrl(item.backdrop_path, "medium") : getPosterUrl(item.poster_path, "medium")}
           alt={title}
           className="w-full h-full object-cover"
           loading="lazy"
@@ -176,22 +175,23 @@ function ContentCardComponent({
 
         {/* Action Buttons - Red themed for consistency */}
         {showActions && (
-          <div className="absolute bottom-2 left-2 right-2 flex gap-1 opacity-0 group-hover/card:opacity-100 transition-all duration-200 transform translate-y-2 group-hover/card:translate-y-0">
+          <div className="poster-quick-actions absolute bottom-2 left-2 right-2 z-20">
             <motion.button
               onClick={handleWatched}
               whileTap={{ scale: 0.94 }}
               transition={{ type: "spring", stiffness: 500, damping: 28 }}
               className={cn(
-                "flex-1 py-1.5 rounded text-xs font-medium flex items-center justify-center gap-1 action-btn transition-all",
+                "flex min-h-11 min-w-11 items-center justify-center rounded-md action-btn transition-colors",
                 watched
                   ? "brand-primary-button text-primary-foreground"
                   : "bg-background/80 text-foreground hover:bg-primary/20 hover:text-primary",
                 watchAnimating && "animate-watched-pop"
               )}
               title={watched ? "Watched" : "Mark as watched"}
+              aria-label={`${watched ? "Watched" : "Mark as watched"}: ${title}`}
+              aria-pressed={watched}
             >
-              <Eye className={cn("w-3 h-3", watchAnimating && "animate-pulse")} />
-              {watched ? "Watched" : "Watch"}
+              <Eye className={cn("size-4", watchAnimating && "animate-pulse")} />
             </motion.button>
             <ContentReactionButtons
               contentId={item.id}
@@ -207,15 +207,17 @@ function ContentCardComponent({
               whileTap={{ scale: 0.92 }}
               transition={{ type: "spring", stiffness: 520, damping: 28 }}
               className={cn(
-                "p-1.5 rounded action-btn transition-all",
+                "flex min-h-11 min-w-11 items-center justify-center rounded-md action-btn transition-colors",
                 bookmarked
                   ? "brand-primary-button text-primary-foreground"
                   : "bg-background/80 text-foreground hover:bg-primary/20 hover:text-primary",
                 bookmarkAnimating && "animate-heart-pop"
               )}
               title={bookmarked ? "Remove from Watchlist" : "Add to Watchlist"}
+              aria-label={`${bookmarked ? "Remove from watchlist" : "Add to watchlist"}: ${title}`}
+              aria-pressed={bookmarked}
             >
-              <Bookmark className={cn("w-3 h-3", bookmarked && "fill-current", bookmarkAnimating && "animate-pulse")} />
+              <Bookmark className={cn("size-4", bookmarked && "fill-current", bookmarkAnimating && "animate-pulse")} />
             </motion.button>
           </div>
         )}
@@ -259,7 +261,7 @@ function ContentCardComponent({
       </div>
 
       {/* Info */}
-      <h3 className="mt-2 break-words text-sm font-medium leading-snug line-clamp-2 group-hover/card:text-primary transition-colors">
+      <h3 className="mt-3 break-words text-sm font-semibold leading-snug line-clamp-2 group-hover/card:text-foreground/80 transition-colors">
         {title}
       </h3>
       <div className="flex items-center justify-between gap-2">
@@ -269,7 +271,7 @@ function ContentCardComponent({
             <PopoverTrigger asChild>
               <button
                 type="button"
-                className="inline-flex items-center gap-1 rounded-full border border-primary/35 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
+                className="relative z-20 inline-flex min-h-11 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                 onClick={(event) => event.stopPropagation()}
               >
                 <Sparkles className="h-3 w-3" />

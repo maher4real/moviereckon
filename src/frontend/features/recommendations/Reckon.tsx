@@ -36,6 +36,7 @@ import {
   Star,
   Crown,
   CalendarDays,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import PickTonight from "./PickTonight";
@@ -504,80 +505,45 @@ export default function Reckon() {
     recTypeFilter !== "all" ||
     selectedGenre !== "all" ||
     selectedLanguage !== "all" ||
-    sortField !== "relevance";
+    sortField !== "relevance" || sortOrder !== "desc";
 
   const hasResolvedItems = processedItems.length > 0;
 
   return (
-    <div className="app-page flex flex-col pb-20 md:pb-0">
+    <div className="app-page reckon-page flex flex-col pb-20 md:pb-0">
       <Header />
 
       <main className="page-main">
-        <div className="container mx-auto px-4">
-          {/* Top header row */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-            <div className="flex items-center gap-3">
-              <div className="page-heading-icon">
-                <Sparkles className="h-5 w-5" />
+        <div className="reckon-container">
+          <div className="mb-7 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+            <div>
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Reckon</h1>
+                {isPersonalized && <Badge className="border-primary/30 bg-primary/12 px-2.5 py-1 text-xs text-foreground">Personalized</Badge>}
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-3xl font-bold tracking-tight">Reckon</h1>
-                  {isPersonalized && (
-                    <Badge className="bg-primary/15 text-primary border border-primary/25 text-[10px] font-semibold px-2">
-                      Personalized
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  {isPersonalized
-                    ? "Picks that evolve with your taste"
-                    : "Trending and globally diverse picks"}
-                </p>
-              </div>
+              <p className="mt-2 text-base text-muted-foreground">
+                {isPersonalized ? "Picks that evolve with your taste" : "Trending and globally diverse picks"}
+              </p>
             </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPrefsOpen(true)}
-                className={cn(
-                  "gap-2 cursor-pointer transition-colors duration-200",
-                  hasPreferences
-                    ? "border-primary/40 text-primary hover:bg-primary/10 hover:border-primary/60"
-                    : "hover:border-primary/30 hover:text-primary",
-                )}
-              >
-                <SlidersHorizontal className="w-4 h-4" />
-                Preferences
-                {hasPreferences && (
-                  <span className="text-[10px] bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 font-bold leading-none">
-                    {(preferences?.preferred_languages?.length ?? 0) +
-                      (preferences?.preferred_genres?.length ?? 0)}
-                  </span>
-                )}
+            <div className="flex items-center gap-2">
+              {tasteSnapshot && <a href="#your-taste-heading" className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"><Sparkles className="size-4" />Your taste</a>}
+              <Button variant="outline" onClick={() => setPrefsOpen(true)} className="min-h-11 gap-2 px-3 sm:px-4">
+                <SlidersHorizontal className="size-4" />Preferences
+                {hasPreferences && <span className="rounded bg-muted px-1.5 py-0.5 text-xs tabular-nums">{(preferences?.preferred_languages?.length ?? 0) + (preferences?.preferred_genres?.length ?? 0)}</span>}
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => void refreshRecommendations()}
-                disabled={isRefreshing}
-                className="gap-2 cursor-pointer transition-colors duration-200 hover:border-primary/30 hover:text-primary"
-              >
-                <RefreshCw
-                  className={cn("w-4 h-4", isRefreshing && "animate-spin")}
-                />
-                Refresh
+              <Button variant="ghost" onClick={() => void refreshRecommendations()} disabled={isRefreshing} className="min-h-11 gap-2 px-3 text-muted-foreground">
+                <RefreshCw className={cn("size-4", isRefreshing && "animate-spin")} />Refresh
               </Button>
-              <span className="text-sm text-muted-foreground tabular-nums">
-                {processedItems.length} picks
-              </span>
             </div>
           </div>
 
           {/* First Time Setup or Preferences Nudge */}
           {showFirstTimeSetup ? (
+            <details className="reckon-setup group/setup mb-8">
+              <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 rounded-lg py-3 [&::-webkit-details-marker]:hidden">
+                <div><h2 className="text-sm font-semibold">Make these picks yours</h2><p className="mt-1 text-sm text-muted-foreground">Choose your favorite languages and genres.</p></div>
+                <ChevronDown className="size-5 shrink-0 text-muted-foreground transition-transform group-open/setup:rotate-180" aria-hidden="true" />
+              </summary>
             <FirstTimeSetup
               langs={setupLangs}
               genres={setupGenres}
@@ -587,11 +553,9 @@ export default function Reckon() {
               onSkip={() => setSkippedSetup(true)}
               saving={setupSaving}
             />
+            </details>
           ) : !hasPreferences && !reckonLoading ? (
-            <div className="surface-panel glass-detail-panel mb-5 flex items-center gap-3 border-primary/25 bg-linear-to-r from-primary/10 to-primary/5 px-4 py-3.5">
-              <span className="section-glass-icon" aria-hidden="true">
-                <Sparkles className="h-4 w-4" />
-              </span>
+            <div className="reckon-setup mb-8 flex flex-wrap items-center gap-3 py-4">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground">
                   Unlock personalized recommendations
@@ -611,160 +575,62 @@ export default function Reckon() {
             </div>
           ) : null}
 
-          <YourTastePanel
-            snapshot={tasteSnapshot || null}
-            feedMode={feedMode}
-            onEditPreferences={() => setPrefsOpen(true)}
-            onExplorationChange={handleExplorationChange}
-            onForgetLearning={handleForgetLearning}
-            onResetLearned={handleResetLearned}
-            onTitleSignal={handleTitleSignal}
-          />
-
           <PickTonight items={recommendations} explanationById={explanationById} />
 
-          {/* Content type + rec type filter rows */}
-          <div className="flex flex-col gap-3 mb-6">
-            <div className="filter-panel mb-0">
-              <div className="filter-row">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setContentTypeFilter("all")}
-                className={cn("filter-chip", contentTypeFilter === "all" && "filter-chip-active")}
-              >
-                <Sparkles className="w-4 h-4" />
-                All
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setContentTypeFilter("movie")}
-                className={cn("filter-chip", contentTypeFilter === "movie" && "filter-chip-active")}
-              >
-                <Film className="w-4 h-4" />
-                Movies
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setContentTypeFilter("tv")}
-                className={cn("filter-chip", contentTypeFilter === "tv" && "filter-chip-active")}
-              >
-                <Tv className="w-4 h-4" />
-                TV Series
-              </Button>
+          <div className="mb-4 flex items-baseline justify-between gap-4">
+            <h2 className="text-2xl font-semibold tracking-tight">More for you</h2>
+            <p className="text-sm tabular-nums text-muted-foreground" aria-live="polite">{processedItems.length} picks</p>
+          </div>
+          <div className="reckon-filters mb-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="reckon-type-tabs" role="group" aria-label="Content type">
+                {([
+                  { value: "all", label: "All", Icon: Sparkles },
+                  { value: "movie", label: "Movies", Icon: Film },
+                  { value: "tv", label: "TV Series", Icon: Tv },
+                ] as const).map(({value, label, Icon}) => (
+                  <button key={value} type="button" aria-pressed={contentTypeFilter === value} onClick={() => setContentTypeFilter(value)} className={cn("reckon-type-tab", contentTypeFilter === value && "reckon-type-tab-active")}><Icon className="size-4" />{label}</button>
+                ))}
+              </div>
+              <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+                <Select value={selectedGenre} onValueChange={setSelectedGenre}>
+                  <SelectTrigger aria-label="Filter by genre" className="select-surface w-full sm:w-40"><SelectValue placeholder="All Genres" /></SelectTrigger>
+                  <SelectContent className="z-50 border-border bg-popover">
+                    <SelectItem value="all">All Genres</SelectItem>
+                    {availableGenres.map(id => <SelectItem key={id} value={String(id)}>{GENRE_MAP[id]}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                  <SelectTrigger aria-label="Filter by language" className="select-surface w-full sm:w-40"><SelectValue placeholder="All Languages" /></SelectTrigger>
+                  <SelectContent className="z-50 border-border bg-popover">
+                    <SelectItem value="all">All Languages</SelectItem>
+                    {availableLanguages.map(lang => <SelectItem key={lang} value={lang}>{LANGUAGE_MAP[lang] || lang.toUpperCase()}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <div className="col-span-2 flex min-w-0 gap-2">
+                  <Select value={sortField} onValueChange={value => setSortField(value as SortField)}>
+                    <SelectTrigger aria-label="Sort recommendations" className="select-surface min-w-0 flex-1 sm:w-36"><SelectValue /></SelectTrigger>
+                    <SelectContent className="z-50 border-border bg-popover">
+                      <SelectItem value="relevance">Relevance</SelectItem><SelectItem value="popularity">Popularity</SelectItem><SelectItem value="rating">Rating</SelectItem><SelectItem value="release_date">Release Date</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button variant="outline" size="icon" onClick={toggleSortOrder} className="size-11 shrink-0" title={sortOrder === "desc" ? "Descending" : "Ascending"} aria-label={sortOrder === "desc" ? "Sort ascending" : "Sort descending"}><ArrowUpDown className={cn("size-4", sortOrder === "asc" && "rotate-180")} /></Button>
+                </div>
+                {hasActiveFilters && <Button variant="ghost" onClick={clearFilters} className="col-span-2 min-h-11 text-muted-foreground">Clear filters</Button>}
               </div>
             </div>
-
-            {feedMode === "v2" && <div className="filter-panel mb-0">
-              <div className="filter-row">
-              {RECOMMENDATION_TYPES.map((t) => {
-                const active = recTypeFilter === t.id;
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => setRecTypeFilter(t.id)}
-                    title={t.description}
-                    className={cn(
-                      "filter-chip flex items-center gap-1.5",
-                      active && "filter-chip-active",
-                    )}
-                  >
-                    <t.Icon className="w-3.5 h-3.5" />
-                    {t.label}
-                  </button>
-                );
-              })}
-              </div>
+            {feedMode === "v2" && <div className="mt-3 flex gap-2 overflow-x-auto" role="group" aria-label="Recommendation category">
+              {RECOMMENDATION_TYPES.map(({id,label,description,Icon}) => <button key={id} type="button" title={description} aria-pressed={recTypeFilter === id} onClick={() => setRecTypeFilter(id)} className={cn("min-h-11 shrink-0 rounded-lg px-3 text-sm transition-colors", recTypeFilter === id ? "bg-primary/12 text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Icon className="mr-2 inline size-4" />{label}</button>)}
             </div>}
           </div>
-
-          <PreferencesSheet
-            open={prefsOpen}
-            onClose={() => setPrefsOpen(false)}
-            onSaved={handlePreferencesSaved}
-          />
-
-          {/* Sort / filter bar */}
-          <div className="filter-panel flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <Select value={selectedGenre} onValueChange={setSelectedGenre}>
-              <SelectTrigger className="select-surface w-full sm:w-42.5">
-                <SelectValue placeholder="All Genres" />
-              </SelectTrigger>
-              <SelectContent className="bg-popover border-border z-50">
-                <SelectItem value="all">All Genres</SelectItem>
-                {availableGenres.map((genreId) => (
-                  <SelectItem key={genreId} value={String(genreId)}>
-                    {GENRE_MAP[genreId]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={selectedLanguage}
-              onValueChange={setSelectedLanguage}
-            >
-              <SelectTrigger className="select-surface w-full sm:w-42.5">
-                <SelectValue placeholder="All Languages" />
-              </SelectTrigger>
-              <SelectContent className="bg-popover border-border z-50">
-                <SelectItem value="all">All Languages</SelectItem>
-                {availableLanguages.map((lang) => (
-                  <SelectItem key={lang} value={lang}>
-                    {LANGUAGE_MAP[lang] || lang.toUpperCase()}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={sortField}
-              onValueChange={(v) => setSortField(v as SortField)}
-            >
-              <SelectTrigger className="select-surface w-full sm:w-42.5">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-popover border-border z-50">
-                <SelectItem value="relevance">Relevance</SelectItem>
-                <SelectItem value="popularity">Popularity</SelectItem>
-                <SelectItem value="rating">Rating</SelectItem>
-                <SelectItem value="release_date">Release Date</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={toggleSortOrder}
-              className="select-surface shrink-0"
-              title={sortOrder === "desc" ? "Descending" : "Ascending"}
-            >
-              <ArrowUpDown
-                className={cn("w-4 h-4", sortOrder === "asc" && "rotate-180")}
-              />
-            </Button>
-
-            {hasActiveFilters && (
-              <Button
-                variant="ghost"
-                onClick={clearFilters}
-                className="text-muted-foreground"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Clear
-              </Button>
-            )}
-          </div>
+          <PreferencesSheet open={prefsOpen} onClose={() => setPrefsOpen(false)} onSaved={handlePreferencesSaved} />
 
           {/* Grid */}
           {reckonLoading && !hasResolvedItems ? (
             <PosterGridSkeleton count={INITIAL_VISIBLE_ITEMS} />
           ) : visibleItems.length > 0 ? (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              <div className="content-grid">
                 {visibleItems.map((item) => {
                   const itemType = getRecommendationItemType(item);
                   const explanation = explanationById[`${itemType}_${item.id}`];
@@ -885,6 +751,17 @@ export default function Reckon() {
               )}
             </div>
           )}
+          {tasteSnapshot && <div className="mt-12 border-t border-border pt-8">
+          <YourTastePanel
+            snapshot={tasteSnapshot || null}
+            feedMode={feedMode}
+            onEditPreferences={() => setPrefsOpen(true)}
+            onExplorationChange={handleExplorationChange}
+            onForgetLearning={handleForgetLearning}
+            onResetLearned={handleResetLearned}
+            onTitleSignal={handleTitleSignal}
+          />
+          </div>}
         </div>
       </main>
 

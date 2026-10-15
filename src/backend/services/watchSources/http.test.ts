@@ -5,6 +5,17 @@ const base = "https://source.example";
 afterEach(() => vi.unstubAllGlobals());
 
 describe("bounded source fetch", () => {
+  it("honors a caller's cancellation signal across a multi-page resolution", async () => {
+    const controller = new AbortController();
+    const fetch = vi.fn((_url: string, options: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      options.signal!.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+    }));
+    vi.stubGlobal("fetch", fetch);
+    const request = fetchSourceDocument(`${base}/post/`, base, {}, { signal: controller.signal });
+    controller.abort();
+    await expect(request).rejects.toThrow("Aborted");
+    expect(fetch).toHaveBeenCalledOnce();
+  });
   it("sends validators and returns a 304 without a body", async () => {
     const fetch = vi.fn().mockResolvedValue(new Response(null, { status: 304 }));
     vi.stubGlobal("fetch", fetch);

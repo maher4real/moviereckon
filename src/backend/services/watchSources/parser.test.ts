@@ -6,6 +6,13 @@ const base = "https://new7.hdhub4u.cl";
 const fixture = (name: string) => readFileSync(`${process.cwd()}/src/backend/services/watchSources/fixtures/${name}.html`, "utf8");
 
 describe("published source links", () => {
+  it("keeps published direct files even without a quality label and preserves episode scope", () => {
+    const page = parseSourcePage(`<h1>Example (Season 1)</h1><h2>DOWNLOAD LINKS</h2><h3>Episode 2</h3>
+      <a href="https://media.example/s1e2.mp4?token=abc">Download</a>
+      <a href="https://media.example/s1e2.m3u8">Watch</a>`, `${base}/example/`);
+    expect(page.links).toHaveLength(2);
+    expect(page.links.every((link) => link.scope === "episode" && link.season === 1 && link.episode === 2)).toBe(true);
+  });
   it("collects all movie quality, player and collection links with metadata", () => {
     const page = parseSourcePage(fixture("movie"), `${base}/weapons-2025-hindi-studio-dub-bluray-full-movie/`);
     expect(page).toMatchObject({ title: "Weapons", year: 2025, imdbId: "tt26581740", mediaType: "movie" });

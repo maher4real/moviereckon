@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { ChevronLeft, ChevronRight, ArrowRight, Sparkles, Star, Play } from "lucide-react";
 import { Movie, TVShow, getPosterUrl, getLanguageBadgeClass } from "@/shared/lib/tmdb";
-import { Button } from "@/frontend/components/ui/button";
 import { cn } from "@/shared/lib/utils";
 import MediaImage from "@/frontend/components/MediaImage";
 import { Popover, PopoverContent, PopoverTrigger } from "@/frontend/components/ui/popover";
@@ -35,8 +34,8 @@ const INITIAL_VISIBLE_DESKTOP = 18;
 const LOAD_STEP_MOBILE = 8;
 const LOAD_STEP_DESKTOP = 12;
 const PRIORITY_POSTER_COUNT = 6;
-const POSTER_CARD_WIDTH_CLASS = "w-[29vw] min-w-[105px] max-w-[140px] sm:w-[130px] md:w-[150px] lg:w-[170px] xl:w-[190px]";
-const POSTER_CARD_SIZES = "(max-width: 639px) 29vw, (max-width: 767px) 130px, (max-width: 1023px) 150px, (max-width: 1279px) 170px, 190px";
+const POSTER_CARD_WIDTH_CLASS = "w-[42vw] max-w-[170px] sm:w-[160px] sm:max-w-none md:w-[180px] lg:w-[200px] xl:w-[210px]";
+const POSTER_CARD_SIZES = "(max-width: 639px) 42vw, (max-width: 767px) 160px, (max-width: 1023px) 180px, (max-width: 1279px) 200px, 210px";
 
 function getInitialVisibleCount(): number {
   if (typeof window === "undefined") return INITIAL_VISIBLE_DESKTOP;
@@ -63,6 +62,8 @@ export default function ContentCarousel({
   const navigate = useNavigate();
   const location = useLocation();
   const [visibleCount, setVisibleCount] = useState(() => getInitialVisibleCount());
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
   const fromPath = `${location.pathname}${location.search}${location.hash}`;
   const itemsLength = items?.length || 0;
 
@@ -71,7 +72,7 @@ export default function ContentCarousel({
     const scrollAmount = scrollRef.current.clientWidth * 0.8;
     scrollRef.current.scrollBy({
       left: direction === "left" ? -scrollAmount : scrollAmount,
-      behavior: "smooth",
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
     });
   };
 
@@ -132,6 +133,8 @@ export default function ContentCarousel({
     let rafId = 0;
     const maybeLoadMore = () => {
       rafId = 0;
+      setCanScrollLeft(container.scrollLeft > 4);
+      setCanScrollRight(container.scrollWidth - container.clientWidth - container.scrollLeft > 4);
       if (visibleCount >= itemsLength) return;
 
       const remaining = container.scrollWidth - (container.scrollLeft + container.clientWidth);
@@ -163,60 +166,24 @@ export default function ContentCarousel({
   }
 
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 18 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.18 }}
-      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-      className="px-3 sm:px-4 md:px-6 lg:px-8"
-    >
-      {title && (
-        <div className="mb-3 flex min-w-0 items-center justify-between gap-3 md:mb-4">
-          <div className="flex min-w-0 items-center gap-2.5">
-            {Icon && (
-              <span className="section-glass-icon" aria-hidden="true">
-                <Icon className="h-4 w-4" />
-              </span>
-            )}
-            <h2 className="min-w-0 truncate text-lg font-bold tracking-tight md:text-xl">{title}</h2>
-          </div>
-          {resolvedViewAllHref && (
-            <button
-              type="button"
-              onClick={() => navigate(resolvedViewAllHref)}
-              className="flex shrink-0 items-center gap-1 rounded-full border border-border/60 bg-card/70 px-2.5 py-1 text-xs font-semibold text-muted-foreground backdrop-blur-sm transition-colors duration-200 hover:border-primary/45 hover:text-primary"
-            >
-              View All
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          )}
+    <section className="content-shelf" aria-label={title || "Recommended titles"}>
+      <div className="shelf-heading">
+        <div className="flex min-w-0 items-center gap-2.5">
+          {Icon && <Icon className="hidden size-[18px] shrink-0 text-primary/80 sm:block" aria-hidden="true" />}
+          {title && <h2 className="min-w-0 text-lg font-semibold tracking-tight md:text-2xl">{title}</h2>}
         </div>
-      )}
-
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          {resolvedViewAllHref && <button type="button" onClick={() => navigate(resolvedViewAllHref)} className="shelf-view-all">View All<ArrowRight className="size-4" aria-hidden="true" /></button>}
+          {(canScrollLeft || canScrollRight) && <div className="hidden items-center gap-1.5 md:flex">
+            <button type="button" onClick={() => scroll("left")} disabled={!canScrollLeft} className="shelf-arrow" aria-label={`Scroll ${title || "carousel"} left`}><ChevronLeft className="size-[18px]" /></button>
+            <button type="button" onClick={() => scroll("right")} disabled={!canScrollRight} className="shelf-arrow" aria-label={`Scroll ${title || "carousel"} right`}><ChevronRight className="size-[18px]" /></button>
+          </div>}
+        </div>
+      </div>
       <div className="relative group">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => scroll("left")}
-          className="absolute left-2 top-1/2 z-10 hidden -translate-y-1/2 border border-white/10 bg-background/75 text-foreground/90 opacity-0 backdrop-blur-md transition-opacity hover:bg-primary/20 hover:text-primary group-hover:opacity-100 md:flex"
-          aria-label={`Scroll ${title || "carousel"} left`}
-        >
-          <ChevronLeft className="w-6 h-6" />
-        </Button>
-
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => scroll("right")}
-          className="absolute right-2 top-1/2 z-10 hidden -translate-y-1/2 border border-white/10 bg-background/75 text-foreground/90 opacity-0 backdrop-blur-md transition-opacity hover:bg-primary/20 hover:text-primary group-hover:opacity-100 md:flex"
-          aria-label={`Scroll ${title || "carousel"} right`}
-        >
-          <ChevronRight className="w-6 h-6" />
-        </Button>
-
         <div
           ref={scrollRef}
-          className="carousel-edge-mask flex gap-2.5 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory px-1 pt-2 pb-3 sm:gap-3 md:gap-4 md:px-4 md:pt-3 md:pb-4"
+          className="carousel-edge-mask flex items-start gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory px-1 pt-2 pb-3 sm:gap-4 md:pb-4"
         >
           {isLoading ? (
             Array.from({ length: 8 }).map((_, i) => (
@@ -240,11 +207,9 @@ export default function ContentCarousel({
                 const isPriorityPoster = priorityImages && index < PRIORITY_POSTER_COUNT;
 
                 return (
-                  <motion.button
+                  <motion.div
                     key={`${itemType}-${item.id}`}
-                    type="button"
-                    onClick={() => handleItemClick(item)}
-                    whileHover={{ y: -6 }}
+                    whileHover={{ y: -4 }}
                     whileTap={{ scale: 0.985 }}
                     transition={{ type: "spring", stiffness: 360, damping: 30 }}
                     className={cn(
@@ -252,6 +217,7 @@ export default function ContentCarousel({
                       POSTER_CARD_WIDTH_CLASS,
                     )}
                   >
+                    <button type="button" onClick={() => handleItemClick(item)} aria-label={`View ${getTitle(item)}`} className="block w-full rounded-lg text-left">
                     <div className="relative aspect-2/3 rounded-lg overflow-hidden poster-card">
                       <MediaImage
                         src={getPosterUrl(item.poster_path, "medium")}
@@ -292,19 +258,20 @@ export default function ContentCarousel({
                       </div>
                     </div>
 
-                    <h3 className="mt-2 break-words text-sm font-medium leading-snug line-clamp-2 group-hover/card:text-primary transition-colors">
+                    <h3 className="mt-3 break-words text-sm font-semibold leading-snug line-clamp-2 group-hover/card:text-foreground/80 transition-colors">
                       {getTitle(item)}
                     </h3>
-                    <div className="flex items-center justify-between gap-2">
+                    </button>
+                    <div className="flex min-h-9 items-center justify-between gap-2">
                       <p className="text-xs text-muted-foreground">{getYear(item)}</p>
                       {explanation?.reasons?.length ? (
                         <Popover>
                           <PopoverTrigger asChild>
                             <button
                               type="button"
-                              className="inline-flex items-center gap-1 rounded-full border border-primary/35 bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-primary transition-colors hover:bg-primary hover:text-primary-foreground sm:px-2 sm:tracking-wide"
+                              className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                               onClick={(event) => event.stopPropagation()}
-                              aria-label="Why this recommendation"
+                              aria-label={`Why ${getTitle(item)} is recommended`}
                             >
                               <Sparkles className="h-3 w-3" />
                               <span className="hidden sm:inline">Why This</span>
@@ -347,7 +314,7 @@ export default function ContentCarousel({
                         </Popover>
                       ) : null}
                     </div>
-                  </motion.button>
+                  </motion.div>
                 );
               })}
 
@@ -355,7 +322,7 @@ export default function ContentCarousel({
                 <motion.button
                   type="button"
                   onClick={() => navigate(resolvedViewAllHref)}
-                  whileHover={{ y: -6 }}
+                  whileHover={{ y: -4 }}
                   whileTap={{ scale: 0.985 }}
                   transition={{ type: "spring", stiffness: 360, damping: 30 }}
                   className={cn(
@@ -386,6 +353,6 @@ export default function ContentCarousel({
           )}
         </div>
       </div>
-    </motion.section>
+    </section>
   );
 }

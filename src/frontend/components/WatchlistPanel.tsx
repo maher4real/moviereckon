@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
+import { useReducedMotion } from "motion/react";
 import {
   DndContext,
   closestCenter,
@@ -21,11 +22,9 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Bookmark, GripVertical, Check, Trash2, BookMarked, ExternalLink, ListVideo, Clapperboard } from "lucide-react";
+import { GripVertical, Trash2, BookMarked, ListVideo, X } from "lucide-react";
 import { Button } from "@/frontend/components/ui/button";
-import { ScrollArea } from "@/frontend/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/frontend/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/frontend/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/frontend/components/ui/tooltip";
 import { getWatchlistStatus, useWatchlist, type WatchlistItem, type WatchlistStatus } from "@/frontend/hooks/useWatchlist";
 import { useIsMobile } from "@/frontend/hooks/use-mobile";
@@ -36,9 +35,17 @@ import { cn } from "@/shared/lib/utils";
 
 // ─── Sortable item ──────────────────────────────────────────────────────────
 
+const WATCHLIST_STATUSES: { value: WatchlistStatus; label: string }[] = [
+  { value: "saved", label: "Saved" },
+  { value: "watching", label: "Watching" },
+  { value: "completed", label: "Completed" },
+  { value: "dropped", label: "Dropped" },
+];
+
 function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
   const navigate = useNavigate();
-  const { removeItem, markWatched, setStatus } = useWatchlist();
+  const { removeItem, setStatus, closePanel } = useWatchlist();
+  const [isPending, setIsPending] = useState(false);
   const status = getWatchlistStatus(item);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.id });
@@ -49,23 +56,22 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const handleMarkWatched = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    void markWatched(item.content_id, item.content_type, !item.watched).catch(() => undefined);
-  };
-
   const handleRemove = (e: React.MouseEvent) => {
     e.stopPropagation();
     void removeItem(item.content_id, item.content_type).catch(() => undefined);
   };
 
-  const handleStatusChange = (value: string) => {
+  const handleStatusChange = async (value: string) => {
     const nextStatus = value as WatchlistStatus;
     if (nextStatus === status) return;
-    void setStatus(item.content_id, item.content_type, nextStatus).catch(() => undefined);
+    setIsPending(true);
+    try { await setStatus(item.content_id, item.content_type, nextStatus); }
+    catch { /* The provider restores the previous status and explains the failure. */ }
+    finally { setIsPending(false); }
   };
 
   const handleOpenDetail = () => {
+    closePanel();
     navigate(`/${item.content_type}/${item.content_id}`);
   };
 
@@ -74,13 +80,13 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex flex-wrap items-center gap-1.5 p-1.5 rounded-xl sm:flex-nowrap sm:gap-3 sm:p-2",
-        "bg-card border border-border",
+        "watchlist-item grid min-w-0 grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-x-1 gap-y-3 rounded-xl p-3",
+        "bg-muted/25",
         "motion-safe:transition-colors duration-200",
         "hover:bg-accent/30",
         isDragging && "shadow-lg ring-1 ring-primary/30 z-10",
-        item.watched && "opacity-60",
       )}
+      aria-busy={isPending}
     >
       {/* Drag handle */}
       <button
@@ -92,10 +98,10 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
           "text-muted-foreground hover:text-foreground",
           "motion-safe:transition-colors duration-150",
           "flex items-center justify-center",
-          "min-h-9 min-w-9 sm:min-h-11 sm:min-w-11 md:min-h-0 md:min-w-0 md:p-1",
+          "size-11",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md",
         )}
-        aria-label="Drag to reorder"
+        aria-label={`Reorder ${item.title}`}
       >
         <GripVertical className="h-4 w-4" />
       </button>
@@ -103,16 +109,16 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
       {/* Poster + title — clickable area to open detail */}
       <button
         onClick={handleOpenDetail}
-      className="flex min-w-0 flex-1 items-center gap-2 text-left group/link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg sm:gap-3"
+        className="group/link flex min-w-0 items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         aria-label={`Open ${item.title}`}
       >
-        <div className="shrink-0 w-10 h-14 rounded-lg overflow-hidden bg-muted">
+        <div className="h-18 w-12 shrink-0 overflow-hidden rounded-md bg-muted">
           <MediaImage
             src={getPosterUrl(item.poster_path, "small")}
             alt={item.title}
             className="w-full h-full object-cover"
-            width={40}
-            height={56}
+            width={48}
+            height={72}
             fallbackSrc="/fallbacks/poster.svg"
           />
         </div>
@@ -120,9 +126,8 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
         <div className="flex-1 min-w-0">
           <p
             className={cn(
-              "text-sm font-medium truncate leading-tight",
+              "line-clamp-2 break-words text-sm font-semibold leading-snug",
               "group-hover/link:text-primary motion-safe:transition-colors duration-150",
-              item.watched && "line-through text-muted-foreground",
             )}
           >
             {item.title}
@@ -131,71 +136,48 @@ function SortableWatchlistCard({ item }: { item: WatchlistItem }) {
             <p className="text-xs text-muted-foreground capitalize">
               {item.content_type === "tv" ? "Series" : "Movie"}
             </p>
-            <span className="text-[10px] text-muted-foreground/70">• {status}</span>
-            <ExternalLink className="h-2.5 w-2.5 text-muted-foreground/50 group-hover/link:text-primary/60 motion-safe:transition-colors" />
           </div>
         </div>
       </button>
 
-      {/* Actions */}
-      <div className="ml-auto flex w-full shrink-0 items-center justify-end gap-0.5 border-t border-border/60 pt-1.5 sm:ml-0 sm:w-auto sm:border-0 sm:pt-0 sm:gap-2">
-        <Select value={status} onValueChange={handleStatusChange}>
-          <SelectTrigger
-            className="h-8 w-22.5 px-2 text-[11px] capitalize sm:w-25"
-            aria-label={`Set status for ${item.title}`}
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="z-[70] bg-popover border-border">
-            <SelectItem value="saved">Saved</SelectItem>
-            <SelectItem value="watching">Watching</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-            <SelectItem value="dropped">Dropped</SelectItem>
-          </SelectContent>
-        </Select>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={handleMarkWatched}
-              className={cn(
-                "cursor-pointer rounded-lg",
-                "flex items-center justify-center",
-                "min-h-9 min-w-9 sm:min-h-11 sm:min-w-11 md:min-h-8 md:min-w-8",
-                "motion-safe:transition-colors duration-150",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                item.watched
-                  ? "text-green-500 bg-green-500/10 hover:bg-green-500/20"
-                  : "text-muted-foreground hover:text-green-500 hover:bg-green-500/10",
-              )}
-              aria-label={item.watched ? "Mark as unwatched" : "Mark as watched"}
-            >
-              <Check className="h-4 w-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="top">
-            {item.watched ? "Mark as unwatched" : "Mark as watched"}
-          </TooltipContent>
-        </Tooltip>
-
+      {/* Removing a title is separate from changing its viewing status. */}
         <Tooltip>
           <TooltipTrigger asChild>
             <button
               onClick={handleRemove}
+              disabled={isPending}
               className={cn(
                 "cursor-pointer rounded-lg",
                 "flex items-center justify-center",
-                "min-h-9 min-w-9 sm:min-h-11 sm:min-w-11 md:min-h-8 md:min-w-8",
+                "size-11 shrink-0 disabled:opacity-50",
                 "motion-safe:transition-colors duration-150",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 "text-muted-foreground hover:text-destructive hover:bg-destructive/10",
               )}
-              aria-label="Remove from watchlist"
+              aria-label={`Remove ${item.title} from watchlist`}
             >
               <Trash2 className="h-4 w-4" />
             </button>
           </TooltipTrigger>
           <TooltipContent side="top">Remove</TooltipContent>
         </Tooltip>
+      <div className="col-span-3 grid min-w-0 grid-cols-2 gap-1 border-t border-border/60 pt-2 min-[400px]:grid-cols-4" role="group" aria-label={`Status for ${item.title}`}>
+        {WATCHLIST_STATUSES.map(option => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => void handleStatusChange(option.value)}
+            disabled={isPending}
+            aria-label={`${option.label}: ${item.title}`}
+            aria-pressed={status === option.value}
+            className={cn(
+              "min-h-11 min-w-0 rounded-md px-1 text-xs font-medium transition-colors disabled:opacity-50",
+              status === option.value
+                ? "bg-primary/15 text-foreground ring-1 ring-inset ring-primary/40"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground",
+            )}
+          >{option.label}</button>
+        ))}
       </div>
     </div>
   );
@@ -217,12 +199,15 @@ function WatchlistContent() {
     if (!over || active.id === over.id) return;
     const oldIndex = items.findIndex((i) => i.id === active.id);
     const newIndex = items.findIndex((i) => i.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    // Completed titles stay in their own group; dragging changes order, not status.
+    if ((getWatchlistStatus(items[oldIndex]) === "completed") !== (getWatchlistStatus(items[newIndex]) === "completed")) return;
     void reorder(arrayMove(items, oldIndex, newIndex)).catch(() => undefined);
   };
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-2 pt-2">
+      <div className="flex flex-col gap-2 pt-2" role="status" aria-label="Loading watchlist">
         {[1, 2, 3].map((n) => (
           <div
             key={n}
@@ -242,7 +227,7 @@ function WatchlistContent() {
         </div>
         <div>
           <p className="text-sm font-medium text-foreground">Your watchlist is empty</p>
-          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             Tap the bookmark icon on any movie or series to add it here.
           </p>
         </div>
@@ -255,49 +240,53 @@ function WatchlistContent() {
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-      <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-        <div className="flex flex-col gap-2">
+        <div className="flex min-w-0 flex-col gap-3">
+          <SortableContext items={unwatched.map((i) => i.id)} strategy={verticalListSortingStrategy}>
           {unwatched.map((item) => (
             <SortableWatchlistCard key={item.id} item={item} />
           ))}
+          </SortableContext>
 
           {watched.length > 0 && (
             <>
               <div className="flex items-center gap-2 mt-3 mb-1 px-1">
                 <div className="flex-1 h-px bg-border" />
-                <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider shrink-0">
+                <p className="shrink-0 text-xs font-medium text-muted-foreground">
                   Watched ({watched.length})
                 </p>
                 <div className="flex-1 h-px bg-border" />
               </div>
+              <SortableContext items={watched.map((i) => i.id)} strategy={verticalListSortingStrategy}>
               {watched.map((item) => (
                 <SortableWatchlistCard key={item.id} item={item} />
               ))}
+              </SortableContext>
             </>
           )}
         </div>
-      </SortableContext>
     </DndContext>
   );
 }
 
 // ─── FAB + Panel ─────────────────────────────────────────────────────────────
 
-import { useEffect, useRef } from "react";
 import type { WatchlistFlyEventDetail } from "./ContentCard";
 
 export default function WatchlistPanel() {
   const { user } = useAuth();
-  const { items, isOpen, openPanel, closePanel, toggleItem } = useWatchlist();
+  const { items, isOpen, openPanel, closePanel, toggleItem, isInWatchlist } = useWatchlist();
   const isMobile = useIsMobile();
+  const reduceMotion = useReducedMotion();
   const [isDragOver, setIsDragOver] = useState(false);
   const fabRef = useRef<HTMLButtonElement>(null);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const [flyingPoster, setFlyingPoster] = useState<{ url: string; x: number; y: number; w: number; h: number } | null>(null);
   const [isSwallowing, setIsSwallowing] = useState(false);
 
   useEffect(() => {
     const handleFlyAnim = (e: Event) => {
+      if (reduceMotion) return;
       const customEvent = e as CustomEvent<WatchlistFlyEventDetail>;
       const { x, y, width, height, posterUrl } = customEvent.detail;
       
@@ -312,16 +301,20 @@ export default function WatchlistPanel() {
         document.documentElement.style.setProperty('--fly-y', `${targetY - y}px`);
       }
 
-      setTimeout(() => {
+      timers.current.push(setTimeout(() => {
         setFlyingPoster(null);
         setIsSwallowing(true);
-        setTimeout(() => setIsSwallowing(false), 400);
-      }, 600);
+        timers.current.push(setTimeout(() => setIsSwallowing(false), 400));
+      }, 600));
     };
 
     window.addEventListener("watchlist-fly-anim", handleFlyAnim);
-    return () => window.removeEventListener("watchlist-fly-anim", handleFlyAnim);
-  }, []);
+    return () => {
+      window.removeEventListener("watchlist-fly-anim", handleFlyAnim);
+      timers.current.forEach(clearTimeout);
+      timers.current = [];
+    };
+  }, [reduceMotion]);
 
   if (!user) return null;
 
@@ -343,8 +336,10 @@ export default function WatchlistPanel() {
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
-    setIsSwallowing(true);
-    setTimeout(() => setIsSwallowing(false), 400);
+    if (!reduceMotion) {
+      setIsSwallowing(true);
+      timers.current.push(setTimeout(() => setIsSwallowing(false), 400));
+    }
     try {
       const raw = e.dataTransfer.getData("application/x-watchlist-item");
       if (!raw) return;
@@ -354,34 +349,34 @@ export default function WatchlistPanel() {
         title: string;
         poster_path: string | null;
       };
-      await toggleItem(data);
-      // Let it swallow the item first before opening the panel maybe, but for now just open it
-      setTimeout(() => openPanel(), 300);
+      if (!isInWatchlist(data.content_id, data.content_type)) await toggleItem(data);
+      timers.current.push(setTimeout(() => openPanel(), reduceMotion ? 0 : 300));
     } catch {
       // malformed drag data — ignore
     }
   };
 
   const panelHeader = (
-    <div className="flex items-center justify-between gap-3 border-b border-border px-4 pt-4 pb-3 sm:px-5 sm:pt-5 sm:pb-4">
+    <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
       <div className="flex items-center gap-2.5">
         <ListVideo className="h-5 w-5 text-primary shrink-0" />
-        <span className="font-semibold text-base">Watchlist</span>
+        <h2 id="watchlist-heading" className="text-lg font-semibold">Watchlist</h2>
       </div>
-      {items.length > 0 && (
-        <span className="text-xs font-medium text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-md">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium tabular-nums text-muted-foreground" aria-live="polite">
           {items.length} {items.length === 1 ? "title" : "titles"}
         </span>
-      )}
+        <button type="button" onClick={closePanel} className="flex size-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Close watchlist"><X className="size-5" /></button>
+      </div>
     </div>
   );
 
   const panelBody = (
-    <ScrollArea className="h-[min(24rem,calc(100dvh-12rem))] w-full md:h-110">
-      <div className="px-3 pt-3 pb-4 sm:px-5 sm:pt-4 sm:pb-6">
+    <div className="max-h-[min(32rem,calc(100dvh-15rem))] overflow-y-auto overscroll-contain" data-lenis-prevent>
+      <div className="min-w-0 p-3">
         <WatchlistContent />
       </div>
-    </ScrollArea>
+    </div>
   );
 
   return (
@@ -422,13 +417,13 @@ export default function WatchlistPanel() {
                 className={cn(
                   "group fixed z-[60] rounded-full cursor-pointer overflow-visible",
                   "bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] right-3 size-14",
-                  "md:bottom-6 md:right-6 md:size-16",
+                  "md:bottom-6 md:right-6 md:h-12 md:w-auto md:gap-2.5 md:rounded-xl md:px-4",
                   "border border-primary/35 bg-primary text-primary-foreground",
-                  "shadow-[0_16px_40px_hsl(var(--primary)/0.38)]",
+                  "shadow-[0_10px_28px_hsl(0_0%_0%/0.4)]",
                   "motion-safe:transition-all motion-safe:duration-300",
-                  "hover:-translate-y-0.5 hover:shadow-[0_20px_52px_hsl(var(--primary)/0.48)] active:translate-y-0 active:scale-95",
+                  "hover:-translate-y-0.5 active:translate-y-0 active:scale-95",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                  "[&_svg]:size-6 md:[&_svg]:size-7",
+                  "[&_svg]:size-5",
                   isDragOver
                     ? "scale-110 bg-primary/95 shadow-[0_0_0_10px_hsl(var(--primary)/0.16),0_24px_64px_hsl(var(--primary)/0.58)] ring-4 ring-primary/60 ring-offset-2 ring-offset-background"
                     : "hover:bg-primary/95",
@@ -436,29 +431,14 @@ export default function WatchlistPanel() {
                 )}
                 aria-label="Open Watchlist"
               >
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    "absolute inset-0 rounded-full bg-gradient-to-br from-white/28 via-white/6 to-transparent",
-                    "opacity-90 motion-safe:transition-opacity duration-300",
-                    "group-hover:opacity-100",
-                  )}
-                />
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    "absolute inset-1 rounded-full border border-white/12",
-                    "motion-safe:transition-transform duration-300",
-                    isDragOver && "scale-90",
-                  )}
-                />
-                <Clapperboard
+                <ListVideo
                   data-icon="inline-start"
                   className={cn(
                     "relative motion-safe:transition-transform duration-300",
                     isDragOver ? "scale-110 -rotate-6" : "group-hover:rotate-[-4deg]",
                   )}
                 />
+                <span className="hidden text-sm font-semibold md:inline">Watchlist</span>
                 {unwatchedCount > 0 && !isDragOver && (
                   <span
                     aria-label={`${unwatchedCount} unwatched items`}
@@ -486,7 +466,9 @@ export default function WatchlistPanel() {
           align="end" 
           sideOffset={12}
           collisionPadding={12}
-          className="z-[60] w-[calc(100vw-1.5rem)] max-w-100 p-0 rounded-2xl shadow-2xl border-border bg-card/95 backdrop-blur-md overflow-hidden sm:w-96 md:w-100"
+          onCloseAutoFocus={event => { event.preventDefault(); fabRef.current?.focus(); }}
+          aria-labelledby="watchlist-heading"
+          className="z-[60] w-[min(28rem,calc(100vw-1.5rem))] max-w-[var(--radix-popover-content-available-width)] overflow-hidden rounded-2xl border-border bg-card p-0 shadow-[0_16px_60px_hsl(0_0%_0%/0.5)]"
         >
           {panelHeader}
           {panelBody}

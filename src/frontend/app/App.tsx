@@ -146,8 +146,8 @@ function RouteTransition({ children }: { children: ReactNode }) {
   return (
     <motion.div
       key={location.pathname}
-      initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
-      animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
       transition={{ duration: shouldReduceMotion ? 0.01 : 0.18, ease: [0.22, 1, 0.36, 1] }}
       className="min-h-screen"
     >

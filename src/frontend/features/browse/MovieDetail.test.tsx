@@ -108,7 +108,7 @@ const movie = {
 };
 
 describe("MovieDetail", () => {
-  it("shows saved movie players and the Fetch links control to regular users", () => {
+  it("shows saved movie players and the Fetch links control to regular users", async () => {
     const query = mocks.useQuery.getMockImplementation()!;
     mocks.useQuery.mockImplementation((options) => options.queryKey[0] === "watch-sources" ? {
       data: { sources: [{ links: [{ id: "movie-watch", label: "WATCH", url: "https://player.example/movie", host: "player.example",
@@ -117,14 +117,14 @@ describe("MovieDetail", () => {
     } : query(options));
     render(<MovieDetail />);
     expect(screen.getByRole("region", { name: "Watch movie" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Watch Dune: Part Two/ })).toHaveAttribute("href", "https://player.example/movie");
-    expect(screen.getByRole("button", { name: "Fetch links" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: /Watch Dune: Part Two/ })).toHaveAttribute("href", "https://player.example/movie");
+    expect(await screen.findByRole("button", { name: "Fetch links" })).toBeInTheDocument();
   });
 
-  it("shows the per-movie Fetch links action for admins", () => {
+  it("shows the per-movie Fetch links action for admins", async () => {
     mocks.useAuth.mockReturnValue({ user: { id: "admin", role: "admin" } });
     render(<MovieDetail />);
-    expect(screen.getByRole("button", { name: "Fetch links" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Fetch links" })).toBeInTheDocument();
   });
 
   beforeEach(() => {

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { isIP } from "node:net";
 import { load } from "cheerio";
 import type { ParsedSourcePage, WatchSourceLink } from "@/shared/types/watchSources";
+import { directMediaFormat, isDirectFileLink } from "@/shared/lib/watchSources";
 
 const text = (value: string) => value.replace(/[\uE000-\uF8FF]/g, "").replace(/\s+/g, " ").trim();
 const LANGUAGE_NAMES = /\b(Hindi|English|Tamil|Telugu|Malayalam|Kannada|Punjabi|Gujarati|Bengali|Marathi|Korean|Japanese|Spanish|French|German|Chinese)\b/gi;
@@ -77,14 +78,14 @@ export function parseSourcePage(html: string, sourceUrl: string): ParsedSourcePa
     }
     if (!active || !label || /how to|join|telegram|whatsapp|imdb|trailer/i.test(label)) return;
     const url = publicLink(node.attr("href") || "", sourceUrl);
-    if (!url || url.origin === new URL(sourceUrl).origin) return;
+    if (!url || (url.origin === new URL(sourceUrl).origin && !directMediaFormat(url.href) && !isDirectFileLink(url.href))) return;
     const block = node.closest("h3,h4,h5,h6,p,li");
     const context = text(block.length ? block.text() : label);
     const metadata = `${label} ${context}`;
     const resolutionMatch = metadata.match(/\b(360|480|576|720|1080|1440|2160|4320)p\b/i);
     const resolution = resolutionMatch ? Number(resolutionMatch[1]) : /\b4K\b/i.test(metadata) ? 2160 : /\b8K\b/i.test(metadata) ? 4320 : null;
     const watch = /\bwatch\b|\bplayer\s*[-:]?\s*\d*\b|\bstream(?:ing)?\b/i.test(label);
-    if (!watch && resolution === null) return;
+    if (!watch && resolution === null && !directMediaFormat(url.href) && !isDirectFileLink(url.href)) return;
     const collection = !watch && /\b(?:SDR|HDR|DV|REMUX)\b/i.test(label) && label.includes("|");
     const scope = mediaType === "movie" ? "movie" : collection ? (season === null ? "series" : "season") :
       episode !== null ? (episodeEnd !== null ? "episode-range" : "episode") : season !== null ? "season" : "series";

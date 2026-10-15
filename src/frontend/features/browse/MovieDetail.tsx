@@ -4,8 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import { useUserData } from "@/frontend/hooks/useUserData";
 import { useWatchlist } from "@/frontend/hooks/useWatchlist";
-import { useWatchSources } from "@/frontend/hooks/useWatchSources";
-import { contentSourceLinks } from "@/shared/lib/watchSources";
 import {
   getMovieDetails,
   getMovieCredits,
@@ -29,8 +27,8 @@ import CastList from "@/frontend/components/CastList";
 import MediaImage from "@/frontend/components/MediaImage";
 import ContentReactionButtons from "@/frontend/components/ContentReactionButtons";
 import ShareContentButton from "@/frontend/components/ShareContentButton";
-import FetchWatchLinksButton from "@/frontend/components/FetchWatchLinksButton";
-import { WatchLinksSection } from "@/frontend/components/WatchSourceLinks";
+import DeferredWatchSources from "@/frontend/components/DeferredWatchSources";
+import LoadingIndicator from "@/frontend/components/LoadingIndicator";
 import { Button } from "@/frontend/components/ui/button";
 import {
   Dialog,
@@ -87,8 +85,6 @@ export default function MovieDetail() {
   const hasAutoPlayedRef = useRef(false);
 
   const movieId = Number(id);
-  const watchSources = useWatchSources(movieId, "movie");
-  const sourceLinks = useMemo(() => contentSourceLinks(watchSources.data), [watchSources.data]);
 
   const handleBack = () => {
     const from = (location.state as { from?: string } | null)?.from;
@@ -585,7 +581,7 @@ export default function MovieDetail() {
       <div className="app-page">
         <Header />
         <div className="pt-20">
-          <div className="h-[60vh] bg-muted animate-pulse" />
+          <div className="flex h-[60vh] items-center justify-center bg-muted"><LoadingIndicator label="Loading movie details…" large /></div>
           <div className="container mx-auto px-4 -mt-32 relative z-10">
             <div className="flex gap-8">
               <div className="w-[300px] aspect-[2/3] bg-muted rounded-lg animate-pulse hidden md:block" />
@@ -790,7 +786,7 @@ export default function MovieDetail() {
             </div>
 
             {/* Meta Info */}
-            <div className="mb-6">
+            <div className="detail-metadata mb-6">
               <div className="flex flex-wrap gap-2.5">
                 {matchScore !== null && (
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/35 bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-300">
@@ -829,7 +825,7 @@ export default function MovieDetail() {
                 </span>
               </div>
 
-              <div className="mt-3 rounded-lg border border-border/60 bg-card/45 px-3 py-2.5">
+              <div className="detail-credits mt-4 py-2.5">
                 <dl className="space-y-2 text-sm">
                   <div className="grid grid-cols-[88px_1fr] items-start gap-2">
                     <dt className="text-muted-foreground">Director</dt>
@@ -867,9 +863,8 @@ export default function MovieDetail() {
               )}
             </div>
 
-            {/* Action Buttons - All using primary brand color */}
-            <div className="flex flex-wrap gap-3 mb-8">
-              <FetchWatchLinksButton key={`movie:${movie.id}`} contentId={movie.id} contentType="movie" title={movie.title} />
+            {/* Trailer leads; collection and reaction controls retain a quieter state. */}
+            <div className="detail-actions mb-8 flex flex-wrap gap-2.5">
               {trailerModalKey && (
                 <Button
                   size="lg"
@@ -885,11 +880,12 @@ export default function MovieDetail() {
                 className={cn(
                   "action-btn",
                   watched
-                    ? "brand-primary-button text-primary-foreground"
+                    ? "bg-primary/15 text-foreground ring-1 ring-inset ring-primary/40 hover:bg-primary/20"
                     : "bg-muted text-foreground hover:bg-primary/20 hover:text-primary",
                   watchAnimating && "animate-watched-pop"
                 )}
                 onClick={handleMarkWatched}
+                aria-pressed={watched}
               >
                 <Check className="w-5 h-5 mr-2" />
                 {watched ? "Watched" : "Mark as Watched"}
@@ -907,26 +903,25 @@ export default function MovieDetail() {
                 className={cn(
                   "action-btn",
                   bookmarked
-                    ? "brand-primary-button text-primary-foreground"
+                    ? "bg-primary/15 text-foreground ring-1 ring-inset ring-primary/40 hover:bg-primary/20"
                     : "bg-muted text-foreground hover:bg-primary/20 hover:text-primary",
                   bookmarkAnimating && "animate-heart-pop"
                 )}
                 onClick={handleToggleWatchlist}
+                aria-pressed={bookmarked}
               >
                 <Bookmark className={cn("w-5 h-5 mr-2", bookmarked && "fill-current")} />
                 {bookmarked ? "Watchlisted" : "Watchlist"}
               </Button>
             </div>
 
-            <WatchLinksSection heading="Watch movie" context={movie.title} links={sourceLinks}
-              isLoading={watchSources.isLoading} isError={watchSources.isError}
-              onRetry={() => void watchSources.refetch()} />
+            <DeferredWatchSources contentId={movie.id} contentType="movie" title={movie.title} />
 
             <div className="mb-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
               <div>
                 {/* Overview */}
                 <h2 className="text-xl font-semibold mb-3">Overview</h2>
-                <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">
+                <p className="max-w-[72ch] text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">
                   {movie.overview || "No overview available."}
                 </p>
 

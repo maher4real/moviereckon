@@ -11,10 +11,13 @@ export function buildContentSecurityPolicy(nonce: string, isDevelopment: boolean
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://challenges.cloudflare.com${isDevelopment ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://image.tmdb.org https://i.ytimg.com https://img.youtube.com https://secure.gravatar.com https://www.gravatar.com https://avatars.githubusercontent.com https://*.googleusercontent.com https://*.public.blob.vercel-storage.com",
-    "connect-src 'self' https://challenges.cloudflare.com",
+    // HLS manifests/segments use fetch from the browser to rotating HTTPS media hosts.
+    // This SPA can navigate to a detail page without requesting a new document policy.
+    "connect-src 'self' https:",
     "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://www.dailymotion.com https://geo.dailymotion.com https://challenges.cloudflare.com",
     "font-src 'self' data:",
-    "media-src 'self'",
+    "media-src 'self' https: blob:",
+    "worker-src 'self' blob:",
     "form-action 'self'",
     "upgrade-insecure-requests",
   ].join("; ");

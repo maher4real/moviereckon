@@ -11,7 +11,7 @@ import {
   Loader2,
   RotateCcw,
   Search,
-  Sparkles,
+  X,
 } from "lucide-react";
 import { searchMulti, type Movie, type MultiSearchResult, type TVShow } from "@/shared/lib/tmdb";
 import * as mongoClient from "@/frontend/lib/mongodbClient";
@@ -170,16 +170,16 @@ function YourTasteTitleSearch({
           }}
           placeholder="Search a movie or series"
           aria-label="Find a title to teach Reckon"
-          className="pr-10"
+          className="h-11 pr-12"
         />
         {query && (
           <button
             type="button"
             onClick={() => setQuery("")}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="absolute right-0 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Clear title search"
           >
-            ×
+            <X className="size-4" />
           </button>
         )}
       </div>
@@ -307,20 +307,15 @@ export default function YourTastePanel({
   };
 
   return (
-    <section className="surface-panel glass-detail-panel mb-6" aria-labelledby="your-taste-heading">
+    <section className="mb-6" aria-labelledby="your-taste-heading">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="section-glass-icon" aria-hidden="true"><Sparkles className="h-4 w-4" /></span>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Your Taste</p>
-            <Badge variant="outline" className="text-[10px]">Profile v{profile.version}</Badge>
-          </div>
-          <h2 id="your-taste-heading" className="mt-2 text-lg font-semibold">A profile that evolves with you</h2>
+          <h2 id="your-taste-heading" className="text-2xl font-semibold tracking-tight">Your Taste</h2>
           <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
             Chosen preferences guide the starting point. Learned affinities come from your watched, saved, and feedback activity.
           </p>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={onEditPreferences} className="shrink-0 gap-2">
+        <Button type="button" variant="outline" onClick={onEditPreferences} className="min-h-11 shrink-0 gap-2">
           <Edit3 className="h-4 w-4" /> Edit choices
         </Button>
       </div>

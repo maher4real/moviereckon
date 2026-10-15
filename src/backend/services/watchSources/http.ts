@@ -19,6 +19,7 @@ export async function fetchSourceDocument(
   value: string,
   baseUrl: string,
   validators: { etag?: string | null; lastModified?: string | null } = {},
+  options: { signal?: AbortSignal } = {},
 ): Promise<SourceResponse> {
   const initial = publicLink(value, baseUrl);
   const origin = new URL(baseUrl).origin;
@@ -32,7 +33,7 @@ export async function fetchSourceDocument(
       let response: Response | undefined;
       for (let redirects = 0; redirects <= 3; redirects++) {
         response = await fetch(url.href, {
-          redirect: "manual", cache: "no-store", signal: controller.signal,
+          redirect: "manual", cache: "no-store", signal: options.signal ? AbortSignal.any([controller.signal, options.signal]) : controller.signal,
           headers: {
             "User-Agent": "MovieReckon-SourceImporter/1.0",
             Accept: "text/html,application/xhtml+xml",

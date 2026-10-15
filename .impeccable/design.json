@@ -1,0 +1,382 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-15T10:39:36.668268+00:00",
+  "title": "Design System: MovieReckon",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "MovieReckon Red",
+        "tonalRamp": [
+          "oklch(15% 0.2394 27.97)",
+          "oklch(26% 0.2394 27.97)",
+          "oklch(38% 0.2394 27.97)",
+          "oklch(49% 0.2394 27.97)",
+          "oklch(61% 0.2394 27.97)",
+          "oklch(72% 0.2394 27.97)",
+          "oklch(84% 0.2394 27.97)",
+          "oklch(95% 0.2394 27.97)"
+        ]
+      },
+      "primary-foreground": {
+        "role": "neutral",
+        "displayName": "Action White",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.00)",
+          "oklch(26% 0.0000 0.00)",
+          "oklch(38% 0.0000 0.00)",
+          "oklch(49% 0.0000 0.00)",
+          "oklch(61% 0.0000 0.00)",
+          "oklch(72% 0.0000 0.00)",
+          "oklch(84% 0.0000 0.00)",
+          "oklch(95% 0.0000 0.00)"
+        ]
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "Warm Near Black",
+        "tonalRamp": [
+          "oklch(15% 0.0017 49.03)",
+          "oklch(26% 0.0017 49.03)",
+          "oklch(38% 0.0017 49.03)",
+          "oklch(49% 0.0017 49.03)",
+          "oklch(61% 0.0017 49.03)",
+          "oklch(72% 0.0017 49.03)",
+          "oklch(84% 0.0017 49.03)",
+          "oklch(95% 0.0017 49.03)"
+        ]
+      },
+      "foreground": {
+        "role": "neutral",
+        "displayName": "Warm White",
+        "tonalRamp": [
+          "oklch(15% 0.0007 48.74)",
+          "oklch(26% 0.0007 48.74)",
+          "oklch(38% 0.0007 48.74)",
+          "oklch(49% 0.0007 48.74)",
+          "oklch(61% 0.0007 48.74)",
+          "oklch(72% 0.0007 48.74)",
+          "oklch(84% 0.0007 48.74)",
+          "oklch(95% 0.0007 48.74)"
+        ]
+      },
+      "card": {
+        "role": "neutral",
+        "displayName": "Raised Charcoal",
+        "tonalRamp": [
+          "oklch(15% 0.0023 48.60)",
+          "oklch(26% 0.0023 48.60)",
+          "oklch(38% 0.0023 48.60)",
+          "oklch(49% 0.0023 48.60)",
+          "oklch(61% 0.0023 48.60)",
+          "oklch(72% 0.0023 48.60)",
+          "oklch(84% 0.0023 48.60)",
+          "oklch(95% 0.0023 48.60)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted Charcoal",
+        "tonalRamp": [
+          "oklch(15% 0.0045 48.55)",
+          "oklch(26% 0.0045 48.55)",
+          "oklch(38% 0.0045 48.55)",
+          "oklch(49% 0.0045 48.55)",
+          "oklch(61% 0.0045 48.55)",
+          "oklch(72% 0.0045 48.55)",
+          "oklch(84% 0.0045 48.55)",
+          "oklch(95% 0.0045 48.55)"
+        ]
+      },
+      "muted-foreground": {
+        "role": "neutral",
+        "displayName": "Warm Gray",
+        "tonalRamp": [
+          "oklch(15% 0.0082 48.62)",
+          "oklch(26% 0.0082 48.62)",
+          "oklch(38% 0.0082 48.62)",
+          "oklch(49% 0.0082 48.62)",
+          "oklch(61% 0.0082 48.62)",
+          "oklch(72% 0.0082 48.62)",
+          "oklch(84% 0.0082 48.62)",
+          "oklch(95% 0.0082 48.62)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Charcoal Stroke",
+        "tonalRamp": [
+          "oklch(15% 0.0052 48.54)",
+          "oklch(26% 0.0052 48.54)",
+          "oklch(38% 0.0052 48.54)",
+          "oklch(49% 0.0052 48.54)",
+          "oklch(61% 0.0052 48.54)",
+          "oklch(72% 0.0052 48.54)",
+          "oklch(84% 0.0052 48.54)",
+          "oklch(95% 0.0052 48.54)"
+        ]
+      },
+      "secondary": {
+        "role": "primary",
+        "displayName": "Deep Red",
+        "tonalRamp": [
+          "oklch(15% 0.1441 25.56)",
+          "oklch(26% 0.1441 25.56)",
+          "oklch(38% 0.1441 25.56)",
+          "oklch(49% 0.1441 25.56)",
+          "oklch(61% 0.1441 25.56)",
+          "oklch(72% 0.1441 25.56)",
+          "oklch(84% 0.1441 25.56)",
+          "oklch(95% 0.1441 25.56)"
+        ]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Red Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0826 23.46)",
+          "oklch(26% 0.0826 23.46)",
+          "oklch(38% 0.0826 23.46)",
+          "oklch(49% 0.0826 23.46)",
+          "oklch(61% 0.0826 23.46)",
+          "oklch(72% 0.0826 23.46)",
+          "oklch(84% 0.0826 23.46)",
+          "oklch(95% 0.0826 23.46)"
+        ]
+      },
+      "destructive": {
+        "role": "error",
+        "displayName": "Destructive Red",
+        "tonalRamp": [
+          "oklch(15% 0.2082 25.38)",
+          "oklch(26% 0.2082 25.38)",
+          "oklch(38% 0.2082 25.38)",
+          "oklch(49% 0.2082 25.38)",
+          "oklch(61% 0.2082 25.38)",
+          "oklch(72% 0.2082 25.38)",
+          "oklch(84% 0.2082 25.38)",
+          "oklch(95% 0.2082 25.38)"
+        ]
+      },
+      "rating-gold": {
+        "role": "tertiary",
+        "displayName": "Rating Gold",
+        "tonalRamp": [
+          "oklch(15% 0.1641 83.87)",
+          "oklch(26% 0.1641 83.87)",
+          "oklch(38% 0.1641 83.87)",
+          "oklch(49% 0.1641 83.87)",
+          "oklch(61% 0.1641 83.87)",
+          "oklch(72% 0.1641 83.87)",
+          "oklch(84% 0.1641 83.87)",
+          "oklch(95% 0.1641 83.87)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Featured hero titles, with responsive variants."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page headings."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Shelf headings; poster cards use a smaller local variant."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Descriptions and overview text."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Navigation and action labels."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Supporting metadata."
+      }
+    },
+    "shadows": [
+      {
+        "name": "primary-action-rest",
+        "value": "0 6px 18px hsl(0 0% 0% / 0.2)",
+        "purpose": "Refined solid primary action at rest."
+      },
+      {
+        "name": "primary-action-hover",
+        "value": "0 8px 24px hsl(0 0% 0% / 0.3)",
+        "purpose": "Refined primary action on hover."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-fluid",
+        "value": "cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Shared interaction easing."
+      },
+      {
+        "name": "control-transition",
+        "value": "200ms",
+        "purpose": "Common button and card transitions."
+      },
+      {
+        "name": "hero-crossfade",
+        "value": "400ms",
+        "purpose": "Artwork crossfade; zero duration for reduced motion."
+      },
+      {
+        "name": "route-enter",
+        "value": "180ms",
+        "purpose": "Opacity-only route entry; 10ms for reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "watchlist-status-columns",
+        "value": "400px"
+      },
+      {
+        "name": "catalog-three-columns",
+        "value": "540px"
+      },
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      },
+      {
+        "name": "2xl",
+        "value": "1536px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Featured Primary Action",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Solid red featured action.",
+      "html": "<button class=\"ds-primary\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"m8 5 11 7-11 7V5Z\"/></svg>Watch Trailer</button>",
+      "css": ".ds-primary{font-family:Inter,system-ui,sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:0 24px;border:0;border-radius:var(--radius,.5rem);background:hsl(var(--primary,357 92% 48%));color:white;font-size:14px;font-weight:600;box-shadow:0 6px 18px hsl(0 0% 0% / .2);cursor:pointer;transition:background-color 200ms,box-shadow 200ms;transition-timing-function:var(--ease-fluid,cubic-bezier(.22,1,.36,1));}.ds-primary:hover{background:hsl(var(--primary,357 92% 48%) / .9);box-shadow:0 8px 24px hsl(0 0% 0% / .3);}.ds-primary:focus-visible{outline:2px solid hsl(var(--ring,357 92% 48%));outline-offset:3px;}.ds-primary:disabled{opacity:.5;pointer-events:none;}"
+    },
+    {
+      "name": "Featured Outline Action",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Companion action over artwork.",
+      "html": "<button class=\"ds-outline\">More Info</button>",
+      "css": ".ds-outline{font-family:Inter,system-ui,sans-serif;min-height:48px;padding:0 20px;border:1px solid hsl(0 0% 100% / .25);border-radius:var(--radius,.5rem);background:hsl(0 0% 100% / .1);color:white;font-size:14px;font-weight:600;backdrop-filter:blur(4px);cursor:pointer;transition:background-color 200ms;}.ds-outline:hover{background:hsl(0 0% 100% / .2);}.ds-outline:focus-visible{outline:2px solid hsl(var(--ring,357 92% 48%));outline-offset:3px;}"
+    },
+    {
+      "name": "Ghost Icon Action",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "A quiet 44px icon action.",
+      "html": "<button class=\"ds-ghost\" aria-label=\"Open search\"><svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg></button>",
+      "css": ".ds-ghost{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;padding:0;border:0;border-radius:6px;background:transparent;color:hsl(var(--foreground,20 8% 98%));cursor:pointer;transition:background-color 200ms,color 200ms;}.ds-ghost:hover{background:hsl(var(--primary,357 92% 48%) / .15);color:hsl(var(--primary,357 92% 48%));}.ds-ghost:active{background:hsl(var(--primary,357 92% 48%) / .25);}.ds-ghost:focus-visible{outline:2px solid hsl(var(--ring,357 92% 48%));outline-offset:3px;}"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Current input primitive; retained 40px default.",
+      "html": "<input class=\"ds-input\" aria-label=\"Search titles\" placeholder=\"Search titles\" />",
+      "css": ".ds-input{font-family:Inter,system-ui,sans-serif;height:40px;width:240px;padding:8px 12px;border:1px solid hsl(var(--input,20 5% 18%));border-radius:calc(var(--radius,.5rem) - 2px);background:hsl(var(--background,20 6% 4%));color:hsl(var(--foreground,20 8% 98%));font-size:16px;line-height:24px;}.ds-input::placeholder{color:hsl(var(--muted-foreground,20 6% 70%));}.ds-input:focus-visible{outline:2px solid hsl(var(--ring,357 92% 48%));outline-offset:2px;}.ds-input:disabled{opacity:.5;cursor:not-allowed;}@media(min-width:768px){.ds-input{font-size:14px;line-height:20px;}}"
+    },
+    {
+      "name": "Desktop Navigation",
+      "kind": "nav",
+      "refersTo": "navigation-link",
+      "description": "Muted text with an active underline.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Primary navigation\"><a class=\"ds-nav-link ds-nav-active\" href=\"#home\" aria-current=\"page\">Home</a><a class=\"ds-nav-link\" href=\"#reckon\">Reckon</a><a class=\"ds-nav-link\" href=\"#movies\">Movies</a></nav>",
+      "css": ".ds-nav{font-family:Inter,system-ui,sans-serif;display:flex;gap:4px;background:hsl(var(--background,20 6% 4%));}.ds-nav-link{position:relative;display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:6px;color:hsl(var(--foreground,20 8% 98%) / .68);font-size:14px;font-weight:500;text-decoration:none;transition:color 160ms,background-color 160ms;}.ds-nav-link:hover{color:hsl(var(--foreground,20 8% 98%));background:hsl(var(--foreground,20 8% 98%) / .055);}.ds-nav-active{color:hsl(var(--foreground,20 8% 98%));font-weight:650;}.ds-nav-active:after{content:\"\";position:absolute;bottom:3px;left:14px;right:14px;height:2px;border-radius:2px;background:hsl(var(--primary,357 92% 48%));}.ds-nav-link:focus-visible{outline:2px solid hsl(var(--ring,357 92% 48%));outline-offset:3px;}"
+    },
+    {
+      "name": "Rating Badge",
+      "kind": "chip",
+      "refersTo": "rating-badge",
+      "description": "Preview label avoids inventing a rating.",
+      "html": "<span class=\"ds-rating\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z\"/></svg>TMDB rating</span>",
+      "css": ".ds-rating{font-family:Inter,system-ui,sans-serif;display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border:1px solid hsl(var(--rating-gold,43 96% 56%) / .5);border-radius:6px;background:hsl(var(--background,20 6% 4%) / .8);color:hsl(var(--rating-gold,43 96% 56%));font-size:12px;font-weight:600;line-height:16px;backdrop-filter:blur(4px);box-shadow:0 8px 20px hsl(var(--rating-gold,43 96% 56%) / .08);}"
+    },
+    {
+      "name": "Poster Card",
+      "kind": "card",
+      "refersTo": "poster-card",
+      "description": "Preview embeds the existing missing-artwork fallback.",
+      "html": "<a class=\"ds-card\" href=\"#title\" aria-label=\"View film title\"><div class=\"ds-poster\"><svg width=\"100%\" height=\"100%\" viewBox=\"0 0 684 1026\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n  <defs>\n    <linearGradient id=\"bg\" x1=\"38\" y1=\"72\" x2=\"646\" y2=\"978\" gradientUnits=\"userSpaceOnUse\">\n      <stop stop-color=\"#0E141D\"/>\n      <stop offset=\"0.46\" stop-color=\"#090E15\"/>\n      <stop offset=\"1\" stop-color=\"#03060A\"/>\n    </linearGradient>\n    <radialGradient id=\"mist\" cx=\"0\" cy=\"0\" r=\"1\" gradientUnits=\"userSpaceOnUse\" gradientTransform=\"translate(198 210) rotate(60) scale(342 286)\">\n      <stop stop-color=\"#7E91A8\" stop-opacity=\"0.03\"/>\n      <stop offset=\"1\" stop-color=\"#7E91A8\" stop-opacity=\"0\"/>\n    </radialGradient>\n    <radialGradient id=\"glow\" cx=\"0\" cy=\"0\" r=\"1\" gradientUnits=\"userSpaceOnUse\" gradientTransform=\"translate(342 513) rotate(90) scale(280 320)\">\n      <stop stop-color=\"#EE3C3C\" stop-opacity=\"0.14\"/>\n      <stop offset=\"1\" stop-color=\"#EE3C3C\" stop-opacity=\"0\"/>\n    </radialGradient>\n    <linearGradient id=\"mark\" x1=\"258\" y1=\"419\" x2=\"426\" y2=\"607\" gradientUnits=\"userSpaceOnUse\">\n      <stop stop-color=\"#FF6B6B\"/>\n      <stop offset=\"0.6\" stop-color=\"#EE3C3C\"/>\n      <stop offset=\"1\" stop-color=\"#C92121\"/>\n    </linearGradient>\n  </defs>\n\n  <rect width=\"100%\" height=\"100%\" rx=\"32\" fill=\"url(#bg)\"/>\n  <rect width=\"100%\" height=\"100%\" rx=\"32\" fill=\"url(#mist)\"/>\n  <rect width=\"100%\" height=\"100%\" rx=\"32\" fill=\"url(#glow)\"/>\n\n  <circle cx=\"342\" cy=\"513\" r=\"112\" fill=\"#EE3C3C\" fill-opacity=\"0.07\"/>\n  <circle cx=\"342\" cy=\"513\" r=\"84\" stroke=\"#EE3C3C\" stroke-opacity=\"0.16\" stroke-width=\"2\"/>\n\n  <g stroke=\"url(#mark)\" stroke-width=\"14\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n    <rect x=\"265\" y=\"436\" width=\"154\" height=\"154\" rx=\"22\"/>\n    <path d=\"M304 436V590\"/>\n    <path d=\"M380 436V590\"/>\n    <path d=\"M265 474H304\"/>\n    <path d=\"M265 513H419\"/>\n    <path d=\"M265 552H304\"/>\n    <path d=\"M380 474H419\"/>\n    <path d=\"M380 552H419\"/>\n  </g>\n</svg>\n</div><h3 class=\"ds-card-title\">Film title</h3><p class=\"ds-card-meta\">Release year</p></a>",
+      "css": ".ds-card{font-family:Inter,system-ui,sans-serif;display:block;width:180px;color:hsl(var(--foreground,20 8% 98%));text-decoration:none;border-radius:8px;transition:transform 200ms;}.ds-poster{aspect-ratio:2/3;overflow:hidden;border:1px solid hsl(0 0% 100% / .1);border-radius:8px;background:hsl(var(--card,20 5% 7%));transition:border-color 200ms;}.ds-poster>svg{display:block;}.ds-card-title{margin:12px 0 0;font-size:14px;font-weight:600;line-height:1.375;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;}.ds-card-meta{margin:4px 0 0;font-size:12px;line-height:16px;color:hsl(var(--muted-foreground,20 6% 70%));}.ds-card:hover{transform:translateY(-4px);}.ds-card:hover .ds-poster{border-color:hsl(var(--foreground,20 8% 98%) / .4);}.ds-card:focus-visible{outline:2px solid hsl(var(--ring,357 92% 48%));outline-offset:3px;}@media(prefers-reduced-motion:reduce){.ds-card{transition:none;}.ds-card:hover{transform:none;}}"
+    },
+    {
+      "name": "Shelf Arrow",
+      "kind": "button",
+      "refersTo": "shelf-arrow",
+      "description": "Native circular shelf control; pair is absent when shelf fits.",
+      "html": "<button class=\"ds-arrow\" aria-label=\"Scroll shelf right\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m9 18 6-6-6-6\"/></svg></button>",
+      "css": ".ds-arrow{display:inline-flex;width:44px;height:44px;flex-shrink:0;align-items:center;justify-content:center;padding:0;border:1px solid hsl(var(--foreground,20 8% 98%) / .14);border-radius:50%;background:hsl(var(--foreground,20 8% 98%) / .035);color:hsl(var(--foreground,20 8% 98%) / .82);cursor:pointer;transition:background-color 160ms,border-color 160ms,color 160ms;}.ds-arrow:hover:not(:disabled){border-color:hsl(var(--foreground,20 8% 98%) / .32);background:hsl(var(--foreground,20 8% 98%) / .1);color:hsl(var(--foreground,20 8% 98%));}.ds-arrow:disabled{border-color:transparent;background:transparent;opacity:.3;cursor:default;}.ds-arrow:focus-visible{outline:2px solid hsl(var(--ring,357 92% 48%));outline-offset:3px;}"
+    },
+    {
+      "name": "Watchlist Entry",
+      "kind": "custom",
+      "refersTo": "watchlist-item",
+      "description": "Visible status buttons below title; remove action remains separate.",
+      "html": "<div class=\"ds-watch\"><button class=\"ds-watch-icon ds-drag\" aria-label=\"Reorder film title\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\"><circle cx=\"9\" cy=\"5\" r=\"1.5\"/><circle cx=\"15\" cy=\"5\" r=\"1.5\"/><circle cx=\"9\" cy=\"12\" r=\"1.5\"/><circle cx=\"15\" cy=\"12\" r=\"1.5\"/><circle cx=\"9\" cy=\"19\" r=\"1.5\"/><circle cx=\"15\" cy=\"19\" r=\"1.5\"/></svg></button><button class=\"ds-watch-title\"><span class=\"ds-watch-poster\"><svg width=\"100%\" height=\"100%\" viewBox=\"0 0 684 1026\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n  <defs>\n    <linearGradient id=\"bg\" x1=\"38\" y1=\"72\" x2=\"646\" y2=\"978\" gradientUnits=\"userSpaceOnUse\">\n      <stop stop-color=\"#0E141D\"/>\n      <stop offset=\"0.46\" stop-color=\"#090E15\"/>\n      <stop offset=\"1\" stop-color=\"#03060A\"/>\n    </linearGradient>\n    <radialGradient id=\"mist\" cx=\"0\" cy=\"0\" r=\"1\" gradientUnits=\"userSpaceOnUse\" gradientTransform=\"translate(198 210) rotate(60) scale(342 286)\">\n      <stop stop-color=\"#7E91A8\" stop-opacity=\"0.03\"/>\n      <stop offset=\"1\" stop-color=\"#7E91A8\" stop-opacity=\"0\"/>\n    </radialGradient>\n    <radialGradient id=\"glow\" cx=\"0\" cy=\"0\" r=\"1\" gradientUnits=\"userSpaceOnUse\" gradientTransform=\"translate(342 513) rotate(90) scale(280 320)\">\n      <stop stop-color=\"#EE3C3C\" stop-opacity=\"0.14\"/>\n      <stop offset=\"1\" stop-color=\"#EE3C3C\" stop-opacity=\"0\"/>\n    </radialGradient>\n    <linearGradient id=\"mark\" x1=\"258\" y1=\"419\" x2=\"426\" y2=\"607\" gradientUnits=\"userSpaceOnUse\">\n      <stop stop-color=\"#FF6B6B\"/>\n      <stop offset=\"0.6\" stop-color=\"#EE3C3C\"/>\n      <stop offset=\"1\" stop-color=\"#C92121\"/>\n    </linearGradient>\n  </defs>\n\n  <rect width=\"100%\" height=\"100%\" rx=\"32\" fill=\"url(#bg)\"/>\n  <rect width=\"100%\" height=\"100%\" rx=\"32\" fill=\"url(#mist)\"/>\n  <rect width=\"100%\" height=\"100%\" rx=\"32\" fill=\"url(#glow)\"/>\n\n  <circle cx=\"342\" cy=\"513\" r=\"112\" fill=\"#EE3C3C\" fill-opacity=\"0.07\"/>\n  <circle cx=\"342\" cy=\"513\" r=\"84\" stroke=\"#EE3C3C\" stroke-opacity=\"0.16\" stroke-width=\"2\"/>\n\n  <g stroke=\"url(#mark)\" stroke-width=\"14\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n    <rect x=\"265\" y=\"436\" width=\"154\" height=\"154\" rx=\"22\"/>\n    <path d=\"M304 436V590\"/>\n    <path d=\"M380 436V590\"/>\n    <path d=\"M265 474H304\"/>\n    <path d=\"M265 513H419\"/>\n    <path d=\"M265 552H304\"/>\n    <path d=\"M380 474H419\"/>\n    <path d=\"M380 552H419\"/>\n  </g>\n</svg>\n</span><span><strong>Film title</strong><small>Movie</small></span></button><button class=\"ds-watch-icon ds-remove\" aria-label=\"Remove from watchlist\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6M14 10v6\"/></svg></button><div class=\"ds-watch-statuses\" role=\"group\" aria-label=\"Status for film title\"><button class=\"ds-status\" aria-pressed=\"true\">Saved</button><button class=\"ds-status\" aria-pressed=\"false\">Watching</button><button class=\"ds-status\" aria-pressed=\"false\">Completed</button><button class=\"ds-status\" aria-pressed=\"false\">Dropped</button></div></div>",
+      "css": ".ds-watch{font-family:Inter,system-ui,sans-serif;display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:12px 4px;width:340px;max-width:100%;padding:12px;border-radius:12px;background:hsl(var(--muted,20 5% 15%) / .25);color:hsl(var(--foreground,20 8% 98%));transition:background-color 200ms;}.ds-watch:hover{background:hsl(var(--accent,357 76% 14%) / .3);}.ds-watch-icon{display:flex;align-items:center;justify-content:center;flex:none;width:44px;height:44px;padding:0;border:0;border-radius:8px;background:transparent;color:hsl(var(--muted-foreground,20 6% 70%));cursor:pointer;}.ds-drag{cursor:grab;}.ds-drag:active{cursor:grabbing;}.ds-watch-title{font-family:Inter,system-ui,sans-serif;display:flex;align-items:center;gap:12px;min-width:0;padding:0;border:0;border-radius:8px;background:transparent;color:hsl(var(--foreground,20 8% 98%));text-align:left;cursor:pointer;}.ds-watch-poster{display:block;width:48px;height:72px;flex:none;overflow:hidden;border-radius:6px;}.ds-watch-title strong{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:14px;font-weight:600;line-height:1.375;overflow-wrap:anywhere;}.ds-watch-title small{display:block;margin-top:2px;font-size:12px;color:hsl(var(--muted-foreground,20 6% 70%));}.ds-watch-statuses{display:grid;grid-column:1/-1;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;padding-top:8px;border-top:1px solid hsl(var(--border,20 5% 18%) / .6);}.ds-status{font-family:Inter,system-ui,sans-serif;min-height:44px;min-width:0;padding:0 4px;border:0;border-radius:6px;background:transparent;color:hsl(var(--muted-foreground,20 6% 70%));font-size:12px;font-weight:500;cursor:pointer;transition:background-color 200ms,color 200ms;}.ds-status[aria-pressed=\"true\"]{background:hsl(var(--primary,357 92% 48%) / .15);color:hsl(var(--foreground,20 8% 98%));box-shadow:inset 0 0 0 1px hsl(var(--primary,357 92% 48%) / .4);}.ds-status:not([aria-pressed=\"true\"]):hover{background:hsl(var(--muted,20 5% 15%));color:hsl(var(--foreground,20 8% 98%));}.ds-watch-title:hover strong{color:hsl(var(--primary,357 92% 48%));}.ds-watch-icon:hover{color:hsl(var(--foreground,20 8% 98%));}.ds-remove:hover{color:hsl(var(--destructive,0 84% 60%));background:hsl(var(--destructive,0 84% 60%) / .1);}.ds-watch button:focus-visible{outline:2px solid hsl(var(--ring,357 92% 48%));outline-offset:3px;}.ds-watch button:disabled{opacity:.5;}@media(min-width:400px){.ds-watch-statuses{grid-template-columns:repeat(4,minmax(0,1fr));}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "MovieReckon's existing cinematic browsing interface",
+    "overview": "MovieReckon retains its warm near-black canvas, red identity, existing logo, and Inter typography. Real film and series artwork carries the visual interest; clear titles, compact metadata, and useful actions support choosing the next watch. Stan, Prime Video, and Netflix inform browsing clarity within this established identity.\n\nThis records the implemented shared navigation, home hero, shelves, poster cards, watchlist entries, and recurring detail patterns. Other routes retain some older glass and gradient treatments; this document does not imply a complete migration.",
+    "keyCharacteristics": [
+      "Warm dark neutrals with solid red actions and selected states.",
+      "Catalog photography, readable scrims, and portrait poster shelves.",
+      "One sans-serif family with strong titles and quiet metadata.",
+      "Responsive navigation and visible, separate watchlist status choices."
+    ],
+    "rules": [
+      {
+        "name": "The Red Action Rule",
+        "body": "Use solid brand red for primary actions. Selected controls may use red tints with light labels. Keep ordinary text and resting surfaces neutral so artwork remains prominent.",
+        "section": "colors"
+      },
+      {
+        "name": "The Title Before Metadata Rule",
+        "body": "Place a semibold title below poster artwork, then quieter metadata. Allow two title lines instead of squeezing the type.",
+        "section": "typography"
+      },
+      {
+        "name": "The Readable Artwork Rule",
+        "body": "Use dark scrims to support text over photography. Keep poster artwork unobstructed at rest apart from useful metadata badges.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do preserve the MovieReckon logo, name, red identity, and established font stack.",
+      "Do show ratings, release years, and recommendation explanations only when supplied by product data.",
+      "Do retain the 44px controls used by refined navigation, poster actions, shelf arrows, and watchlist entries, with visible keyboard focus.",
+      "Do show all four watchlist statuses as buttons, with a separate remove action beside the title.",
+      "Do retain the hero pause control and interaction pause behavior, including its reduced-motion handling."
+    ],
+    "donts": [
+      "Don't fill primary actions with gradients; the refined primary action is solid red.",
+      "Don't hide watchlist statuses in a dropdown; the user selected visible choices.",
+      "Don't rely on hover alone for essential poster actions; the implemented pattern also responds to focus and coarse pointers.",
+      "Don't transform the shared frame or route wrapper around fixed navigation; the frame is static and route transitions change opacity.",
+      "Don't promote legacy glass icon tiles, decorative kickers, glyph headings, or large glows into the default for new surfaces."
+    ]
+  }
+}

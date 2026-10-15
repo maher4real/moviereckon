@@ -1,5 +1,25 @@
 export type SourceMediaType = "movie" | "tv";
 
+export interface WatchSourceIdentity {
+  contentId: number;
+  contentType: SourceMediaType;
+}
+
+export interface DirectMediaSource {
+  url: string;
+  format: "mp4" | "webm" | "hls";
+  label: string;
+}
+
+export interface ResolvedDownload {
+  url: string;
+  filename: string;
+  sizeBytes: number | null;
+  contentType: string;
+  checkedAt: string;
+  expiresAt: string | null;
+}
+
 export interface WatchSourceLink {
   id: string;
   label: string;

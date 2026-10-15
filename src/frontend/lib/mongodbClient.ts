@@ -5,7 +5,27 @@
 import { getPublicMongoApiUrl } from "@/shared/lib/runtimeEnv";
 import type { Era, Mood, Pace, SeedTitle } from "@/shared/lib/recommendation/preferences";
 import type { Movie, TVShow } from "@/shared/lib/tmdb";
-import type { ContentWatchSources, FetchContentSourcesResult, SourceMediaType } from "@/shared/types/watchSources";
+import type { ContentWatchSources, DirectMediaSource, FetchContentSourcesResult, ResolvedDownload, SourceMediaType, WatchSourceIdentity } from "@/shared/types/watchSources";
+
+export async function resolveDownloadLink(identity: WatchSourceIdentity, linkId: string, signal?: AbortSignal): Promise<ResolvedDownload[]> {
+  const response = await fetchWithAuth("/api/watch-sources/resolve", {
+    method: "POST", signal, body: JSON.stringify({ ...identity, linkId }),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(data?.error || "Unable to get this file link");
+  if (!Array.isArray(data?.downloads) || !data.downloads.length) throw new Error("No confirmed file link is available");
+  return data.downloads;
+}
+
+export async function resolveWatchLink(identity: WatchSourceIdentity, linkId: string, signal?: AbortSignal): Promise<DirectMediaSource[]> {
+  const response = await fetchWithAuth("/api/watch-sources/resolve", {
+    method: "POST", signal, body: JSON.stringify({ ...identity, linkId }),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(data?.error || "Unable to load this stream");
+  if (!Array.isArray(data?.sources) || !data.sources.length) throw new Error("No direct stream available");
+  return data.sources;
+}
 
 export async function getWatchSources(
   contentId: number, contentType: SourceMediaType, signal?: AbortSignal,

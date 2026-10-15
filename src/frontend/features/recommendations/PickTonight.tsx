@@ -7,7 +7,6 @@ import {
   Loader2,
   RotateCw,
   Save,
-  Sparkles,
 } from "lucide-react";
 import {
   getMovieDetails,
@@ -23,7 +22,6 @@ import { useToast } from "@/frontend/hooks/use-toast";
 import ContentCard from "@/frontend/components/ContentCard";
 import { Button } from "@/frontend/components/ui/button";
 import { Input } from "@/frontend/components/ui/input";
-import { Badge } from "@/frontend/components/ui/badge";
 import { cn } from "@/shared/lib/utils";
 
 type ContentItem = Movie | TVShow;
@@ -207,28 +205,30 @@ function PickTonightCard({
   const reasons = explanation?.reasons?.map((reason) => reason.label).filter(Boolean) || [];
 
   return (
-    <article className="min-w-0 rounded-xl border border-border/70 bg-background/35 p-3">
-      <ContentCard item={item} type="mixed" showActions={false} />
-      <div className="mt-3 flex flex-wrap gap-1.5" aria-label={`Why ${title} was picked`}>
-        {reasons.length > 0 ? reasons.slice(0, 2).map((reason) => <Badge key={reason} variant="outline" className="text-[10px]">{reason}</Badge>) : <Badge variant="outline" className="text-[10px]">Discovery pick</Badge>}
-        {runtime && <Badge variant="secondary" className="gap-1 text-[10px]"><Clock3 className="h-3 w-3" /> {runtime} min{contentType === "tv" ? " / episode" : ""}</Badge>}
+    <article className="tonight-card min-w-0 snap-start">
+      <ContentCard item={item} type="mixed" showActions={false} variant="landscape" />
+      <div className="mt-2 min-h-10 text-sm leading-relaxed text-muted-foreground" aria-label={`Why ${title} was picked`}>
+        <p className="line-clamp-2">{reasons.length > 0 ? reasons.slice(0, 2).join(" · ") : "Discovery pick"}</p>
+        {runtime && <p className="mt-1 flex items-center gap-1.5 text-xs"><Clock3 className="h-3 w-3" /> {runtime} min{contentType === "tv" ? " / episode" : ""}</p>}
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3" aria-label={`${title} actions`}>
-        <Button type="button" size="sm" variant={liked ? "default" : "outline"} aria-pressed={liked} onClick={(event) => void handleLove(event)} className="gap-1 px-2 text-[11px]">
-          <Heart className={cn("h-3.5 w-3.5", liked && "fill-current")} /> {liked ? "Loved" : "Love"}
-        </Button>
-        <Button type="button" size="sm" variant={saved ? "default" : "outline"} aria-pressed={saved} onClick={(event) => void handleSave(event)} className="gap-1 px-2 text-[11px]">
+      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_44px_44px] gap-2" aria-label={`${title} actions`}>
+        <Button type="button" variant={saved ? "outline" : "default"} aria-pressed={saved} onClick={(event) => void handleSave(event)} className="min-h-11 gap-2 px-3 text-sm">
           <Save className="h-3.5 w-3.5" /> {saved ? "Saved" : "Save"}
         </Button>
-        <Button type="button" size="sm" variant={watched ? "default" : "outline"} aria-pressed={watched} disabled={watched} onClick={(event) => void handleWatched(event)} className="gap-1 px-2 text-[11px]">
-          <Check className="h-3.5 w-3.5" /> {watched ? "Watched" : "Already watched"}
+        <Button type="button" size="icon" variant="outline" aria-pressed={liked} aria-label={liked ? "Loved" : "Love"} title={liked ? "Loved" : "Love"} onClick={(event) => void handleLove(event)} className={cn("size-11", liked && "bg-primary/15 text-foreground ring-1 ring-primary/40")}>
+          <Heart className={cn("size-4", liked && "fill-current")} />
         </Button>
-        <Button type="button" size="sm" variant="ghost" disabled={pendingFeedback !== null} onClick={(event) => void handleFeedback("skip", event)} className="gap-1 px-2 text-[11px] text-muted-foreground hover:text-destructive">
+        <Button type="button" size="icon" variant="outline" aria-pressed={watched} aria-label={watched ? "Watched" : "Already watched"} title={watched ? "Watched" : "Already watched"} disabled={watched} onClick={(event) => void handleWatched(event)} className="size-11">
+          <Check className="size-4" />
+        </Button>
+        <div className="col-span-3 flex items-center justify-between gap-2">
+        <Button type="button" variant="ghost" disabled={pendingFeedback !== null} onClick={(event) => void handleFeedback("skip", event)} className="min-h-11 px-2 text-xs text-muted-foreground hover:text-foreground">
           Not for me
         </Button>
-        <Button type="button" size="sm" variant="ghost" disabled={pendingFeedback !== null} onClick={(event) => void handleFeedback("not_now", event)} className="gap-1 px-2 text-[11px] text-muted-foreground">
+        <Button type="button" variant="ghost" disabled={pendingFeedback !== null} onClick={(event) => void handleFeedback("not_now", event)} className="min-h-11 px-2 text-xs text-muted-foreground">
           Not now
         </Button>
+        </div>
       </div>
     </article>
   );
@@ -312,18 +312,14 @@ export default function PickTonight({
   const hasPartialRuntimeError = maxMinutes !== null && runtimeLookup.failedCount > 0 && !runtimeError;
 
   return (
-    <section className="surface-panel glass-detail-panel mb-6" aria-labelledby="pick-tonight-heading">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="section-glass-icon" aria-hidden="true"><Sparkles className="h-4 w-4" /></span>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Pick Tonight</p>
-          </div>
-          <h2 id="pick-tonight-heading" className="mt-2 text-lg font-semibold">Three eligible choices for now</h2>
-          <p className="mt-1 text-xs text-muted-foreground">Reckon removes titles already watched, liked, saved, or rated before choosing this trio.</p>
+    <section className="pick-tonight mb-10" aria-labelledby="pick-tonight-heading">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h2 id="pick-tonight-heading" className="text-2xl font-semibold tracking-tight">Pick Tonight</h2>
+          <p className="sr-only mt-2 max-w-[62ch] text-sm leading-relaxed text-muted-foreground sm:not-sr-only">Three choices from your feed, excluding titles already watched, liked, saved, or rated.</p>
         </div>
         <div className="flex items-center gap-2">
-          <label htmlFor="pick-tonight-time" className="text-xs text-muted-foreground">Up to</label>
+          <label htmlFor="pick-tonight-time" className="whitespace-nowrap text-sm text-muted-foreground">Up to</label>
           <Input
             id="pick-tonight-time"
             type="number"
@@ -334,7 +330,7 @@ export default function PickTonight({
             onChange={(event) => setTimeInput(event.target.value)}
             placeholder="Any"
             aria-label="Maximum runtime in minutes"
-            className="h-9 w-20 text-xs"
+            className="h-11 w-20 text-base"
           />
           <span className="text-xs text-muted-foreground">min</span>
           {timeInput && (
@@ -343,7 +339,7 @@ export default function PickTonight({
               variant="ghost"
               size="sm"
               onClick={() => setTimeInput("")}
-              className="h-9 px-2 text-xs"
+              className="min-h-11 px-2 text-xs"
             >
               Clear
             </Button>
@@ -358,7 +354,7 @@ export default function PickTonight({
 
       {picks.length > 0 ? (
         <>
-          <div className="mt-4 grid gap-4 md:grid-cols-3">
+          <div className="tonight-grid mt-5">
             {picks.map((item) => {
               const key = pickItemKey(item);
               return <PickTonightCard key={key} item={item} explanation={explanationById[key]} runtime={runtimeByKey[key]} />;
@@ -372,7 +368,7 @@ export default function PickTonight({
               size="sm"
               disabled={eligibleItems.length <= 3}
               onClick={() => setOffset((current) => current + 3 >= eligibleItems.length ? 0 : current + 3)}
-              className="gap-2"
+              className="min-h-11 gap-2"
             >
               <RotateCw className="h-3.5 w-3.5" /> Show another trio
             </Button>

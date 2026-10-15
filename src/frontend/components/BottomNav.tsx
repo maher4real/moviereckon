@@ -34,7 +34,7 @@ export default function BottomNav() {
       transition={{ type: "spring", stiffness: 360, damping: 32 }}
       className="pointer-events-none fixed inset-x-0 bottom-0 z-50 px-2 safe-area-bottom sm:px-3 md:hidden"
     >
-      <div className="pointer-events-auto mx-auto max-w-[31rem] rounded-[1.75rem] border border-primary/20 bg-[linear-gradient(180deg,hsl(var(--card)/0.94),hsl(var(--background)/0.96)),radial-gradient(circle_at_50%_-10%,hsl(var(--primary)/0.20),transparent_18rem)] p-1.5 shadow-[0_18px_48px_hsl(var(--background)/0.82),0_0_30px_hsl(var(--primary)/0.15)] backdrop-blur-xl">
+      <div className="pointer-events-auto mx-auto max-w-[31rem] rounded-[1.5rem] border border-white/10 bg-card/95 p-1.5 shadow-[0_10px_32px_hsl(0_0%_0%/0.5)] backdrop-blur-md">
         <div className="grid h-14 grid-cols-6 items-center gap-0.5 max-[400px]:grid-cols-5 sm:gap-1">
           {navItems.map((item) => {
             const active = isActive(item.href);
@@ -46,7 +46,7 @@ export default function BottomNav() {
                 className={cn(
                   "relative flex h-full min-h-11 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-[1.25rem] px-0.5 transition-colors duration-200 sm:px-1",
                   active
-                    ? "text-primary"
+                    ? "text-foreground"
                     : "text-muted-foreground hover:text-foreground",
                   item.hideOnNarrow && "max-[400px]:hidden",
                 )}
@@ -54,19 +54,19 @@ export default function BottomNav() {
                 {active && (
                   <motion.span
                     layoutId="bottom-nav-active"
-                    className="absolute inset-0 rounded-[1.25rem] border border-primary/30 bg-[image:var(--brand-gradient-soft)] shadow-[inset_0_1px_0_hsl(var(--primary-foreground)/0.08),0_0_18px_hsl(var(--primary)/0.22)]"
+                    className="absolute inset-0 rounded-[1.1rem] bg-primary/12"
                     transition={{ type: "spring", stiffness: 440, damping: 36 }}
                   />
                 )}
                 <span
                   className={cn(
                     "relative z-10 flex size-7 items-center justify-center rounded-full transition-colors duration-200",
-                    active ? "bg-primary/12" : "bg-transparent"
+                    active ? "bg-primary/12 text-primary" : "bg-transparent"
                   )}
                 >
                   <item.icon className={cn("size-[1.125rem]", active && "fill-primary/20")} />
                 </span>
-                <span className="relative z-10 max-w-full truncate text-[9px] font-medium leading-none">
+                <span className="relative z-10 max-w-full truncate text-[10px] font-medium leading-none">
                   {item.label}
                 </span>
               </Link>

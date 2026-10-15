@@ -144,3 +144,31 @@ Old pages are periodically refreshed even when they leave the recent-post index.
 This is incremental discovery with a seed mechanism, not a full historical crawl.
 Source layout changes may require parser updates, and scraping success does not
 establish whether third-party playback or iframe embedding works.
+
+## Direct playback and external pages
+
+### Python resolver and deferred UI
+
+Movie/series details render before the watch-source module or saved-source request begins. The source area loads after two animation frames and an idle callback (800 ms deadline), with a circular loading indicator. Imports remain explicit **Fetch links** actions. Every episode uses the same cached title snapshot, and mounting/focusing another episode does not trigger another refresh. A manual import cancels any pending saved read before replacing that cache, so a late read cannot overwrite fresh links.
+
+The fetch flow stays inline with its loading, error, retry and optional source-page field. Download qualities display as rows; **Get file link** checks only the selected file, then reveals its download action. Fetching/importing a title never resolves all final files in parallel.
+
+`scripts/resolve_watch_links.py` is an independent Python 3.10+ resolver using the standard library. It accepts one JSON object `{ "title": "The Trap", "link": { ...savedWatchSourceLink } }` on stdin and returns `{ "downloads": [...] }`. Use `npm run resolve:links < /path/to/input.json`. It preserves the provider allowlists, title/episode/quality/codec matching, expiry checks, document caps and headers/one-byte probes used by the TypeScript resolver. It executes no third-party scripts and downloads no full media files.
+
+`WATCH_SOURCE_RESOLVER=auto` starts the Python script only when a local **Get file link** request arrives, and uses TypeScript if Python is absent. `WATCH_SOURCE_RESOLVER=typescript` explicitly selects the existing engine. `WATCH_SOURCE_RESOLVER=python` requires a working Python executable locally or a configured worker. Each request selects one engine; a provider failure does not launch a second scrape in another language. No Python process starts during page loading or an ordinary saved-source lookup.
+
+On Vercel, do not assume Python can be spawned inside a Node.js function. To use Python there, run `npm run worker:links` on a separate Python host, set `WATCH_SOURCE_PYTHON_SECRET` (32+ characters) on both services, and set `WATCH_SOURCE_PYTHON_URL=https://your-worker/resolve` on the app. The worker binds to `127.0.0.1:8765` by default; use a TLS reverse proxy for remote access. It accepts authenticated POST requests only and limits active resolutions to two. Without a worker, auto mode retains TypeScript on Vercel. `WATCH_SOURCE_PYTHON_BIN` selects a local executable. `WATCH_SOURCE_CA_BUNDLE` adds a trusted CA bundle; TLS verification always remains enabled.
+
+Run Python checks with `python3 -B -m unittest discover -s scripts -p '*_test.py'`.
+
+**Get file link** resolves supported HubCDN and HubDrive downloads on demand. HubCDN's published redirect data is decoded without loading its advertising page; HubDrive's file button is followed only through the known HubCloud and Gamerxyt paths. Only the published R2 storage buttons are considered. Returned filenames must match the selected title, season/episode or season pack, resolution and known codec. A HEAD probe (or a one-byte range for a signed GET URL) checks file headers and availability. HTML responses, redirects, wrong episodes, ambiguous targets and expired URLs are rejected. This checks filenames/headers, not the movie's contents. The final file goes directly from the storage host to the viewer; the API never buffers/proxies the full video. File links are generated when requested and can be refreshed because signed URLs expire. Other domains and unsupported/challenged flows retain their external-page option.
+
+The document CSP allows HTTPS connections/media and local blob media/workers so HLS can run after SPA navigation. This broadens the connection/media destinations for rotating media hosts; script nonces and the existing frame allowlist remain enforced. No provider scripts are embedded in the player.
+
+Imported labels such as WATCH or 1080p describe the publisher's link; they do not prove that the URL is a working video. Most saved URLs lead to third-party player/download pages. Those pages are now collapsed under **External sites · may show ads** in both detail pages and fetch results.
+
+**Play here** uses a native video element for HTTPS MP4/WebM files and native HLS or a lazily loaded hls.js player for HLS. It supports movie links and explicitly scoped single-episode links. Season packs and episode ranges are never substituted for a single episode. HLS quality and audio choices come from the actual manifest. Published MP4/WebM, MKV/MOV/AVI and ZIP/RAR/7z URLs have **Open / save file**; cross-origin servers and browsers determine whether they save or open. HLS manifests are not offered as movie downloads.
+
+The signed-in `POST /api/watch-sources/resolve` endpoint accepts only a content ID/type and saved link ID, with origin/AJAX checks and a 20/minute per-user limit. It resolves Play4u movie pages by reading their published JSON and comparing both TMDB and IMDb identity. It does not execute provider scripts, follow ad chains, or fetch arbitrary URLs. Resolution happens on play, returns `no-store`, and is not persisted because stream URLs can expire. Other provider adapters, including hash-based Hubstream episode pages and scripted HDStream pages, are not implemented; they remain external fallbacks.
+
+All video/manifest/segment traffic goes from the browser to the media host. Vercel serves the app and the small resolution response, not a media proxy. The host can still reject playback because of CORS, referrer restrictions, expiry or outages. A successful JSON resolution is not verification of playback, language, quality or movie contents. Playback errors stay inside the app and never automatically open the provider's ad page. Existing saved links need no migration for this UI; newly discovered file links are picked up by **Fetch links**.

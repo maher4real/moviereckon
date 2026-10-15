@@ -59,11 +59,11 @@ export default function Footer() {
 
   return (
     <footer className="relative mt-auto border-t border-border/70 bg-background">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_18%,hsl(var(--primary)/0.18),transparent_40%),radial-gradient(circle_at_88%_90%,hsl(var(--accent)/0.2),transparent_35%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-card/30 to-transparent" />
 
       <div className="container relative mx-auto px-4 py-10 md:py-12">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,2fr)]">
-          <div className="rounded-2xl border border-border/80 bg-card/60 p-5 backdrop-blur">
+          <div className="max-w-sm py-2">
             <Link to="/home" className="mb-3 inline-flex items-center">
               <BrandLogo size="md" />
             </Link>
@@ -97,18 +97,18 @@ export default function Footer() {
             {footerSections.map((section) => (
               <div
                 key={section.title}
-                className="rounded-2xl border border-border/70 bg-card/35 p-4 backdrop-blur"
+                className="py-2"
               >
                 <h3 className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-foreground">
                   <section.icon className="h-4 w-4 text-primary" />
                   {section.title}
                 </h3>
-                <ul className="space-y-2">
+                <ul className="space-y-1">
                   {section.links.map((link) => (
                     <li key={link.label}>
                       <Link
                         to={link.href}
-                        className="group inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                        className="group inline-flex min-h-11 items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
                       >
                         <span>{link.label}</span>
                         <ArrowUpRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />

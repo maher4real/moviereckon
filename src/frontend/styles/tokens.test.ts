@@ -94,12 +94,12 @@ describe("panel blur on small screens", () => {
 });
 
 describe("content grid", () => {
-  it("starts at two columns on phones and adds a third at 480px", () => {
+  it("keeps posters readable with two phone columns and expands from 540px", () => {
     const grid = block(".content-grid");
     expect(grid).toContain("grid-cols-2");
-    expect(grid).toContain("min-[480px]:grid-cols-3");
+    expect(grid).toContain("min-[540px]:grid-cols-3");
     expect(grid).not.toMatch(/(^|\s)grid-cols-3(\s|;)/);
-    for (const step of ["sm:grid-cols-4", "md:grid-cols-5", "lg:grid-cols-6", "xl:grid-cols-7"]) {
+    for (const step of ["md:grid-cols-4", "lg:grid-cols-5", "xl:grid-cols-6"]) {
       expect(grid).toContain(step);
     }
   });

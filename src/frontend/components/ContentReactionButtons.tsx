@@ -74,7 +74,7 @@ export default function ContentReactionButtons({
           type="button"
           onClick={(event) => void applyReaction("like", event)}
           className={cn(
-            "p-1.5 rounded action-btn transition-all",
+            "flex min-h-11 min-w-11 items-center justify-center rounded-md action-btn transition-colors",
             liked
               ? "brand-primary-button text-primary-foreground"
               : "bg-background/80 text-foreground hover:bg-primary/20 hover:text-primary",
@@ -84,13 +84,13 @@ export default function ContentReactionButtons({
           aria-pressed={liked}
           aria-label={liked ? "Unlike" : "Like"}
         >
-          <Heart className={cn("w-3 h-3", liked && "fill-current", activeAction === "like" && "animate-pulse")} />
+          <Heart className={cn("size-4", liked && "fill-current", activeAction === "like" && "animate-pulse")} />
         </button>
         <button
           type="button"
           onClick={(event) => void applyReaction("dislike", event)}
           className={cn(
-            "p-1.5 rounded action-btn transition-all",
+            "flex min-h-11 min-w-11 items-center justify-center rounded-md action-btn transition-colors",
             disliked
               ? "brand-primary-button text-primary-foreground"
               : "bg-background/80 text-foreground hover:bg-primary/20 hover:text-primary",
@@ -100,7 +100,7 @@ export default function ContentReactionButtons({
           aria-pressed={disliked}
           aria-label={disliked ? "Remove dislike" : "Dislike"}
         >
-          <ThumbsDown className={cn("w-3 h-3", disliked && "fill-current", activeAction === "dislike" && "animate-pulse")} />
+          <ThumbsDown className={cn("size-4", disliked && "fill-current", activeAction === "dislike" && "animate-pulse")} />
         </button>
       </>
     );
@@ -113,7 +113,7 @@ export default function ContentReactionButtons({
         className={cn(
           "action-btn",
           liked
-            ? "brand-primary-button text-primary-foreground"
+            ? "bg-primary/15 text-foreground ring-1 ring-inset ring-primary/40 hover:bg-primary/20"
             : "bg-muted text-foreground hover:bg-primary/20 hover:text-primary",
           activeAction === "like" && "animate-heart-pop",
         )}
@@ -128,7 +128,7 @@ export default function ContentReactionButtons({
         className={cn(
           "action-btn",
           disliked
-            ? "brand-primary-button text-primary-foreground"
+            ? "bg-primary/15 text-foreground ring-1 ring-inset ring-primary/40 hover:bg-primary/20"
             : "bg-muted text-foreground hover:bg-primary/20 hover:text-primary",
           activeAction === "dislike" && "animate-heart-pop",
         )}

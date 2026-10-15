@@ -13,5 +13,7 @@ export function useWatchSources(contentId: number, contentType: SourceMediaType)
     enabled: Number.isSafeInteger(contentId) && contentId > 0,
     staleTime: 60_000,
     retry: 1,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 }

@@ -2,6 +2,15 @@ import { describe, expect, it } from "vitest";
 import { buildContentSecurityPolicy } from "./proxy";
 
 describe("nonce CSP", () => {
+  it("allows HTTPS media, HLS requests and local blob workers without enabling provider scripts or frames", () => {
+    const policy = buildContentSecurityPolicy("media-nonce", false);
+    expect(policy).toContain("connect-src 'self' https:;");
+    expect(policy).toContain("media-src 'self' https: blob:;");
+    expect(policy).toContain("worker-src 'self' blob:;");
+    expect(policy).toContain("script-src 'self' 'nonce-media-nonce' 'strict-dynamic' https://challenges.cloudflare.com;");
+    expect(policy).not.toContain("frame-src https:;");
+    expect(policy).not.toContain("'unsafe-eval'");
+  });
   it("requires nonce and removes unsafe inline scripts in production", () => {
     const policy = buildContentSecurityPolicy("nonce-one", false);
     expect(policy).toContain("script-src 'self' 'nonce-nonce-one' 'strict-dynamic'");

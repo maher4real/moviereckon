@@ -70,7 +70,6 @@ describe("saved source queries", () => {
     await screen.findByText("No watch links available yet.");
     fireEvent.click(screen.getByRole("button", { name: "Fetch links" }));
     await screen.findByText("1 link available for this title.");
-    fireEvent.click(screen.getByRole("button", { name: "Close" }));
     const saved = await screen.findByRole("region", { name: "Saved players" });
     await waitFor(() => expect(within(saved).getByRole("link", { name: /Watch movie 42/ })).toHaveAttribute("href", link.url));
     expect(mocks.read).toHaveBeenCalledTimes(1);

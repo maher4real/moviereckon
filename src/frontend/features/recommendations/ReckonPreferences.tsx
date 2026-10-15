@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/frontend/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/frontend/components/ui/sheet";
-import { Check, Sparkles, Globe, Film, Settings2, RefreshCw } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/frontend/components/ui/sheet";
+import { Check, Globe, Film, Settings2, RefreshCw } from "lucide-react";
 import { useUserData } from "@/frontend/hooks/useUserData";
 import { cn } from "@/shared/lib/utils";
 
@@ -68,14 +68,11 @@ export function FirstTimeSetup({
   saving: boolean;
 }) {
   return (
-    <div className="surface-panel glass-detail-panel mb-6 border-primary/30 bg-linear-to-br from-primary/10 via-card/60 to-primary/5 px-6 py-8">
-      <div className="max-w-2xl mx-auto">
+    <div className="pb-6 pt-4">
+      <div className="max-w-3xl">
         {/* Header */}
-        <div className="text-center mb-6">
-          <div className="inline-flex p-3 rounded-xl bg-primary/10 border border-primary/20 mb-4">
-            <Sparkles className="w-8 h-8 text-primary" />
-          </div>
-          <h2 className="text-2xl font-bold text-foreground mb-2">
+        <div className="sr-only">
+          <h2>
             Welcome to Reckon!
           </h2>
           <p className="text-muted-foreground">
@@ -97,7 +94,7 @@ export function FirstTimeSetup({
               className={cn(
                 "text-sm font-medium px-3 py-1 rounded-full transition-all duration-200",
                 langs.length > 0
-                  ? "bg-primary/15 text-primary"
+                  ? "bg-primary/15 text-foreground"
                   : "bg-muted text-muted-foreground",
               )}
             >
@@ -112,8 +109,9 @@ export function FirstTimeSetup({
                   key={code}
                   type="button"
                   onClick={() => onToggleLang(code)}
+                    aria-pressed={active}
                   className={cn(
-                    "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border transition-all duration-200 cursor-pointer",
+                    "flex min-h-11 items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border transition-all duration-200 cursor-pointer",
                     active
                       ? "bg-primary border-primary text-primary-foreground shadow-sm"
                       : "bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground hover:bg-primary/5",
@@ -140,7 +138,7 @@ export function FirstTimeSetup({
               className={cn(
                 "text-sm font-medium px-3 py-1 rounded-full transition-all duration-200",
                 genres.length > 0
-                  ? "bg-primary/15 text-primary"
+                  ? "bg-primary/15 text-foreground"
                   : "bg-muted text-muted-foreground",
               )}
             >
@@ -157,8 +155,9 @@ export function FirstTimeSetup({
                   key={id}
                   type="button"
                   onClick={() => onToggleGenre(id)}
+                    aria-pressed={active}
                   className={cn(
-                    "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border transition-all duration-200 cursor-pointer",
+                    "flex min-h-11 items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border transition-all duration-200 cursor-pointer",
                     active
                       ? "bg-primary border-primary text-primary-foreground shadow-sm"
                       : "bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground hover:bg-primary/5",
@@ -285,10 +284,10 @@ export function PreferencesSheet({
               Recommendation Preferences
             </SheetTitle>
           </SheetHeader>
-          <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+          <SheetDescription className="text-sm text-muted-foreground mt-2 leading-relaxed">
             The engine strongly weights your selections — the more you set, the
             more tailored your feed.
-          </p>
+          </SheetDescription>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
@@ -305,7 +304,7 @@ export function PreferencesSheet({
                 className={cn(
                   "text-xs font-medium px-2 py-0.5 rounded-full transition-all duration-200",
                   langs.length > 0
-                    ? "bg-primary/15 text-primary"
+                    ? "bg-primary/15 text-foreground"
                     : "bg-muted text-muted-foreground",
                 )}
               >
@@ -320,8 +319,9 @@ export function PreferencesSheet({
                     key={code}
                     type="button"
                     onClick={() => toggleLang(code)}
+                    aria-pressed={active}
                     className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 cursor-pointer",
+                      "flex min-h-11 items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-200 cursor-pointer",
                       active
                         ? "bg-primary border-primary text-primary-foreground shadow-sm"
                         : "bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground hover:bg-primary/5",
@@ -350,7 +350,7 @@ export function PreferencesSheet({
                 className={cn(
                   "text-xs font-medium px-2 py-0.5 rounded-full transition-all duration-200",
                   genres.length > 0
-                    ? "bg-primary/15 text-primary"
+                    ? "bg-primary/15 text-foreground"
                     : "bg-muted text-muted-foreground",
                 )}
               >
@@ -365,8 +365,9 @@ export function PreferencesSheet({
                     key={id}
                     type="button"
                     onClick={() => toggleGenre(id)}
+                    aria-pressed={active}
                     className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 cursor-pointer",
+                      "flex min-h-11 items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-200 cursor-pointer",
                       active
                         ? "bg-primary border-primary text-primary-foreground shadow-sm"
                         : "bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground hover:bg-primary/5",
@@ -386,7 +387,7 @@ export function PreferencesSheet({
           <Button
             onClick={save}
             disabled={saving || !hasChanges}
-            className="flex-1 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 disabled:opacity-50"
+            className="min-h-11 flex-1 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 disabled:opacity-50"
           >
             {saving ? (
               <RefreshCw className="w-4 h-4 animate-spin mr-2" />
@@ -403,7 +404,7 @@ export function PreferencesSheet({
             variant="outline"
             onClick={onClose}
             disabled={saving}
-            className="cursor-pointer"
+            className="min-h-11 cursor-pointer"
           >
             Cancel
           </Button>

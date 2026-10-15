@@ -4,8 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import { useUserData } from "@/frontend/hooks/useUserData";
 import { useWatchlist } from "@/frontend/hooks/useWatchlist";
-import { useWatchSources } from "@/frontend/hooks/useWatchSources";
-import { contentSourceLinks } from "@/shared/lib/watchSources";
 import {
   getTVShowDetails,
   getTVShowCredits,
@@ -31,8 +29,8 @@ import CastList from "@/frontend/components/CastList";
 import MediaImage from "@/frontend/components/MediaImage";
 import ContentReactionButtons from "@/frontend/components/ContentReactionButtons";
 import ShareContentButton from "@/frontend/components/ShareContentButton";
-import FetchWatchLinksButton from "@/frontend/components/FetchWatchLinksButton";
-import { EpisodeWatchLinks, WatchLinksSection } from "@/frontend/components/WatchSourceLinks";
+import DeferredWatchSources from "@/frontend/components/DeferredWatchSources";
+import LoadingIndicator from "@/frontend/components/LoadingIndicator";
 import { Button } from "@/frontend/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/frontend/components/ui/tabs";
 import {
@@ -103,9 +101,6 @@ export default function TVDetail() {
   const communitySectionRef = useRef<HTMLDivElement>(null);
 
   const tvId = Number(id);
-  const watchSources = useWatchSources(tvId, "tv");
-  const sourceLinks = useMemo(() => contentSourceLinks(watchSources.data), [watchSources.data]);
-  const seriesLinks = sourceLinks.filter((link) => link.scope === "series");
 
   const handleBack = () => {
     const from = (location.state as { from?: string } | null)?.from;
@@ -577,7 +572,7 @@ export default function TVDetail() {
       <div className="app-page">
         <Header />
         <div className="pt-20">
-          <div className="h-[60vh] bg-muted animate-pulse" />
+          <div className="flex h-[60vh] items-center justify-center bg-muted"><LoadingIndicator label="Loading series details…" large /></div>
           <div className="container mx-auto px-4 -mt-32 relative z-10">
             <div className="flex gap-8">
               <div className="w-[300px] aspect-[2/3] bg-muted rounded-lg animate-pulse hidden md:block" />
@@ -794,7 +789,7 @@ export default function TVDetail() {
             </div>
 
             {/* Meta Info */}
-            <div className="mb-6">
+            <div className="detail-metadata mb-6">
               <div className="flex flex-wrap gap-2.5">
                 {matchScore !== null && (
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/35 bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-300">
@@ -838,7 +833,7 @@ export default function TVDetail() {
                 </span>
               </div>
 
-              <div className="mt-3 rounded-lg border border-border/60 bg-card/45 px-3 py-2.5">
+              <div className="detail-credits mt-4 py-2.5">
                 <dl className="space-y-2 text-sm">
                   <div className="grid grid-cols-[98px_1fr] items-start gap-2">
                     <dt className="text-muted-foreground">Created By</dt>
@@ -876,9 +871,8 @@ export default function TVDetail() {
               )}
             </div>
 
-            {/* Action Buttons - All using primary brand color */}
-            <div className="flex flex-wrap gap-3 mb-8">
-              <FetchWatchLinksButton key={`tv:${tvShow.id}`} contentId={tvShow.id} contentType="tv" title={tvShow.name} />
+            {/* Trailer leads; collection and reaction controls retain a quieter state. */}
+            <div className="detail-actions mb-8 flex flex-wrap gap-2.5">
               {trailerModalKey && (
                 <Button
                   size="lg"
@@ -894,11 +888,12 @@ export default function TVDetail() {
                 className={cn(
                   "action-btn",
                   watched
-                    ? "brand-primary-button text-primary-foreground"
+                    ? "bg-primary/15 text-foreground ring-1 ring-inset ring-primary/40 hover:bg-primary/20"
                     : "bg-muted text-foreground hover:bg-primary/20 hover:text-primary",
                   watchAnimating && "animate-watched-pop"
                 )}
                 onClick={handleMarkWatched}
+                aria-pressed={watched}
               >
                 <Check className="w-5 h-5 mr-2" />
                 {watched ? "Watched" : "Mark as Watched"}
@@ -916,28 +911,25 @@ export default function TVDetail() {
                 className={cn(
                   "action-btn",
                   bookmarked
-                    ? "brand-primary-button text-primary-foreground"
+                    ? "bg-primary/15 text-foreground ring-1 ring-inset ring-primary/40 hover:bg-primary/20"
                     : "bg-muted text-foreground hover:bg-primary/20 hover:text-primary",
                   bookmarkAnimating && "animate-heart-pop"
                 )}
                 onClick={handleToggleWatchlist}
+                aria-pressed={bookmarked}
               >
                 <Bookmark className={cn("w-5 h-5 mr-2", bookmarked && "fill-current")} />
                 {bookmarked ? "Watchlisted" : "Watchlist"}
               </Button>
             </div>
 
-            <WatchLinksSection heading="Watch series" context={tvShow.name} links={seriesLinks}
-              isLoading={watchSources.isLoading} isError={watchSources.isError}
-              onRetry={() => void watchSources.refetch()}
-              emptyMessage={sourceLinks.some((link) => link.kind === "watch" && link.scope !== "series") ?
-                "Choose a season and episode below to open its player." : "No watch links available for this series yet."} />
+            <DeferredWatchSources contentId={tvShow.id} contentType="tv" title={tvShow.name} />
 
             <div className="mb-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
               <div>
                 {/* Overview */}
                 <h2 className="text-xl font-semibold mb-3">Overview</h2>
-                <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">
+                <p className="max-w-[72ch] text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">
                   {tvShow.overview || "No overview available."}
                 </p>
 
@@ -1012,11 +1004,8 @@ export default function TVDetail() {
 
                   {seasons.map((season) => (
                     <TabsContent key={season.season_number} value={String(season.season_number)}>
-                      {sourceLinks.some((link) => link.scope === "season" && link.season === season.season_number) && (
-                        <WatchLinksSection heading={`Season ${season.season_number} links`}
-                          context={`${tvShow.name} season ${season.season_number}`}
-                          links={sourceLinks.filter((link) => link.scope === "season" && link.season === season.season_number)} />
-                      )}
+                      <DeferredWatchSources contentId={tvShow.id} contentType="tv" title={tvShow.name}
+                        variant="season" season={season.season_number} />
                       {seasonLoading && selectedSeason === season.season_number ? (
                         <div className="space-y-4">
                           {Array.from({ length: 5 }).map((_, i) => (
@@ -1101,9 +1090,8 @@ export default function TVDetail() {
                                 </div>
                               </div>
 
-                              {!watchSources.isLoading && !watchSources.isError && (
-                                <EpisodeWatchLinks links={sourceLinks} season={season.season_number} episode={episode.episode_number} />
-                              )}
+                              <DeferredWatchSources contentId={tvShow.id} contentType="tv" title={tvShow.name}
+                                variant="episode" season={season.season_number} episode={episode.episode_number} />
 
                               {/* Expanded Overview */}
                               {expandedEpisode === episode.id && episode.overview && (

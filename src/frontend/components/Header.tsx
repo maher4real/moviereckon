@@ -1,231 +1,88 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { Search, Menu, X, User, Home, Tv, Clapperboard, LogOut, Sparkles, CalendarDays, Film } from "lucide-react";
 import { useAuth } from "@/frontend/hooks/useAuth";
-import {
-  Search,
-  Menu,
-  X,
-  User,
-  Home,
-  Tv,
-  Clapperboard,
-  LogOut,
-  Sparkles,
-  CalendarDays,
-  Film,
-} from "lucide-react";
 import BrandLogo from "@/frontend/components/BrandLogo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/frontend/components/ui/avatar";
 import { Button } from "@/frontend/components/ui/button";
 import { cn } from "@/shared/lib/utils";
 
-const preloadSearch = () => {
-  void import("@/frontend/features/browse/Search");
-};
+const navLinks = [
+  { href: "/home", label: "Home", icon: Home },
+  { href: "/reckon", label: "Reckon", icon: Sparkles },
+  { href: "/movies", label: "Movies", icon: Clapperboard },
+  { href: "/series", label: "Series", icon: Tv },
+  { href: "/upcoming", label: "Upcoming", icon: CalendarDays },
+  { href: "/theater", label: "Cinema", icon: Film },
+];
+const preloadSearch = () => { void import("@/frontend/features/browse/Search"); };
 
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
   const { profile, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
-    let rafId: number | null = null;
-    const handleScroll = () => {
-      if (rafId !== null) return;
-      rafId = window.requestAnimationFrame(() => {
-        rafId = null;
-        setIsScrolled(window.scrollY > 50);
-      });
-    };
-
+    const handleScroll = () => setIsScrolled(window.scrollY > 24);
+    handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-      if (rafId !== null) {
-        window.cancelAnimationFrame(rafId);
-      }
-    };
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const navLinks = [
-    { href: "/home", label: "Home", icon: Home },
-    { href: "/reckon", label: "Reckon", icon: Sparkles },
-    { href: "/movies", label: "Movies", icon: Clapperboard },
-    { href: "/series", label: "Series", icon: Tv },
-    { href: "/upcoming", label: "Upcoming", icon: CalendarDays },
-    { href: "/theater", label: "Cinema", icon: Film },
-  ];
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsMobileMenuOpen(false);
+        menuButton.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [isMobileMenuOpen]);
 
-  const isActive = (path: string) => {
-    return location.pathname === path;
-  };
-
-  const handleSignOut = async () => {
-    await signOut();
-    navigate("/");
-  };
-
-  const profileAvatarSrc =
-    typeof profile?.avatar_url === "string" && profile.avatar_url.trim().length > 0
-      ? profile.avatar_url.trim()
-      : undefined;
+  const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(`${path}/`);
+  const goTo = (path: string) => { setIsMobileMenuOpen(false); navigate(path); };
+  const handleSignOut = async () => { await signOut(); goTo("/"); };
+  const avatar = profile?.avatar_url?.trim() || undefined;
 
   return (
-    <header
-      className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
-        isScrolled
-          ? "border-b border-primary/15 bg-[linear-gradient(180deg,hsl(var(--background)/0.97),hsl(var(--background)/0.9)),radial-gradient(circle_at_50%_0%,hsl(var(--primary)/0.18),transparent_32rem)] shadow-[0_14px_42px_hsl(0_0%_0%/0.28)] backdrop-blur-md"
-          : "bg-[linear-gradient(180deg,hsl(var(--background)/0.86),hsl(var(--background)/0.34)_58%,transparent)]",
-      )}
-    >
-      <div className="container mx-auto px-3 sm:px-4">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link
-            to="/home"
-            data-brand-logo-anchor="true"
-            aria-label="MovieReckon home"
-            className="relative z-10 inline-flex shrink-0 items-center transition-opacity hover:opacity-80"
-          >
-            <BrandLogo size="sm" labelClassName="hidden lg:inline" />
-          </Link>
-
-          {/* Desktop Navigation */}
-          <nav className="hidden min-w-0 flex-1 items-center justify-center gap-3 px-3 lg:flex lg:gap-6 lg:px-6">
-            {navLinks.map((link) => {
-              const active = isActive(link.href);
-
-              return (
-                <Link
-                  key={link.href}
-                  to={link.href}
-                  className={cn(
-                    "relative inline-flex h-9 shrink-0 items-center rounded-full px-3 text-sm font-medium transition-colors",
-                    active
-                      ? "text-primary"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  {active && (
-                    <motion.span
-                      layoutId="header-nav-active"
-                      className="absolute inset-0 rounded-full border border-primary/35 bg-[image:var(--brand-gradient-soft)] shadow-[0_0_22px_hsl(var(--primary)/0.22)]"
-                      transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                    />
-                  )}
-                  <span className="relative z-10">{link.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* Right Side Actions */}
-          <div className="relative z-10 flex shrink-0 items-center gap-1 sm:gap-2">
-            {/* Search Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/search")}
-              onPointerEnter={preloadSearch}
-              onFocus={preloadSearch}
-              className="size-11 text-muted-foreground hover:text-foreground"
-              aria-label="Open search"
-            >
-              <Search className="w-5 h-5" />
-            </Button>
-
-            {/* Profile Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/profile")}
-            className="size-11 rounded-full border border-primary/15 bg-background/40 p-0 text-muted-foreground backdrop-blur-sm hover:border-primary/30 hover:bg-primary/10 hover:text-foreground"
-              aria-label="Open profile"
-            >
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={profileAvatarSrc} alt={profile?.username || "Profile"} />
-                <AvatarFallback className="bg-primary/10 text-primary">
-                  <User className="h-4 w-4" />
-                </AvatarFallback>
-              </Avatar>
-            </Button>
-
-            {/* Mobile Menu Toggle */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="size-11 text-muted-foreground hover:text-foreground lg:hidden"
-              aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
-              aria-expanded={isMobileMenuOpen}
-              aria-controls="mobile-header-menu"
-            >
-              {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </Button>
-          </div>
+    <header className="app-header" data-scrolled={isScrolled || isMobileMenuOpen}>
+      <div className="app-header-inner">
+        <Link to="/home" data-brand-logo-anchor="true" aria-label="MovieReckon home" className="shrink-0 rounded-sm transition-opacity hover:opacity-85" onClick={() => setIsMobileMenuOpen(false)}>
+          <BrandLogo size="sm" labelClassName="text-[17px] sm:text-xl" />
+        </Link>
+        <nav aria-label="Primary navigation" className="hidden min-w-0 items-center gap-1 lg:flex">
+          {navLinks.map(({ href, label }) => (
+            <Link key={href} to={href} aria-current={isActive(href) ? "page" : undefined} className={cn("app-nav-link", isActive(href) && "app-nav-link-active")}>
+              {label}
+            </Link>
+          ))}
+        </nav>
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          <Button variant="ghost" onClick={() => goTo("/search")} onPointerEnter={preloadSearch} onFocus={preloadSearch} className="header-search size-11 p-0 xl:w-auto xl:gap-2.5 xl:px-3.5" aria-label="Open search">
+            <Search className="size-[19px]" aria-hidden="true" /><span className="hidden text-sm xl:inline">Search titles</span>
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => goTo("/profile")} className="size-11 rounded-full p-0 hover:bg-white/10" aria-label="Open profile">
+            <Avatar className="size-8 border border-white/15"><AvatarImage src={avatar} alt={profile?.username || "Profile"} /><AvatarFallback className="bg-muted text-foreground"><User className="size-4" /></AvatarFallback></Avatar>
+          </Button>
+          <Button ref={menuButton} variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(open => !open)} className="size-11 text-foreground/80 lg:hidden" aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"} aria-expanded={isMobileMenuOpen} aria-controls="mobile-header-menu">
+            {isMobileMenuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+          </Button>
         </div>
       </div>
-
-      {/* Mobile Menu */}
       <AnimatePresence initial={false}>
         {isMobileMenuOpen && (
-          <motion.div
-            id="mobile-header-menu"
-            key="mobile-header-menu"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className="max-h-[calc(100dvh-4rem)] overflow-x-hidden overflow-y-auto overscroll-contain border-t border-primary/15 bg-[linear-gradient(180deg,hsl(var(--background)/0.98),hsl(var(--card)/0.9))] backdrop-blur-md lg:hidden"
-          >
-            <nav className="container mx-auto flex flex-col gap-2 px-4 pt-4 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]">
-              {navLinks.map((link) => {
-                const active = isActive(link.href);
-
-                return (
-                  <Link
-                    key={link.href}
-                    to={link.href}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className={cn(
-                      "relative flex items-center gap-3 overflow-hidden rounded-lg px-4 py-3 transition-colors",
-                      active
-                        ? "text-primary"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                    )}
-                  >
-                    {active && (
-                      <motion.span
-                        layoutId="mobile-header-nav-active"
-                        className="absolute inset-0 rounded-lg border border-primary/25 bg-[image:var(--brand-gradient-soft)]"
-                        transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                      />
-                    )}
-                    <link.icon className="relative z-10 w-5 h-5" />
-                    <span className="relative z-10">{link.label}</span>
-                  </Link>
-                );
-              })}
-              {profile && (
-                <>
-                  <div className="px-4 py-3 mt-2 border-t border-border">
-                    <p className="text-sm text-muted-foreground">
-                      Logged in as <span className="text-foreground font-medium">{profile.username}</span>
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleSignOut}
-                    className="flex items-center gap-3 px-4 py-3 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
-                  >
-                    <LogOut className="w-5 h-5" />
-                    Sign Out
-                  </button>
-                </>
-              )}
+          <motion.div id="mobile-header-menu" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.18 }} className="max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-white/10 bg-background lg:hidden">
+            <nav aria-label="Expanded navigation" className="grid gap-1 px-4 pt-3 pb-[calc(6rem+env(safe-area-inset-bottom,0px))] sm:px-6">
+              {navLinks.map(({ href, label, icon: Icon }) => (
+                <Link key={href} to={href} onClick={() => setIsMobileMenuOpen(false)} aria-current={isActive(href) ? "page" : undefined} className={cn("flex min-h-12 items-center gap-3 rounded-lg px-4 text-sm font-medium transition-colors", isActive(href) ? "bg-primary/12 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Icon className="size-[18px]" aria-hidden="true" />{label}</Link>
+              ))}
+              {profile && <div className="mt-3 border-t border-border pt-3"><p className="px-4 pb-2 text-xs text-muted-foreground">Logged in as <span className="font-medium text-foreground">{profile.username}</span></p><button type="button" onClick={handleSignOut} className="flex min-h-12 w-full items-center gap-3 rounded-lg px-4 text-sm text-destructive hover:bg-destructive/10"><LogOut className="size-[18px]" />Sign Out</button></div>}
             </nav>
           </motion.div>
         )}
