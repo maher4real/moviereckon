@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
-import { getImporterConfig, sourcePageUrl } from "@/backend/services/watchSources/config";
+import { getCatalogConfigs, getImporterConfig, sourcePageUrl } from "@/backend/services/watchSources/config";
 import { previewSourcePages, runSourceImport } from "@/backend/services/watchSources/importer";
 
 export const runtime = "nodejs";
@@ -49,7 +49,10 @@ async function execute(request: Request, manual: boolean) {
   }
   try {
     if (input.dryRun) return json({ dryRun: true, pages: await previewSourcePages(input.urls!, config) });
-    return json(await runSourceImport({ urls: input.urls }, config));
+    if (input.urls) return json(await runSourceImport({ urls: input.urls }, config));
+    const results = await Promise.allSettled(getCatalogConfigs(config).map((catalog) => runSourceImport({}, catalog)));
+    return json({ catalogs: results.map((result, index) => ({ provider: getCatalogConfigs(config)[index].provider || "hdhub",
+      ...(result.status === "fulfilled" ? result.value : { errors: 1, failed: true }) })) });
   } catch {
     // Do not expose database details, API keys, or upstream HTML in public errors.
     return json({ error: "Watch source import failed; check source and database availability" }, 502);

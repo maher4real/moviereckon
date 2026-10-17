@@ -1,5 +1,8 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useState } from "react";
+import { Play } from "lucide-react";
 import type { SourceMediaType } from "@/shared/types/watchSources";
+import { Button } from "./ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "./ui/dialog";
 import LoadingIndicator from "./LoadingIndicator";
 
 const DetailWatchSection = lazy(() => import("./DetailWatchSection"));
@@ -13,30 +16,28 @@ export interface DetailWatchProps {
   episode?: number;
 }
 
-function Pending({ variant = "content", contentType }: DetailWatchProps) {
-  if (variant !== "content") return <LoadingIndicator label="Loading links…" className="min-h-14 px-4 py-3" />;
-  return <section aria-label={contentType === "movie" ? "Watch movie" : "Watch series"} className="mb-8 min-h-44 rounded-xl border border-border bg-card p-5 sm:p-6">
-    <h2 className="text-lg font-semibold">{contentType === "movie" ? "Watch movie" : "Watch series"}</h2>
-    <LoadingIndicator label="Loading saved links…" large className="min-h-24 justify-center" />
-  </section>;
-}
-
 function DeferredContent(props: DetailWatchProps) {
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    let frame = 0;
-    let idle = 0;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const schedule = () => {
-      if (typeof window.requestIdleCallback === "function") idle = window.requestIdleCallback(() => setReady(true), { timeout: 800 });
-      else timer = setTimeout(() => setReady(true), 80);
-    };
-    // Two frames let the title/poster commit and paint before loading link code/data.
-    if (typeof window.requestAnimationFrame === "function") frame = requestAnimationFrame(() => { frame = requestAnimationFrame(schedule); });
-    else schedule();
-    return () => { if (frame) window.cancelAnimationFrame(frame); if (idle) window.cancelIdleCallback(idle); clearTimeout(timer); };
-  }, []);
-  return ready ? <Suspense fallback={<Pending {...props} />}><DetailWatchSection {...props} /></Suspense> : <Pending {...props} />;
+  const [open, setOpen] = useState(false);
+  const primary = !props.variant || props.variant === "content";
+  const label = props.variant === "episode" ? `Watch episode ${props.episode}` :
+    props.variant === "season" ? `Watch season ${props.season}` : props.contentType === "movie" ? "Watch movie" : "Watch series";
+  return <div className={primary ? "mb-8" : "px-4 py-3"}>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild><Button type="button" variant={primary ? "default" : "outline"} className="min-h-11 gap-2 px-5">
+        <Play className="h-4 w-4" aria-hidden="true" />{label}
+      </Button></DialogTrigger>
+      {open && <DialogContent className="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl [&>button:last-child]:right-2 [&>button:last-child]:top-2 [&>button:last-child]:flex [&>button:last-child]:h-11 [&>button:last-child]:w-11 [&>button:last-child]:items-center [&>button:last-child]:justify-center">
+        <div className="border-b border-border px-5 py-5 pr-12 sm:px-6">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-primary">Watch & download</p>
+          <DialogTitle className="break-words text-xl sm:text-2xl">{props.title}</DialogTitle>
+          <DialogDescription className="mt-2">Choose a source. Links are checked when you play or download.</DialogDescription>
+        </div>
+        <Suspense fallback={<LoadingIndicator label="Opening link search…" className="min-h-48 justify-center" />}>
+          <DetailWatchSection {...props} />
+        </Suspense>
+      </DialogContent>}
+    </Dialog>
+  </div>;
 }
 
 export default function DeferredWatchSources(props: DetailWatchProps) {

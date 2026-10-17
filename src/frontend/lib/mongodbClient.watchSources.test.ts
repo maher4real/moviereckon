@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/shared/lib/runtimeEnv", () => ({ getPublicMongoApiUrl: () => "" }));
-import { fetchWatchLinks, getWatchSources } from "./mongodbClient";
+import { fetchWatchLinks, getWatchSources, readSourceSearchEvents } from "./mongodbClient";
 afterEach(() => vi.restoreAllMocks());
 
 describe("per-title link fetch client", () => {
@@ -34,5 +34,27 @@ describe("per-title link fetch client", () => {
   it("surfaces server validation and configuration errors", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ error: "Configure TMDB_API_KEY" }), { status: 503 }));
     await expect(fetchWatchLinks(42, "movie")).rejects.toThrow("TMDB_API_KEY");
+  });
+});
+
+
+describe("streaming source search", () => {
+  const identity = { contentId: 42, contentType: "movie" as const };
+  const content = { ...identity, sources: [] };
+  const result = { content, status: "imported", importedPages: 1, errors: 0 };
+  it("handles split UTF-8 chunks, heartbeat lines and progressive snapshots", async () => {
+    const bytes = new TextEncoder().encode(`${JSON.stringify({ type: "progress", message: "Searching…" })}\n\n${JSON.stringify({ type: "content", content })}\n${JSON.stringify({ type: "complete", result })}`);
+    const stream = new ReadableStream({ start(controller) {
+      for (let i = 0; i < bytes.length; i += 3) controller.enqueue(bytes.slice(i, i + 3));
+      controller.close();
+    } });
+    const emit = vi.fn();
+    expect(await readSourceSearchEvents(new Response(stream), identity, emit)).toEqual(result);
+    expect(emit.mock.calls.map(([event]) => event.type)).toEqual(["progress", "content", "complete"]);
+    expect(emit.mock.calls[0][0].message).toBe("Searching…");
+  });
+  it("reports interrupted streams and rejects content from another title", async () => {
+    await expect(readSourceSearchEvents(new Response(JSON.stringify({ type: "content", content }) + "\n"), identity, vi.fn())).rejects.toThrow("interrupted");
+    await expect(readSourceSearchEvents(new Response(JSON.stringify({ type: "content", content: { ...content, contentId: 43 } }) + "\n"), identity, vi.fn())).rejects.toThrow("different title");
   });
 });

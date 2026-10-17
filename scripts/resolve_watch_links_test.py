@@ -1,4 +1,5 @@
 import base64
+import codecs
 from email.message import Message
 import importlib.util
 import json
@@ -21,6 +22,13 @@ LINK = {"url": "https://hubcdn.club/file/episode1", "kind": "download", "scope":
 def wrapped(url=FILE):
     value = base64.b64encode(("https://hubcdn.club/dl/?link=" + url).encode()).decode()
     return "<script>const ad='https://ads.example/click';const redirect='https://inventoryidea.com/?r=" + value + "';</script>"
+
+
+def green_html(archive="https://hblinks.lol/archives/123", raw=None):
+    encode = lambda value: base64.b64encode(value.encode()).decode()
+    raw = raw or json.dumps({"w": 10, "l": "https://greenmotors.cc/homelander/", "o": encode(archive)})
+    token = encode(encode(codecs.encode(encode(raw), "rot_13")))
+    return "<script>s('o','" + token + "',180*1000);</script>"
 
 
 def headers(name=NAME, content_type="application/octet-stream"):
@@ -47,6 +55,43 @@ class FakeNetwork:
 
 
 class ResolverTests(unittest.TestCase):
+    def test_greenmotors_resolves_all_trusted_mirrors_and_ignores_failed_mirrors(self):
+        archive = "https://hblinks.lol/archives/123"
+        pages = {"https://greenmotors.cc/?id=YXJjaGl2ZQ==": green_html(),
+                 archive: '<nav><a href="https://hubcdn.club/file/unrelated">No</a></nav><div class="entry-content"><a href="https://hubcdn.club/file/offline">One</a><a href="https://hubcdn.club/file/wrong">Two</a><a href="https://hubcdn.club/file/episode1">Three</a><a href="https://ads.example/track">No</a></div>',
+                 "https://hubcdn.wiki/file/wrong": wrapped(FILE + "2"), "https://hubcdn.wiki/file/episode1": wrapped()}
+        class Mirrors(FakeNetwork):
+            def document(self, url):
+                if url not in self.pages:
+                    self.documents.append(url)
+                    raise OSError("Mirror offline")
+                return super().document(url)
+            def probe(self, url):
+                return (200, headers(NAME.replace("S01E01", "S01E02") if url.endswith("2") else NAME))
+        network = Mirrors(pages=pages)
+        files = resolver.resolve({"title": "The Trap", "link": {**LINK, "url": "https://greenmotors.club/?id=YXJjaGl2ZQ=="}}, network)
+        self.assertEqual([file["url"] for file in files], [FILE])
+        self.assertFalse(any("homelander" in url or "unrelated" in url or "ads.example" in url for url in network.documents))
+
+    def test_greenmotors_direct_provider_destination(self):
+        wrapper = "https://greenmotors.cc/?id=YXJjaGl2ZQ=="
+        network = FakeNetwork(pages={wrapper: green_html(LINK["url"]), "https://hubcdn.wiki/file/episode1": wrapped()})
+        self.assertEqual(resolver.greenmotors_destination(green_html(LINK["url"])), LINK["url"])
+        self.assertIsNone(resolver.greenmotors_archive(green_html(LINK["url"])))
+        result = resolver.resolve({"title": "The Trap", "link": {**LINK, "url": wrapper}}, network)
+        self.assertEqual(result[0]["url"], FILE)
+        self.assertEqual(network.documents, [wrapper, "https://hubcdn.wiki/file/episode1"])
+
+    def test_greenmotors_payload_requires_canonical_data_and_an_allowlisted_archive(self):
+        self.assertEqual(resolver.greenmotors_archive(green_html()), "https://hblinks.lol/archives/123")
+        for destination in ("https://hblinks.lol.evil.example/archives/123", "https://hblinks.lol/archives/123?next=private", "https://127.0.0.1/archives/123", "/archives/123"):
+            self.assertIsNone(resolver.greenmotors_archive(green_html(destination)))
+        self.assertIsNone(resolver.greenmotors_archive(green_html() + green_html("https://hblinks.lol/archives/456")))
+        self.assertIsNone(resolver.greenmotors_archive(green_html().replace("<script>", "").replace("</script>", "")))
+        self.assertIsNone(resolver.greenmotors_archive(green_html(raw='{"w":10,"w":20,"l":"https://greenmotors.cc/homelander/","o":"eA=="}')))
+        for url in ("https://greenmotors.club/?id=YXJjaGl2ZQ==&next=private", "https://greenmotors.club.evil.example/?id=YXJjaGl2ZQ==", "https://greenmotors.cc/other/?id=YXJjaGl2ZQ=="):
+            self.assertFalse(resolver.greenmotors_url(url))
+
     def test_cdn_decodes_only_published_file_and_checks_metadata(self):
         network = FakeNetwork()
         files = resolver.resolve({"title": "The Trap", "link": LINK}, network)
@@ -99,6 +144,47 @@ class ResolverTests(unittest.TestCase):
         network.open = lambda url, method, headers: calls.append((url, method, headers)) or Response()
         network.probe(SIGNED)
         self.assertEqual(calls, [(SIGNED, "GET", {"Range": "bytes=0-0"})])
+
+    def test_head_fallback_and_url_filename_without_disposition(self):
+        network = resolver.Network()
+        calls = []
+        class Response:
+            headers = Message()
+            def __init__(self, status): self.status = status
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def read(self, *args): raise AssertionError("Must not read video")
+        network.open = lambda url, method, headers: calls.append((method, headers)) or Response(405 if method == "HEAD" else 206)
+        network.probe(FILE)
+        self.assertEqual(calls, [("HEAD", {}), ("GET", {"Range": "bytes=0-0"})])
+        name = NAME.replace(".", "_").replace("_mkv", ".mkv")
+        url = FILE + "/" + name
+        metadata = headers()
+        del metadata["Content-Disposition"]
+        result = resolver.probe_file(url, LINK, "The Trap", FakeNetwork(response=(200, metadata)))
+        self.assertEqual(result["filename"], name)
+
+    def test_google_download_host_is_exact_and_still_requires_matching_content(self):
+        url = "https://video-downloads.googleusercontent.com/file"
+        self.assertEqual(resolver.storage_url(url), url)
+        self.assertIsNone(resolver.storage_url("https://video-downloads.googleusercontent.com.evil.example/file"))
+        network = FakeNetwork(pages={"https://hubcdn.wiki/file/episode1": wrapped(url)})
+        self.assertEqual(resolver.resolve({"title": "The Trap", "link": LINK}, network)[0]["url"], url)
+
+    def test_direct_cloud_source(self):
+        link = {**LINK, "url": "https://hubcloud.ist/drive/abc"}
+        next_page = "https://gamerxyt.com/hubcloud.php?host=hubcloud&id=abc&token=fixture"
+        network = FakeNetwork(pages={link["url"]: '<a id="download" href="' + next_page + '">Download</a>',
+            next_page: '<a id="s3" href="' + FILE + '">File</a>'})
+        self.assertEqual(len(resolver.resolve({"title": "The Trap", "link": link}, network)), 1)
+        self.assertEqual(network.documents, [link["url"], next_page])
+
+    def test_release_year_rejects_other_remakes(self):
+        link = {**LINK, "releaseYear": 2026, "scope": "movie", "codec": None}
+        self.assertTrue(resolver.matches("Example.2026.720p.mkv", link, "Example"))
+        self.assertFalse(resolver.matches("Example.1991.720p.mkv", link, "Example"))
+        self.assertFalse(resolver.matches("Example.Returns.2026.720p.mkv", link, "Example"))
+        self.assertFalse(resolver.matches("Example.720p.mkv", link, "Example"))
 
     def test_season_pack_never_becomes_an_episode(self):
         pack = {**LINK, "scope": "season", "episode": None}

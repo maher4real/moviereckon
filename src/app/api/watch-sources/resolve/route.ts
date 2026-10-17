@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       if (!downloads.length) return json({ error: "No working file matching this title and episode could be confirmed. Try another quality or source" }, 422);
       return json({ sources: [], downloads });
     }
-    const sources = await resolveWatchMedia(link, { contentId, contentType });
+    const sources = await resolveWatchMedia(link, { contentId, contentType }, undefined, source.title);
     if (!sources.length) return json({ error: "This host does not expose a supported direct stream for this title" }, 422);
     return json({ sources });
   } catch {

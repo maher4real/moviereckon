@@ -4,6 +4,8 @@ import { z } from "zod";
 import { directMediaFormat, isResolvablePlayer } from "@/shared/lib/watchSources";
 import type { DirectMediaSource, WatchSourceIdentity, WatchSourceLink } from "@/shared/types/watchSources";
 import { fetchSourceDocument } from "./http";
+import { resolveHubStreamMedia } from "./hubStream";
+import { parseHdStreamMedia } from "./packedPlayer";
 import { publicLink } from "./parser";
 
 const playerData = z.object({
@@ -33,12 +35,22 @@ export function parsePlayerMedia(html: string, pageUrl: string, identity: WatchS
 }
 
 export async function resolveWatchMedia(link: WatchSourceLink, identity: WatchSourceIdentity,
-  fetchDocument = fetchSourceDocument): Promise<DirectMediaSource[]> {
+  fetchDocument = fetchSourceDocument, title?: string): Promise<DirectMediaSource[]> {
   // Never turn a season pack or a multi-episode collection into one episode.
   if (link.scope !== "movie" && link.scope !== "episode") return [];
   const format = directMediaFormat(link.url);
   if (format) return [{ url: link.url, format, label: link.quality || link.label }];
-  if (!isResolvablePlayer(link) || identity.contentType !== "movie") return [];
+  if (!isResolvablePlayer(link)) return [];
+  if (new URL(link.url).origin === "https://hubstream.art") {
+    if (!title || (link.scope === "movie") !== (identity.contentType === "movie")) return [];
+    return resolveHubStreamMedia(link, title);
+  }
+  if (new URL(link.url).origin === "https://hdstream4u.com") {
+    if ((link.scope === "movie") !== (identity.contentType === "movie")) return [];
+    const result = await fetchDocument(link.url, "https://hdstream4u.com");
+    return parseHdStreamMedia(result.html || "", link.url);
+  }
+  if (identity.contentType !== "movie") return [];
   // Fixed origin, no arbitrary-URL fetch or traversal of ad/redirect chains.
   const result = await fetchDocument(link.url, "https://play4u.org");
   return parsePlayerMedia(result.html || "", link.url, identity);

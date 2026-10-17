@@ -6,9 +6,9 @@ import Footer from "@/frontend/components/Footer";
 import MediaImage from "@/frontend/components/MediaImage";
 import { Button } from "@/frontend/components/ui/button";
 import { ArrowLeft, Play, Star, Calendar, Tag, Users, Film, User } from "lucide-react";
+import { Skeleton } from "@/frontend/components/ui/skeleton";
 
 const BLOB_HOST = "public.blob.vercel-storage.com";
-const FONT_URL = "https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap";
 
 function isVercelBlob(url: string) {
   try { return new URL(url).hostname.includes(BLOB_HOST); } catch { return false; }
@@ -73,11 +73,14 @@ export default function TheaterDetail() {
         <Header />
         <main className="pt-24">
           {/* Hero skeleton */}
-          <div className="relative h-[60vh] md:h-[75vh] bg-muted animate-pulse" />
-          <div className="container mx-auto px-4 md:px-8 py-8 space-y-4">
-            <div className="h-8 w-64 bg-muted rounded animate-pulse" />
-            <div className="h-4 w-48 bg-muted rounded animate-pulse" />
-            <div className="h-20 bg-muted rounded animate-pulse" />
+          <div role="status" aria-busy="true">
+            <span className="sr-only">Loading film details</span>
+            <Skeleton className="h-[60vh] rounded-none md:h-[75vh]" />
+            <div className="container mx-auto space-y-4 px-4 py-8 md:px-8">
+              <Skeleton className="h-8 w-64" />
+              <Skeleton className="h-4 w-48" />
+              <Skeleton className="h-20 w-full" />
+            </div>
           </div>
         </main>
       </div>
@@ -91,7 +94,7 @@ export default function TheaterDetail() {
         <main className="flex min-h-[60vh] flex-col items-center justify-center gap-4 pt-24">
           <Film className="w-16 h-16 text-muted-foreground/30" />
           <p className="text-muted-foreground">Movie not found.</p>
-          <Button onClick={() => navigate("/theater")}>Back to Cinema</Button>
+          <Button onClick={() => navigate("/theater")}>Back to Theater</Button>
         </main>
       </div>
     );
@@ -99,8 +102,6 @@ export default function TheaterDetail() {
 
   return (
     <div className="app-page text-foreground">
-      <link rel="stylesheet" href={FONT_URL} />
-      <style>{`.bebas { font-family: 'Bebas Neue', sans-serif; }`}</style>
 
       <Header />
 
@@ -132,7 +133,7 @@ export default function TheaterDetail() {
               className="gap-2 text-white/80 hover:text-white hover:bg-white/10 backdrop-blur-sm"
             >
               <ArrowLeft className="w-4 h-4" />
-              Cinema
+              Theater
             </Button>
           </div>
 
@@ -160,7 +161,7 @@ export default function TheaterDetail() {
                     {movie.genre}
                   </span>
                 )}
-                <h1 className="bebas text-4xl sm:text-5xl md:text-6xl leading-none tracking-wide drop-shadow-lg" style={{ textShadow: "0 4px 24px hsl(0 0% 0% / 0.5)" }}>
+                <h1 className="text-4xl font-black leading-none tracking-[-0.04em] drop-shadow-lg sm:text-5xl md:text-6xl" style={{ textShadow: "0 4px 24px hsl(0 0% 0% / 0.5)" }}>
                   {movie.title}
                 </h1>
                 <div className="flex flex-wrap items-center gap-3 text-sm text-white/70">

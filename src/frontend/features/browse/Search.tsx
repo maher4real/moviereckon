@@ -20,12 +20,13 @@ import {
 } from "@/shared/lib/popularSuggestions";
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
+import GenreRail from "@/frontend/components/GenreRail";
 import MediaImage from "@/frontend/components/MediaImage";
 import { PosterGridSkeleton } from "@/frontend/components/AppSkeletons";
 import { Input } from "@/frontend/components/ui/input";
 import { Button } from "@/frontend/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/frontend/components/ui/tabs";
-import { Search as SearchIcon, X, Clock, TrendingUp, Play, Star } from "lucide-react";
+import { Search as SearchIcon, X, Clock, TrendingUp, Play, Star, Tv, CalendarDays, Sparkles } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import {
   fetchSearchPage,
@@ -330,15 +331,17 @@ export default function Search() {
     <div className="app-page flex flex-col pb-20 md:pb-0">
       <Header />
 
-      <main className="page-main">
-        <div className="container mx-auto px-4">
-          {/* Search Input */}
-          <div className="max-w-2xl mx-auto mb-8">
-            <div className="surface-panel glass-detail-panel relative p-2">
-              <SearchIcon className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+      <main className="flex-1 pb-12">
+        <section className="search-hero">
+          <div className="container mx-auto max-w-3xl px-4">
+            <p className="page-kicker text-center">Search MovieReckon</p>
+            <h1 className="mt-2 text-center text-3xl font-black tracking-[-0.03em] sm:text-4xl">Find any movie, show or person</h1>
+            <div className="search-field mt-6">
+              <SearchIcon className="pointer-events-none absolute left-5 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <Input
                 type="text"
                 placeholder="Search movies, TV shows, cast..."
+                aria-label="Search movies, TV shows and cast"
                 value={query}
                 onChange={(e) => updateQuery(e.target.value)}
                 onKeyDown={(e) => {
@@ -348,7 +351,7 @@ export default function Search() {
                   setDebouncedQuery(submitted);
                   saveRecentSearch(submitted);
                 }}
-                className="h-14 border-border/60 bg-background/60 pl-12 pr-12 text-base shadow-none transition-colors focus:border-primary md:text-lg"
+                className="h-14 rounded-full border-white/12 bg-card/80 pl-13 pr-14 text-base shadow-[0_18px_50px_hsl(0_0%_0%/0.35)] transition-colors focus-visible:border-primary/60 md:text-lg"
                 autoFocus
               />
               {query && (
@@ -356,91 +359,86 @@ export default function Search() {
                   variant="ghost"
                   size="icon"
                   onClick={() => updateQuery("")}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full"
                   aria-label="Clear search"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="size-5" />
                 </Button>
               )}
             </div>
 
-            {/* Filter Tabs */}
             {hasSearchQuery && (
-              <Tabs
-                value={filterType}
-                onValueChange={updateFilterType}
-                className="mt-4"
-              >
-                <TabsList className="border border-border/70 bg-card/70">
-                  <TabsTrigger value="all">All</TabsTrigger>
-                  <TabsTrigger value="movie">Movies</TabsTrigger>
-                  <TabsTrigger value="tv">TV Shows</TabsTrigger>
-                  <TabsTrigger value="person">Cast</TabsTrigger>
-                </TabsList>
-              </Tabs>
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                <Tabs value={filterType} onValueChange={updateFilterType}>
+                  <TabsList className="h-auto gap-1 rounded-full border border-white/10 bg-card/70 p-1">
+                    {([["all", "All"], ["movie", "Movies"], ["tv", "TV Shows"], ["person", "Cast"]] as const).map(([value, label]) => (
+                      <TabsTrigger key={value} value={value} className="min-h-9 rounded-full px-4 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">{label}</TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+                {filteredResults.length > 0 && (
+                  <p className="text-xs tabular-nums text-muted-foreground" aria-live="polite">
+                    {searchData?.pages[0]?.total_results?.toLocaleString() ?? filteredResults.length} results
+                  </p>
+                )}
+              </div>
             )}
           </div>
+        </section>
 
+        <div className="container mx-auto px-4">
           {/* Content */}
           {!normalizedQuery ? (
-            // Recent Searches
-            <div className="mx-auto max-w-2xl space-y-8">
-              {recentSearches.length > 0 && (
-                <div className="surface-panel glass-detail-panel p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="flex items-center gap-2.5 text-lg font-semibold">
-                      <span className="section-glass-icon" aria-hidden="true">
-                        <Clock className="h-4 w-4" />
-                      </span>
-                      Recent Searches
-                    </h2>
-                    <Button variant="ghost" size="sm" onClick={clearRecentSearches}>
-                      Clear
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {recentSearches.map((search) => (
-                      <Button
-                        key={search}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleRecentSearchClick(search)}
-                        className="filter-chip"
-                      >
-                        {search}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              )}
+            <div className="grid gap-10">
+              <div className="mx-auto grid w-full max-w-3xl gap-6 md:grid-cols-2">
+                {recentSearches.length > 0 && (
+                  <section className="surface-panel p-5" aria-labelledby="recent-searches">
+                    <div className="mb-4 flex items-center justify-between">
+                      <h2 id="recent-searches" className="flex items-center gap-2 text-base font-semibold">
+                        <Clock className="size-4 text-primary" aria-hidden="true" />Recent searches
+                      </h2>
+                      <Button variant="ghost" size="sm" onClick={clearRecentSearches} className="text-muted-foreground">Clear</Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {recentSearches.map((search) => (
+                        <button key={search} type="button" onClick={() => handleRecentSearchClick(search)} className="browse-genre-chip">{search}</button>
+                      ))}
+                    </div>
+                  </section>
+                )}
 
-              {/* Trending Suggestions */}
-              <div className="surface-panel glass-detail-panel p-4">
-                <h2 className="mb-4 flex items-center gap-2.5 text-lg font-semibold">
-                  <span className="section-glass-icon" aria-hidden="true">
-                    <TrendingUp className="h-4 w-4" />
-                  </span>
-                  Popular Searches
-                </h2>
-                <div className="flex flex-wrap gap-2">
-                  {popularSuggestions.length > 0 ? (
-                    popularSuggestions.map((suggestion) => (
-                      <Button
-                        key={suggestion}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => updateQuery(suggestion)}
-                        className="filter-chip"
-                      >
-                        {suggestion}
-                      </Button>
-                    ))
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Popular suggestions are loading.
-                    </p>
-                  )}
-                </div>
+                <section className={cn("surface-panel p-5", recentSearches.length === 0 && "md:col-span-2")} aria-labelledby="popular-searches">
+                  <h2 id="popular-searches" className="mb-4 flex items-center gap-2 text-base font-semibold">
+                    <TrendingUp className="size-4 text-primary" aria-hidden="true" />Popular this week
+                  </h2>
+                  <div className="flex flex-wrap gap-2">
+                    {popularSuggestions.length > 0 ? (
+                      popularSuggestions.map((suggestion) => (
+                        <button key={suggestion} type="button" onClick={() => updateQuery(suggestion)} className="browse-genre-chip">{suggestion}</button>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Popular suggestions are loading.</p>
+                    )}
+                  </div>
+                </section>
+              </div>
+
+              <nav className="mx-auto grid w-full max-w-3xl grid-cols-2 gap-3 sm:grid-cols-4" aria-label="Quick browse">
+                {[
+                  { href: "/movies?category=trending", label: "Trending films", icon: TrendingUp },
+                  { href: "/series?category=popular", label: "Popular series", icon: Tv },
+                  { href: "/upcoming", label: "Coming soon", icon: CalendarDays },
+                  { href: "/reckon", label: "Your Reckon", icon: Sparkles },
+                ].map((item) => (
+                  <button key={item.href} type="button" onClick={() => navigate(item.href)} className="search-shortcut">
+                    <item.icon className="size-5 text-primary" aria-hidden="true" />
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </nav>
+
+              <div className="-mx-4 sm:mx-0">
+                <GenreRail enabled />
               </div>
             </div>
           ) : !hasSearchQuery ? (

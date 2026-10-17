@@ -6,8 +6,10 @@ const mocks = vi.hoisted(() => ({
   handlers: new Map<string, (event: string, data: unknown) => void>(),
   load: vi.fn(), attach: vi.fn(), destroy: vi.fn(), supported: vi.fn(),
   engine: { currentLevel: -1, audioTrack: 0 },
+  config: null as Record<string, unknown> | null,
 }));
-vi.mock("hls.js", () => ({ default: class {
+vi.mock("hls.js", () => ({ FetchLoader: class {}, default: class {
+  constructor(config: Record<string, unknown>) { mocks.config = config; }
   static isSupported = mocks.supported;
   static Events = { ERROR: "error", MANIFEST_PARSED: "manifest", AUDIO_TRACKS_UPDATED: "audio" };
   levels = [{ height: 480 }, { height: 1080 }];
@@ -28,9 +30,34 @@ beforeEach(() => {
   vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
   vi.spyOn(HTMLMediaElement.prototype, "canPlayType").mockReturnValue("");
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("HLS player lifecycle", () => {
+  it("plays supplied playlist metadata from a local Blob and releases it on close", async () => {
+    const create = vi.fn((_blob: Blob) => "blob:https://moviereckon.example/playlist");
+    const revoke = vi.fn();
+    vi.stubGlobal("URL", Object.assign(class extends URL {}, { createObjectURL: create, revokeObjectURL: revoke }));
+    render(<DirectWatchPlayer link={link} context="Example" media={{ url: link.url, format: "hls", label: "720p",
+      hlsPlaylist: "#EXTM3U\n#EXTINF:4,\nhttps://media.example/segment.ts\n#EXT-X-ENDLIST\n" }} />);
+    expect(create).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /Play here/ }));
+    await waitFor(() => expect(mocks.load).toHaveBeenCalledWith("blob:https://moviereckon.example/playlist"));
+    expect(create.mock.calls[0][0]).toBeInstanceOf(Blob);
+    expect(revoke).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(revoke).toHaveBeenCalledWith("blob:https://moviereckon.example/playlist");
+  });
+  it("honors a source's referrer policy for playlist and media fetches even when native HLS is advertised", async () => {
+    vi.mocked(HTMLMediaElement.prototype.canPlayType).mockReturnValue("probably");
+    render(<DirectWatchPlayer link={link} context="Example" media={{ url: link.url, format: "hls", label: "Auto", referrerPolicy: "no-referrer" }} />);
+    fireEvent.click(screen.getByRole("button", { name: /Play here/ }));
+    await waitFor(() => expect(mocks.attach).toHaveBeenCalled());
+    const setup = mocks.config!.fetchSetup as (context: { url: string }, init: RequestInit) => Request;
+    const request = setup({ url: "https://media.example/fragment" }, { method: "GET" });
+    expect(request.referrerPolicy).toBe("no-referrer");
+    expect(request.url).toBe("https://media.example/fragment");
+    expect(mocks.config!.loader).toBeDefined();
+  });
   it("loads HLS on demand, uses manifest quality/audio choices, and stops the player when closed", async () => {
     render(<DirectWatchPlayer link={link} context="Example" />);
     expect(mocks.load).not.toHaveBeenCalled();

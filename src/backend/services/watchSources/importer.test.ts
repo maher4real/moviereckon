@@ -38,6 +38,26 @@ function repository() {
 }
 
 describe("resumable source importer", () => {
+  it("processes recent releases ahead of archive backlog while preserving archive progress", async () => {
+    const { repo, records } = repository();
+    const backlog = Array.from({ length: 8 }, (_, i) => `${config.baseUrl}/old-${i}-full-movie/`);
+    await repo.enqueue(backlog, new Date(now.getTime() - 86400000));
+    const recent = `${config.baseUrl}/new-full-movie/`;
+    const seen: string[] = [];
+    const onSaved = vi.fn((record) => { expect(records.get(record._id)).toEqual(record); });
+    const fetchDocument = vi.fn(async (value: string) => {
+      if (value === `${config.baseUrl}/`) return { html: `<a href="${recent}">New</a>`, etag: null, lastModified: null };
+      seen.push(value); return { html, etag: null, lastModified: null };
+    });
+    await runSourceImport({}, { ...config, batchSize: 4, concurrency: 1 },
+      { repository: repo, fetchDocument, match: vi.fn().mockResolvedValue(matched), now: () => now, onSaved });
+    expect(seen).toHaveLength(4);
+    expect(seen[0]).toBe(recent);
+    expect(seen.slice(1).every((value) => backlog.includes(value))).toBe(true);
+    expect(records.get(sourcePageId(recent))!.nextCheckAt.getTime() - now.getTime()).toBe(3600000);
+    expect(onSaved).toHaveBeenCalledTimes(4);
+  });
+
   it("persists all sources, avoids duplicates and reuses matching after a conditional 304", async () => {
     const { repo, records } = repository();
     const fetchDocument = vi.fn().mockResolvedValueOnce({ html, etag: '"v1"', lastModified: null })

@@ -6,6 +6,7 @@ import { createContext, useContext, useEffect, useRef, useState, useCallback, Re
 import * as mongoClient from "@/frontend/lib/mongodbClient";
 import { useToast } from "@/frontend/hooks/use-toast";
 import { disableGoogleAutoSelect } from "@/frontend/lib/googleIdentity";
+import { clearTodaysPicksSession } from "./useTodaysPicksGate";
 
 interface Profile {
   id: string;
@@ -338,6 +339,7 @@ export function AuthProvider({
     // user state after logout.
     authGenerationRef.current += 1;
     disableGoogleAutoSelect();
+    clearTodaysPicksSession();
     mongoClient.clearTokens();
     setUser(null);
     setProfile(null);

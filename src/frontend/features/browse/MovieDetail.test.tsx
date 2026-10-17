@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import MovieDetail from "./MovieDetail";
 
@@ -108,7 +108,7 @@ const movie = {
 };
 
 describe("MovieDetail", () => {
-  it("shows saved movie players and the Fetch links control to regular users", async () => {
+  it("shows saved movie players in a popup to regular users", async () => {
     const query = mocks.useQuery.getMockImplementation()!;
     mocks.useQuery.mockImplementation((options) => options.queryKey[0] === "watch-sources" ? {
       data: { sources: [{ links: [{ id: "movie-watch", label: "WATCH", url: "https://player.example/movie", host: "player.example",
@@ -116,15 +116,19 @@ describe("MovieDetail", () => {
       isLoading: false, isError: false,
     } : query(options));
     render(<MovieDetail />);
-    expect(screen.getByRole("region", { name: "Watch movie" })).toBeInTheDocument();
-    expect(await screen.findByRole("link", { name: /Watch Dune: Part Two/ })).toHaveAttribute("href", "https://player.example/movie");
-    expect(await screen.findByRole("button", { name: "Fetch links" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Watch movie" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Watch movie" }));
+    expect(await screen.findByRole("dialog", { name: "Dune: Part Two" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /Other provider pages/ })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: /Open external page/ })).toHaveAttribute("href", "https://player.example/movie");
+    expect(await screen.findByRole("button", { name: "Search again" })).toBeInTheDocument();
   });
 
-  it("shows the per-movie Fetch links action for admins", async () => {
+  it("shows the per-movie search action for admins", async () => {
     mocks.useAuth.mockReturnValue({ user: { id: "admin", role: "admin" } });
     render(<MovieDetail />);
-    expect(await screen.findByRole("button", { name: "Fetch links" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Watch movie" }));
+    expect(await screen.findByRole("button", { name: "Search again" })).toBeInTheDocument();
   });
 
   beforeEach(() => {

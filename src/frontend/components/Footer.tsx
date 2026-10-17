@@ -16,43 +16,41 @@ export default function Footer() {
 
   const footerSections = [
     {
-      title: "Discover",
+      title: "Browse",
       icon: Compass,
       links: [
-        { label: "Home", href: "/home" },
-        { label: "Upcoming", href: "/upcoming" },
         { label: "Movies", href: "/movies" },
         { label: "TV Series", href: "/series" },
+        { label: "Upcoming", href: "/upcoming" },
+        { label: "Theater", href: "/theater" },
       ],
     },
     {
-      title: "Genres",
+      title: "For you",
       icon: Sparkles,
       links: [
-        { label: "Action", href: "/movies?genre=28" },
-        { label: "Comedy", href: "/movies?genre=35" },
-        { label: "Drama", href: "/movies?genre=18" },
-        { label: "Thriller", href: "/movies?genre=53" },
+        { label: "Reckon feed", href: "/reckon" },
+        { label: "Taste preferences", href: "/reckon/preferences" },
+        { label: "Search", href: "/search" },
+        { label: "Trending now", href: "/movies?category=trending" },
       ],
     },
     {
-      title: "Your Space",
+      title: "Your space",
       icon: UserRound,
       links: [
         { label: "Profile", href: "/profile" },
-        { label: "Favorites", href: "/profile?tab=liked" },
-        { label: "Reckon", href: "/reckon" },
-        { label: "Search", href: "/search" },
+        { label: "Edit profile", href: "/profile/edit" },
       ],
     },
     {
-      title: "Support",
+      title: "Help",
       icon: LifeBuoy,
       links: [
         { label: "About", href: "/about" },
+        { label: "FAQ", href: "/faq" },
         { label: "Feedback", href: "/feedback" },
         { label: "Contact", href: "/contact" },
-        { label: "FAQ", href: "/faq" },
       ],
     },
   ];
@@ -122,7 +120,7 @@ export default function Footer() {
         </div>
 
         <div className="mt-7 flex flex-col gap-3 border-t border-border/70 pt-5 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between">
-          <p>© {currentYear} MovieReckon. Crafted for people who love stories.</p>
+          <p>© {currentYear} MovieReckon. Movie and TV data from TMDB.</p>
           <div className="flex flex-wrap items-center gap-3">
             <Link to="/terms" className="transition-colors hover:text-foreground">
               Terms

@@ -7,6 +7,7 @@ Run --serve for an authenticated worker; never crawls or imports on startup.
 """
 import argparse
 import base64
+import codecs
 import datetime as dt
 import hmac
 from html.parser import HTMLParser
@@ -25,7 +26,7 @@ from urllib.request import HTTPRedirectHandler, HTTPSHandler, Request, build_ope
 
 MAX_HTML = 3 * 1024 * 1024
 MAX_INPUT = 32 * 1024
-STORAGE = re.compile(r"(?:pub-[a-f0-9]{32}\.r2\.dev|[a-f0-9]{32}\.r2\.cloudflarestorage\.com)")
+STORAGE = re.compile(r"(?:pub-[a-f0-9]{32}\.r2\.dev|[a-f0-9]{32}\.r2\.cloudflarestorage\.com|video-downloads\.googleusercontent\.com)")
 
 
 def safe_url(value):
@@ -43,12 +44,21 @@ def storage_url(value):
     return value if url and STORAGE.fullmatch(url.hostname) and url.path not in ("", "/") else None
 
 
+def greenmotors_url(value):
+    url = safe_url(value)
+    if not url or url.netloc not in ("greenmotors.club", "greenmotors.cc") or url.path != "/" or not re.fullmatch(r"id=[^&]+", url.query):
+        return False
+    token = unquote(url.query[3:])
+    return 8 <= len(token) <= 8192 and bool(re.fullmatch(r"[A-Za-z0-9+/_=-]+", token))
+
+
 def supported(link):
     url = safe_url(link.get("url"))
-    return bool(url and not url.query and link.get("kind") == "download" and
-                link.get("scope") in ("movie", "episode", "season") and (
-                    url.hostname == "hubdrive.pics" and re.fullmatch(r"/file/\d+/?", url.path) or
-                    url.hostname in ("hubcdn.club", "hubcdn.wiki") and re.fullmatch(r"/file/[a-zA-Z0-9]+/?", url.path)))
+    return bool(url and link.get("kind") == "download" and link.get("scope") in ("movie", "episode", "season") and (
+        greenmotors_url(link.get("url")) or (not url.query and (
+            url.hostname == "hubcloud.ist" and re.fullmatch(r"/drive/[a-z0-9]+/?", url.path) or
+            url.hostname == "hubdrive.pics" and re.fullmatch(r"/file/\d+/?", url.path) or
+            url.hostname in ("hubcdn.club", "hubcdn.wiki") and re.fullmatch(r"/file/[a-zA-Z0-9]+/?", url.path)))))
 
 
 def normalize(value):
@@ -61,6 +71,11 @@ def matches(filename, link, title):
         return False
     if not re.search(r"\.(mp4|webm|mkv|mov|avi|zip|rar|7z)$", filename, re.I) or not normalize(filename).startswith(normalize(title) + " "):
         return False
+    release_year = link.get("releaseYear")
+    if link["scope"] == "movie" and release_year is not None:
+        if type(release_year) is not int or not normalize(filename).startswith(normalize(title) + " " + str(release_year) + " "):
+            return False
+    filename = filename.replace("_", ".")
     episodes = list(re.finditer(r"\bS(\d{1,3})[._ -]?E(\d{1,4})(?:\s*[-–]\s*E?(\d{1,4}))?\b", filename, re.I))
     if link["scope"] == "episode" and (len(episodes) != 1 or int(episodes[0][1]) != link.get("season") or
                                        int(episodes[0][2]) != link.get("episode") or episodes[0][3]):
@@ -87,6 +102,99 @@ class Anchors(HTMLParser):
     def handle_starttag(self, tag, attrs):
         if tag == "a":
             self.links.append(dict(attrs))
+
+
+class InlineScripts(HTMLParser):
+    def __init__(self, html):
+        super().__init__(convert_charrefs=False)
+        self.scripts, self.capture, self.parts = [], False, []
+        self.feed(html)
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "script":
+            self.capture, self.parts = "src" not in dict(attrs), []
+
+    def handle_data(self, value):
+        if self.capture:
+            self.parts.append(value)
+
+    def handle_endtag(self, tag):
+        if tag == "script":
+            if self.capture:
+                self.scripts.append("".join(self.parts))
+            self.capture, self.parts = False, []
+
+
+class ArchiveAnchors(HTMLParser):
+    def __init__(self, html):
+        super().__init__(convert_charrefs=True)
+        self.links, self.stack = [], []
+        self.feed(html)
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        inside = bool(self.stack and self.stack[-1][1]) or "entry-content" in attrs.get("class", "").split()
+        blocked = tag in ("nav", "header", "footer", "aside") or attrs.get("id") == "comments" or "comments" in attrs.get("class", "").split()
+        if blocked or any(item[2] for item in self.stack):
+            inside, blocked = False, True
+        if inside and tag == "a":
+            self.links.append(attrs)
+        if tag not in ("area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"):
+            self.stack.append((tag, inside, blocked))
+
+    def handle_endtag(self, tag):
+        for index in range(len(self.stack) - 1, -1, -1):
+            if self.stack[index][0] == tag:
+                del self.stack[index:]
+                break
+
+
+def strict_base64(value):
+    if not isinstance(value, str) or not value or len(value) > 8192 or not re.fullmatch(r"[A-Za-z0-9+/]*={0,2}", value):
+        raise ValueError("Invalid redirect data")
+    raw = base64.b64decode(value, validate=True)
+    if base64.b64encode(raw).decode("ascii") != value:
+        raise ValueError("Invalid redirect encoding")
+    return raw.decode("utf-8")
+
+
+def greenmotors_destination(html):
+    if len(html) > 1_000_000:
+        return None
+    tokens = set()
+    pattern = r"\bs\s*\(\s*(['\"])o\1\s*,\s*(['\"])([A-Za-z0-9+/=]{1,8192})\2\s*,\s*180\s*\*\s*1000\s*\)"
+    for script in InlineScripts(html).scripts:
+        tokens.update(match[3] for match in re.finditer(pattern, script))
+    if len(tokens) != 1:
+        return None
+    try:
+        raw = strict_base64(codecs.decode(strict_base64(strict_base64(next(iter(tokens)))), "rot_13"))
+        value = json.loads(raw)
+        if not isinstance(value, dict) or set(value) != {"w", "l", "o"} or type(value["w"]) is not int or not 0 <= value["w"] <= 120 or value["l"] != "https://greenmotors.cc/homelander/":
+            return None
+        if any(len(re.findall('"' + key + r'"\s*:', raw)) != 1 for key in ("w", "l", "o")):
+            return None
+        destination = strict_base64(value["o"])
+        allowed = r"https://(?:hblinks\.lol/archives/[1-9]\d*|hubcloud\.ist/drive/[a-z0-9]+/?|hubdrive\.pics/file/\d+/?|hubcdn\.(?:club|wiki)/file/[A-Za-z0-9]+/?)"
+        return destination if re.fullmatch(allowed, destination) else None
+    except (ValueError, UnicodeError, TypeError):
+        return None
+
+
+def greenmotors_archive(html):
+    destination = greenmotors_destination(html)
+    return destination if destination and re.fullmatch(r"https://hblinks\.lol/archives/[1-9]\d*", destination) else None
+
+
+def archive_mirrors(html, archive):
+    if len(html) > 1_000_000 or not re.fullmatch(r"https://hblinks\.lol/archives/[1-9]\d*", archive):
+        return []
+    mirrors = []
+    for node in ArchiveAnchors(html).links:
+        value = urljoin(archive, node.get("href", ""))
+        if supported({"url": value, "kind": "download", "scope": "movie"}) and not greenmotors_url(value) and value not in mirrors:
+            mirrors.append(value)
+    return mirrors[:10]
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -146,6 +254,10 @@ class Network:
     def probe(self, url):
         signed = "X-Amz-Signature" in parse_qs(urlsplit(url).query)
         with self.open(url, method="GET" if signed else "HEAD", headers={"Range": "bytes=0-0"} if signed else {}) as response:
+            # Some storage servers disable HEAD even when GET works.
+            if signed or response.status not in (405, 501):
+                return response.status, response.headers
+        with self.open(url, method="GET", headers={"Range": "bytes=0-0"}) as response:
             # Read headers only, then close; never consume the media body.
             return response.status, response.headers
 
@@ -174,6 +286,8 @@ def cdn_file(html):
 def probe_file(url, link, title, network):
     status, headers = network.probe(url)
     filename = headers.get_filename()
+    if filename is None and not headers.get("Content-Disposition"):
+        filename = unquote(urlsplit(url).path.rsplit("/", 1)[-1])
     if isinstance(filename, tuple):
         from email.utils import collapse_rfc2231_value
         filename = collapse_rfc2231_value(filename)
@@ -215,12 +329,30 @@ def resolve(payload, network=None):
         raise ValueError("Provide the selected episode")
     network = network or Network()
     original = urlsplit(link["url"])
+    if greenmotors_url(link["url"]):
+        destination = greenmotors_destination(network.document("https://greenmotors.cc/?" + original.query))
+        if not destination:
+            return []
+        mirrors = archive_mirrors(network.document(destination), destination) if urlsplit(destination).netloc == "hblinks.lol" else [destination]
+        files, seen = [], set()
+        for mirror in mirrors:
+            try:
+                for result in resolve({"title": title, "link": {**link, "url": mirror}}, network):
+                    destination = urlsplit(result["url"])
+                    key = (destination.netloc, destination.path, result["filename"], result["sizeBytes"])
+                    if key not in seen:
+                        seen.add(key)
+                        files.append(result)
+            except (OSError, ValueError, URLError):
+                continue
+        return files[:8]
     if original.hostname in ("hubcdn.club", "hubcdn.wiki"):
         final = cdn_file(network.document("https://hubcdn.wiki" + original.path))
         candidates = [final] if final else []
     else:
-        cloud = {node["href"] for node in Anchors(network.document(link["url"])).links if
-                 re.fullmatch(r"https://hubcloud\.ist/drive/[a-z0-9]+", node.get("href", ""))}
+        cloud = {link["url"].rstrip("/")} if original.hostname == "hubcloud.ist" else {
+            node["href"].rstrip("/") for node in Anchors(network.document(link["url"])).links if
+            re.fullmatch(r"https://hubcloud\.ist/drive/[a-z0-9]+/?", node.get("href", ""))}
         if len(cloud) != 1:
             return []
         cloud = next(iter(cloud))

@@ -6,6 +6,9 @@ import type { VercelRequest } from "@/backend/api/lib/http";
 import { getImporterConfig, sourcePageUrl } from "@/backend/services/watchSources/config";
 import { fetchContentSources, SourceSelectionError } from "@/backend/services/watchSources/contentImport";
 
+import { searchContentSources } from "@/backend/services/watchSources/search";
+import type { SourceSearchEvent } from "@/shared/types/watchSources";
+
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
@@ -48,7 +51,33 @@ export async function POST(request: Request) {
         return json({ error: "Use a source-page URL on the configured HDHub domain" }, 400);
       }
     }
-    return json(await fetchContentSources(input.contentId, input.contentType, input.sourceUrl, config));
+    if (!input.sourceUrl && request.headers.get("accept")?.includes("application/x-ndjson")) {
+      let disconnected = false;
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          const emit = (event: SourceSearchEvent) => {
+            if (!disconnected) {
+              try { controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`)); }
+              catch { disconnected = true; }
+            }
+          };
+          // Keep intermediaries from buffering a long provider lookup.
+          emit({ type: "progress", message: "Loading saved links and searching providers…" });
+          const heartbeat = setInterval(() => { if (!disconnected) { try { controller.enqueue(encoder.encode("\n")); } catch { disconnected = true; } } }, 10_000);
+          try {
+            const result = await searchContentSources(input.contentId, input.contentType, config, emit);
+            emit({ type: "complete", result });
+          } catch { emit({ type: "error", message: "Search interrupted. Saved links are still available. Try again." }); }
+          finally { clearInterval(heartbeat); if (!disconnected) controller.close(); }
+        },
+        // Completed writes remain saved. Work stays bounded if the popup closes.
+        cancel() { disconnected = true; },
+      });
+      return new Response(stream, { headers: { "Content-Type": "application/x-ndjson", "Cache-Control": "no-store, no-transform", "X-Content-Type-Options": "nosniff", "X-Accel-Buffering": "no" } });
+    }
+    return json(input.sourceUrl ? await fetchContentSources(input.contentId, input.contentType, input.sourceUrl, config) :
+      await searchContentSources(input.contentId, input.contentType, config));
   } catch (error) {
     if (error instanceof SourceSelectionError) return json({ error: error.message }, 422);
     return json({ error: "Unable to fetch links right now. Please try again later" }, 503);

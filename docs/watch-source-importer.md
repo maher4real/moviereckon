@@ -13,7 +13,7 @@ use a `NEXT_PUBLIC_` variable for this secret. The optional configuration is:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `HDHUB_BASE_URL` | `https://new7.hdhub4u.cl` | Current public HTTPS origin |
+| `HDHUB_BASE_URL` | `https://new8.hdhub4u.cl` | Current public HTTPS origin |
 | `WATCH_IMPORTER_ENABLED` | enabled | Set `false` to disable imports |
 | `WATCH_IMPORT_BATCH_SIZE` | 20 | Max post jobs per invocation; range 1–100 |
 | `WATCH_IMPORT_CONCURRENCY` | 3 | Parallel post workers; range 1–5 |
@@ -21,7 +21,7 @@ use a `NEXT_PUBLIC_` variable for this secret. The optional configuration is:
 | `WATCH_IMPORT_REFRESH_HOURS` | 24 | Refresh interval for matched pages; range 1–168 |
 
 The current public WordPress REST posts endpoint returned 403 during verification,
-so discovery uses the home page and `/page/2/` etc. Only same-origin post paths
+so discovery uses the published `/sitemap.xml` post indexes, supplemented by the home page and `/page/2/` etc. Archive indexes are cached in MongoDB for six hours, with conditional revalidation and stale snapshots on failure. Traversal is limited to 50 same-origin post sitemaps and a 90-second discovery budget; incomplete coverage is reported as partial. A read-only live check on 2026-10-17 found 14,260 post URLs across 15 post sitemaps in 8.2 seconds. Only same-origin post paths
 are queued. Request timeouts, response size limits and redirect restrictions
 bound fetches. The importer does not execute source scripts or fetch video files.
 
@@ -34,10 +34,7 @@ does not run cron automatically.
 
 ## Run and preview
 
-Signed-in users see **Fetch links** in each movie and series detail
-page's action row. Clicking it opens a results dialog and runs an import for
-that TMDB title only. Watch players, download qualities and additional quality
-collections appear separately, including episode/season labels for series.
+Signed-in users open **Watch movie / Watch series** on a detail page. A popup searches that TMDB title automatically and streams saved and newly matched results into separate Watch and Download tabs. Season and episode buttons open the same popup with the matching scope selected. Other provider pages are listed directly below supported actions.
 
 The button calls `POST /api/watch-sources/fetch` using the existing HttpOnly
 user session, a trusted Origin and the AJAX header. It never receives the cron
@@ -45,10 +42,9 @@ secret. The server requires authentication and limits each user to
 six requests per minute. `TMDB_API_KEY` and `MONGODB_URI` are required; `CRON_SECRET`
 is only needed by the scheduled/bearer endpoint below.
 
-Automatic per-title discovery checks previously saved source pages and the
-configured recent-release index pages. HDHub's JS search proxy returned 403 to
-server requests during verification. For a title outside those indexes, paste
-its source-page URL in the dialog and use **Fetch from page**. The server fetches
+Automatic per-title discovery checks previously saved source pages, all cached post sitemap entries, and the configured recent-release index pages. Original and display titles select candidates; IMDb/TMDB identity still determines whether a page belongs to the selected title. Up to 100 matching candidate pages are checked per request; a limit or deadline cutoff reports partial coverage. HDHub's JS search proxy returned 403 to
+server requests during verification. For a title missing from the published indexes, submit
+its source-page URL through the authenticated endpoint's optional `sourceUrl` field. The server fetches
 the title's canonical identity from TMDB and imports only matching candidates;
 a supplied page for a different movie/series returns a validation error. This
 manual action does not enqueue or import unrelated catalog entries.
@@ -64,7 +60,7 @@ discovers candidates automatically. The response distinguishes imported,
 partially refreshed, not-found and busy states and includes the saved sources
 directly, avoiding stale cached lookup responses after a manual import.
 
-`GET /api/import/watch-sources` discovers recent pages, enqueues them, and
+`GET /api/import/watch-sources` discovers archive and recent pages, enqueues them, and
 processes a bounded batch. It requires the cron bearer secret. Responses report
 discovery, queued/processed counts, updated/unchanged pages, matches, pending
 matches, review items, errors and remaining due jobs. `skipped: true` indicates
@@ -104,15 +100,12 @@ pages; they remain labeled as collections and are not crawled on another origin.
 
 Series-wide links and season packs are excluded from an episode lookup. An
 explicit episode range is retained as `episode-range`, including its boundaries.
-No missing episodes are synthesized. Saved links are visible to regular viewers
-on the movie and TV detail pages, without triggering an import. Movies have a
-Watch movie section. TV shows display episode links on their matching episode
-cards, with separate season options that follow the selected season. Series-wide
-players appear in Watch series. Download and collection options are expandable.
-The page reads one cached snapshot per title rather than making a request for
-every episode. Fetching links updates that snapshot in the page immediately.
-Fetch links is available to signed-in users on the same detail pages; it is not part of
-the Cinema admin panel. An embedded playback integration is separate.
+No missing episodes are synthesized. Movie, series, season and episode controls
+open the same lazy popup with the selected scope. The popup shares one cached
+snapshot per title; it does not request each episode separately. Saved and newly
+matched results update that cache while the search runs. Detail pages make no
+watch-source request before the popup opens. These controls are available to
+signed-in viewers and are separate from Cinema administration.
 
 ## Matching and persistence
 
@@ -141,7 +134,7 @@ function deadline and unfinished jobs remain due for the next run.
 Changing `HDHUB_BASE_URL` keeps post identities stable across domain rotations.
 Redirects to a different domain fail until that origin is configured explicitly.
 Old pages are periodically refreshed even when they leave the recent-post index.
-This is incremental discovery with a seed mechanism, not a full historical crawl.
+Archive URLs enter the durable queue; each scheduled run processes a bounded batch, so initial catalog import completes over multiple runs. Per-title fetch checks matching archive candidates immediately without importing unrelated titles.
 Source layout changes may require parser updates, and scraping success does not
 establish whether third-party playback or iframe embedding works.
 
@@ -149,9 +142,9 @@ establish whether third-party playback or iframe embedding works.
 
 ### Python resolver and deferred UI
 
-Movie/series details render before the watch-source module or saved-source request begins. The source area loads after two animation frames and an idle callback (800 ms deadline), with a circular loading indicator. Imports remain explicit **Fetch links** actions. Every episode uses the same cached title snapshot, and mounting/focusing another episode does not trigger another refresh. A manual import cancels any pending saved read before replacing that cache, so a late read cannot overwrite fresh links.
+Movie/series details render without importing the watch-source module or making a saved-source request. Clicking **Watch movie**, **Watch series**, or a scoped season/episode control loads the popup and starts its search. A circular indicator appears during loading. Every episode uses the same cached title snapshot, and mounting/focusing another episode does not trigger another refresh. Search results cancel any pending saved read before replacing that cache, so a late read cannot overwrite fresh links.
 
-The fetch flow stays inline with its loading, error, retry and optional source-page field. Download qualities display as rows; **Get file link** checks only the selected file, then reveals its download action. Fetching/importing a title never resolves all final files in parallel.
+Search runs inside the lazy popup with loading, retry, cached results and separate Watch/Download tabs. Download qualities display as rows; **Get file link** checks only the selected file, then reveals its download action. Fetching/importing a title never resolves all final files in parallel.
 
 `scripts/resolve_watch_links.py` is an independent Python 3.10+ resolver using the standard library. It accepts one JSON object `{ "title": "The Trap", "link": { ...savedWatchSourceLink } }` on stdin and returns `{ "downloads": [...] }`. Use `npm run resolve:links < /path/to/input.json`. It preserves the provider allowlists, title/episode/quality/codec matching, expiry checks, document caps and headers/one-byte probes used by the TypeScript resolver. It executes no third-party scripts and downloads no full media files.
 
@@ -161,14 +154,48 @@ On Vercel, do not assume Python can be spawned inside a Node.js function. To use
 
 Run Python checks with `python3 -B -m unittest discover -s scripts -p '*_test.py'`.
 
-**Get file link** resolves supported HubCDN and HubDrive downloads on demand. HubCDN's published redirect data is decoded without loading its advertising page; HubDrive's file button is followed only through the known HubCloud and Gamerxyt paths. Only the published R2 storage buttons are considered. Returned filenames must match the selected title, season/episode or season pack, resolution and known codec. A HEAD probe (or a one-byte range for a signed GET URL) checks file headers and availability. HTML responses, redirects, wrong episodes, ambiguous targets and expired URLs are rejected. This checks filenames/headers, not the movie's contents. The final file goes directly from the storage host to the viewer; the API never buffers/proxies the full video. File links are generated when requested and can be refreshed because signed URLs expire. Other domains and unsupported/challenged flows retain their external-page option.
+**Get file link** resolves supported HubCDN, HubDrive, directly published HubCloud and GreenMotors-wrapped downloads on demand. GreenMotors is decoded as bounded data: the observed payload selects either one supported provider file page or one `hblinks.lol/archives/<id>` page, whose content-area links expose supported mirrors. The resolver skips the advertising landing page, tries all bounded trusted mirrors under one deadline, preserves original title/quality/episode metadata, and deduplicates final file destinations (up to eight). HubCDN's published redirect data is decoded without loading its advertising page; HubDrive's file button is followed only through the known HubCloud and Gamerxyt paths. Only published R2 storage buttons and the exact `video-downloads.googleusercontent.com` host are considered. Returned filenames must match the selected title, season/episode or season pack, resolution and known codec. Newly parsed movie links also bind the release year immediately after the normalized title so remakes and longer sequel titles cannot substitute for the movie; TV episode matching uses season/episode rather than a series release year. A HEAD probe (or a one-byte range for a signed GET URL) checks file headers and availability. A 405/501 HEAD response retries once with a ranged GET. When Content-Disposition is absent, the URL basename may supply the filename, but the same title, episode, quality, codec, and MIME checks still apply. Underscore-separated release metadata is supported. HTML responses, redirects, wrong episodes, ambiguous targets and expired URLs are rejected. This checks filenames/headers, not the movie's contents. The final file goes directly from the storage host to the viewer; the API never buffers/proxies the full video. File links are generated when requested and can be refreshed because signed URLs expire. Other domains and unsupported/challenged flows retain their external-page option.
 
 The document CSP allows HTTPS connections/media and local blob media/workers so HLS can run after SPA navigation. This broadens the connection/media destinations for rotating media hosts; script nonces and the existing frame allowlist remain enforced. No provider scripts are embedded in the player.
 
-Imported labels such as WATCH or 1080p describe the publisher's link; they do not prove that the URL is a working video. Most saved URLs lead to third-party player/download pages. Those pages are now collapsed under **External sites · may show ads** in both detail pages and fetch results.
+Imported labels such as WATCH or 1080p describe the publisher's link; they do not prove that the URL is a working video. Most saved URLs lead to third-party player/download pages. Unsupported pages appear directly below supported actions in each popup tab, labelled **Other provider pages · may show ads**.
 
-**Play here** uses a native video element for HTTPS MP4/WebM files and native HLS or a lazily loaded hls.js player for HLS. It supports movie links and explicitly scoped single-episode links. Season packs and episode ranges are never substituted for a single episode. HLS quality and audio choices come from the actual manifest. Published MP4/WebM, MKV/MOV/AVI and ZIP/RAR/7z URLs have **Open / save file**; cross-origin servers and browsers determine whether they save or open. HLS manifests are not offered as movie downloads.
+**Play here** uses a native video element for HTTPS MP4/WebM files and lazily loaded hls.js for HLS, with native HLS as a compatibility fallback. It supports movie links and explicitly scoped single-episode links. Season packs and episode ranges are never substituted for a single episode. HLS quality and audio choices come from the actual manifest. Published MP4/WebM, MKV/MOV/AVI and ZIP/RAR/7z URLs have **Open / save file**; cross-origin servers and browsers determine whether they save or open. HLS manifests are not offered as movie downloads.
 
-The signed-in `POST /api/watch-sources/resolve` endpoint accepts only a content ID/type and saved link ID, with origin/AJAX checks and a 20/minute per-user limit. It resolves Play4u movie pages by reading their published JSON and comparing both TMDB and IMDb identity. It does not execute provider scripts, follow ad chains, or fetch arbitrary URLs. Resolution happens on play, returns `no-store`, and is not persisted because stream URLs can expire. Other provider adapters, including hash-based Hubstream episode pages and scripted HDStream pages, are not implemented; they remain external fallbacks.
+The signed-in `POST /api/watch-sources/resolve` endpoint accepts only a content ID/type and saved link ID, with origin/AJAX checks and a 20/minute per-user limit. It resolves Play4u movie pages by reading their published JSON and comparing both TMDB and IMDb identity. It does not execute provider scripts, follow ad chains, or fetch arbitrary URLs. Resolution happens on play, returns `no-store`, and is not persisted because stream URLs can expire. HDStream movie and single-episode pages are also supported: a bounded dictionary decoder reads the published JSON `links` object as text and never evaluates the packed player or advertising code. Provider-origin proxy alternatives are excluded because the observed endpoint omits CORS headers despite HTTP 200; the direct CDN master retains its actual quality variants. Hash-based HubStream links are also supported. The resolver reads the fixed-origin encrypted info/video API using its published HTTPS response protocol and checks both filenames, the saved ID and returned swarm ID. It follows the published TikTok configuration to read a master and up to two complete media playlists (1 MiB each), accepting only the observed signed CDN URL structure and fresh tokens. A capped 1 KiB range probe checks each variant's first segment for CORS and MPEG-TS packet sync. Validated playlist text travels in the resolution response and becomes a temporary browser Blob, released when the player closes. hls.js omits the app referrer where required. No provider script executes and no video segment is proxied; unverified or blocked alternatives are excluded.
 
-All video/manifest/segment traffic goes from the browser to the media host. Vercel serves the app and the small resolution response, not a media proxy. The host can still reject playback because of CORS, referrer restrictions, expiry or outages. A successful JSON resolution is not verification of playback, language, quality or movie contents. Playback errors stay inside the app and never automatically open the provider's ad page. Existing saved links need no migration for this UI; newly discovered file links are picked up by **Fetch links**.
+Video segments and ordinary manifests travel directly from browser to media host. HubStream's bounded playlist metadata uses the resolution response because its playlist endpoint omits browser CORS headers. Vercel serves the app and resolution metadata, with at most a capped first-segment probe; it does not proxy playback. The host can still reject playback because of CORS, referrer restrictions, expiry or outages. A successful JSON resolution is not verification of playback, language, quality or movie contents. Playback errors stay inside the app and never automatically open the provider's ad page. Existing saved links need no migration for this UI; newly discovered file links are picked up when the popup searches or **Search again** is used.
+
+Resolved MP4/WebM downloads also offer **Play here** without opening the provider page. Other formats remain downloads. Expired signed file links disappear from the UI and show a refresh action. Browser/host behavior still determines whether a cross-origin file saves or opens; filename and header checks cannot establish the actual video contents.
+
+
+### Popup search and multiple catalogs
+
+The detail page renders only a **Watch movie / Watch series** button (or a scoped season/episode button). Opening it mounts the query code and starts an authenticated NDJSON search. Saved links appear first; validated pages appear as they are persisted. Watch and Download tabs separate actionable sources; other provider pages appear directly below the actionable sources, with clear availability labels. Final media URLs are resolved only on Play/Get file link, so expiring links are fresh. Closing the popup cancels the browser request; any completed import writes stay saved. Reopening within two minutes reuses the search result; Search again explicitly refreshes it.
+
+HDHub uses its archive sitemaps and recent releases. 4KHDHub uses its title search and recent content cards, with independent persistent queues and leases. Both require a unique IMDb or exact title/year TMDB match. Set `WATCH_4KHDHUB_ENABLED=false` to disable the secondary catalog. Its unsupported redirect pages are not represented as confirmed downloads. No provider is guaranteed to publish every title or every release.
+
+### Frequent new-release sync
+
+Scheduled imports reserve up to 75% of each batch for due recent releases and the remainder for older archive work. Recent matched releases refresh hourly; other matched pages use `WATCH_IMPORT_REFRESH_HOURS`. Failed pages keep their last good data and back off. This prevents a large archive from starving new titles.
+
+The existing daily Vercel cron remains compatible with Hobby scheduling. For more frequent discovery, `.github/workflows/watch-sources.yml` provides an opt-in 15-minute schedule and a manual trigger. After deploying, configure:
+
+- Repository variable `WATCH_IMPORT_ORIGIN`: your deployed HTTPS origin, without a trailing slash.
+- Repository secret `WATCH_IMPORT_CRON_SECRET`: the same value as deployment `CRON_SECRET` (minimum 32 characters).
+
+The workflow is inactive until the origin variable is set. It has no checkout/write permissions and prevents overlapping runs. GitHub schedules can be delayed; discovery is eventual, not instantaneous. Each call runs bounded batches, so a full archive backfill takes multiple runs. Opening a title's popup also searches that title directly, independently of backfill progress.
+
+
+### Content-wise resolution verification
+
+All automatic searches, including JSON and streamed responses, now query the enabled independent catalogs. Saved sources are emitted even when TMDB identity lookup fails, preserving already available results. Collection and final media resolution remain separate: opening a detail page performs neither; the popup searches when opened, and a particular file/player resolves only when requested.
+
+REA investigation of Prahaar identified all nine published entries, including two formerly unsupported GreenMotors downloads and HubStream Player-2. Backend file validation and browser playback verification are recorded separately; a successful playlist request alone does not prove playback. Evidence references:
+
+- GreenMotors redirect data and three-mirror archive: `ev_7ff0b2f5d7d7979df7eebccb5c576e58b7818bd283c4d5805115a74be719cf47`, `ev_a1549ac606504fb28f0a75ca2e906c1ea5fe92a3e06ea81af581d37929f0a96b`.
+- HubStream API/title and manifest discovery: `ev_f3ff502450135221f9d75e53a7aea673bfadd2291461472b1cbee0e4c6c17e34`.
+
+These are provider-specific adapters, reusable across matching content, rather than an unconditional promise of every internet host. Provider protocol changes, challenges, deleted files and unavailable releases remain possible. Automated checks cover filenames, HTTP headers/ranges and HLS playlists; they do not establish the video contents, language or complete playback.
+
+Live verification on 2026-10-17 found all nine published Prahaar entries: seven download rows resolving to 13 final file mirrors, plus HDStream and HubStream watch providers. Chrome playback advanced for HDStream and both HubStream qualities (720p and 1080p). UI checks used fixture API responses with real media, confirmed no requests before opening the popup, and checked desktop/mobile layouts; they did not establish live authentication, TMDB or MongoDB coverage. Downloads were validated by matching filenames and file headers, not by downloading entire films. A separate GreenMotors entry from the Weapons 4K catalog also resolved through its directly wrapped HubCloud destination. HubStream's blocked native-media route and HDStream's CORS-incompatible proxy are not offered as working fallbacks.

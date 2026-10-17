@@ -1,8 +1,8 @@
 import { memo, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import Footer from "@/frontend/components/Footer";
 import Header from "@/frontend/components/Header";
-import { AppPageSkeleton } from "@/frontend/components/AppSkeletons";
+import { ProfileSkeleton } from "@/frontend/components/PageSkeletons";
 import MediaImage from "@/frontend/components/MediaImage";
 import { Avatar, AvatarFallback, AvatarImage } from "@/frontend/components/ui/avatar";
 import {
@@ -17,7 +17,6 @@ import {
 } from "@/frontend/components/ui/alert-dialog";
 import { Badge } from "@/frontend/components/ui/badge";
 import { Button } from "@/frontend/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/frontend/components/ui/card";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import { useUserData } from "@/frontend/hooks/useUserData";
 import { getWatchlistStatus, useWatchlist } from "@/frontend/hooks/useWatchlist";
@@ -36,7 +35,24 @@ import {
   Trash2,
   Tv,
   UserRound,
+  Bookmark,
+  Download,
+  ListVideo,
+  SlidersHorizontal,
+  ShieldAlert,
 } from "lucide-react";
+import { cn } from "@/shared/lib/utils";
+
+const PROFILE_TABS = [
+  { id: "overview", label: "Overview", icon: UserRound },
+  { id: "watchlist", label: "Watchlist", icon: Bookmark },
+  { id: "history", label: "History", icon: Clock },
+  { id: "liked", label: "Liked", icon: Heart },
+  { id: "settings", label: "Settings", icon: SlidersHorizontal },
+] as const;
+type ProfileTab = (typeof PROFILE_TABS)[number]["id"];
+
+const STATUS_LABEL = { saved: "Saved", watching: "Watching", completed: "Completed", dropped: "Dropped" } as const;
 
 type ActivityItem = {
   content_id: number;
@@ -142,7 +158,15 @@ export default function Profile() {
     removeFromWatchHistory,
     clearHistory,
   } = useUserData();
-  const { items: watchlistItems } = useWatchlist();
+  const { items: watchlistItems, openPanel } = useWatchlist();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const activeTab: ProfileTab = PROFILE_TABS.some((tab) => tab.id === requestedTab) ? requestedTab as ProfileTab : "overview";
+  const selectTab = (tab: ProfileTab) => {
+    const next = new URLSearchParams(searchParams);
+    if (tab === "overview") next.delete("tab"); else next.set("tab", tab);
+    setSearchParams(next, { replace: true });
+  };
   const navigate = useNavigate();
   const location = useLocation();
   const [privacyBusy, setPrivacyBusy] = useState(false);
@@ -251,150 +275,207 @@ export default function Profile() {
   );
 
   if (dataLoading) {
-    return <AppPageSkeleton cardCount={16} showFilterRow={false} />;
+    return <ProfileSkeleton />;
   }
+
+  const statCards = [
+    { label: "Movies watched", value: stats.movies, icon: Film },
+    { label: "Series watched", value: stats.tvShows, icon: Tv },
+    { label: "Active last 7 days", value: stats.activeThisWeek, icon: Sparkles },
+    { label: "Liked titles", value: stats.likes, icon: Heart },
+  ];
+
+  const emptyState = (message: string, cta: string, href: string) => (
+    <div className="empty-state">
+      <p className="mb-4 text-muted-foreground">{message}</p>
+      <Button onClick={() => navigate(href)}>{cta}</Button>
+    </div>
+  );
 
   return (
     <div className="app-page pb-20 md:pb-0">
       <Header />
 
-      <main className="page-main">
-        <div className="container mx-auto px-4 space-y-7">
-          <section className="surface-panel glass-detail-panel relative overflow-hidden bg-linear-to-br from-card via-card to-primary/10 p-5 md:p-7">
-            <div className="absolute inset-0 opacity-25 [background-image:repeating-linear-gradient(90deg,transparent_0,transparent_62px,hsl(var(--foreground)/0.05)_63px,hsl(var(--foreground)/0.05)_64px)]" />
-
-            <div className="relative flex flex-col gap-6">
-              <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex items-start gap-4 md:gap-5">
-                  <Avatar className="h-20 w-20 border-4 border-background shadow-xl md:h-24 md:w-24">
-                    <AvatarImage
-                      key={avatarUrl || "profile-avatar"}
-                      src={avatarUrl || undefined}
-                      alt={`${displayName} avatar`}
-                    />
-                    <AvatarFallback className="bg-linear-to-br from-primary to-secondary text-xl font-bold text-primary-foreground">
-                      {getInitials(displayName)}
-                    </AvatarFallback>
-                  </Avatar>
-
-                  <div>
-                    <Badge
-                      variant="secondary"
-                      className="mb-2 bg-primary/15 text-primary"
-                    >
-                      <UserRound className="mr-1 h-3.5 w-3.5" />
-                      Profile
-                    </Badge>
-                    <h1 className="text-3xl font-bold leading-tight md:text-4xl">
-                      {displayName}
-                    </h1>
-                    <p className="mt-1 flex items-center gap-2 text-muted-foreground">
-                      <Calendar className="h-4 w-4" />
-                      Member since {memberSince}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    className="gap-2 bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:bg-primary/90"
-                    onClick={() => navigate("/profile/edit")}
-                  >
-                    <Camera className="h-4 w-4" />
-                    Edit Profile
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleSignOut}
-                    className="gap-2"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Sign Out
-                  </Button>
+      <main className="flex-1 pb-12">
+        <section className="profile-hero">
+          <div className="container mx-auto px-4">
+            <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+              <div className="flex items-center gap-4 md:gap-5">
+                <Avatar className="size-20 border-4 border-background shadow-xl md:size-24">
+                  <AvatarImage key={avatarUrl || "profile-avatar"} src={avatarUrl || undefined} alt={`${displayName} avatar`} />
+                  <AvatarFallback className="bg-linear-to-br from-primary to-secondary text-xl font-bold text-primary-foreground">
+                    {getInitials(displayName)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <p className="page-kicker">Your profile</p>
+                  <h1 className="truncate text-3xl font-black tracking-[-0.03em] md:text-4xl">{displayName}</h1>
+                  <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+                    <Calendar className="size-4" aria-hidden="true" />Member since {memberSince}
+                  </p>
                 </div>
               </div>
-
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                <Card className="border-border/50 bg-background/55 shadow-none">
-                  <CardContent className="p-4">
-                    <p className="text-xl font-bold">{stats.movies}</p>
-                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Film className="h-3.5 w-3.5" />
-                      Movies Watched
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="border-border/50 bg-background/55 shadow-none">
-                  <CardContent className="p-4">
-                    <p className="text-xl font-bold">{stats.tvShows}</p>
-                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Tv className="h-3.5 w-3.5" />
-                      Series Watched
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="border-border/50 bg-background/55 shadow-none">
-                  <CardContent className="p-4">
-                    <p className="text-xl font-bold">{stats.activeThisWeek}</p>
-                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Sparkles className="h-3.5 w-3.5" />
-                      Active Last 7 Days
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="border-border/50 bg-background/55 shadow-none">
-                  <CardContent className="p-4">
-                    <p className="text-xl font-bold">{stats.likes}</p>
-                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Heart className="h-3.5 w-3.5" />
-                      Liked Titles
-                    </p>
-                  </CardContent>
-                </Card>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" className="brand-primary-button gap-2 rounded-full" onClick={() => navigate("/profile/edit")}>
+                  <Camera className="size-4" />Edit profile
+                </Button>
+                <Button type="button" variant="outline" onClick={() => navigate("/reckon/preferences", { state: { from: "/profile" } })} className="gap-2 rounded-full">
+                  <SlidersHorizontal className="size-4" />Taste
+                </Button>
               </div>
             </div>
-          </section>
 
-          <Card className="surface-panel bg-card/70">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2">
-                <UserRound className="h-5 w-5 text-primary" />
-                Your Data &amp; Library
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Download a copy of your MovieReckon activity or permanently delete your account and its private data.
-              </p>
-              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground" aria-label="Library status counts">
-                <span className="rounded-md bg-muted/60 px-2 py-1">Saved {libraryStats.saved}</span>
-                <span className="rounded-md bg-muted/60 px-2 py-1">Watching {libraryStats.watching}</span>
-                <span className="rounded-md bg-muted/60 px-2 py-1">Completed {libraryStats.completed}</span>
-                <span className="rounded-md bg-muted/60 px-2 py-1">Dropped {libraryStats.dropped}</span>
+            <dl className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+              {statCards.map((stat) => (
+                <div key={stat.label} className="profile-stat">
+                  <dt className="flex items-center gap-1.5 text-xs text-muted-foreground"><stat.icon className="size-3.5" aria-hidden="true" />{stat.label}</dt>
+                  <dd className="mt-1 text-2xl font-black tabular-nums">{stat.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </section>
+
+        <div className="container mx-auto px-4">
+          <nav className="detail-section-nav" aria-label="Profile sections">
+            <ul className="filter-row" role="tablist">
+              {PROFILE_TABS.map((tab) => (
+                <li key={tab.id}>
+                  <button type="button" role="tab" aria-selected={activeTab === tab.id} onClick={() => selectTab(tab.id)}
+                    className={cn("detail-section-link gap-2", activeTab === tab.id && "detail-section-link-active")}>
+                    <tab.icon className="size-4" aria-hidden="true" />{tab.label}
+                    {tab.id === "watchlist" && watchlistItems.length > 0 && <span className="tabular-nums text-muted-foreground">{watchlistItems.length}</span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          {activeTab === "overview" && (
+            <div className="grid gap-6 lg:grid-cols-2">
+              <section className="surface-panel p-5" aria-labelledby="library-heading">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 id="library-heading" className="flex items-center gap-2 text-lg font-bold"><ListVideo className="size-5 text-primary" />Library</h2>
+                  <Button variant="ghost" size="sm" onClick={() => selectTab("watchlist")}>View all</Button>
+                </div>
+                <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="Library status counts">
+                  {(Object.keys(STATUS_LABEL) as (keyof typeof STATUS_LABEL)[]).map((status) => (
+                    <div key={status} className="rounded-xl bg-muted/40 p-3">
+                      <dt className="text-xs text-muted-foreground">{STATUS_LABEL[status]}</dt>
+                      <dd className="text-xl font-bold tabular-nums">{libraryStats[status]}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+              <section className="surface-panel p-5" aria-labelledby="recent-heading">
+                <div className="mb-2 flex items-center justify-between">
+                  <h2 id="recent-heading" className="flex items-center gap-2 text-lg font-bold"><Clock className="size-5 text-primary" />Recently watched</h2>
+                  {activityHistory.length > 0 && <Button variant="ghost" size="sm" onClick={() => selectTab("history")}>View all</Button>}
+                </div>
+                {activityHistory.length === 0 ? (
+                  <p className="py-6 text-sm text-muted-foreground">Nothing watched yet. Titles you mark as watched show up here.</p>
+                ) : (
+                  <ul className="divide-y divide-border/60">
+                    {activityHistory.slice(0, 4).map((item) => (
+                      <ActivityListItem key={`${item.content_type}-${item.content_id}`} item={item} onOpen={() => handleItemClick(item.content_id, item.content_type)} />
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
+          )}
+
+          {activeTab === "watchlist" && (
+            <section aria-label="Watchlist">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-muted-foreground">{watchlistItems.length} titles in your library</p>
+                {watchlistItems.length > 0 && <Button variant="outline" onClick={openPanel} className="gap-2 rounded-full"><ListVideo className="size-4" />Reorder & manage</Button>}
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button type="button" variant="outline" onClick={handleExport} disabled={privacyBusy}>
-                  Download My Data
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setPrivacyError(null);
-                    setDeleteDialogOpen(true);
-                  }}
-                  disabled={privacyBusy}
-                >
-                  Delete Account
-                </Button>
+              {watchlistItems.length === 0 ? emptyState("Your watchlist is empty.", "Browse movies", "/movies") : (
+                <ul className="content-grid">
+                  {watchlistItems.map((item) => (
+                    <li key={item.id}>
+                      <button type="button" onClick={() => handleItemClick(item.content_id, item.content_type)} className="browse-card group text-left" aria-label={`Open ${item.title}`}>
+                        <div className="poster-card relative aspect-2/3 overflow-hidden rounded-xl">
+                          <MediaImage src={getPosterUrl(item.poster_path, "medium")} alt={item.title} className="size-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" loading="lazy" fallbackSrc="/fallbacks/poster.svg" />
+                          <span className={cn("profile-status-pill", `profile-status-${getWatchlistStatus(item)}`)}>{STATUS_LABEL[getWatchlistStatus(item)]}</span>
+                        </div>
+                        <h3 className="mt-2.5 line-clamp-2 text-sm font-semibold group-hover:text-primary">{item.title}</h3>
+                        <p className="text-xs text-muted-foreground">{item.content_type === "movie" ? "Movie" : "Series"}</p>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
+
+          {activeTab === "history" && (
+            <section className="surface-panel p-5" aria-label="Watch history">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">{activityHistory.length} titles watched</p>
+                {watchHistory.length > 0 && (
+                  <Button variant="ghost" size="sm" onClick={clearHistory} className="text-destructive hover:text-destructive">
+                    <Trash2 className="mr-2 size-4" />Clear history
+                  </Button>
+                )}
               </div>
-              {privacyError ? (
-                <p role="alert" className="text-sm text-destructive">{privacyError}</p>
-              ) : null}
-            </CardContent>
-          </Card>
+              {activityHistory.length === 0 ? emptyState("No watch history yet.", "Start exploring", "/home") : (
+                <>
+                  <ul className="divide-y divide-border/60">
+                    {activityHistory.slice(0, 60).map((item) => (
+                      <ActivityListItem key={`${item.content_type}-${item.content_id}`} item={item}
+                        onOpen={() => handleItemClick(item.content_id, item.content_type)}
+                        onRemove={() => removeFromWatchHistory(item.content_id, item.content_type)} />
+                    ))}
+                  </ul>
+                  {activityHistory.length > 60 && <p className="pt-3 text-xs text-muted-foreground">Showing the latest 60 entries.</p>}
+                </>
+              )}
+            </section>
+          )}
+
+          {activeTab === "liked" && (
+            <section className="surface-panel p-5" aria-label="Liked titles">
+              {activityLikes.length === 0 ? emptyState("No liked titles yet.", "Find something to like", "/reckon") : (
+                <ul className="divide-y divide-border/60">
+                  {activityLikes.slice(0, 60).map((item) => (
+                    <ActivityListItem key={`${item.content_type}-${item.content_id}`} item={item} onOpen={() => handleItemClick(item.content_id, item.content_type)} />
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
+
+          {activeTab === "settings" && (
+            <div className="grid max-w-3xl gap-4">
+              {[
+                { title: "Profile details", body: "Change your username, avatar and bio.", action: "Edit profile", icon: Camera, onClick: () => navigate("/profile/edit") },
+                { title: "Taste preferences", body: "Languages and genres Reckon uses to build your feed.", action: "Edit taste", icon: SlidersHorizontal, onClick: () => navigate("/reckon/preferences", { state: { from: "/profile?tab=settings" } }) },
+                { title: "Your data", body: "Download a copy of your MovieReckon activity as JSON.", action: "Download my data", icon: Download, onClick: () => void handleExport() },
+              ].map((row) => (
+                <section key={row.title} className="profile-setting">
+                  <row.icon className="size-5 shrink-0 text-primary" aria-hidden="true" />
+                  <div className="min-w-0 flex-1">
+                    <h2 className="font-semibold">{row.title}</h2>
+                    <p className="text-sm text-muted-foreground">{row.body}</p>
+                  </div>
+                  <Button variant="outline" onClick={row.onClick} disabled={privacyBusy} className="shrink-0 rounded-full">{row.action}</Button>
+                </section>
+              ))}
+              <section className="profile-setting">
+                <LogOut className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <div className="min-w-0 flex-1"><h2 className="font-semibold">Sign out</h2><p className="text-sm text-muted-foreground">Sign out of MovieReckon on this device.</p></div>
+                <Button variant="outline" onClick={handleSignOut} className="shrink-0 rounded-full">Sign out</Button>
+              </section>
+              <section className="profile-setting border-destructive/30 bg-destructive/5">
+                <ShieldAlert className="size-5 shrink-0 text-destructive" aria-hidden="true" />
+                <div className="min-w-0 flex-1"><h2 className="font-semibold">Delete account</h2><p className="text-sm text-muted-foreground">Permanently remove your profile, library, history and recommendation data.</p></div>
+                <Button variant="outline" onClick={() => { setPrivacyError(null); setDeleteDialogOpen(true); }} disabled={privacyBusy} className="shrink-0 rounded-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive">Delete account</Button>
+              </section>
+              {privacyError ? <p role="alert" className="text-sm text-destructive">{privacyError}</p> : null}
+            </div>
+          )}
 
           <AlertDialog
             open={deleteDialogOpen}
@@ -427,105 +508,6 @@ export default function Profile() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-
-          <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <Card className="surface-panel bg-card/70">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  Watch History
-                </CardTitle>
-                {watchHistory.length > 0 ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearHistory}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Clear Activity
-                  </Button>
-                ) : null}
-              </CardHeader>
-              <CardContent>
-                {activityHistory.length === 0 ? (
-                  <div className="py-10 text-center">
-                    <p className="mb-4 text-muted-foreground">
-                      No watch history yet.
-                    </p>
-                    <Button onClick={() => navigate("/upcoming")}>
-                      Start Exploring
-                    </Button>
-                  </div>
-                ) : (
-                  <>
-                    <ul className="divide-y divide-border/60">
-                      {activityHistory.slice(0, 18).map((item) => (
-                        <ActivityListItem
-                          key={`${item.content_type}-${item.content_id}`}
-                          item={item}
-                          onOpen={() =>
-                            handleItemClick(item.content_id, item.content_type)
-                          }
-                          onRemove={() =>
-                            removeFromWatchHistory(
-                              item.content_id,
-                              item.content_type,
-                            )
-                          }
-                        />
-                      ))}
-                    </ul>
-                    {activityHistory.length > 18 ? (
-                      <p className="pt-3 text-xs text-muted-foreground">
-                        Showing latest 18 entries.
-                      </p>
-                    ) : null}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="surface-panel bg-card/70">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2">
-                  <Heart className="h-5 w-5 text-primary" />
-                  Liked Content
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {activityLikes.length === 0 ? (
-                  <div className="py-10 text-center">
-                    <p className="mb-4 text-muted-foreground">
-                      No liked content yet.
-                    </p>
-                    <Button onClick={() => navigate("/upcoming")}>
-                      Find Something to Like
-                    </Button>
-                  </div>
-                ) : (
-                  <>
-                    <ul className="divide-y divide-border/60">
-                      {activityLikes.slice(0, 18).map((item) => (
-                        <ActivityListItem
-                          key={`${item.content_type}-${item.content_id}`}
-                          item={item}
-                          onOpen={() =>
-                            handleItemClick(item.content_id, item.content_type)
-                          }
-                        />
-                      ))}
-                    </ul>
-                    {activityLikes.length > 18 ? (
-                      <p className="pt-3 text-xs text-muted-foreground">
-                        Showing latest 18 likes.
-                      </p>
-                    ) : null}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </section>
         </div>
       </main>
 

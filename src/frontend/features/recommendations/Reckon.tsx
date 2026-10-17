@@ -7,10 +7,11 @@ import React, {
   useCallback,
 } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useRecommendations } from "@/frontend/hooks/useRecommendations";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import { useUserData } from "@/frontend/hooks/useUserData";
-import { Movie, TVShow } from "@/shared/lib/tmdb";
+import { Movie, TVShow, getBackdropUrl } from "@/shared/lib/tmdb";
 import * as mongoClient from "@/frontend/lib/mongodbClient";
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
@@ -24,7 +25,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/frontend/components/ui/select";
-import { Badge } from "@/frontend/components/ui/badge";
 import {
   Sparkles,
   ArrowUpDown,
@@ -36,11 +36,13 @@ import {
   Star,
   Crown,
   CalendarDays,
-  ChevronDown,
+  ArrowRight,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
+import { useLoadMoreOnScroll } from "@/frontend/hooks/useBrowseFeed";
+import { GENRE_NAMES, LANGUAGE_LABELS, PREFERENCE_GENRE_IDS } from "@/shared/lib/catalogue";
 import PickTonight from "./PickTonight";
-import { FirstTimeSetup, PreferencesSheet } from "./ReckonPreferences";
+import MediaImage from "@/frontend/components/MediaImage";
 import YourTastePanel, { type TasteSignal } from "./YourTastePanel";
 
 type ContentTypeFilter = "all" | "movie" | "tv";
@@ -88,48 +90,8 @@ const RECOMMENDATION_TYPES: {
 
 const INITIAL_VISIBLE_ITEMS = 48;
 
-const GENRE_MAP: Record<number, string> = {
-  28: "Action",
-  12: "Adventure",
-  16: "Animation",
-  35: "Comedy",
-  80: "Crime",
-  99: "Documentary",
-  18: "Drama",
-  10751: "Family",
-  14: "Fantasy",
-  36: "History",
-  27: "Horror",
-  10402: "Music",
-  9648: "Mystery",
-  10749: "Romance",
-  878: "Sci-Fi",
-  10770: "TV Movie",
-  53: "Thriller",
-  10752: "War",
-  37: "Western",
-};
-
-const LANGUAGE_MAP: Record<string, string> = {
-  en: "English",
-  hi: "Hindi",
-  ta: "Tamil",
-  te: "Telugu",
-  gu: "Gujarati",
-  ml: "Malayalam",
-  kn: "Kannada",
-  ko: "Korean",
-  ja: "Japanese",
-  es: "Spanish",
-  fr: "French",
-  tr: "Turkish",
-  pt: "Portuguese",
-  zh: "Chinese",
-  ar: "Arabic",
-  ru: "Russian",
-  it: "Italian",
-  de: "German",
-};
+const GENRE_MAP = GENRE_NAMES;
+const LANGUAGE_MAP = LANGUAGE_LABELS;
 
 const ReckonCard = memo(
   ({
@@ -164,7 +126,7 @@ function getRecommendationKey(item: Movie | TVShow): string {
 
 export default function Reckon() {
   const { user } = useAuth();
-  const { preferences, updatePreferences, setFeedback } = useUserData();
+  const { preferences, setFeedback } = useUserData();
   const queryClient = useQueryClient();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const tastePreferencesKey = [
@@ -192,11 +154,8 @@ export default function Reckon() {
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [selectedGenre, setSelectedGenre] = useState<string>("all");
   const [selectedLanguage, setSelectedLanguage] = useState<string>("all");
-  const [prefsOpen, setPrefsOpen] = useState(false);
-  const [skippedSetup, setSkippedSetup] = useState(false);
-  const [setupLangs, setSetupLangs] = useState<string[]>([]);
-  const [setupGenres, setSetupGenres] = useState<number[]>([]);
-  const [setupSaving, setSetupSaving] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
   const [explorationMode, setExplorationMode] = useState<mongoClient.TasteExplorationMode>("familiar");
 
   useEffect(() => {
@@ -210,15 +169,6 @@ export default function Reckon() {
     setExplorationMode(snapshot.controls.explorationMode);
     queryClient.setQueryData(tasteQueryKey, snapshot);
   }, [queryClient, tasteQueryKey]);
-  const toggleSetupLang = (l: string) =>
-    setSetupLangs((prev) =>
-      prev.includes(l) ? prev.filter((x) => x !== l) : [...prev, l],
-    );
-
-  const toggleSetupGenre = (g: number) =>
-    setSetupGenres((prev) =>
-      prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g],
-    );
 
   const {
     items: recommendations,
@@ -290,19 +240,6 @@ export default function Reckon() {
     return result;
   }, [applyTasteSnapshot, queryClient, refetchTaste, refreshRecommendations, setFeedback, tasteQueryKey]);
 
-  const saveSetup = useCallback(async () => {
-    setSetupSaving(true);
-    try {
-      await updatePreferences({
-        preferred_languages: setupLangs,
-        preferred_genres: setupGenres,
-      });
-      await refetchTaste();
-      await refreshRecommendations();
-    } finally {
-      setSetupSaving(false);
-    }
-  }, [refetchTaste, refreshRecommendations, setupGenres, setupLangs, updatePreferences]);
   const [extraItems, setExtraItems] = useState<(Movie | TVShow)[]>([]);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [moreExhausted, setMoreExhausted] = useState(false);
@@ -327,16 +264,24 @@ export default function Reckon() {
     (preferences?.preferred_languages?.length ?? 0) > 0 ||
     (preferences?.preferred_genres?.length ?? 0) > 0;
 
-  const handlePreferencesSaved = useCallback(() => {
+  const openPreferences = useCallback(() => {
+    navigate("/reckon/preferences", { state: { from: "/reckon" } });
+  }, [navigate]);
+
+  // Coming back from the preferences page with saved changes rebuilds the feed.
+  const preferencesUpdated = Boolean((location.state as { preferencesUpdated?: boolean } | null)?.preferencesUpdated);
+  useEffect(() => {
+    if (!preferencesUpdated) return;
+    navigate(location.pathname, { replace: true, state: null });
     void refetchTaste();
     void refreshRecommendations();
-  }, [refetchTaste, refreshRecommendations]);
+  }, [location.pathname, navigate, preferencesUpdated, refetchTaste, refreshRecommendations]);
 
-  const showFirstTimeSetup =
-    !hasPreferences && !reckonLoading && preferences !== null && !skippedSetup;
+  const preferenceCount = (preferences?.preferred_languages?.length ?? 0) + (preferences?.preferred_genres?.length ?? 0);
+  const heroBackdrop = recommendations.find((item) => item.backdrop_path)?.backdrop_path ?? null;
 
   const availableGenres = useMemo(() => {
-    const genres = new Set<number>(Object.keys(GENRE_MAP).map(Number));
+    const genres = new Set<number>([...PREFERENCE_GENRE_IDS, 10770]);
     preferences?.preferred_genres?.forEach((g) => genres.add(g));
     return Array.from(genres)
       .filter((g) => GENRE_MAP[g])
@@ -474,19 +419,13 @@ export default function Reckon() {
 
   const hasMore = hasMoreFromServer;
 
-  useEffect(() => {
-    const node = loadMoreRef.current;
-    if (!node || !hasMore || recommendationsHasError || recommendationsState === "retryable") return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (!entries[0]?.isIntersecting) return;
-        if (!isFetchingNextPage) void fetchNextPage();
-      },
-      { rootMargin: "500px 0px" },
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [fetchNextPage, hasMore, isFetchingNextPage, processedItems.length, recommendationsHasError, recommendationsState]);
+  useLoadMoreOnScroll({
+    sentinel: loadMoreRef,
+    enabled: hasMore && !recommendationsHasError && recommendationsState !== "retryable" && !isFetchingNextPage,
+    onLoadMore: () => void fetchNextPage(),
+    rootMargin: "500px 0px",
+    revision: processedItems.length,
+  });
 
   const toggleSortOrder = () =>
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -515,65 +454,53 @@ export default function Reckon() {
 
       <main className="page-main">
         <div className="reckon-container">
-          <div className="mb-7 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-            <div>
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Reckon</h1>
-                {isPersonalized && <Badge className="border-primary/30 bg-primary/12 px-2.5 py-1 text-xs text-foreground">Personalized</Badge>}
+          <section className="reckon-hero">
+            {heroBackdrop && (
+              <MediaImage key={heroBackdrop} src={getBackdropUrl(heroBackdrop, "large")} alt="" aria-hidden="true" className="reckon-hero-art" width={1280} height={720} sizes="100vw" fadeIn priority />
+            )}
+            <div className="reckon-hero-scrim" aria-hidden="true" />
+            <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+              <div className="min-w-0 max-w-2xl">
+                <p className="page-kicker flex items-center gap-2"><Sparkles className="size-3.5" aria-hidden="true" />{isPersonalized ? "Personalized for you" : "Trending worldwide"}</p>
+                <h1 className="mt-2 text-5xl font-black tracking-[-0.045em] sm:text-6xl">Reckon</h1>
+                <p className="mt-3 text-base leading-7 text-white/70">
+                  {isPersonalized ? "Picks that evolve with every title you like, save or skip." : "Set your taste to turn these trending picks into a feed made for you."}
+                </p>
+                {hasPreferences && (
+                  <ul className="mt-4 flex flex-wrap gap-1.5" aria-label="Your saved preferences">
+                    {(preferences?.preferred_languages || []).slice(0, 4).map((code) => (
+                      <li key={code} className="reckon-taste-chip">{LANGUAGE_MAP[code] || code.toUpperCase()}</li>
+                    ))}
+                    {(preferences?.preferred_genres || []).slice(0, 5).map((id) => (
+                      <li key={id} className="reckon-taste-chip reckon-taste-chip-genre">{GENRE_MAP[id] || id}</li>
+                    ))}
+                    {preferenceCount > 9 && <li className="reckon-taste-chip">+{preferenceCount - 9}</li>}
+                  </ul>
+                )}
               </div>
-              <p className="mt-2 text-base text-muted-foreground">
-                {isPersonalized ? "Picks that evolve with your taste" : "Trending and globally diverse picks"}
-              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                {tasteSnapshot && <a href="#your-taste-heading" className="inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white"><Sparkles className="size-4" />Your taste</a>}
+                <Button variant="outline" onClick={openPreferences} className="min-h-11 gap-2 rounded-full border-white/20 bg-white/5 px-4 backdrop-blur-sm hover:bg-white/10">
+                  <SlidersHorizontal className="size-4" />Preferences
+                </Button>
+                <Button variant="ghost" onClick={() => void refreshRecommendations()} disabled={isRefreshing} className="min-h-11 gap-2 rounded-full px-4 text-white/75">
+                  <RefreshCw className={cn("size-4", isRefreshing && "animate-spin")} />Refresh
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              {tasteSnapshot && <a href="#your-taste-heading" className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"><Sparkles className="size-4" />Your taste</a>}
-              <Button variant="outline" onClick={() => setPrefsOpen(true)} className="min-h-11 gap-2 px-3 sm:px-4">
-                <SlidersHorizontal className="size-4" />Preferences
-                {hasPreferences && <span className="rounded bg-muted px-1.5 py-0.5 text-xs tabular-nums">{(preferences?.preferred_languages?.length ?? 0) + (preferences?.preferred_genres?.length ?? 0)}</span>}
-              </Button>
-              <Button variant="ghost" onClick={() => void refreshRecommendations()} disabled={isRefreshing} className="min-h-11 gap-2 px-3 text-muted-foreground">
-                <RefreshCw className={cn("size-4", isRefreshing && "animate-spin")} />Refresh
-              </Button>
-            </div>
-          </div>
+          </section>
 
-          {/* First Time Setup or Preferences Nudge */}
-          {showFirstTimeSetup ? (
-            <details className="reckon-setup group/setup mb-8">
-              <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 rounded-lg py-3 [&::-webkit-details-marker]:hidden">
-                <div><h2 className="text-sm font-semibold">Make these picks yours</h2><p className="mt-1 text-sm text-muted-foreground">Choose your favorite languages and genres.</p></div>
-                <ChevronDown className="size-5 shrink-0 text-muted-foreground transition-transform group-open/setup:rotate-180" aria-hidden="true" />
-              </summary>
-            <FirstTimeSetup
-              langs={setupLangs}
-              genres={setupGenres}
-              onToggleLang={toggleSetupLang}
-              onToggleGenre={toggleSetupGenre}
-              onSave={saveSetup}
-              onSkip={() => setSkippedSetup(true)}
-              saving={setupSaving}
-            />
-            </details>
-          ) : !hasPreferences && !reckonLoading ? (
-            <div className="reckon-setup mb-8 flex flex-wrap items-center gap-3 py-4">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-foreground">
-                  Unlock personalized recommendations
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Set your favorite languages and genres — the engine strongly
-                  prioritizes them.
-                </p>
-              </div>
-              <Button
-                size="sm"
-                onClick={() => setPrefsOpen(true)}
-                className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer transition-colors duration-200"
-              >
-                Set Up
-              </Button>
-            </div>
-          ) : null}
+          {!hasPreferences && !reckonLoading && preferences !== null && (
+            <button type="button" onClick={openPreferences} className="reckon-setup-card group">
+              <span className="min-w-0 flex-1 text-left">
+                <span className="block text-lg font-bold">Make these picks yours</span>
+                <span className="mt-1 block text-sm text-muted-foreground">Choose your languages and favourite genres. It takes under a minute.</span>
+              </span>
+              <span className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground transition-transform group-hover:translate-x-0.5">
+                Set up taste<ArrowRight className="size-4" aria-hidden="true" />
+              </span>
+            </button>
+          )}
 
           <PickTonight items={recommendations} explanationById={explanationById} />
 
@@ -581,7 +508,7 @@ export default function Reckon() {
             <h2 className="text-2xl font-semibold tracking-tight">More for you</h2>
             <p className="text-sm tabular-nums text-muted-foreground" aria-live="polite">{processedItems.length} picks</p>
           </div>
-          <div className="reckon-filters mb-6">
+          <div className="reckon-filters reckon-filters-sticky mb-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="reckon-type-tabs" role="group" aria-label="Content type">
                 {([
@@ -623,7 +550,6 @@ export default function Reckon() {
               {RECOMMENDATION_TYPES.map(({id,label,description,Icon}) => <button key={id} type="button" title={description} aria-pressed={recTypeFilter === id} onClick={() => setRecTypeFilter(id)} className={cn("min-h-11 shrink-0 rounded-lg px-3 text-sm transition-colors", recTypeFilter === id ? "bg-primary/12 text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Icon className="mr-2 inline size-4" />{label}</button>)}
             </div>}
           </div>
-          <PreferencesSheet open={prefsOpen} onClose={() => setPrefsOpen(false)} onSaved={handlePreferencesSaved} />
 
           {/* Grid */}
           {reckonLoading && !hasResolvedItems ? (
@@ -755,7 +681,7 @@ export default function Reckon() {
           <YourTastePanel
             snapshot={tasteSnapshot || null}
             feedMode={feedMode}
-            onEditPreferences={() => setPrefsOpen(true)}
+            onEditPreferences={openPreferences}
             onExplorationChange={handleExplorationChange}
             onForgetLearning={handleForgetLearning}
             onResetLearned={handleResetLearned}

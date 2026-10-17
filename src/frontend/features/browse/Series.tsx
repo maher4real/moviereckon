@@ -1,7 +1,6 @@
-import { useEffect, useMemo, memo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { motion } from "motion/react";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import {
   discoverTVShows,
@@ -10,23 +9,15 @@ import {
   getPopularTVShows,
   getTopRatedTVShows,
   TVShow,
-  Genre,
-  getPosterUrl,
-  getLanguageBadgeClass,
-  getLanguageLabel,
 } from "@/shared/lib/tmdb";
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
-import {
-  AppPageSkeleton,
-  PosterGridSkeleton,
-  InlineLoadMoreSkeleton,
-} from "@/frontend/components/AppSkeletons";
-import MediaImage from "@/frontend/components/MediaImage";
-import { Button } from "@/frontend/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/frontend/components/ui/select";
-import { cn, formatLocalDate, isAnimeLike } from "@/shared/lib/utils";
-import { CalendarDays, Clapperboard, Languages, Play, Star, TrendingUp, Tv } from "lucide-react";
+import { PosterGridSkeleton, InlineLoadMoreSkeleton } from "@/frontend/components/AppSkeletons";
+import { BrowseFilters, BrowseHeader, BrowsePosterCard, type ActiveFilter, type BrowseSelect } from "@/frontend/components/browse/BrowseLayout";
+import { cn, isAnimeLike, formatLocalDate } from "@/shared/lib/utils";
+import { getNextTmdbPage, mergeUniquePages, useCanonicalSearchParams, useLoadMoreOnScroll } from "@/frontend/hooks/useBrowseFeed";
+import { SERIES_LANGUAGE_OPTIONS } from "@/shared/lib/catalogue";
+import { CalendarDays, Clapperboard, Languages, Star, TrendingUp, Tv } from "lucide-react";
 import {
   buildSeriesDiscoverFilters,
   getSeriesBrowseQueryKey,
@@ -63,17 +54,7 @@ const sortOptions: { value: SortOption; label: string }[] = [
 const currentYear = new Date().getFullYear();
 const yearOptions = Array.from({ length: currentYear - 1949 }, (_, i) => currentYear - i);
 
-const LANGUAGE_OPTIONS = [
-  { value: "all", label: "All Languages" },
-  { value: "en", label: "English" },
-  { value: "hi", label: "Hindi" },
-  { value: "ko", label: "Korean" },
-  { value: "ja", label: "Japanese" },
-  { value: "ta", label: "Tamil" },
-  { value: "te", label: "Telugu" },
-  { value: "es", label: "Spanish" },
-  { value: "fr", label: "French" },
-];
+const LANGUAGE_OPTIONS = SERIES_LANGUAGE_OPTIONS;
 
 const SERIES_CATEGORY_OPTIONS = [
   { value: "all", label: "All Series", Icon: Tv },
@@ -103,71 +84,15 @@ export function getSeriesCardTagLabel({
 
 export { getSeriesWatchProviderFilter } from "./browseFilterState";
 
-const PosterCard = memo(
-  ({
-    item,
-    onClick,
-    ottLabel,
-    priority = false,
-  }: {
-    item: TVShow;
-    onClick: () => void;
-    ottLabel?: string;
-    priority?: boolean;
-  }) => (
-    <motion.div
-      onClick={onClick}
-      whileHover={{ y: -6 }}
-      whileTap={{ scale: 0.985 }}
-      transition={{ type: "spring", stiffness: 360, damping: 30 }}
-      className="cursor-pointer group"
-    >
-      <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
-        <MediaImage
-          src={getPosterUrl(item.poster_path, "medium")}
-          alt={item.name}
-          className="w-full h-full object-cover"
-          loading={priority ? "eager" : "lazy"}
-          fetchPriority={priority ? "high" : "auto"}
-          priority={priority}
-          fallbackSrc="/fallbacks/poster.svg"
-        />
-        <div className="absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <motion.div
-            className="poster-play-button"
-            initial={false}
-            whileHover={{ scale: 1.08 }}
-            transition={{ type: "spring", stiffness: 420, damping: 24 }}
-          >
-            <Play className="h-5 w-5 fill-current" />
-          </motion.div>
-        </div>
-        {item.vote_average > 0 && (
-          <div className="rating-badge absolute top-2 right-2">
-            <Star className="h-3 w-3 fill-current" />
-            {item.vote_average.toFixed(1)}
-          </div>
-        )}
-        <div className={cn("language-badge absolute top-2 left-2", getLanguageBadgeClass(item.original_language))}>
-          {item.original_language.toUpperCase()}
-        </div>
-        {ottLabel && (
-          <div className="absolute bottom-2 left-2 px-2 py-1 rounded bg-black/70 text-[10px] font-semibold uppercase tracking-wide">
-            {ottLabel}
-          </div>
-        )}
-      </div>
-      <h3 className="mt-2 break-words text-sm font-medium leading-snug line-clamp-2 group-hover:text-primary transition-colors">
-        {item.name}
-      </h3>
-      <p className="text-xs text-muted-foreground">
-        {item.first_air_date?.split("-")[0] || ""} • {getLanguageLabel(item.original_language)}
-      </p>
-    </motion.div>
-  )
-);
-
-PosterCard.displayName = "PosterCard";
+const CATEGORY_COPY: Record<SeriesCategory, string> = {
+  all: "Every series on TMDB. Filter by platform, language, genre and year.",
+  popular: "The shows drawing the biggest audiences right now.",
+  top_rated: "The highest-rated series of all time.",
+  upcoming: "Series premiering soon.",
+  korean: "Korean dramas, from romance to thrillers.",
+  indian: "Indian originals across the major streaming platforms.",
+  anime: "Japanese animation, from long-running classics to new seasons.",
+};
 
 export default function Series() {
   const { user } = useAuth();
@@ -187,10 +112,7 @@ export default function Series() {
     [searchParamString, seriesState],
   );
 
-  useEffect(() => {
-    if (canonicalSearchParamString === searchParamString) return;
-    setSearchParams(new URLSearchParams(canonicalSearchParamString), { replace: true });
-  }, [canonicalSearchParamString, searchParamString, setSearchParams]);
+  useCanonicalSearchParams(canonicalSearchParamString, searchParamString, setSearchParams);
 
   const updateSeriesState = (changes: Partial<SeriesBrowseState>) => {
     const nextState = normalizeSeriesBrowseState({ ...seriesState, ...changes });
@@ -248,60 +170,31 @@ export default function Series() {
 
       return discoverTVShows(buildSeriesDiscoverFilters(seriesState, page, tomorrowStr));
     },
-    getNextPageParam: (lastPage) => {
-      if (!lastPage?.page || !lastPage?.total_pages) return undefined;
-      return lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined;
-    },
+    getNextPageParam: getNextTmdbPage,
     staleTime: 1000 * 60 * 5,
     enabled: !!user,
   });
 
   const filteredSeries = useMemo(() => {
-    if (!contentData?.pages) return [];
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = formatLocalDate(tomorrow);
-
-    const dedupe = new Set<number>();
-    const merged: TVShow[] = [];
-
-    contentData.pages.forEach((page) => {
-      (page.results || []).forEach((item) => {
-        if (dedupe.has(item.id)) return;
-
-        const animeLike = isAnimeLike(item);
-        if (category === "anime" && !animeLike) return;
-        if (category !== "anime" && animeLike) return;
-        if (category === "upcoming" && item.first_air_date < tomorrowStr) return;
-        if (selectedYear && !item.first_air_date?.startsWith(`${selectedYear}-`)) return;
-        if (selectedLanguage !== "all" && category === "all" && item.original_language !== selectedLanguage) {
-          return;
-        }
-
-        dedupe.add(item.id);
-        merged.push(item);
-      });
+    return mergeUniquePages<TVShow, SeriesPage>(contentData?.pages, (item) => {
+      const animeLike = isAnimeLike(item);
+      if (category === "anime" && !animeLike) return false;
+      if (category !== "anime" && animeLike) return false;
+      if (category === "upcoming" && item.first_air_date < tomorrowStr) return false;
+      if (selectedYear && !item.first_air_date?.startsWith(`${selectedYear}-`)) return false;
+      return !(selectedLanguage !== "all" && category === "all" && item.original_language !== selectedLanguage);
     });
-
-    return merged;
   }, [contentData, category, selectedLanguage, selectedYear]);
 
-  useEffect(() => {
-    const node = loadMoreRef.current;
-    if (!node || !hasNextPage) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      },
-      { rootMargin: "600px 0px" }
-    );
-
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage, filteredSeries.length]);
+  useLoadMoreOnScroll({
+    sentinel: loadMoreRef,
+    enabled: Boolean(hasNextPage) && !isFetchingNextPage,
+    onLoadMore: fetchNextPage,
+    revision: filteredSeries.length,
+  });
 
   const ottLabel = useMemo(
     () => providerOptions.find((opt) => opt.value === ottFilter)?.label,
@@ -312,186 +205,120 @@ export default function Series() {
     return getSeriesCardTagLabel({ category, ottFilter, ottLabel });
   }, [ottFilter, ottLabel, category]);
 
+  const genreLabel = genres?.find((genre) => String(genre.id) === selectedGenre)?.name;
+  const sortLabel = sortOptions.find((option) => option.value === sortBy)?.label;
+  const languageLabel = LANGUAGE_OPTIONS.find((option) => option.value === selectedLanguage)?.label;
+  const activeCategory = SERIES_CATEGORY_OPTIONS.find((option) => option.value === category) ?? SERIES_CATEGORY_OPTIONS[0];
+  const languageLocked = category === "korean" || category === "indian" || category === "anime";
+  const genreDisabled = isSpecialCategory || category === "anime";
+  const totalResults = contentData?.pages[0]?.total_results;
+
+  const selects: BrowseSelect[] = [
+    {
+      id: "sort", label: "Sort by", value: sortBy, options: sortOptions, disabled: isSpecialCategory,
+      onChange: (value) => updateSeriesState({ sortBy: value as SortOption }),
+    },
+    {
+      id: "genre", label: "Genre", value: selectedGenre || "all", disabled: genreDisabled,
+      options: [{ value: "all", label: "All genres" }, ...(genres || []).map((genre) => ({ value: String(genre.id), label: genre.name }))],
+      onChange: (value) => updateSeriesState({ selectedGenre: value === "all" ? "" : value }),
+    },
+    {
+      id: "platform", label: "Platform", value: ottFilter, options: providerOptions,
+      onChange: (value) => updateSeriesState({ ottFilter: value }),
+    },
+    {
+      id: "region", label: "Watch region", value: watchRegion, options: getWatchRegionOptions(),
+      onChange: (value) => updateSeriesState({ watchRegion: value as WatchRegion }),
+    },
+    {
+      id: "language", label: "Language", value: selectedLanguage, options: LANGUAGE_OPTIONS, disabled: languageLocked,
+      onChange: (value) => updateSeriesState({ selectedLanguage: value }),
+    },
+    {
+      id: "year", label: "First aired", value: selectedYear || "all",
+      options: [{ value: "all", label: "Any year" }, ...yearOptions.map((year) => ({ value: String(year), label: String(year) }))],
+      onChange: (value) => updateSeriesState({ selectedYear: value === "all" ? "" : value }),
+    },
+  ];
+
+  const activeFilters: ActiveFilter[] = [
+    ...(selectedGenre && genreLabel ? [{ key: "genre", label: genreLabel, onClear: () => updateSeriesState({ selectedGenre: "" }) }] : []),
+    ...(ottFilter !== "all" && ottLabel ? [{ key: "platform", label: ottLabel, onClear: () => updateSeriesState({ ottFilter: "all" }) }] : []),
+    ...(!languageLocked && selectedLanguage !== "all" && languageLabel ? [{ key: "language", label: languageLabel, onClear: () => updateSeriesState({ selectedLanguage: "all" }) }] : []),
+    ...(selectedYear ? [{ key: "year", label: selectedYear, onClear: () => updateSeriesState({ selectedYear: "" }) }] : []),
+    ...(!isSpecialCategory && sortBy !== "popularity.desc" && sortLabel ? [{ key: "sort", label: sortLabel, onClear: () => updateSeriesState({ sortBy: "popularity.desc" }) }] : []),
+  ];
+
   return (
     <div className="app-page flex flex-col pb-20 md:pb-0">
       <Header />
 
-      <main className="page-main">
+      <main className="flex-1 pb-12">
+        <BrowseHeader
+          kicker="Browse library"
+          title={category === "all" ? "TV Series" : activeCategory.label}
+          description={CATEGORY_COPY[category]}
+          icon={Tv}
+          backdropPath={filteredSeries.find((show) => show.backdrop_path)?.backdrop_path}
+          resultLabel={!isLoading && totalResults ? `${totalResults.toLocaleString()} titles` : null}
+        />
         <div className="container mx-auto px-4">
-          <div className="page-heading">
-            <div className="page-heading-icon">
-              <Tv className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="page-kicker">Browse Library</p>
-              <h1 className="page-title">TV Series</h1>
-            </div>
-          </div>
-
-          <div className="filter-panel">
-            <div className="filter-row">
-              {SERIES_CATEGORY_OPTIONS.map((cat) => {
-                const active = category === cat.value;
-                return (
-                <Button
-                  key={cat.value}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => updateSeriesState({ category: cat.value })}
-                  className={cn("filter-chip", active && "filter-chip-active")}
-                >
-                  <cat.Icon className="h-4 w-4" />
-                  {cat.label}
-                </Button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="filter-panel flex flex-wrap gap-3">
-            <Select
-              value={selectedGenre}
-              onValueChange={(v) => updateSeriesState({ selectedGenre: v === "all" ? "" : v })}
-              disabled={isSpecialCategory || category === "anime"}
-            >
-              <SelectTrigger className="select-surface w-[150px]">
-                <SelectValue placeholder="All Genres" />
-              </SelectTrigger>
-              <SelectContent className="bg-popover border-border z-50">
-                <SelectItem value="all">All Genres</SelectItem>
-                {genres?.map((g: Genre) => (
-                  <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={sortBy}
-              onValueChange={(v) => updateSeriesState({ sortBy: v as SortOption })}
-              disabled={isSpecialCategory}
-            >
-              <SelectTrigger className="select-surface w-[150px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-popover border-border z-50">
-                {sortOptions.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={watchRegion}
-              onValueChange={(value) => updateSeriesState({ watchRegion: value as WatchRegion })}
-            >
-              <SelectTrigger aria-label="Watch region" className="select-surface w-[170px]">
-                <SelectValue placeholder="Watch Region" />
-              </SelectTrigger>
-              <SelectContent className="bg-popover border-border z-50">
-                {getWatchRegionOptions().map((option) => (
-                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={ottFilter} onValueChange={(value) => updateSeriesState({ ottFilter: value })}>
-              <SelectTrigger className="select-surface w-[160px]">
-                <SelectValue placeholder="OTT Platform" />
-              </SelectTrigger>
-              <SelectContent className="bg-popover border-border z-50">
-                {providerOptions.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={selectedYear}
-              onValueChange={(v) => updateSeriesState({ selectedYear: v === "all" ? "" : v })}
-            >
-              <SelectTrigger className="select-surface w-[150px]">
-                <SelectValue placeholder="All Years" />
-              </SelectTrigger>
-              <SelectContent className="bg-popover border-border z-50 max-h-[300px]">
-                <SelectItem value="all">All Years</SelectItem>
-                {yearOptions.map((year) => (
-                  <SelectItem key={year} value={String(year)}>{year}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={selectedLanguage}
-              onValueChange={(value) => updateSeriesState({ selectedLanguage: value })}
-              disabled={category === "korean" || category === "indian" || category === "anime"}
-            >
-              <SelectTrigger className="select-surface w-[170px]">
-                <SelectValue placeholder="Language" />
-              </SelectTrigger>
-              <SelectContent className="bg-popover border-border z-50">
-                {LANGUAGE_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {isSpecialCategory && (
-            <p className="mt-3 text-xs text-muted-foreground">
-              {category === "popular" ? "Popular" : "Top Rated"} uses its fixed category ordering; genre and sort are unavailable.
-              Year, language, and platform filters still apply.
-            </p>
-          )}
-
-          <p className="mt-3 text-xs text-muted-foreground">
-            Platform choices use TMDB&apos;s catalog for the selected watch region when available, with a curated
-            supported fallback. Availability is title-specific; the selected language does not change the watch region.
-            {category === "indian" && " Indian All OTT uses the supported provider subset for this region."}
-          </p>
+          <BrowseFilters
+            categories={SERIES_CATEGORY_OPTIONS}
+            activeCategory={category}
+            onCategory={(value) => updateSeriesState({ category: value })}
+            genres={genres}
+            selectedGenre={selectedGenre}
+            onGenre={(value) => updateSeriesState({ selectedGenre: value })}
+            genreDisabled={genreDisabled}
+            selects={selects}
+            activeFilters={activeFilters}
+            onReset={() => updateSeriesState({ selectedGenre: "", selectedYear: "", sortBy: "popularity.desc", ottFilter: "all", selectedLanguage: "all" })}
+            note={<>
+              {isSpecialCategory && `${activeCategory.label} uses its fixed ordering, so genre and sort are unavailable. `}
+              Platform availability comes from TMDB for the selected watch region and varies by title.
+              {category === "indian" && " Indian uses the supported provider subset for this region."}
+            </>}
+          />
 
           {isLoading ? (
             <PosterGridSkeleton count={18} />
           ) : (
             <>
-              <div
-                className={cn(
-                  "content-grid",
-                  isFetching && !isFetchingNextPage && "opacity-75",
-                )}
-              >
+              <div className={cn("content-grid", isFetching && !isFetchingNextPage && "opacity-75")}>
                 {filteredSeries.map((item, index) => (
-                  <PosterCard
+                  <BrowsePosterCard
                     key={item.id}
-                    item={item}
+                    title={item.name}
+                    posterPath={item.poster_path}
+                    rating={item.vote_average}
+                    language={item.original_language}
+                    year={item.first_air_date?.split("-")[0]}
+                    tag={cardOttLabel}
                     priority={index < 8}
                     onClick={() =>
                       navigate(`/tv/${item.id}`, {
-                        state: {
-                          from: `${location.pathname}${location.search}${location.hash}`,
-                        },
+                        state: { from: `${location.pathname}${location.search}${location.hash}` },
                       })
                     }
-                    ottLabel={cardOttLabel}
                   />
                 ))}
               </div>
 
               {filteredSeries.length === 0 && (
                 <div className="empty-state">
-                  <p className="text-muted-foreground">No series found for the selected filters.</p>
+                  <p className="font-semibold">No series match these filters.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Try another platform or language, or clear the filters.</p>
                 </div>
               )}
 
               <div ref={loadMoreRef} className="h-12 w-full" />
 
-              {isFetchingNextPage && (
-                <InlineLoadMoreSkeleton />
-              )}
+              {isFetchingNextPage && <InlineLoadMoreSkeleton />}
 
               {!hasNextPage && filteredSeries.length > 0 && (
-                <p className="text-center text-sm text-muted-foreground py-2">
-                  You are all caught up.
-                </p>
+                <p className="py-2 text-center text-sm text-muted-foreground">You are all caught up.</p>
               )}
             </>
           )}

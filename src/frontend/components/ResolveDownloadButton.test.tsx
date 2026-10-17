@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ResolveDownloadButton from "./ResolveDownloadButton";
 import { WatchSourceOptions } from "./WatchSourceLinks";
@@ -37,6 +37,30 @@ describe("final download link action", () => {
     fireEvent.click(screen.getByRole("button", { name: /Get file link/ }));
     expect(mocks.resolve).toHaveBeenCalledTimes(2);
     await screen.findByRole("link", { name: "Download file" });
+  });
+  it("removes expiring download actions and offers refresh", async () => {
+    mocks.resolve.mockResolvedValue([{ ...file, expiresAt: new Date(Date.now() + 60_000).toISOString() }]);
+    render(<ResolveDownloadButton identity={identity} link={link} />);
+    fireEvent.click(screen.getByRole("button", { name: /Get file link/ }));
+    await screen.findByRole("link", { name: "Download file" });
+    const now = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 70_000);
+    try {
+      await screen.findByText("File links expired. Refresh to get a new link.", {}, { timeout: 2000 });
+      expect(screen.queryByRole("link", { name: "Download file" })).not.toBeInTheDocument();
+    } finally { now.mockRestore(); }
+  });
+  it("offers in-app playback for a resolved MP4 without loading media before play", async () => {
+    mocks.resolve.mockResolvedValue([{ ...file, contentType: "video/mp4", filename: "The.Trap.S01E01.720p.x264.mp4" }]);
+    render(<ResolveDownloadButton identity={identity} link={link} />);
+    fireEvent.click(screen.getByRole("button", { name: /Get file link/ }));
+    const play = await screen.findByRole("button", { name: /Play here/ });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const load = vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
+    try {
+      await act(async () => fireEvent.click(play));
+      expect(screen.getByLabelText(/Video for/)).toHaveAttribute("src", file.url);
+      cleanup();
+    } finally { load.mockRestore(); }
   });
   it("shows a host error and retains the explicit retry action", async () => {
     mocks.resolve.mockRejectedValueOnce(new Error("No matching file could be confirmed"));

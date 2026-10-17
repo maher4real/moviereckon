@@ -1,0 +1,451 @@
+/* Shared components: cards, badges, buttons, animations */
+@layer components {
+  @media (max-width: 639px) {
+    .surface-panel,
+    .glass-detail-panel,
+    .filter-panel,
+    .empty-state,
+    .select-surface,
+    .section-glass-icon,
+    .page-heading-icon {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .surface-panel,
+    .glass-detail-panel,
+    .filter-panel,
+    .empty-state,
+    .select-surface,
+    .section-glass-icon,
+    .page-heading-icon {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
+
+  .hero-gradient {
+    background: linear-gradient(
+      to top,
+      hsl(var(--background)) 0%,
+      hsl(var(--background) / 0.86) 12%,
+      hsl(var(--background) / 0.52) 30%,
+      hsl(var(--background) / 0.22) 48%,
+      hsl(var(--background) / 0.06) 66%,
+      transparent 100%
+    );
+  }
+
+  .hero-bottom-blend {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: clamp(110px, 20vh, 220px);
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      hsl(var(--background) / 0) 0%,
+      hsl(var(--background) / 0.38) 34%,
+      hsl(var(--background) / 0.8) 70%,
+      hsl(var(--background)) 100%
+    );
+  }
+
+  .detail-hero-media::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    bottom: -1px;
+    z-index: 6;
+    height: clamp(88px, 14vh, 170px);
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      hsl(var(--background) / 0) 0%,
+      hsl(var(--background) / 0.36) 58%,
+      hsl(var(--background)) 100%
+    );
+  }
+
+  .detail-content-shell {
+    isolation: isolate;
+  }
+
+  .card-gradient {
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      hsl(var(--background) / 0.9) 100%
+    );
+  }
+
+  .brand-logo-label {
+    position: relative;
+    display: inline-block;
+    color: hsl(var(--primary));
+  }
+
+  .brand-logo-shine {
+    overflow: visible;
+    color: hsl(var(--primary));
+  }
+
+  .brand-logo-shine::after {
+    content: attr(data-brand-text);
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    color: transparent;
+    background: linear-gradient(
+      105deg,
+      transparent 34%,
+      hsl(var(--foreground) / 0.96) 47%,
+      hsl(var(--foreground) / 0.72) 50%,
+      transparent 63%
+    );
+    background-size: 260% 100%;
+    background-position: 160% 0;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    opacity: 0.78;
+    animation: brand-logo-shine 1.55s ease-in-out infinite;
+    will-change: background-position;
+  }
+
+  .glow-primary {
+    box-shadow:
+      0 0 20px hsl(var(--primary) / 0.3),
+      0 0 34px hsl(var(--brand-red-bright) / 0.16);
+  }
+
+  .glow-secondary {
+    box-shadow: 0 0 20px hsl(var(--secondary) / 0.3);
+  }
+
+  /* Button hierarchy - buttons stay solid red; gradients are reserved for surfaces. */
+  .btn-primary {
+    @apply bg-primary text-primary-foreground transition-[background-color,box-shadow,transform] duration-200 hover:bg-primary/90;
+    box-shadow:
+      0 12px 30px hsl(var(--primary) / 0.24),
+      inset 0 1px 0 hsl(var(--foreground) / 0.12);
+    transition-timing-function: var(--ease-fluid);
+  }
+
+  .btn-primary:hover {
+    box-shadow:
+      0 14px 34px hsl(var(--primary) / 0.3),
+      inset 0 1px 0 hsl(var(--foreground) / 0.12);
+  }
+
+  .btn-secondary {
+    @apply border border-primary/20 bg-primary/10 text-primary transition-colors duration-200 hover:border-primary/35 hover:bg-primary/15;
+    transition-timing-function: var(--ease-fluid);
+  }
+
+  .btn-brand-soft {
+    @apply border border-primary/20 bg-primary/10 text-primary shadow-[0_10px_24px_hsl(var(--primary)/0.14)] hover:bg-primary/15 hover:text-primary;
+    transition-timing-function: var(--ease-fluid);
+  }
+
+  .brand-primary-button {
+    @apply bg-primary text-primary-foreground transition-[background-color,box-shadow] duration-200 hover:bg-primary/90;
+    box-shadow: 0 6px 18px hsl(0 0% 0% / 0.2);
+    transition-timing-function: var(--ease-fluid);
+  }
+
+  .brand-primary-button:hover {
+    box-shadow: 0 8px 24px hsl(0 0% 0% / 0.3);
+  }
+
+  .brand-warm-surface {
+    background:
+      linear-gradient(135deg, hsl(var(--primary) / 0.12), hsl(var(--brand-red-bright) / 0.08) 45%, hsl(var(--card) / 0.68)),
+      hsl(var(--card) / 0.42);
+  }
+
+  .brand-gradient-bar {
+    background: hsl(var(--primary));
+  }
+
+  .btn-tertiary {
+    @apply bg-muted text-muted-foreground hover:bg-muted/80 transition-colors duration-200;
+    transition-timing-function: var(--ease-fluid);
+  }
+
+  .btn-success {
+    @apply bg-emerald-600 text-white hover:bg-emerald-700 transition-colors duration-200;
+    transition-timing-function: var(--ease-fluid);
+  }
+
+  .detail-share-button {
+    @apply rounded-full border border-white/10 bg-background/70 px-3 text-xs font-semibold text-foreground/90 shadow-lg shadow-black/20 backdrop-blur-md transition-colors duration-200 hover:border-primary/45 hover:bg-primary/15 hover:text-primary;
+  }
+
+  /* Interactive elements - unified transitions */
+  .interactive {
+    @apply transition-all duration-300;
+    transition-timing-function: var(--ease-fluid);
+  }
+
+  .interactive:hover {
+    @apply brightness-110;
+  }
+
+  .interactive:active {
+    @apply brightness-95;
+  }
+
+  /* Hide scrollbar for carousels */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Poster card hover effect with animation */
+  .poster-card {
+    @apply border border-white/10 bg-card transition-[border-color,filter] duration-200;
+    background: hsl(var(--card));
+  }
+
+  .poster-card:hover {
+    border-color: hsl(var(--foreground) / 0.4);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fade-up,
+    .play-pulse,
+    .brand-logo-shine::after {
+      animation: none !important;
+    }
+
+    .fade-up,
+    .fade-up-1,
+    .fade-up-2,
+    .fade-up-3,
+    .fade-up-4 {
+      opacity: 1 !important;
+    }
+  }
+
+  .group:hover .poster-card img,
+  .group\/card:hover .poster-card img {
+    filter: saturate(1.08) contrast(1.04);
+  }
+
+  .poster-play-button {
+    @apply flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-primary text-primary-foreground shadow-lg shadow-primary/30 backdrop-blur-sm transition-colors duration-200 hover:bg-primary/90;
+  }
+
+  .rating-badge {
+    @apply inline-flex items-center gap-1 rounded-md border bg-background/80 px-2 py-1 text-xs font-semibold backdrop-blur-sm;
+    border-color: hsl(var(--rating-gold) / 0.5);
+    color: hsl(var(--rating-gold));
+    box-shadow: 0 8px 20px hsl(var(--rating-gold) / 0.08);
+  }
+
+  .rating-badge svg {
+    color: currentColor;
+    fill: currentColor;
+  }
+
+  .language-badge {
+    @apply inline-flex items-center rounded-md border border-white/10 px-2 py-1 text-xs font-semibold backdrop-blur-sm;
+  }
+
+  /* Language badges - all using primary color family */
+  .badge-hindi {
+    @apply bg-primary text-primary-foreground;
+  }
+
+  .badge-english {
+    @apply bg-primary/80 text-primary-foreground;
+  }
+
+  .badge-tamil {
+    @apply bg-primary/70 text-primary-foreground;
+  }
+
+  .badge-telugu {
+    @apply bg-primary/60 text-primary-foreground;
+  }
+
+  .badge-gujarati {
+    @apply bg-primary/50 text-primary-foreground;
+  }
+
+  /* Better placeholder for missing images */
+  .poster-placeholder {
+    @apply bg-linear-to-br from-muted to-muted/50 flex items-center justify-center;
+  }
+
+  .carousel-edge-mask {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  @media (min-width: 768px) {
+    .carousel-edge-mask {
+      -webkit-mask-image: linear-gradient(
+        to right,
+        transparent 0,
+        black 36px,
+        black calc(100% - 36px),
+        transparent 100%
+      );
+      mask-image: linear-gradient(
+        to right,
+        transparent 0,
+        black 36px,
+        black calc(100% - 36px),
+        transparent 100%
+      );
+    }
+  }
+
+  /* Like/Watch animation */
+  @keyframes heart-pop {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.3);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  .animate-heart-pop {
+    animation: heart-pop 0.3s ease-out;
+  }
+
+  @keyframes watched-pop {
+    0% {
+      transform: scale(1);
+    }
+    35% {
+      transform: scale(1.08);
+    }
+    70% {
+      transform: scale(0.97);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  .animate-watched-pop {
+    animation: watched-pop 0.4s ease-out;
+  }
+
+  /* Safe area for bottom nav on iOS */
+  .safe-area-bottom {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Action button consistent styling */
+  .action-btn {
+    @apply transition-colors duration-200;
+    transition-timing-function: var(--ease-fluid);
+  }
+
+  .action-btn-active {
+    @apply bg-primary text-primary-foreground;
+  }
+
+  .action-btn-inactive {
+    @apply bg-background/80 text-foreground hover:bg-background;
+  }
+
+  .auth-submit-btn {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .auth-submit-btn::after {
+    content: "";
+    position: absolute;
+    inset: -2px -34%;
+    pointer-events: none;
+    background: linear-gradient(
+      110deg,
+      transparent 18%,
+      hsl(var(--foreground) / 0.48) 48%,
+      transparent 78%
+    );
+    mix-blend-mode: screen;
+    opacity: 0.52;
+    transform: translateX(-145%) skewX(-18deg);
+    animation: auth-button-shine 3s ease-in-out infinite;
+  }
+
+  .auth-submit-btn > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .auth-poster-row {
+    @apply flex gap-3;
+    width: max-content;
+    animation: auth-marquee 40s linear infinite;
+    will-change: transform;
+  }
+
+  .auth-poster-row-reverse {
+    animation-name: auth-marquee-reverse;
+  }
+
+  .auth-poster-tile {
+    width: clamp(88px, 9vw, 146px);
+    aspect-ratio: 2 / 3;
+    @apply rounded-md overflow-hidden border border-white/10 shadow-lg shadow-black/30;
+  }
+
+  .auth-ambient-art { position: absolute; inset: -4%; width: 108%; height: 108%; object-fit: cover; filter: blur(28px) saturate(1.25) brightness(0.55); transform: scale(1.04); }
+  .auth-ambient-scrim { position: absolute; inset: 0; background: radial-gradient(circle at 18% 30%, hsl(var(--primary) / 0.18), transparent 40%), linear-gradient(90deg, hsl(var(--background) / 0.55), hsl(var(--background) / 0.75) 55%, hsl(var(--background) / 0.9)), linear-gradient(0deg, hsl(var(--background)), transparent 40%); }
+  .auth-perk { display: flex; flex-direction: column; gap: 0.5rem; border: 1px solid hsl(var(--foreground) / 0.08); border-radius: 0.875rem; padding: 0.85rem; background: hsl(var(--card) / 0.5); color: hsl(var(--foreground) / 0.75); font-size: 0.8125rem; line-height: 1.35; -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+  .auth-trending-rail { display: flex; gap: 0.6rem; overflow-x: auto; padding-bottom: 0.25rem; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  .auth-trending-rail::-webkit-scrollbar { display: none; }
+  .auth-trending-item { width: 5.5rem; flex-shrink: 0; aspect-ratio: 2 / 3; overflow: hidden; border: 1px solid hsl(0 0% 100% / 0.1); border-radius: 0.6rem; scroll-snap-align: start; box-shadow: 0 10px 24px hsl(0 0% 0% / 0.4); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto !important;
+    }
+
+    .auth-poster-row,
+    .animate-auth-brand-pulse,
+    .animate-auth-brand-shimmer,
+    .brand-logo-shine::after,
+    .animate-auth-brand-glow {
+      animation-duration: 0.01ms;
+      animation-iteration-count: 1;
+    }
+  }
+
+  /* Skeleton loading blocks: a soft sweep over a muted base. */
+  .skeleton { position: relative; overflow: hidden; background: hsl(var(--muted)); }
+  .skeleton::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.09), transparent); animation: skeleton-sweep 1.7s ease-in-out infinite; }
+  .skeleton-surface { border: 1px solid hsl(var(--foreground) / 0.07); border-radius: 1rem; background: hsl(var(--card) / 0.6); }
+  .skeleton-splash-bar { position: relative; width: 9rem; height: 3px; overflow: hidden; border-radius: 999px; background: hsl(var(--foreground) / 0.12); }
+  .skeleton-splash-bar::after { content: ""; position: absolute; inset: 0; width: 40%; border-radius: inherit; background: hsl(var(--primary)); animation: skeleton-bar 1.3s ease-in-out infinite; }
+
+  @keyframes skeleton-sweep { to { transform: translateX(100%); } }
+  @keyframes skeleton-bar { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton::after, .skeleton-splash-bar::after { animation: none; }
+    .skeleton-splash-bar::after { width: 100%; opacity: 0.4; }
+  }
+}

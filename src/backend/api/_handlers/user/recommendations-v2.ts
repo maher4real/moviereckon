@@ -1,12 +1,14 @@
 /**
- * Durable cursor based recommendation feed.
+ * Durable cursor based recommendation feed (route handler).
  *
- * The legacy recommendations handler remains available for older clients. This
- * handler owns a user scoped session and stores every generated page so a
- * repeated cursor is idempotent across server instances.
+ * This file owns the request lifecycle only. Ranking lives in
+ * `@/shared/lib/recommendation/feedRanking`, signed cursors in
+ * `recommendationCursor`, session/batch persistence in `recommendationSessions`
+ * and TMDB retrieval in `recommendationSources`. The legacy handler remains
+ * available only as a rollback path.
  */
 import type { VercelRequest, VercelResponse } from "../../lib/http";
-import { createHmac, randomUUID, timingSafeEqual } from "crypto";
+import { randomUUID } from "crypto";
 import { connectToDatabase } from "../../lib/mongodb.js";
 import { getUserFromRequest } from "../../lib/auth.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
@@ -17,896 +19,75 @@ import {
   type AccountWriteFence,
 } from "@/backend/services/accountLifecycle";
 import {
-  discoverServerMovies,
-  discoverServerTVShows,
-  getServerMovieRecommendations,
-  getServerSimilarMovies,
-  getServerSimilarTVShows,
-  getServerTVShowRecommendations,
-} from "@/backend/services/tmdbServer";
-import type { Movie, TVShow } from "@/shared/lib/tmdb";
-import {
-  getContentKey,
   getRecommendations,
   normalizeTmdbItem,
   type UnifiedContentItem,
 } from "@/shared/lib/recommendation";
+import type { TasteProfile } from "@/shared/lib/recommendation/taste";
 import {
-  getLearnedTasteGenreWeight,
-  getLearnedTasteLanguageWeight,
-  getTasteGenreWeight,
-  getTasteLanguageWeight,
-  type TasteProfile,
-} from "@/shared/lib/recommendation/taste";
-import {
-  ERA_LABELS,
-  MOOD_LABELS,
-  coldStartQuality,
-  discoverExclusions,
-  matchedEra,
-  moodGenreSum,
-  paceScore,
-  pickSeedsForPage,
-  preferenceMultiplier,
-  strongestMood,
-  tasteConfidence,
-} from "@/shared/lib/recommendation/coldStart";
+  hardFilter,
+  passesQualityFloor,
+  rankCandidatesForTaste,
+  toDisplayItem,
+} from "@/shared/lib/recommendation/feedRanking";
+import type {
+  ContentType,
+  FeedExplanation,
+  FeedResponse,
+  FeedState,
+} from "@/shared/lib/recommendation/feedTypes";
 import {
   loadRecommendationExclusions,
   loadRecommendationTaste,
 } from "@/backend/services/recommendationTaste";
 import * as recommendationTasteService from "@/backend/services/recommendationTaste";
+import {
+  cursorSecret,
+  decodeCursor,
+  encodeCursor,
+  hashFilters,
+  parseFilters,
+  parseLimit,
+} from "@/backend/services/recommendationCursor";
+import {
+  acquireGenerationLease,
+  isExpired,
+  loadDeliveredCandidateKeys,
+  readBatch,
+  releaseGenerationLease,
+  repairBatchCheckpoint,
+} from "@/backend/services/recommendationSessions";
+import {
+  buildTasteInterests,
+  fetchSeedCandidates,
+  fetchSource,
+} from "@/backend/services/recommendationSources";
+import type {
+  BatchDoc,
+  CursorPayload,
+  Database,
+  SessionDoc,
+  SourceResult,
+  SourceState,
+  SourceStream,
+  TasteInterestState,
+} from "@/backend/services/recommendationFeedTypes";
 
-type ContentType = "movie" | "tv";
-type FeedState = "ready" | "retryable" | "exhausted";
-type Database = Awaited<ReturnType<typeof connectToDatabase>>["db"];
+// Public names other modules and tests import from this handler.
+export {
+  hardFilter,
+  passesQualityFloor,
+  rankCandidatesForTaste,
+  scoreCandidate,
+  type TasteRankOptions,
+} from "@/shared/lib/recommendation/feedRanking";
 
-interface FeedFilters {
-  contentType: ContentType | "all";
-  recommendationType: "all" | "trending" | "highrated" | "popular" | "newreleases";
-  genreId: number | null;
-  language: string | null;
-  sort: "relevance" | "popularity" | "rating" | "release_date";
-  direction: "asc" | "desc";
-  exploration: "familiar" | "adventurous";
-}
-
-interface FeedExplanation {
-  reasons: Array<{ label: string; evidence?: string }>;
-  score: number;
-  scoreBreakdown: {
-    genre: number;
-    keywords: number;
-    people: number;
-    year: number;
-    runtime: number;
-    quality: number;
-    popularity: number;
-    novelty: number;
-    diversityPenalty: number;
-    preference?: number;
-    negativePenalty?: number;
-  };
-  seedTitle: string | null;
-}
-
-interface FeedResponse {
-  items: (Movie | TVShow)[];
-  explanationById: Record<string, FeedExplanation>;
-  nextCursor: string | null;
-  hasMore: boolean;
-  state: FeedState;
-  profileVersion: number;
-  feedSessionId: string;
-  isPersonalized: boolean;
-}
-
-interface CursorPayload {
-  sessionId: string;
-  page: number;
-  pageSize: number;
-  filtersHash: string;
-  issuedAt: number;
-}
-
-interface SessionDoc {
-  session_id: string;
-  user_id: string;
-  filters_hash: string;
-  filters: FeedFilters;
-  page_size: number;
-  profile_version: number;
-  ranking_version: string;
-  next_page: number;
-  source_state?: SourceState;
-  candidate_buffer?: UnifiedContentItem[];
-  generation_page?: number | null;
-  generation_lease?: string | null;
-  generation_lease_expires_at?: Date | null;
-  revision?: number;
-  expires_at: Date;
-  created_at: Date;
-  updated_at: Date;
-}
-
-interface BatchDoc {
-  session_id: string;
-  user_id?: string;
-  page: number;
-  profile_version: number;
-  items: (Movie | TVShow)[];
-  explanation_by_id: Record<string, FeedExplanation>;
-  next_cursor: string | null;
-  has_more: boolean;
-  state: FeedState;
-  source_state_after?: SourceState;
-  candidate_buffer_after?: UnifiedContentItem[];
-  expires_at: Date;
-  created_at: Date;
-  is_personalized?: boolean;
-}
-
-interface SourceState {
-  movieTastePage: number;
-  movieExplorePage: number;
-  movieTasteTotalPages: number | null;
-  movieExploreTotalPages: number | null;
-  tvTastePage: number;
-  tvExplorePage: number;
-  tvTasteTotalPages: number | null;
-  tvExploreTotalPages: number | null;
-  movieTasteInterests?: TasteInterestState[];
-  tvTasteInterests?: TasteInterestState[];
-}
-
-interface TasteInterestState {
-  key: string;
-  genreId?: number;
-  language?: string;
-  page: number;
-  totalPages: number | null;
-}
-
-interface SourceResult {
-  stream: SourceStream;
-  type: ContentType;
-  profileSource: boolean;
-  interestKey?: string;
-  page: number;
-  totalPages: number | null;
-  results: unknown[];
-  failed: boolean;
-}
-
-type SourceStream = "movieTaste" | "movieExplore" | "tvTaste" | "tvExplore";
-
-const CURSOR_VERSION = "recommendations-v2";
 const RANKING_VERSION = "taste-v2";
 const SESSION_TTL_MS = 45 * 60 * 1000;
-const MAX_LIMIT = 48;
 const MAX_SOURCE_PAGE = 500;
 const MAX_REFILL_PAGES = 5;
 const MAX_IP_REQUESTS = 70;
 const MAX_USER_REQUESTS = 35;
-
-function cursorSecret(): string {
-  const secret =
-    process.env.RECOMMENDATIONS_CURSOR_SECRET ||
-    process.env.BETTER_AUTH_SECRET ||
-    process.env.AUTH_SECRET ||
-    process.env.JWT_SECRET;
-  if (!secret || secret.length < 32) {
-    throw new Error("RECOMMENDATIONS_CURSOR_SECRET must be configured with at least 32 characters");
-  }
-  return secret;
-}
-
-function encodeBase64Url(value: string): string {
-  return Buffer.from(value, "utf8").toString("base64url");
-}
-
-function decodeBase64Url(value: string): string {
-  return Buffer.from(value, "base64url").toString("utf8");
-}
-
-function signCursor(payload: string): string {
-  return createHmac("sha256", cursorSecret()).update(payload).digest("base64url");
-}
-
-function encodeCursor(cursor: CursorPayload): string {
-  const payload = encodeBase64Url(JSON.stringify({ v: CURSOR_VERSION, ...cursor }));
-  return `${payload}.${signCursor(payload)}`;
-}
-
-function decodeCursor(raw: string | null): CursorPayload | null {
-  if (!raw) return null;
-  const [payload, signature] = raw.split(".");
-  if (!payload || !signature || signature.length !== 43) return null;
-  const expected = signCursor(payload);
-  try {
-    if (!timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
-    const value = JSON.parse(decodeBase64Url(payload)) as Partial<CursorPayload> & { v?: string };
-    if (
-      value.v !== CURSOR_VERSION ||
-      typeof value.sessionId !== "string" ||
-      !/^[0-9a-f-]{16,80}$/i.test(value.sessionId) ||
-      !Number.isInteger(value.page) ||
-      Number(value.page) < 1 ||
-      !Number.isInteger(value.pageSize) ||
-      Number(value.pageSize) < 1 ||
-      typeof value.filtersHash !== "string" ||
-      !Number.isFinite(value.issuedAt)
-    ) {
-      return null;
-    }
-    return {
-      sessionId: value.sessionId,
-      page: Number(value.page),
-      pageSize: Number(value.pageSize),
-      filtersHash: value.filtersHash,
-      issuedAt: Number(value.issuedAt),
-    };
-  } catch {
-    return null;
-  }
-}
-
-function positiveInteger(value: string | null): number | null {
-  if (!value) return null;
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
-}
-
-function normalizeLanguage(value: string | null): string | null {
-  if (!value) return null;
-  const normalized = value.trim().toLowerCase();
-  return /^[a-z]{2,3}$/.test(normalized) ? normalized : null;
-}
-
-function parseFilters(req: VercelRequest): FeedFilters {
-  const url = new URL(req.url || "/api/user/recommendations/v2", `http://${req.headers.host || "localhost"}`);
-  const type = url.searchParams.get("content_type");
-  const recommendationType = url.searchParams.get("recommendation_type");
-  const sort = url.searchParams.get("sort");
-  const direction = url.searchParams.get("sort_order");
-  return {
-    contentType: type === "movie" || type === "tv" ? type : "all",
-    recommendationType:
-      recommendationType === "trending" ||
-      recommendationType === "highrated" ||
-      recommendationType === "popular" ||
-      recommendationType === "newreleases"
-        ? recommendationType
-        : "all",
-    genreId: positiveInteger(url.searchParams.get("genre")),
-    language: normalizeLanguage(url.searchParams.get("language")),
-    sort:
-      sort === "popularity" || sort === "rating" || sort === "release_date"
-        ? sort
-        : "relevance",
-    direction: direction === "asc" ? "asc" : "desc",
-    exploration: url.searchParams.get("exploration") === "adventurous" ? "adventurous" : "familiar",
-  };
-}
-
-function parseLimit(req: VercelRequest): number {
-  const url = new URL(req.url || "/api/user/recommendations/v2", `http://${req.headers.host || "localhost"}`);
-  const parsed = Number(url.searchParams.get("limit"));
-  if (!Number.isInteger(parsed) || parsed <= 0) return 24;
-  return Math.min(parsed, MAX_LIMIT);
-}
-
-function hashFilters(filters: FeedFilters, limit: number): string {
-  const input = [
-    filters.contentType,
-    filters.recommendationType,
-    filters.genreId || "all",
-    filters.language || "all",
-    filters.sort,
-    filters.direction,
-    filters.exploration,
-    limit,
-  ].join("|");
-  return createHmac("sha256", CURSOR_VERSION).update(input).digest("hex").slice(0, 32);
-}
-
-function dateValue(item: UnifiedContentItem): number {
-  const value = item.releaseDate ? Date.parse(item.releaseDate) : Number.NaN;
-  return Number.isFinite(value) ? value : 0;
-}
-
-const GENRE_LABELS: Record<number, string> = {
-  12: "adventure", 14: "fantasy", 16: "animation", 18: "drama", 27: "horror",
-  28: "action", 35: "comedy", 36: "history", 37: "western", 53: "thrillers",
-  80: "crime", 99: "documentaries", 878: "science fiction", 9648: "mysteries",
-  10402: "music", 10749: "romance", 10751: "family", 10752: "war",
-  10759: "action and adventure", 10762: "kids", 10765: "science fiction and fantasy",
-};
-
-export function scoreCandidate(
-  item: UnifiedContentItem,
-  profile: TasteProfile,
-  exploration: FeedFilters["exploration"] = "familiar",
-): {
-  score: number;
-  explanation: FeedExplanation;
-} {
-  const confidence = tasteConfidence(profile);
-  const multiplier = preferenceMultiplier(profile);
-  const genre = item.genreIds.reduce((total, genreId) => total + getTasteGenreWeight(profile, genreId), 0);
-  const language = getTasteLanguageWeight(profile, item.originalLanguage);
-  const negativeGenre = item.genreIds.reduce(
-    (total, genreId) => total + (profile.negative.genres[String(genreId)] || 0),
-    0,
-  );
-  const negativeLanguage = item.originalLanguage
-    ? profile.negative.languages[item.originalLanguage] || 0
-    : 0;
-  // Affinity totals grow with activity volume. Saturate each feature before
-  // blending so a prolific account cannot drown out metadata similarity or
-  // exploration simply by repeating the same kind of event.
-  const bounded = (value: number, scale: number): number =>
-    value > 0 ? 1 - Math.exp(-value / scale) : 0;
-  // With little activity the explicit picks and seeds are all we know, so they
-  // count for more; the multiplier fades to 1 as real activity accumulates.
-  const boundedGenre = bounded(genre * multiplier, 4);
-  const boundedLanguage = bounded(language * multiplier, 3);
-  const boundedNegativeGenre = bounded(negativeGenre, 4);
-  const boundedNegativeLanguage = bounded(negativeLanguage, 3);
-  const dislikedHits = item.genreIds.filter((genreId) =>
-    (profile.explicit.dislikedGenres ?? []).includes(genreId),
-  ).length;
-  const dislikePenalty = dislikedHits > 0 ? 0.3 : 0;
-  const quality = coldStartQuality(item, confidence);
-  const popularity = Math.max(0, Math.min(1, Math.log1p(item.popularity) / Math.log1p(500)));
-  const moodSum = moodGenreSum(profile.tone?.moodGenreBoost, item.genreIds);
-  const boundedMood = bounded(moodSum, 1.6);
-  const era = matchedEra(item.year, profile.tone?.eras);
-  const eraBonus = era ? 0.06 : 0;
-  const paceBonus = paceScore(profile.tone?.pace, item.runtime) * 0.04;
-  const seedTag = item.sourceTags.find((tag) => tag.startsWith("seed:"));
-  const seedSourceBonus = seedTag ? 0.08 * (1 + (1 - confidence)) : 0;
-  const profileMatch = boundedGenre * 0.46 + boundedLanguage * 0.24;
-  const explorationBoost = exploration === "adventurous"
-    ? quality * 0.18 + popularity * 0.08 + 0.18
-    : quality * 0.1 + popularity * 0.04 + 0.04;
-  const score = profileMatch + explorationBoost + boundedMood * 0.1 + eraBonus + paceBonus + seedSourceBonus -
-    (boundedNegativeGenre * 0.08 + boundedNegativeLanguage * 0.06 + dislikePenalty);
-  const reasons: Array<{ label: string; evidence?: string }> = [];
-  const seedKey = seedTag?.slice("seed:".length);
-  const seedTitle = seedKey
-    ? (profile.explicit.seeds ?? []).find(
-        (seed) => `${seed.contentType}_${seed.contentId}` === seedKey,
-      )?.title
-    : undefined;
-  if (seedTitle) reasons.push({ label: `Because you picked ${seedTitle}` });
-  const strongestGenre = item.genreIds
-    .map((genreId) => ({ genreId, weight: getTasteGenreWeight(profile, genreId) }))
-    .sort((left, right) => right.weight - left.weight)[0];
-  if (strongestGenre && strongestGenre.weight >= 1) {
-    const selected = profile.explicit.genres.includes(strongestGenre.genreId);
-    const learned = getLearnedTasteGenreWeight(profile, strongestGenre.genreId);
-    reasons.push({
-      label: selected
-        ? `Matches your selected ${GENRE_LABELS[strongestGenre.genreId] || "genre"}`
-        : learned > 0
-          ? `Matches your ${GENRE_LABELS[strongestGenre.genreId] || "genre"} affinity`
-          : `Matches a preferred ${GENRE_LABELS[strongestGenre.genreId] || "genre"}`,
-    });
-    const evidence = profile.evidence.find((entry) =>
-      entry.contentType === item.type && entry.signal !== "watchlist" &&
-      entry.key !== item.key && profile.clusters.some((cluster) =>
-        cluster.evidence.some((itemEvidence) => itemEvidence.key === entry.key) &&
-        cluster.genreIds.includes(strongestGenre.genreId),
-      ),
-    );
-    if (evidence) reasons[0]!.evidence = `from ${evidence.title}`;
-  }
-  if (language >= 1) {
-    reasons.push({
-      label: profile.explicit.languages.includes(item.originalLanguage || "")
-        ? "Matches your selected language"
-        : getLearnedTasteLanguageWeight(profile, item.originalLanguage) > 0
-          ? "Matches a language you often enjoy"
-          : "Matches a preferred language",
-    });
-  }
-  if (negativeGenre > 0 || negativeLanguage > 0) {
-    reasons.push({ label: "Contains a signal you previously rejected" });
-  }
-  const topMood = strongestMood(profile.tone?.moods, item.genreIds);
-  if (topMood) reasons.push({ label: `Matches your ${MOOD_LABELS[topMood]} mood` });
-  if (era) reasons.push({ label: `From the ${ERA_LABELS[era]} you like` });
-  if (reasons.length === 0) reasons.push({ label: "Exploration pick" });
-  return {
-    score,
-    explanation: {
-      reasons: reasons.slice(0, 3),
-      score,
-      scoreBreakdown: {
-        genre: boundedGenre,
-        keywords: 0,
-        people: 0,
-        year: eraBonus,
-        runtime: paceBonus,
-        quality,
-        popularity,
-        novelty: 0.1,
-        diversityPenalty: 0,
-        preference: boundedGenre + boundedLanguage + boundedMood,
-        negativePenalty: boundedNegativeGenre + boundedNegativeLanguage,
-      },
-      seedTitle: null,
-    },
-  };
-}
-
-export interface TasteRankOptions {
-  sort?: FeedFilters["sort"];
-  direction?: FeedFilters["direction"];
-  exploration?: FeedFilters["exploration"];
-}
-
-/**
- * Blend the shared metadata/similarity engine with the user's current taste
- * signals. Keeping this as a pure boundary makes it possible to verify that
- * a changed profile changes ordering without duplicating the ranking logic in
- * tests or UI code.
- */
-export function rankCandidatesForTaste(
-  candidates: UnifiedContentItem[],
-  profile: TasteProfile,
-  engineRanked: Array<{
-    item: UnifiedContentItem;
-    score: number;
-    reasons: Array<{ label: string; evidence?: string }>;
-    seedTitle: string | null;
-  }> = [],
-  options: TasteRankOptions = {},
-): Array<{ item: UnifiedContentItem; score: number; explanation: FeedExplanation }> {
-  const engineByKey = new Map(engineRanked.map((entry) => [entry.item.key, entry]));
-  const direction = options.direction === "asc" ? -1 : 1;
-  const ranked = candidates.map((item) => {
-    const dynamic = scoreCandidate(item, profile, options.exploration);
-    const engine = engineByKey.get(item.key);
-    const engineScore = Number.isFinite(engine?.score) ? Number(engine?.score) : 0;
-    const score = engine
-      ? engineScore * 0.72 + dynamic.score * 0.28
-      : dynamic.score;
-    const reasons = [...dynamic.explanation.reasons];
-    for (const reason of engine?.reasons || []) {
-      if (!reasons.some((existing) => existing.label === reason.label)) reasons.push(reason);
-    }
-    return {
-      item,
-      score,
-      explanation: {
-        ...dynamic.explanation,
-        reasons: reasons.slice(0, 3),
-        score,
-        seedTitle: engine?.seedTitle || dynamic.explanation.seedTitle,
-      },
-    };
-  });
-  return ranked.sort((left, right) => {
-    if (options.sort === "popularity") {
-      const difference = right.item.popularity - left.item.popularity;
-      if (difference !== 0) return direction * difference;
-    } else if (options.sort === "rating") {
-      const difference = right.item.voteAverage - left.item.voteAverage;
-      if (difference !== 0) return direction * difference;
-    } else if (options.sort === "release_date") {
-      const difference = dateValue(right.item) - dateValue(left.item);
-      if (difference !== 0) return direction * difference;
-    }
-    const scoreDifference = right.score - left.score;
-    if (scoreDifference !== 0) return direction * scoreDifference;
-    const popularityDifference = right.item.popularity - left.item.popularity;
-    if (popularityDifference !== 0) return direction * popularityDifference;
-    return direction * left.item.key.localeCompare(right.item.key);
-  });
-}
-
-function toDisplayItem(item: UnifiedContentItem): Movie | TVShow {
-  const raw = item.raw;
-  if (raw && typeof raw === "object") return raw as Movie | TVShow;
-  if (item.type === "movie") {
-    return {
-      id: item.id,
-      title: item.title,
-      original_title: item.originalTitle || item.title,
-      overview: item.overview,
-      poster_path: null,
-      backdrop_path: null,
-      release_date: item.releaseDate || "",
-      vote_average: item.voteAverage,
-      vote_count: item.voteCount,
-      popularity: item.popularity,
-      genre_ids: item.genreIds,
-      original_language: item.originalLanguage || "en",
-      adult: false,
-      video: false,
-    };
-  }
-  return {
-    id: item.id,
-    name: item.title,
-    original_name: item.originalTitle || item.title,
-    overview: item.overview,
-    poster_path: null,
-    backdrop_path: null,
-    first_air_date: item.releaseDate || "",
-    vote_average: item.voteAverage,
-    vote_count: item.voteCount,
-    popularity: item.popularity,
-    genre_ids: item.genreIds,
-    original_language: item.originalLanguage || "en",
-    origin_country: [],
-  };
-}
-
-export function hardFilter(item: UnifiedContentItem, filters: FeedFilters, profile?: TasteProfile): boolean {
-  if (filters.contentType !== "all" && item.type !== filters.contentType) return false;
-  if (filters.genreId && !item.genreIds.includes(filters.genreId)) return false;
-  // Explicit dislikes hide an item only when its primary genre is disliked and
-  // the person has not asked for that genre. Liked wins over disliked.
-  const disliked = (profile?.explicit.dislikedGenres ?? []).filter(
-    (genreId) => !(profile?.explicit.genres ?? []).includes(genreId),
-  );
-  if (
-    item.primaryGenreId !== null &&
-    disliked.includes(item.primaryGenreId) &&
-    filters.genreId !== item.primaryGenreId
-  ) {
-    return false;
-  }
-  if (filters.language && item.originalLanguage !== filters.language) return false;
-  const releaseTimestamp = item.releaseDate ? Date.parse(item.releaseDate) : Number.NaN;
-  const recentCutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
-  switch (filters.recommendationType) {
-    case "trending":
-      if (item.popularity <= 50) return false;
-      break;
-    case "highrated":
-      if (item.voteAverage < 8) return false;
-      break;
-    case "popular":
-      if (item.popularity < 100) return false;
-      break;
-    case "newreleases":
-      if (!Number.isFinite(releaseTimestamp) || releaseTimestamp <= recentCutoff || releaseTimestamp > Date.now()) return false;
-      break;
-  }
-  return true;
-}
-
-function buildTasteInterests(profile: TasteProfile, type: ContentType): TasteInterestState[] {
-  const interests: TasteInterestState[] = [];
-  const seen = new Set<string>();
-  const add = (genreId?: number, language?: string) => {
-    const normalizedLanguage = language?.trim().toLowerCase();
-    const key = `${genreId || "any"}|${normalizedLanguage || "any"}`;
-    if (seen.has(key)) return;
-    seen.add(key);
-    interests.push({
-      key,
-      ...(genreId ? { genreId } : {}),
-      ...(normalizedLanguage ? { language: normalizedLanguage } : {}),
-      page: 1,
-      totalPages: null,
-    });
-  };
-
-  // Learned clusters carry the language observed with that genre. Keep that
-  // association intact instead of combining unrelated top genre/language
-  // values (for example Hindi comedy with English horror).
-  for (const cluster of [...profile.clusters].sort((left, right) => right.weight - left.weight)) {
-    if (cluster.contentType !== type && cluster.contentType !== "mixed") continue;
-    const genreId = cluster.genreIds[0];
-    const languages = [...new Set(cluster.evidence.map((entry) => entry.language).filter(Boolean))] as string[];
-    if (genreId && languages.length > 0) {
-      languages.slice(0, 3).forEach((value) => add(genreId, value));
-    } else if (genreId) {
-      add(genreId);
-    }
-    if (interests.length >= 16) break;
-  }
-
-  // Explicit choices are soft retrieval signals when no learned cluster has
-  // paired them with activity. They remain separate one-dimensional queries.
-  for (const genreId of profile.explicit.genres) {
-    if (interests.length >= 16) break;
-    add(genreId);
-  }
-  for (const language of profile.explicit.languages) {
-    if (interests.length >= 16) break;
-    add(undefined, language);
-  }
-  const learnedLanguages = Object.entries(profile.learned?.languages || profile.inferred.languages || {})
-    .sort(([, left], [, right]) => right - left)
-    .map(([value]) => value);
-  for (const language of learnedLanguages) {
-    if (interests.length >= 16) break;
-    add(undefined, language);
-  }
-  return interests;
-}
-
-async function fetchSource(
-  type: ContentType,
-  page: number,
-  filters: FeedFilters,
-  profile: TasteProfile,
-  profileSource: boolean,
-  stream: SourceStream,
-  interest?: TasteInterestState,
-): Promise<SourceResult> {
-  try {
-    const params = {
-      page: interest?.page || page,
-      with_genres: filters.genreId
-        ? String(filters.genreId)
-        : profileSource && interest?.genreId
-          ? String(interest.genreId)
-          : undefined,
-      with_original_language: filters.language
-        ? filters.language
-        : profileSource && interest?.language
-          ? interest.language
-          : undefined,
-        sort_by:
-        filters.sort === "rating"
-          ? `vote_average.${filters.direction}`
-          : filters.sort === "release_date"
-            ? type === "movie" ? `primary_release_date.${filters.direction}` : `first_air_date.${filters.direction}`
-            : `popularity.${filters.direction}`,
-      "vote_count.gte": filters.sort === "rating" ? 40 : undefined,
-      without_genres: discoverExclusions(profile, filters.genreId),
-    };
-    const response = type === "movie"
-      ? await discoverServerMovies(params)
-      : await discoverServerTVShows(params);
-    return {
-      stream,
-      type,
-      profileSource,
-      ...(interest ? { interestKey: interest.key } : {}),
-      page,
-      // A TMDB page count belongs to one exact genre/language query. When we
-      // cycle through several interests, keep the count unknown so one query
-      // cannot prematurely exhaust another.
-      totalPages: Number.isFinite(response.total_pages) ? response.total_pages : null,
-      results: Array.isArray(response.results) ? response.results : [],
-      failed: false,
-    };
-  } catch {
-    return { stream, type, profileSource, page, totalPages: null, results: [], failed: true };
-  }
-}
-
-function isExpired(value: Date | string | undefined): boolean {
-  if (!value) return true;
-  const timestamp = value instanceof Date ? value.getTime() : Date.parse(value);
-  return !Number.isFinite(timestamp) || timestamp <= Date.now();
-}
-
-async function loadDeliveredCandidateKeys(
-  db: Database,
-  sessionId: string,
-  candidates: UnifiedContentItem[],
-): Promise<Set<string>> {
-  const keys = [...new Set(candidates.map((item) => item.key))];
-  if (keys.length === 0) return new Set();
-  const cursor = db.collection("recommendation_deliveries").find(
-    { session_id: sessionId, content_key: { $in: keys } },
-    { projection: { content_key: 1 } },
-  );
-  if (typeof cursor.toArray !== "function") return new Set();
-  const rows = await cursor.toArray() as Array<Record<string, unknown>>;
-  return new Set(rows.map((row) => String(row.content_key)));
-}
-
-async function persistBatchMembership(
-  db: Database,
-  session: SessionDoc,
-  batch: BatchDoc,
-): Promise<void> {
-  for (const item of batch.items) {
-    const type: ContentType = "title" in item ? "movie" : "tv";
-    const contentKey = getContentKey(type, item.id);
-    try {
-      await db.collection("recommendation_deliveries").updateOne(
-        { session_id: session.session_id, content_key: contentKey },
-        {
-          $setOnInsert: {
-            session_id: session.session_id,
-            user_id: session.user_id,
-            content_key: contentKey,
-            page: batch.page,
-            expires_at: batch.expires_at,
-            created_at: new Date(),
-          },
-        },
-        { upsert: true },
-      );
-    } catch (error) {
-      const duplicate = (error as { code?: number; codeName?: string }).code === 11000 ||
-        (error as { codeName?: string }).codeName === "DuplicateKey";
-      if (!duplicate) throw error;
-      // A retry or concurrent request may have inserted the same membership.
-    }
-  }
-}
-
-async function repairBatchCheckpoint(
-  db: Database,
-  session: SessionDoc,
-  batch: BatchDoc,
-  leaseToken?: string,
-): Promise<void> {
-  await persistBatchMembership(db, session, batch);
-  if ((session.next_page || 1) !== batch.page) return;
-  const checkpointLeaseFilter = leaseToken
-    ? { generation_lease: leaseToken }
-    : {
-        $or: [
-          { generation_lease: { $exists: false } },
-          { generation_lease: null },
-          { generation_lease_expires_at: { $lt: new Date() } },
-        ],
-      };
-  await db.collection<SessionDoc>("recommendation_sessions").updateOne(
-    {
-      session_id: session.session_id,
-      user_id: session.user_id,
-      next_page: batch.page,
-      ...checkpointLeaseFilter,
-    },
-    {
-      $set: {
-        next_page: Math.max(session.next_page || 1, batch.page + 1),
-        ...(batch.source_state_after ? { source_state: batch.source_state_after } : {}),
-        ...(batch.candidate_buffer_after ? { candidate_buffer: batch.candidate_buffer_after } : {}),
-        updated_at: new Date(),
-        generation_page: null,
-        generation_lease: null,
-        generation_lease_expires_at: null,
-      },
-    },
-  );
-}
-
-async function acquireGenerationLease(
-  db: Database,
-  session: SessionDoc,
-  page: number,
-): Promise<string | null> {
-  const token = randomUUID();
-  const now = new Date();
-  const result = await db.collection<SessionDoc>("recommendation_sessions").updateOne(
-    {
-      session_id: session.session_id,
-      user_id: session.user_id,
-      next_page: page,
-      $or: [
-        { generation_lease: { $exists: false } },
-        { generation_lease: null },
-        { generation_lease_expires_at: { $lt: now } },
-      ],
-    },
-    {
-      $set: {
-        generation_page: page,
-        generation_lease: token,
-        generation_lease_expires_at: new Date(now.getTime() + 15_000),
-      },
-      $inc: { revision: 1 },
-    },
-  );
-  return result.matchedCount > 0 ? token : null;
-}
-
-async function releaseGenerationLease(
-  db: Database,
-  session: SessionDoc,
-  page: number,
-  token: string,
-): Promise<void> {
-  await db.collection<SessionDoc>("recommendation_sessions").updateOne(
-    { session_id: session.session_id, user_id: session.user_id, next_page: page, generation_lease: token },
-    { $set: { generation_page: null, generation_lease: null, generation_lease_expires_at: null } },
-  );
-}
-
-async function readBatch(
-  db: Database,
-  session: SessionDoc,
-  page: number,
-  taste: Awaited<ReturnType<typeof loadRecommendationTaste>>,
-  fence?: AccountWriteFence,
-): Promise<FeedResponse | null> {
-  const batch = await db.collection<BatchDoc>("recommendation_batches").findOne({
-    session_id: session.session_id,
-    page,
-  });
-  if (!batch || isExpired(batch.expires_at)) return null;
-  if (fence) await assertAccountWriteFence(db, fence);
-  try {
-    await repairBatchCheckpoint(db, session, batch);
-    if (fence) await assertAccountWriteFence(db, fence);
-  } catch (error) {
-    if (error instanceof AccountDeletedError) {
-      await db.collection("recommendation_deliveries").deleteMany({ session_id: session.session_id }).catch(() => undefined);
-      await db.collection("recommendation_batches").deleteMany({ session_id: session.session_id }).catch(() => undefined);
-      await db.collection("recommendation_sessions").deleteOne({ session_id: session.session_id, user_id: session.user_id }).catch(() => undefined);
-    }
-    throw error;
-  }
-  const batchKeys = batch.items.map((item) => ({
-    type: ("title" in item ? "movie" : "tv") as ContentType,
-    id: item.id,
-  }));
-  const currentExcluded = new Set([
-    ...taste.excludedKeys,
-    ...(taste.suppressedKeys || new Set<string>()),
-    ...await loadRecommendationExclusions(db, session.user_id, batchKeys),
-    ...(typeof recommendationTasteService.loadRecommendationSuppressions === "function"
-      ? await recommendationTasteService.loadRecommendationSuppressions(db, session.user_id, batchKeys)
-      : new Set<string>()),
-  ]);
-  const currentItems = batch.items.filter((item) => {
-    const type: ContentType = "title" in item ? "movie" : "tv";
-    return !currentExcluded.has(getContentKey(type, item.id));
-  });
-  const explanationById: Record<string, FeedExplanation> = {};
-  currentItems.forEach((item) => {
-    const type: ContentType = "title" in item ? "movie" : "tv";
-    const key = getContentKey(type, item.id);
-    if (batch.explanation_by_id[key]) explanationById[key] = batch.explanation_by_id[key];
-  });
-  return {
-    items: currentItems,
-    explanationById,
-    nextCursor: batch.next_cursor,
-    hasMore: batch.has_more,
-    state: currentItems.length > 0 ? batch.state : batch.has_more ? "ready" : "exhausted",
-    profileVersion: batch.profile_version,
-    feedSessionId: session.session_id,
-    isPersonalized: batch.is_personalized === true,
-  };
-}
-
-async function fetchSeedCandidates(
-  profile: TasteProfile,
-  page: number,
-  filters: FeedFilters,
-): Promise<Array<{ type: ContentType; seedKey: string; results: unknown[] }>> {
-  const seeds = pickSeedsForPage(profile.explicit.seeds, page).filter(
-    (seed) => filters.contentType === "all" || filters.contentType === seed.contentType,
-  );
-  const settle = async (load: () => Promise<{ results?: unknown[] }>): Promise<unknown[]> => {
-    try {
-      const response = await load();
-      return Array.isArray(response?.results) ? response.results.slice(0, 20) : [];
-    } catch {
-      return [];
-    }
-  };
-  return Promise.all(
-    seeds.map(async (seed) => {
-      const [recommended, similar] = await Promise.all(
-        seed.contentType === "movie"
-          ? [settle(() => getServerMovieRecommendations(seed.contentId)), settle(() => getServerSimilarMovies(seed.contentId))]
-          : [settle(() => getServerTVShowRecommendations(seed.contentId)), settle(() => getServerSimilarTVShows(seed.contentId))],
-      );
-      return {
-        type: seed.contentType,
-        seedKey: `${seed.contentType}_${seed.contentId}`,
-        results: [...recommended, ...similar],
-      };
-    }),
-  );
-}
 
 async function generatePage(
   db: Database,
@@ -1003,7 +184,8 @@ async function generatePage(
   const seedLists = seedSources.map((source) =>
     source.results
       .map((raw) => normalizeTmdbItem(raw, { typeHint: source.type, sourceTag: `seed:${source.seedKey}` }))
-      .filter((item): item is UnifiedContentItem => item !== null && hardFilter(item, filters, profile)),
+      .filter((item): item is UnifiedContentItem =>
+        item !== null && hardFilter(item, filters, profile) && passesQualityFloor(item)),
   );
   let seedsAdded = 0;
   for (let index = 0; seedsAdded < seedCap && seedLists.some((list) => index < list.length); index += 1) {
@@ -1040,7 +222,7 @@ async function generatePage(
           typeHint: source.type,
           sourceTag: `discover:${source.stream}:${source.interestKey || "all"}:p${source.page}`,
         });
-        if (!normalized || !hardFilter(normalized, filters, profile)) return;
+        if (!normalized || !hardFilter(normalized, filters, profile) || !passesQualityFloor(normalized)) return;
         if (excludedKeys.has(normalized.key) || candidateMap.has(normalized.key)) return;
         candidateMap.set(normalized.key, normalized);
       });

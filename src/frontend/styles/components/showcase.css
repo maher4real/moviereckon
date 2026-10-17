@@ -1,0 +1,159 @@
+/* Poster showcase: coverflow carousel shared by landing and auth */
+@layer components {
+  /* Poster showcase: coverflow carousel shared by landing and auth */
+  .poster-showcase {
+    --poster-w: clamp(9rem, 40vw, 15rem);
+    position: relative;
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.25rem;
+  }
+
+  .poster-showcase-stage {
+    position: relative;
+    width: 100%;
+    height: calc(var(--poster-w) * 1.5);
+    perspective: 1400px;
+    touch-action: pan-y;
+    user-select: none;
+    border-radius: 1rem;
+    outline: none;
+  }
+
+  .poster-showcase-stage:focus-visible {
+    box-shadow: 0 0 0 2px hsl(var(--ring) / 0.7);
+  }
+
+  .poster-showcase-slide {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: var(--poster-w);
+    aspect-ratio: 2 / 3;
+    overflow: hidden;
+    border: 1px solid hsl(0 0% 100% / 0.12);
+    border-radius: 1.1rem;
+    background: hsl(var(--card));
+    box-shadow: 0 30px 70px hsl(0 0% 0% / 0.55);
+    cursor: pointer;
+    opacity: calc(1 - var(--distance) * 0.28);
+    filter: brightness(calc(1 - var(--distance) * 0.24)) saturate(calc(1 - var(--distance) * 0.15));
+    transform:
+      translateX(-50%)
+      translateX(calc(var(--offset) * var(--poster-w) * 0.6))
+      scale(calc(1 - var(--distance) * 0.13))
+      rotateY(calc(var(--offset) * -9deg));
+    transition:
+      transform 650ms var(--ease-fluid),
+      opacity 650ms var(--ease-fluid),
+      filter 650ms var(--ease-fluid),
+      border-color 300ms,
+      box-shadow 300ms;
+  }
+
+  .poster-showcase-slide[data-active="true"] {
+    cursor: default;
+    border-color: hsl(var(--primary) / 0.4);
+    box-shadow: 0 34px 90px hsl(0 0% 0% / 0.6), 0 0 60px hsl(var(--primary) / 0.18);
+  }
+
+  .poster-showcase-slide[data-hidden="true"] {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .poster-showcase-slide:not([data-active="true"]):hover {
+    border-color: hsl(0 0% 100% / 0.28);
+  }
+
+  .poster-showcase-sheen {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(125deg, hsl(0 0% 100% / 0.14), transparent 28%, transparent 70%, hsl(var(--primary) / 0.1));
+    pointer-events: none;
+  }
+
+  .poster-showcase-caption {
+    width: min(100%, 24rem);
+    min-height: 6.5rem;
+    border: 1px solid hsl(var(--foreground) / 0.09);
+    border-radius: 1.1rem;
+    padding: 0.9rem 1.1rem;
+    background: linear-gradient(145deg, hsl(var(--foreground) / 0.055), transparent 45%), hsl(var(--card) / 0.7);
+    box-shadow: 0 20px 60px hsl(0 0% 0% / 0.35), inset 0 1px 0 hsl(var(--foreground) / 0.06);
+    -webkit-backdrop-filter: blur(18px) saturate(1.15);
+    backdrop-filter: blur(18px) saturate(1.15);
+    text-align: left;
+  }
+
+  .poster-showcase-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .poster-showcase-arrow {
+    display: inline-flex;
+    width: 2.25rem;
+    height: 2.25rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid hsl(var(--foreground) / 0.14);
+    border-radius: 999px;
+    background: hsl(var(--foreground) / 0.04);
+    color: hsl(var(--foreground) / 0.8);
+    transition: background-color 160ms, border-color 160ms, color 160ms;
+  }
+
+  .poster-showcase-arrow:hover {
+    border-color: hsl(var(--foreground) / 0.3);
+    background: hsl(var(--foreground) / 0.1);
+    color: hsl(var(--foreground));
+  }
+
+  .poster-showcase-dot {
+    position: relative;
+    display: block;
+    width: 0.5rem;
+    height: 3px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: hsl(var(--foreground) / 0.3);
+    transition: width 300ms var(--ease-fluid), background-color 200ms;
+  }
+
+  .group:hover .poster-showcase-dot { background: hsl(var(--foreground) / 0.6); }
+  .poster-showcase-dot[data-active="true"] { width: 1.75rem; background: hsl(var(--primary) / 0.35); }
+
+  .poster-showcase-progress {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: hsl(var(--primary));
+    transform-origin: left;
+    animation: showcase-progress linear forwards;
+  }
+
+  .poster-showcase-dot[data-active="true"]:not(:has(.poster-showcase-progress)) { background: hsl(var(--primary)); }
+
+  @media (min-width: 640px) {
+    .poster-showcase-caption { padding: 1rem 1.25rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .poster-showcase-slide, .poster-showcase-dot { transition: none; }
+  }
+
+  @keyframes hero-drift {
+    from { transform: scale(1.06); }
+    to { transform: scale(1); }
+  }
+
+  @keyframes showcase-progress {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+  }
+}

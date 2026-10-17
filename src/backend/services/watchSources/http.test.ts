@@ -16,6 +16,13 @@ describe("bounded source fetch", () => {
     await expect(request).rejects.toThrow("Aborted");
     expect(fetch).toHaveBeenCalledOnce();
   });
+  it("reads XML only in explicit sitemap mode and rejects HTML challenge pages", async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(new Response("<urlset/>", { headers: { "content-type": "application/xml" } }))
+      .mockResolvedValueOnce(new Response("<html>Challenge</html>", { headers: { "content-type": "text/html" } }));
+    vi.stubGlobal("fetch", fetch);
+    expect(await fetchSourceDocument(`${base}/sitemap.xml`, base, {}, { format: "xml" })).toMatchObject({ html: "<urlset/>" });
+    await expect(fetchSourceDocument(`${base}/sitemap.xml`, base, {}, { format: "xml" })).rejects.toThrow("XML");
+  });
   it("sends validators and returns a 304 without a body", async () => {
     const fetch = vi.fn().mockResolvedValue(new Response(null, { status: 304 }));
     vi.stubGlobal("fetch", fetch);

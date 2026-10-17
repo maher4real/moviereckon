@@ -6,7 +6,7 @@ import type { ParsedSourcePage, SourceContentMatch, ContentWatchSources } from "
 
 export interface SourcePageRecord {
   _id: string;
-  provider: "hdhub";
+  provider: "hdhub" | "4khdhub";
   url: string;
   status: "queued" | "matched" | "pending" | "review" | "error";
   parsed: ParsedSourcePage | null;
@@ -22,6 +22,7 @@ export interface SourcePageRecord {
 }
 
 export interface DiscoveryRecord {
+  checkedAt?: Date;
   _id: string;
   etag: string | null;
   lastModified: string | null;
@@ -54,14 +55,14 @@ export interface SourceRepository {
 }
 
 // Identity is independent of the rotating source domain; URLs are refreshed on discovery.
-export const sourcePageId = (url: string) => createHash("sha256").update(`hdhub:${new URL(url).pathname}`).digest("hex");
+export const sourcePageId = (url: string, provider: "hdhub" | "4khdhub" = "hdhub") => createHash("sha256").update(`${provider}:${new URL(url).pathname}`).digest("hex");
 
-export async function createSourceRepository(): Promise<SourceRepository> {
+export async function createSourceRepository(provider: "hdhub" | "4khdhub" = "hdhub"): Promise<SourceRepository> {
   const { db } = await connectToDatabase();
-  return mongoSourceRepository(db);
+  return mongoSourceRepository(db, provider);
 }
 
-export async function mongoSourceRepository(db: Db): Promise<SourceRepository> {
+export async function mongoSourceRepository(db: Db, provider: "hdhub" | "4khdhub" = "hdhub"): Promise<SourceRepository> {
   const pages = db.collection<SourcePageRecord>("watch_source_pages");
   const discovery = db.collection<DiscoveryRecord>("watch_source_discovery");
   const state = db.collection<{ _id: string; token?: string; leaseUntil: Date; lastRun?: ImportSummary }>("watch_import_state");
@@ -72,31 +73,31 @@ export async function mongoSourceRepository(db: Db): Promise<SourceRepository> {
   ]);
   return {
     async acquire(token, now, leaseMs) {
-      await state.updateOne({ _id: "hdhub" }, { $setOnInsert: { leaseUntil: new Date(0) } }, { upsert: true });
-      const result = await state.findOneAndUpdate({ _id: "hdhub", leaseUntil: { $lte: now } },
+      await state.updateOne({ _id: provider }, { $setOnInsert: { leaseUntil: new Date(0) } }, { upsert: true });
+      const result = await state.findOneAndUpdate({ _id: provider, leaseUntil: { $lte: now } },
         { $set: { token, leaseUntil: new Date(now.getTime() + leaseMs) } }, { returnDocument: "after" });
       return !!result;
     },
     async release(token, summary) {
-      await state.updateOne({ _id: "hdhub", token }, { $set: { leaseUntil: new Date(0), lastRun: summary }, $unset: { token: "" } });
+      await state.updateOne({ _id: provider, token }, { $set: { leaseUntil: new Date(0), lastRun: summary }, $unset: { token: "" } });
     },
     async enqueue(urls, now, force = false) {
       if (!urls.length) return 0;
       const result = await pages.bulkWrite([...new Set(urls)].map((url) => ({ updateOne: {
-        filter: { _id: sourcePageId(url) },
+        filter: { _id: sourcePageId(url, provider) },
         update: {
           $set: { url, ...(force ? { nextCheckAt: now } : {}) },
-          $setOnInsert: { provider: "hdhub" as const, createdAt: now, status: "queued" as const,
+          $setOnInsert: { provider, createdAt: now, status: "queued" as const,
             parsed: null, match: null, contentHash: null, etag: null, lastModified: null,
             checkedAt: null, failures: 0, lastError: null, ...(!force ? { nextCheckAt: now } : {}) },
         }, upsert: true,
       } })), { ordered: false });
       return result.upsertedCount;
     },
-    due: (now, limit, ids) => pages.find({ nextCheckAt: { $lte: now }, ...(ids ? { _id: { $in: ids } } : {}) })
+    due: (now, limit, ids) => pages.find({ provider, nextCheckAt: { $lte: now }, ...(ids ? { _id: { $in: ids } } : {}) })
       .sort({ nextCheckAt: 1, createdAt: -1 }).limit(limit).toArray(),
     async save(record) { await pages.replaceOne({ _id: record._id }, record); },
-    remaining: (now) => pages.countDocuments({ nextCheckAt: { $lte: now } }),
+    remaining: (now) => pages.countDocuments({ provider, nextCheckAt: { $lte: now } }),
     discovery: (id) => discovery.findOne({ _id: id }),
     async saveDiscovery(record) { await discovery.replaceOne({ _id: record._id }, record, { upsert: true }); },
   };
@@ -108,7 +109,7 @@ export async function lookupContentSources(
   const { db } = await connectToDatabase();
   const records = await db.collection<SourcePageRecord>("watch_source_pages").find({
     "match.tmdbId": contentId, "match.mediaType": contentType,
-  }, { projection: { url: 1, provider: 1, parsed: 1, checkedAt: 1 } }).sort({ checkedAt: -1 }).limit(50).toArray();
+  }, { projection: { url: 1, provider: 1, parsed: 1, checkedAt: 1 } }).sort({ checkedAt: -1 }).toArray();
   const sources = records.flatMap((record) => {
     const links = record.parsed?.links.filter((link) => {
       if (season !== undefined && link.season !== season) return false;

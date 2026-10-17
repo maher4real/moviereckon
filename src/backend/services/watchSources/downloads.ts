@@ -1,7 +1,8 @@
 import "server-only";
 import { load } from "cheerio";
-import { isResolvableDownload } from "@/shared/lib/watchSources";
+import { isGreenMotorsUrl, isResolvableDownload } from "@/shared/lib/watchSources";
 import type { ResolvedDownload, WatchSourceLink } from "@/shared/types/watchSources";
+import { decodeGreenMotorsDestination, parseGreenMotorsMirrors } from "./greenMotors";
 import { fetchSourceDocument } from "./http";
 import { normalizeSourceTitle, publicLink } from "./parser";
 
@@ -9,7 +10,7 @@ import { normalizeSourceTitle, publicLink } from "./parser";
 export function finalStorageUrl(value: string): URL | null {
   const url = publicLink(value, "https://hubcdn.wiki");
   return url?.protocol === "https:" && !url.hash && url.pathname !== "/" &&
-    /^(?:pub-[a-f0-9]{32}\.r2\.dev|[a-f0-9]{32}\.r2\.cloudflarestorage\.com)$/.test(url.hostname) ? url : null;
+    /^(?:pub-[a-f0-9]{32}\.r2\.dev|[a-f0-9]{32}\.r2\.cloudflarestorage\.com|video-downloads\.googleusercontent\.com)$/.test(url.hostname) ? url : null;
 }
 
 /** Decode this provider's published redirect parameter as data, without visiting the ad site. */
@@ -37,6 +38,8 @@ export function filenameMatchesSource(filename: string, link: WatchSourceLink, t
   const normalized = normalizeSourceTitle(filename);
   const expected = normalizeSourceTitle(title);
   if (!expected || !normalized.startsWith(`${expected} `)) return false;
+  if (link.scope === "movie" && link.releaseYear && !normalized.startsWith(`${expected} ${link.releaseYear} `)) return false;
+  filename = filename.replaceAll("_", ".");
   const episodes = [...filename.matchAll(/\bS(\d{1,3})[._ -]?E(\d{1,4})(?:\s*[-–]\s*E?(\d{1,4}))?\b/gi)];
   const se = episodes[0];
   if (link.scope === "episode" && (episodes.length !== 1 || Number(se[1]) !== link.season || Number(se[2]) !== link.episode || se[3])) return false;
@@ -73,11 +76,18 @@ async function checkFile(url: URL, link: WatchSourceLink, title: string, signal:
   // Signed S3 links authorize GET rather than HEAD. Request one byte and cancel
   // immediately; the full movie/episode is never buffered or proxied by this API.
   const signed = url.searchParams.has("X-Amz-Signature");
-  const response = await request(url.href, { method: signed ? "GET" : "HEAD", redirect: "manual", cache: "no-store",
+  let response = await request(url.href, { method: signed ? "GET" : "HEAD", redirect: "manual", cache: "no-store",
     signal, headers: signed ? { Range: "bytes=0-0" } : {} });
   await response.body?.cancel();
+  if (!signed && [405, 501].includes(response.status)) {
+    response = await request(url.href, { method: "GET", redirect: "manual", cache: "no-store", signal, headers: { Range: "bytes=0-0" } });
+    await response.body?.cancel();
+  }
   if (![200, 206].includes(response.status)) return null;
-  const filename = responseFilename(response);
+  let filename = responseFilename(response);
+  if (!filename && !response.headers.has("content-disposition")) {
+    try { filename = decodeURIComponent(url.pathname.split("/").pop() || ""); } catch { return null; }
+  }
   const contentType = (response.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
   if (!filename || !filenameMatchesSource(filename, link, title) ||
       !/^(?:video\/[a-z0-9.+-]+|application\/(?:octet-stream|zip|x-zip-compressed|x-rar-compressed|vnd\.rar|x-7z-compressed))$/.test(contentType)) return null;
@@ -90,24 +100,47 @@ async function checkFile(url: URL, link: WatchSourceLink, title: string, signal:
 }
 
 export async function resolveSourceDownloads(link: WatchSourceLink, title: string,
-  dependencies = { fetchDocument: fetchSourceDocument, request: fetch }): Promise<ResolvedDownload[]> {
+  dependencies = { fetchDocument: fetchSourceDocument, request: fetch },
+  signal = AbortSignal.timeout(22_000)): Promise<ResolvedDownload[]> {
   if (!isResolvableDownload(link)) return [];
-  const signal = AbortSignal.timeout(22_000);
   const document = async (url: URL) => (await dependencies.fetchDocument(url.href, url.origin, {}, { signal })).html || "";
   let candidates: URL[] = [];
   const original = new URL(link.url);
+  if (isGreenMotorsUrl(link.url)) {
+    // Canonicalize the observed domain rotation instead of following arbitrary redirects.
+    const wrapper = new URL(original.pathname + original.search, "https://greenmotors.cc");
+    const destination = decodeGreenMotorsDestination(await document(wrapper));
+    if (!destination) return [];
+    const mirrors = destination.origin === "https://hblinks.lol" ?
+      parseGreenMotorsMirrors(await document(destination), destination) : [destination.href];
+    const found: ResolvedDownload[] = [];
+    let cursor = 0;
+    await Promise.all(Array.from({ length: Math.min(2, mirrors.length) }, async () => {
+      while (cursor < mirrors.length && !signal.aborted) {
+        const mirror = mirrors[cursor++];
+        try {
+          found.push(...await resolveSourceDownloads({ ...link, url: mirror, host: new URL(mirror).hostname }, title, dependencies, signal));
+        } catch { /* A failed mirror must not hide other working destinations. */ }
+      }
+    }));
+    // Signed timestamps can change between mirrors while pointing to the same file.
+    return [...new Map(found.map((file) => {
+      const url = new URL(file.url);
+      return [`${url.origin}${url.pathname}|${file.filename}|${file.sizeBytes}`, file] as const;
+    })).values()].slice(0, 8);
+  }
   if (original.hostname === "hubcdn.club" || original.hostname === "hubcdn.wiki") {
     // This is the observed provider domain rotation, not an arbitrary redirect.
     const canonical = new URL(original.pathname, "https://hubcdn.wiki");
     const file = parseCdnFile(await document(canonical));
     if (file) candidates = [file];
   } else {
-    const drive = load(await document(original));
+    const drive = load(original.hostname === "hubcloud.ist" ? "" : await document(original));
     const cloudLinks = drive("a[href]").toArray().flatMap((node) => {
       const url = publicLink(drive(node).attr("href") || "", original.href);
       return url?.origin === "https://hubcloud.ist" && !url.search && !url.hash && /^\/drive\/[a-z0-9]+$/.test(url.pathname) ? [url] : [];
     });
-    const unique = [...new Map(cloudLinks.map((url) => [url.href, url])).values()];
+    const unique = original.hostname === "hubcloud.ist" ? [new URL(original.href.replace(/\/$/, ""))] : [...new Map(cloudLinks.map((url) => [url.href, url])).values()];
     if (unique.length !== 1) return [];
     const cloud = unique[0];
     const page = load(await document(cloud));

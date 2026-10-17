@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, ArrowRight, Sparkles, Star, Play } from "luc
 import { Movie, TVShow, getPosterUrl, getLanguageBadgeClass } from "@/shared/lib/tmdb";
 import { cn } from "@/shared/lib/utils";
 import MediaImage from "@/frontend/components/MediaImage";
+import { Skeleton } from "@/frontend/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/frontend/components/ui/popover";
 
 interface ContentItem extends Movie, TVShow {
@@ -187,13 +188,10 @@ export default function ContentCarousel({
         >
           {isLoading ? (
             Array.from({ length: 8 }).map((_, i) => (
-              <div
-                key={i}
-                className={cn("shrink-0 snap-start", POSTER_CARD_WIDTH_CLASS)}
-              >
-                <div className="aspect-2/3 rounded-lg bg-muted animate-pulse" />
-                <div className="mt-2 h-4 bg-muted rounded animate-pulse w-3/4" />
-                <div className="mt-1 h-3 bg-muted rounded animate-pulse w-1/2" />
+              <div key={i} aria-hidden="true" className={cn("shrink-0 snap-start", POSTER_CARD_WIDTH_CLASS)}>
+                <Skeleton className="aspect-2/3 rounded-lg" />
+                <Skeleton className="mt-3 h-4 w-4/5" />
+                <Skeleton className="mt-1.5 h-3 w-1/3" />
               </div>
             ))
           ) : (
@@ -230,7 +228,7 @@ export default function ContentCarousel({
                         fallbackSrc="/fallbacks/poster.svg"
                       />
 
-                      <div className="absolute inset-0 bg-background/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center justify-center">
+                      <div className="poster-hover-scrim absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-300 group-hover/card:opacity-100 group-focus-within/card:opacity-100">
                         <motion.div
                           className="poster-play-button"
                           initial={false}

@@ -60,6 +60,8 @@ interface UpcomingPage {
   total_results: number;
 }
 
+const SSR_PREFETCH_BUDGET_MS = 1200;
+
 const BOLLYWOOD_LANGUAGE_LIST = ["hi", "gu", "ta", "te", "kn"] as const;
 
 function normalizePathname(slug: string | string[] | undefined): string {
@@ -500,14 +502,22 @@ export default async function SpaPage({ params, searchParams }: SpaPageProps) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
-        retry: 1,
+        // The client retries on its own; a server retry only delays first paint.
+        retry: 0,
         staleTime: 1000 * 60 * 10,
         gcTime: 1000 * 60 * 60,
       },
     },
   });
 
-  await prefetchRouteData(queryClient, pathname, resolvedSearchParams, Boolean(initialUser));
+  // Never hold the HTML on a slow TMDB response. Whatever finished within the
+  // budget is dehydrated (only successful queries are), the rest loads client-side.
+  let budgetTimer: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([
+    prefetchRouteData(queryClient, pathname, resolvedSearchParams, Boolean(initialUser)).catch(() => undefined),
+    new Promise<void>((resolve) => { budgetTimer = setTimeout(resolve, SSR_PREFETCH_BUDGET_MS); }),
+  ]);
+  clearTimeout(budgetTimer);
   const dehydratedState = dehydrate(queryClient);
 
   return (

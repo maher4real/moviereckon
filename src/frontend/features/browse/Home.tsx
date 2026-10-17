@@ -23,6 +23,11 @@ import Header from "@/frontend/components/Header";
 import HeroBanner from "@/frontend/components/HeroBanner";
 import ContentCarousel from "@/frontend/components/ContentCarousel";
 import Footer from "@/frontend/components/Footer";
+import GenreRail from "@/frontend/components/GenreRail";
+import TodaysPicksDialog from "@/frontend/components/TodaysPicksDialog";
+import { useTodaysPicksGate } from "@/frontend/hooks/useTodaysPicksGate";
+import { useWatchlist } from "@/frontend/hooks/useWatchlist";
+import { buildPickPool } from "./todaysPicksSource";
 import {
   TrendingUp,
   Film,
@@ -93,6 +98,10 @@ export default function Home() {
     isPersonalized,
     explanationById,
   } = useRecommendations();
+  const { items: watchlistItems } = useWatchlist();
+  const { allowed: picksAllowed, markShown: markPicksShown, skipToday: skipPicksToday } = useTodaysPicksGate(user?.id);
+  const [picksOpen, setPicksOpen] = useState(false);
+  const [picksWaitedLongEnough, setPicksWaitedLongEnough] = useState(false);
   const shouldReduceHomeMotion = useReducedMotion();
   const reduceHomeMotion = Boolean(shouldReduceHomeMotion);
   const [heroIndex, setHeroIndex] = useState(0);
@@ -112,12 +121,24 @@ export default function Home() {
   useEffect(() => {
     if (!user) return;
     const t1 = window.setTimeout(() => setLoadSecondaryShelves(true), 200);
-    const t2 = window.setTimeout(() => setLoadTertiaryShelves(true), 700);
-    return () => {
-      window.clearTimeout(t1);
-      window.clearTimeout(t2);
-    };
+    return () => window.clearTimeout(t1);
   }, [user]);
+
+  // Below-the-fold shelves fetch only when the reader scrolls near them.
+  const tertiarySentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!user || loadTertiaryShelves) return;
+    const node = tertiarySentinelRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") {
+      setLoadTertiaryShelves(true);
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) setLoadTertiaryShelves(true);
+    }, { rootMargin: "900px 0px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [user, loadTertiaryShelves, loadSecondaryShelves]);
 
   // Fetch all data with optimized query config
   const queryConfig = useMemo(
@@ -393,6 +414,39 @@ export default function Home() {
     announceHomeHeroReady();
   }, []);
 
+  // "What to watch today": opens once per login session, after the data it needs has settled.
+  const pickCandidates = useMemo(
+    () => buildPickPool({
+      feed: reckonItems as (Movie | TVShow)[],
+      explanations: explanationById,
+      watchlist: watchlistItems,
+      trending: filteredTrendingMovies,
+      popularTv: filteredTvShows,
+      topRated: filteredTopRatedMovies,
+    }),
+    [reckonItems, explanationById, watchlistItems, filteredTrendingMovies, filteredTvShows, filteredTopRatedMovies],
+  );
+  const watchedKeys = useMemo(
+    () => new Set(watchHistory.map((entry) => `${entry.content_type}_${entry.content_id}`)),
+    [watchHistory],
+  );
+  const firstName = (profile?.username || user?.username || "").trim().split(/\s+/)[0] || undefined;
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setPicksWaitedLongEnough(true), 3500);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const picksReady = !reckonLoading && (Boolean(tvShowsData) || picksWaitedLongEnough) && pickCandidates.length >= 4;
+  useEffect(() => {
+    if (!picksAllowed || !picksReady || picksOpen) return;
+    const timer = window.setTimeout(() => {
+      setPicksOpen(true);
+      markPicksShown();
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [picksAllowed, picksReady, picksOpen, markPicksShown]);
+
   const secondaryShelvesPending = !loadSecondaryShelves;
   const tertiaryShelvesPending = !loadTertiaryShelves;
 
@@ -408,6 +462,7 @@ export default function Home() {
             currentIndex={heroIndex}
             totalSlides={heroMovies.length}
             onDotClick={handleDotClick}
+            onStep={setHeroIndex}
             onBackdropReady={handleHeroBackdropReady}
             isPlaying={isHeroPlaying && !reduceHomeMotion}
             onTogglePlayback={reduceHomeMotion ? undefined : () => setIsHeroPlaying(playing => !playing)}
@@ -430,27 +485,15 @@ export default function Home() {
                 />
               )}
 
-          {/* Now Playing */}
-          {(secondaryShelvesPending || filteredNowPlaying.length > 0 || nowPlayingLoading) && (
+          {/* Continue Watching */}
+          {recentlyWatched.length > 0 && (
             <MemoizedCarousel
-              title="Now Playing"
-              icon={Clapperboard}
-              items={filteredNowPlaying as (Movie | TVShow)[]}
-              isLoading={secondaryShelvesPending || nowPlayingLoading}
-              type="movie"
-              viewAllHref="/movies?category=now_playing"
-            />
-          )}
-
-          {/* Upcoming */}
-          {(tertiaryShelvesPending || filteredUpcoming.length > 0 || upcomingLoading) && (
-            <MemoizedCarousel
-              title="Upcoming"
-              icon={CalendarDays}
-              items={filteredUpcoming as (Movie | TVShow)[]}
-              isLoading={tertiaryShelvesPending || upcomingLoading}
+              title="Continue Watching"
+              icon={History}
+              items={recentlyWatched as (Movie | TVShow)[]}
+              isLoading={false}
               type="mixed"
-              viewAllHref="/upcoming"
+              viewAllHref="/profile"
             />
           )}
 
@@ -465,17 +508,27 @@ export default function Home() {
             priorityImages={reckonItems.length === 0}
           />
 
-          {/* Continue Watching */}
-          {recentlyWatched.length > 0 && (
+          {/* Now Playing */}
+          {(secondaryShelvesPending || filteredNowPlaying.length > 0 || nowPlayingLoading) && (
             <MemoizedCarousel
-              title="Continue Watching"
-              icon={History}
-              items={recentlyWatched as (Movie | TVShow)[]}
-              isLoading={false}
-              type="mixed"
-              viewAllHref="/profile"
+              title="Now Playing"
+              icon={Clapperboard}
+              items={filteredNowPlaying as (Movie | TVShow)[]}
+              isLoading={secondaryShelvesPending || nowPlayingLoading}
+              type="movie"
+              viewAllHref="/movies?category=now_playing"
             />
           )}
+
+          {/* Trending TV Series */}
+          <MemoizedCarousel
+            title="Trending TV Series"
+            icon={Tv}
+            items={filteredTvShows as (Movie | TVShow)[]}
+            isLoading={secondaryShelvesPending || tvLoading}
+            type="tv"
+            viewAllHref="/series?category=popular"
+          />
 
           {/* Bollywood Hits */}
           <MemoizedCarousel
@@ -496,6 +549,33 @@ export default function Home() {
             type="movie"
             viewAllHref="/movies?category=hollywood"
           />
+
+          {/* Top Rated */}
+          <MemoizedCarousel
+            title="Top Rated"
+            icon={Award}
+            items={filteredTopRatedMovies as (Movie | TVShow)[]}
+            isLoading={secondaryShelvesPending || topRatedLoading}
+            type="movie"
+            viewAllHref="/movies?sort=vote_average.desc"
+          />
+
+          <div ref={tertiarySentinelRef} aria-hidden="true" />
+
+          {/* Browse by genre */}
+          <GenreRail enabled={loadTertiaryShelves} />
+
+          {/* Upcoming */}
+          {(tertiaryShelvesPending || filteredUpcoming.length > 0 || upcomingLoading) && (
+            <MemoizedCarousel
+              title="Upcoming"
+              icon={CalendarDays}
+              items={filteredUpcoming as (Movie | TVShow)[]}
+              isLoading={tertiaryShelvesPending || upcomingLoading}
+              type="mixed"
+              viewAllHref="/upcoming"
+            />
+          )}
 
           {/* Tamil Cinema */}
           {tamilData?.results && tamilData.results.length > 0 && (
@@ -533,28 +613,18 @@ export default function Home() {
             />
           )}
 
-          {/* Trending TV Series */}
-          <MemoizedCarousel
-            title="Trending TV Series"
-            icon={Tv}
-            items={filteredTvShows as (Movie | TVShow)[]}
-            isLoading={secondaryShelvesPending || tvLoading}
-            type="tv"
-            viewAllHref="/series?category=popular"
-          />
-
-          {/* Top Rated */}
-          <MemoizedCarousel
-            title="Top Rated"
-            icon={Award}
-            items={filteredTopRatedMovies as (Movie | TVShow)[]}
-            isLoading={secondaryShelvesPending || topRatedLoading}
-            type="movie"
-            viewAllHref="/movies?sort=vote_average.desc"
-          />
-
             </div>
           </main>
+
+          <TodaysPicksDialog
+            open={picksOpen}
+            onOpenChange={setPicksOpen}
+            candidates={pickCandidates}
+            excludeKeys={watchedKeys}
+            personalized={isPersonalized}
+            name={firstName}
+            onSkipToday={skipPicksToday}
+          />
 
           <Footer />
     </div>

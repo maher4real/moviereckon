@@ -209,11 +209,13 @@ function WatchlistContent() {
     return (
       <div className="flex flex-col gap-2 pt-2" role="status" aria-label="Loading watchlist">
         {[1, 2, 3].map((n) => (
-          <div
-            key={n}
-            className="h-17.5 rounded-xl bg-muted/50 animate-pulse"
-            aria-hidden="true"
-          />
+          <div key={n} className="flex h-17.5 items-center gap-3 rounded-xl bg-muted/30 p-2" aria-hidden="true">
+            <Skeleton className="h-full w-11 shrink-0 rounded-md" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-3.5 w-3/4" />
+              <Skeleton className="h-3 w-1/3" />
+            </div>
+          </div>
         ))}
       </div>
     );
@@ -271,6 +273,7 @@ function WatchlistContent() {
 // ─── FAB + Panel ─────────────────────────────────────────────────────────────
 
 import type { WatchlistFlyEventDetail } from "./ContentCard";
+import { Skeleton } from "@/frontend/components/ui/skeleton";
 
 export default function WatchlistPanel() {
   const { user } = useAuth();

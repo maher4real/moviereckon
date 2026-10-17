@@ -13,6 +13,19 @@ describe("published source links", () => {
     expect(page.links).toHaveLength(2);
     expect(page.links.every((link) => link.scope === "episode" && link.season === 1 && link.episode === 2)).toBe(true);
   });
+  it("reads watch sections after story text, standalone quality headings and row-specific episodes", () => {
+    const page = parseSourcePage(`<h1>Example (Season 1)</h1><h2>DOWNLOAD LINKS</h2>
+      <h3>Episode 1</h3><h4>720p x264</h4><a href="https://hubcloud.ist/drive/abc">Download</a>
+      <h4><a href="https://host.example/two">S01E02 1080p Drive</a></h4>
+      <h2>Storyline</h2><a href="https://ads.example/ad">Watch ad</a>
+      <h2>Watch Online</h2><h3>Episode 3</h3><a href="https://player.example/three">Server 1</a>
+      <h2>Comments</h2><a href="https://ads.example/comment">Download</a>`, `${base}/example/`);
+    expect(page.links).toHaveLength(3);
+    expect(page.links[0]).toMatchObject({ scope: "episode", episode: 1, resolution: 720, codec: "H.264" });
+    expect(page.links[1]).toMatchObject({ scope: "episode", episode: 2, resolution: 1080 });
+    expect(page.links[2]).toMatchObject({ scope: "episode", episode: 3, kind: "watch", resolution: null });
+  });
+
   it("collects all movie quality, player and collection links with metadata", () => {
     const page = parseSourcePage(fixture("movie"), `${base}/weapons-2025-hindi-studio-dub-bluray-full-movie/`);
     expect(page).toMatchObject({ title: "Weapons", year: 2025, imdbId: "tt26581740", mediaType: "movie" });

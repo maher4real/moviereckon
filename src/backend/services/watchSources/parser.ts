@@ -43,7 +43,8 @@ export function parseSourcePage(html: string, sourceUrl: string): ParsedSourcePa
   const links: WatchSourceLink[] = [];
   const seen = new Set<string>();
   let active = false;
-  let ended = false;
+  let watchSection = false;
+  let sectionQuality = "";
   let season = defaultSeason;
   let episode: number | null = null;
   let episodeEnd: number | null = null;
@@ -52,15 +53,19 @@ export function parseSourcePage(html: string, sourceUrl: string): ParsedSourcePa
   // Some source pages have malformed nested divs. Walk document order instead
   // of relying on one CSS content wrapper to contain every quality row.
   $("h1,h2,h3,h4,h5,h6,a[href]").each((_, element) => {
-    if (ended) return;
+    if ($(element).closest("nav,header,footer,aside,#comments,.comments,.related-posts").length) return;
     const node = $(element);
     const label = text(node.text());
     if (element.tagName !== "a") {
-      if (/download\s+links/i.test(label)) { active = true; return; }
+      if (/download\s+links|watch\s+(?:online|links)|streaming\s+links/i.test(label)) {
+        active = true; watchSection = /watch|streaming/i.test(label);
+        episode = null; episodeEnd = null; season = defaultSeason; sectionQuality = ""; sectionCodec = null;
+        return;
+      }
       if (!active) return;
       if (/^(?:h1|h2)$/.test(element.tagName) &&
-          /storyline|review|description|trailer|screen.?shots|watch online|you may also/i.test(label)) {
-        ended = true; return;
+          /storyline|review|description|trailer|screen.?shots|you may also|comments|related/i.test(label)) {
+        active = false; return;
       }
       if (/single\s+episode/i.test(label)) {
         episode = null; episodeEnd = null;
@@ -70,9 +75,10 @@ export function parseSourcePage(html: string, sourceUrl: string): ParsedSourcePa
       // note or a range in a season-pack label cannot contaminate later rows.
       if (node.find("a").length === 0) {
         const sm = label.match(/\bSeason\s*[-:]?\s*(\d+)\b|\bS(\d{1,2})(?=E|\b)/i);
-        if (sm) { season = Number(sm[1] || sm[2]); episode = null; episodeEnd = null; }
+        if (sm) { season = Number(sm[1] || sm[2]); episode = null; episodeEnd = null; sectionQuality = ""; }
         const em = label.match(/\b(?:episodes?|ep)\s*[-:]?\s*(\d+)(?:\s*[-–]\s*(\d+))?\b|\bS\d{1,2}E(\d{1,3})(?:\s*[-–]\s*E?(\d+))?/i);
-        if (em) { episode = Number(em[1] || em[3]); episodeEnd = em[2] || em[4] ? Number(em[2] || em[4]) : null; }
+        if (em) { episode = Number(em[1] || em[3]); episodeEnd = em[2] || em[4] ? Number(em[2] || em[4]) : null; sectionQuality = ""; }
+        if (/\b(?:360|480|576|720|1080|1440|2160|4320)p\b|\b[48]K\b/i.test(label)) sectionQuality = label;
       }
       return;
     }
@@ -81,15 +87,23 @@ export function parseSourcePage(html: string, sourceUrl: string): ParsedSourcePa
     if (!url || (url.origin === new URL(sourceUrl).origin && !directMediaFormat(url.href) && !isDirectFileLink(url.href))) return;
     const block = node.closest("h3,h4,h5,h6,p,li");
     const context = text(block.length ? block.text() : label);
-    const metadata = `${label} ${context}`;
+    const localMetadata = `${label} ${context}`;
+    const metadata = /\b(?:360|480|576|720|1080|1440|2160|4320)p\b|\b[48]K\b/i.test(localMetadata) ? localMetadata : `${localMetadata} ${sectionQuality}`;
     const resolutionMatch = metadata.match(/\b(360|480|576|720|1080|1440|2160|4320)p\b/i);
     const resolution = resolutionMatch ? Number(resolutionMatch[1]) : /\b4K\b/i.test(metadata) ? 2160 : /\b8K\b/i.test(metadata) ? 4320 : null;
-    const watch = /\bwatch\b|\bplayer\s*[-:]?\s*\d*\b|\bstream(?:ing)?\b/i.test(label);
-    if (!watch && resolution === null && !directMediaFormat(url.href) && !isDirectFileLink(url.href)) return;
+    const watch = watchSection || /\bwatch\b|\bplayer\s*[-:]?\s*\d*\b|\bstream(?:ing)?\b/i.test(label);
+    if (!watch && resolution === null && !/\b(?:download|drive|instant|mirror)\b/i.test(label) && !directMediaFormat(url.href) && !isDirectFileLink(url.href)) return;
     const collection = !watch && /\b(?:SDR|HDR|DV|REMUX)\b/i.test(label) && label.includes("|");
-    const scope = mediaType === "movie" ? "movie" : collection ? (season === null ? "series" : "season") :
-      episode !== null ? (episodeEnd !== null ? "episode-range" : "episode") : season !== null ? "season" : "series";
-    const key = `${url.href}|${scope}|${season}|${episode}|${episodeEnd}|${resolution}`;
+    const seasonPattern = /\bS(\d{1,3})(?=E|\b)|\bSeason\s*[-:]?\s*(\d+)/i;
+    const episodePattern = /\bS\d{1,3}E(\d{1,4})(?:\s*[-–]\s*E?(\d+))?|\b(?:episodes?|ep)\s*[-:]?\s*(\d+)(?:\s*[-–]\s*(\d+))?/i;
+    const rowSeason = label.match(seasonPattern) || context.match(seasonPattern);
+    const rowEpisode = label.match(episodePattern) || context.match(episodePattern);
+    const linkSeason = rowSeason ? Number(rowSeason[1] || rowSeason[2]) : season;
+    const linkEpisode = rowEpisode ? Number(rowEpisode[1] || rowEpisode[3]) : episode;
+    const linkEpisodeEnd = rowEpisode ? (rowEpisode[2] || rowEpisode[4] ? Number(rowEpisode[2] || rowEpisode[4]) : null) : episodeEnd;
+    const scope = mediaType === "movie" ? "movie" : collection ? (linkSeason === null ? "series" : "season") :
+      linkEpisode !== null ? (linkEpisodeEnd !== null ? "episode-range" : "episode") : linkSeason !== null ? "season" : "series";
+    const key = `${url.href}|${scope}|${linkSeason}|${linkEpisode}|${linkEpisodeEnd}|${resolution}`;
     if (seen.has(key)) return;
     seen.add(key);
     const bitMatch = metadata.match(/\b(8|10|12)\s*[- ]?bit\b/i);
@@ -98,14 +112,14 @@ export function parseSourcePage(html: string, sourceUrl: string): ParsedSourcePa
       id: createHash("sha256").update(key).digest("hex").slice(0, 24),
       label, url: url.href, host: url.hostname,
       kind: watch ? "watch" : collection ? "collection" : "download",
-      verification: "unverified", quality: resolution === null ? null : `${resolution}p`, resolution,
+      verification: "unverified", releaseYear: mediaType === "movie" && yearMatch ? Number(yearMatch[1]) : null, quality: resolution === null ? null : `${resolution}p`, resolution,
       codec: /hevc|x265|h\.?265/i.test(metadata) ? "HEVC" : /x264|h\.?264/i.test(metadata) ? "H.264" : /\bAV1\b/i.test(metadata) ? "AV1" : sectionCodec,
       bitDepth: bitMatch ? Number(bitMatch[1]) : null,
       size: sizeMatch ? sizeMatch[0].replace(/\s/g, "").toUpperCase() : null,
       formats: [...new Set((metadata.match(/\b(?:SDR|HDR10\+?|HDR|DV|REMUX|BluRay|WEB-DL)\b/gi) || []).map((format) => format.toUpperCase()))],
-      languages, scope, season: mediaType === "tv" ? season : null,
-      episode: scope === "episode" || scope === "episode-range" ? episode : null,
-      episodeEnd: scope === "episode-range" ? episodeEnd : null,
+      languages, scope, season: mediaType === "tv" ? linkSeason : null,
+      episode: scope === "episode" || scope === "episode-range" ? linkEpisode : null,
+      episodeEnd: scope === "episode-range" ? linkEpisodeEnd : null,
     });
   });
   return { title, year: yearMatch ? Number(yearMatch[1]) : null, mediaType, imdbId, season: defaultSeason, links };

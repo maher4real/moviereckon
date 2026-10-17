@@ -31,13 +31,14 @@ import StartupSoundManager from "@/frontend/components/StartupSoundManager";
 import AuthTransitionOverlay from "@/frontend/components/AuthTransitionOverlay";
 import GlassPageFrame from "@/frontend/components/GlassPageFrame";
 import { CenteredAppSkeleton } from "@/frontend/components/AppSkeletons";
+import { RouteSkeleton } from "@/frontend/components/PageSkeletons";
 import BottomNav from "@/frontend/components/BottomNav";
 import type { MongoUser } from "@/frontend/lib/mongodbClient";
-import Auth from "@/frontend/features/auth/Auth";
-import Home from "@/frontend/features/browse/Home";
 import ProtectedRoute from "@/frontend/components/ProtectedRoute";
 
 const routeLoaders = {
+  auth: () => import("@/frontend/features/auth/Auth"),
+  home: () => import("@/frontend/features/browse/Home"),
   upcoming: () => import("@/frontend/features/browse/Upcoming"),
   search: () => import("@/frontend/features/browse/Search"),
   movieDetail: () => import("@/frontend/features/browse/MovieDetail"),
@@ -46,6 +47,7 @@ const routeLoaders = {
   profile: () => import("@/frontend/features/profile/Profile"),
   profileEdit: () => import("@/frontend/features/profile/ProfileEdit"),
   reckon: () => import("@/frontend/features/recommendations/Reckon"),
+  preferences: () => import("@/frontend/features/recommendations/PreferencesPage"),
   notFound: () => import("@/frontend/features/system/NotFound"),
   movies: () => import("@/frontend/features/browse/Movies"),
   series: () => import("@/frontend/features/browse/Series"),
@@ -60,6 +62,8 @@ const routeLoaders = {
   landing: () => import("@/frontend/features/landing/Landing"),
 } as const;
 
+const Auth = lazy(routeLoaders.auth);
+const Home = lazy(routeLoaders.home);
 const Upcoming = lazy(routeLoaders.upcoming);
 const Search = lazy(routeLoaders.search);
 const MovieDetail = lazy(routeLoaders.movieDetail);
@@ -68,6 +72,7 @@ const PersonDetail = lazy(routeLoaders.personDetail);
 const Profile = lazy(routeLoaders.profile);
 const ProfileEdit = lazy(routeLoaders.profileEdit);
 const Reckon = lazy(routeLoaders.reckon);
+const PreferencesPage = lazy(routeLoaders.preferences);
 const NotFound = lazy(routeLoaders.notFound);
 const Movies = lazy(routeLoaders.movies);
 const Series = lazy(routeLoaders.series);
@@ -118,6 +123,13 @@ function useIdleRoutePreload(enabled: boolean) {
 function AuthenticatedRoutePreload() {
   const { user, isLoading } = useAuth();
   useIdleRoutePreload(Boolean(user) && !isLoading);
+
+  // Start the most likely next chunk as soon as auth resolves, before idle.
+  useEffect(() => {
+    if (isLoading) return;
+    void (user ? routeLoaders.home() : routeLoaders.auth()).catch(() => undefined);
+  }, [isLoading, user]);
+
   return null;
 }
 
@@ -266,7 +278,7 @@ const App = ({
                       <AuthenticatedRoutePreload />
                       <AuthTransitionOverlay />
                       <WatchlistPanel />
-                      <Suspense fallback={<CenteredAppSkeleton />}>
+                      <Suspense fallback={<RouteSkeleton />}>
                         <GlassPageFrame>
                           <RouteTransition>
                           {/* Public routes */}
@@ -295,6 +307,7 @@ const App = ({
                           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                           <Route path="/profile/edit" element={<ProtectedRoute><ProfileEdit /></ProtectedRoute>} />
                           <Route path="/reckon" element={<ProtectedRoute><Reckon /></ProtectedRoute>} />
+                          <Route path="/reckon/preferences" element={<ProtectedRoute><PreferencesPage /></ProtectedRoute>} />
                           <Route path="/movies" element={<ProtectedRoute><Movies /></ProtectedRoute>} />
                           <Route path="/series" element={<ProtectedRoute><Series /></ProtectedRoute>} />
                           <Route path="/about" element={<InfoPage page="about" />} />

@@ -37,6 +37,7 @@ import {
   getTMDBAvatarUrl,
   getTVShowReviewsExpanded,
 } from "@/shared/lib/tmdb";
+import { Skeleton } from "@/frontend/components/ui/skeleton";
 
 interface CommentsSectionProps {
   contentId: number;
@@ -383,10 +384,13 @@ export default function CommentsSection({
           {commentsLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="rounded-lg bg-card border border-border p-4 animate-pulse">
-                  <div className="h-3 bg-muted rounded w-1/3 mb-2" />
-                  <div className="h-3 bg-muted rounded w-full mb-1" />
-                  <div className="h-3 bg-muted rounded w-2/3" />
+                <div key={i} className="skeleton-surface p-4" aria-hidden="true">
+                  <div className="mb-3 flex items-center gap-2">
+                    <Skeleton className="size-7 rounded-full" />
+                    <Skeleton className="h-3 w-28" />
+                  </div>
+                  <Skeleton className="mb-1.5 h-3 w-full" />
+                  <Skeleton className="h-3 w-2/3" />
                 </div>
               ))}
             </div>
@@ -525,10 +529,13 @@ export default function CommentsSection({
           {reviewsLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 2 }).map((_, i) => (
-                <div key={i} className="rounded-lg bg-card border border-border p-4 animate-pulse">
-                  <div className="h-3 bg-muted rounded w-1/3 mb-2" />
-                  <div className="h-3 bg-muted rounded w-full mb-1" />
-                  <div className="h-3 bg-muted rounded w-4/5" />
+                <div key={i} className="skeleton-surface p-4" aria-hidden="true">
+                  <div className="mb-3 flex items-center gap-2">
+                    <Skeleton className="size-7 rounded-full" />
+                    <Skeleton className="h-3 w-28" />
+                  </div>
+                  <Skeleton className="mb-1.5 h-3 w-full" />
+                  <Skeleton className="h-3 w-4/5" />
                 </div>
               ))}
             </div>

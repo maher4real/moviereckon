@@ -1,0 +1,30 @@
+name: Refresh watch catalogs
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: watch-source-import
+  cancel-in-progress: false
+jobs:
+  refresh:
+    # Set this repository variable to opt into frequent imports after deployment.
+    if: ${{ vars.WATCH_IMPORT_ORIGIN != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Run bounded persistent catalog import
+        env:
+          WATCH_IMPORT_ORIGIN: ${{ vars.WATCH_IMPORT_ORIGIN }}
+          CRON_SECRET: ${{ secrets.WATCH_IMPORT_CRON_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$WATCH_IMPORT_ORIGIN" =~ ^https://[a-zA-Z0-9.-]+$ ]] || (( ${#CRON_SECRET} < 32 )); then
+            echo 'Configure WATCH_IMPORT_ORIGIN (HTTPS origin) and WATCH_IMPORT_CRON_SECRET (at least 32 characters).'
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error --max-time 280 \
+            --header "Authorization: Bearer ${CRON_SECRET}" \
+            "${WATCH_IMPORT_ORIGIN}/api/import/watch-sources"

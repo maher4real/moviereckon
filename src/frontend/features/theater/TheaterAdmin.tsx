@@ -13,6 +13,7 @@ import {
 import { cn } from "@/shared/lib/utils";
 import { toast } from "sonner";
 import { useAuth } from "@/frontend/hooks/useAuth";
+import { Skeleton } from "@/frontend/components/ui/skeleton";
 
 interface TheaterCastMember { name: string; role: string; photo: string; }
 
@@ -339,7 +340,7 @@ export default function TheaterAdmin() {
           {/* Movie grid */}
           {isLoading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 bg-muted rounded-xl animate-pulse" />)}
+              {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
             </div>
           ) : movies.length === 0 ? (
             <div className="flex flex-col items-center py-24 gap-4 text-muted-foreground">

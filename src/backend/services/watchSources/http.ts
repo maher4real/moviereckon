@@ -19,7 +19,7 @@ export async function fetchSourceDocument(
   value: string,
   baseUrl: string,
   validators: { etag?: string | null; lastModified?: string | null } = {},
-  options: { signal?: AbortSignal } = {},
+  options: { signal?: AbortSignal; format?: "html" | "xml" } = {},
 ): Promise<SourceResponse> {
   const initial = publicLink(value, baseUrl);
   const origin = new URL(baseUrl).origin;
@@ -36,7 +36,7 @@ export async function fetchSourceDocument(
           redirect: "manual", cache: "no-store", signal: options.signal ? AbortSignal.any([controller.signal, options.signal]) : controller.signal,
           headers: {
             "User-Agent": "MovieReckon-SourceImporter/1.0",
-            Accept: "text/html,application/xhtml+xml",
+            Accept: options.format === "xml" ? "application/xml,text/xml" : "text/html,application/xhtml+xml",
             ...(validators.etag ? { "If-None-Match": validators.etag } : {}),
             ...(validators.lastModified ? { "If-Modified-Since": validators.lastModified } : {}),
           },
@@ -59,9 +59,9 @@ export async function fetchSourceDocument(
         throw new SourceHttpError(response.status);
       }
       const contentType = response.headers.get("content-type") || "";
-      if (!/text\/html|application\/xhtml\+xml/i.test(contentType)) {
+      if (!(options.format === "xml" ? /(?:application|text)\/xml/i : /text\/html|application\/xhtml\+xml/i).test(contentType)) {
         await response.body?.cancel();
-        throw new Error("Source did not return HTML");
+        throw new Error(`Source did not return ${options.format === "xml" ? "XML" : "HTML"}`);
       }
       if (Number(response.headers.get("content-length") || 0) > MAX_BYTES) {
         await response.body?.cancel();

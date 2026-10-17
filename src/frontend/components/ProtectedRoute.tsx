@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/frontend/hooks/useAuth";
-import { CenteredAppSkeleton } from "@/frontend/components/AppSkeletons";
+import { RouteSkeleton } from "@/frontend/components/PageSkeletons";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -19,7 +19,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
-    return <CenteredAppSkeleton />;
+    return <RouteSkeleton />;
   }
 
   if (!user) {

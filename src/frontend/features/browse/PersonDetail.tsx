@@ -28,6 +28,7 @@ import {
   type PersonCombinedCrewCredit,
 } from "@/shared/lib/tmdb";
 import { cn } from "@/shared/lib/utils";
+import { Skeleton } from "@/frontend/components/ui/skeleton";
 
 type MediaFilter = "all" | "movie" | "tv";
 type WorkCredit = PersonCombinedCastCredit | PersonCombinedCrewCredit;
@@ -297,10 +298,19 @@ export default function PersonDetail() {
     return (
       <div className="app-page">
         <Header />
-        <div className="container mx-auto space-y-3 px-3 pt-24 sm:space-y-4 sm:px-4">
-          <div className="h-12 w-14 animate-pulse rounded-full bg-muted" />
-          <div className="h-72 animate-pulse rounded-2xl bg-muted" />
-          <div className="h-48 animate-pulse rounded-2xl bg-muted" />
+        <div role="status" aria-busy="true" className="container mx-auto space-y-3 px-3 pt-24 sm:space-y-4 sm:px-4">
+          <span className="sr-only">Loading profile</span>
+          <div className="flex flex-col gap-6 sm:flex-row">
+            <Skeleton className="aspect-2/3 w-40 shrink-0 rounded-2xl sm:w-56" />
+            <div className="flex-1 space-y-3">
+              <Skeleton className="h-10 w-2/3" />
+              <Skeleton className="h-4 w-1/3" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+            </div>
+          </div>
+          <Skeleton className="h-48 rounded-2xl" />
         </div>
       </div>
     );

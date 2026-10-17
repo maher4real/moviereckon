@@ -9,7 +9,7 @@ const MAX_OUTPUT = 256 * 1024;
 const resultSchema = z.object({ downloads: z.array(z.object({
   url: z.string().max(12_000), filename: z.string().max(1000), sizeBytes: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable(),
   contentType: z.string().max(100), checkedAt: z.iso.datetime(), expiresAt: z.iso.datetime().nullable(),
-})).max(2) });
+})).max(8) });
 
 function validate(raw: unknown, link: WatchSourceLink, title: string): ResolvedDownload[] {
   const { downloads } = resultSchema.parse(raw);

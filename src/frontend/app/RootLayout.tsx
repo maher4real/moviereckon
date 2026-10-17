@@ -2,7 +2,19 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import "@/index.css";
 
+// Resolves relative canonical and Open Graph URLs. Without APP_URL Next falls back to its default.
+function siteUrl(): URL | undefined {
+  const raw = process.env.APP_URL?.trim();
+  if (!raw) return undefined;
+  try {
+    return new URL(raw);
+  } catch {
+    return undefined;
+  }
+}
+
 export const metadata: Metadata = {
+  metadataBase: siteUrl(),
   applicationName: "MovieReckon",
   description: "Movie and TV recommendations tailored to your taste.",
   manifest: "/manifest.webmanifest",

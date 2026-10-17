@@ -15,17 +15,12 @@ export function PosterGridSkeleton({
   className,
 }: PosterGridSkeletonProps) {
   return (
-    <div
-      className={cn(
-        "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4",
-        className,
-      )}
-    >
+    <div className={cn("content-grid", className)} aria-hidden="true">
       {Array.from({ length: count }).map((_, index) => (
         <div key={`poster-skeleton-${index}`}>
-          <Skeleton className="aspect-[2/3] rounded-lg" />
-          <Skeleton className="mt-2 h-4 w-3/4" />
-          <Skeleton className="mt-1 h-3 w-1/2" />
+          <Skeleton className="aspect-[2/3] rounded-xl" />
+          <Skeleton className="mt-3 h-4 w-4/5" />
+          <Skeleton className="mt-1.5 h-3 w-1/3" />
         </div>
       ))}
     </div>
@@ -37,56 +32,43 @@ interface UpcomingTimelineSkeletonProps {
   sectionCount?: number;
 }
 
+/** Date strip plus day cards, matching the Upcoming page layout. */
 export function UpcomingTimelineSkeleton({
   dateChipCount = 14,
   sectionCount = 3,
 }: UpcomingTimelineSkeletonProps) {
   return (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-border/80 bg-card/45 px-4 py-3">
-        <Skeleton className="h-3 w-36" />
-        <Skeleton className="mt-2 h-7 w-60" />
-        <Skeleton className="mt-2 h-3 w-72" />
-      </div>
-
-      <div className="rounded-2xl border border-border/70 bg-card/35 overflow-hidden">
-        <div className="flex items-center justify-between gap-3 border-b border-border/70 bg-background/40 px-4 py-2.5">
-          <Skeleton className="h-3 w-36" />
-          <Skeleton className="hidden sm:block h-3 w-24" />
+    <div className="space-y-4" role="status" aria-busy="true">
+      <span className="sr-only">Loading release calendar</span>
+      <div className="surface-panel overflow-hidden" aria-hidden="true">
+        <div className="border-b border-border/70 bg-background/40 px-4 py-2.5">
+          <Skeleton className="h-3 w-56" />
         </div>
-        <div className="overflow-x-auto scrollbar-hide px-3 py-3">
+        <div className="overflow-hidden px-3 py-3">
           <div className="flex w-max items-stretch gap-2">
-            <Skeleton className="h-[74px] w-[108px] rounded-xl" />
+            <Skeleton className="h-[74px] w-[108px] rounded-lg" />
             {Array.from({ length: dateChipCount }).map((_, index) => (
-              <Skeleton
-                key={`upcoming-date-chip-skeleton-${index}`}
-                className="h-[74px] w-[98px] rounded-xl"
-              />
+              <Skeleton key={`upcoming-date-chip-skeleton-${index}`} className="h-[74px] w-[98px] rounded-lg" />
             ))}
           </div>
         </div>
       </div>
 
       {Array.from({ length: sectionCount }).map((_, sectionIndex) => (
-        <div
-          key={`upcoming-section-skeleton-${sectionIndex}`}
-          className="rounded-xl border border-border/70 bg-card/35 p-4"
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div>
+        <div key={`upcoming-section-skeleton-${sectionIndex}`} className="upcoming-day" aria-hidden="true">
+          <div className="upcoming-day-head">
+            <Skeleton className="h-[3.75rem] w-14 shrink-0 rounded-[0.875rem]" />
+            <div className="flex-1">
               <Skeleton className="h-5 w-40" />
               <Skeleton className="mt-2 h-3 w-24" />
             </div>
             <Skeleton className="h-6 w-20 rounded-full" />
           </div>
-          <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-6">
             {Array.from({ length: 5 }).map((_, itemIndex) => (
-              <div
-                key={`upcoming-poster-skeleton-${sectionIndex}-${itemIndex}`}
-              >
-                <Skeleton className="aspect-[2/3] rounded-lg" />
-                <Skeleton className="mt-2 h-4 w-3/4" />
-                <Skeleton className="mt-1 h-3 w-1/2" />
+              <div key={`upcoming-poster-skeleton-${sectionIndex}-${itemIndex}`}>
+                <Skeleton className="aspect-[2/3] rounded-xl" />
+                <Skeleton className="mt-3 h-4 w-4/5" />
               </div>
             ))}
           </div>
@@ -96,64 +78,15 @@ export function UpcomingTimelineSkeleton({
   );
 }
 
-interface AppPageSkeletonProps {
-  cardCount?: number;
-  showFilterRow?: boolean;
-  className?: string;
-}
-
-export function AppPageSkeleton({
-  cardCount = 12,
-  showFilterRow = true,
-  className,
-}: AppPageSkeletonProps) {
-  return (
-    <div className={cn("min-h-screen bg-background pb-20 md:pb-0", className)}>
-      <div className="border-b border-border/60 px-4 py-4">
-        <div className="mx-auto flex max-w-7xl items-center justify-between">
-          <Skeleton className="h-8 w-36" />
-          <div className="hidden md:flex items-center gap-3">
-            <Skeleton className="h-9 w-24" />
-            <Skeleton className="h-9 w-24" />
-            <Skeleton className="h-9 w-24" />
-          </div>
-        </div>
-      </div>
-
-      <main className="container mx-auto px-4 pt-20 pb-12">
-        <Skeleton className="h-9 w-52 mb-6" />
-        {showFilterRow && (
-          <div className="flex flex-wrap gap-3 mb-6">
-            <Skeleton className="h-10 w-36" />
-            <Skeleton className="h-10 w-32" />
-            <Skeleton className="h-10 w-28" />
-          </div>
-        )}
-        <PosterGridSkeleton count={cardCount} />
-      </main>
-    </div>
-  );
-}
-
 export function CenteredAppSkeleton() {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
       <LoadingPosterCarouselBackdrop rowCount={3} postersPerRow={8} />
 
-      <div className="relative z-10 flex items-center justify-center">
+      <div className="relative z-10 flex flex-col items-center justify-center gap-5" role="status">
         <BrandLogo size="xl" animated />
-      </div>
-    </div>
-  );
-}
-
-export function AuthPageSkeleton() {
-  return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      <LoadingPosterCarouselBackdrop rowCount={3} postersPerRow={8} />
-
-      <div className="relative z-10 flex flex-col items-center justify-center">
-        <BrandLogo size="xl" animated />
+        <div className="skeleton-splash-bar" aria-hidden="true" />
+        <span className="sr-only">Loading MovieReckon</span>
       </div>
     </div>
   );

@@ -58,7 +58,7 @@ export default function FetchWatchLinksButton({ contentId, contentType, title, s
   ];
   const statusMessage = result?.status === "busy" ? "Another import is running. Please try again shortly." :
     result?.status === "partial" ? "Some sources could not be refreshed. Try again or use a source page below." :
-      result?.status === "not_found" ? "No matching source was found in recent releases. Try its HDHub page URL below." :
+      result?.status === "not_found" ? "No matching source was found in the available catalog. Try its HDHub page URL below." :
         result ? `${links.length} ${links.length === 1 ? "link" : "links"} available for this title.` : "";
 
   return <div className="min-w-0 space-y-3">

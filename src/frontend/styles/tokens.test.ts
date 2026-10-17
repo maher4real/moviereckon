@@ -1,8 +1,16 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const css = readFileSync(resolve(__dirname, "index.css"), "utf8");
+// Tokens live in index.css; component rules are split across components/*.css.
+const componentsDir = resolve(__dirname, "components");
+const css = [
+  readFileSync(resolve(__dirname, "index.css"), "utf8"),
+  ...readdirSync(componentsDir)
+    .filter((name) => name.endsWith(".css"))
+    .sort()
+    .map((name) => readFileSync(resolve(componentsDir, name), "utf8")),
+].join("\n");
 
 function block(selector: string): string {
   const start = css.indexOf(`${selector} {`);

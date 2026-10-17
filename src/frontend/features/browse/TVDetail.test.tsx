@@ -117,7 +117,7 @@ const tvShow = {
 };
 
 describe("TVDetail", () => {
-  it("puts players on the matching episode cards and changes season packs with the selected season", async () => {
+  it("opens only the matching episode and resets popup scope after changing seasons", async () => {
     const query = mocks.useQuery.getMockImplementation()!;
     mocks.useQuery.mockImplementation((options) => {
       if (options.queryKey[0] === "tv") return { data: { ...tvShow, seasons: [tvShow.seasons[0],
@@ -135,22 +135,28 @@ describe("TVDetail", () => {
       return query(options);
     });
     render(<TVDetail />);
-    const first = await screen.findByLabelText("Links for season 1 episode 1");
-    expect(within(first).getByRole("link", { name: /Watch season 1 episode 1/ })).toHaveAttribute("href", "https://player.example/s1e1");
-    expect(within(screen.getByLabelText("Links for season 1 episode 2")).queryByRole("link")).not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Season 1 links" })).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: "Fetch links" })).toBeInTheDocument();
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Season 2" }));
     expect(screen.queryByLabelText("Links for season 1 episode 1")).not.toBeInTheDocument();
-    expect(within(await screen.findByLabelText("Links for season 2 episode 1")).getByRole("link")).toHaveAttribute("href", "https://player.example/s2e1");
-    expect(await screen.findByRole("region", { name: "Season 2 links" })).toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "Season 1 links" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Watch episode 1" }));
+    const popup = await screen.findByRole("dialog");
+    expect(await within(popup).findByLabelText("Season")).toHaveValue("1");
+    expect(within(popup).getByLabelText("Episode")).toHaveValue("1");
+    expect(within(popup).getByRole("heading", { name: /Other provider pages/ })).toBeInTheDocument();
+    expect(within(popup).getByRole("link", { name: /Open external page/ })).toHaveAttribute("href", "https://player.example/s1e1");
+    expect(within(popup).queryByRole("link", { name: /season pack/ })).not.toBeInTheDocument();
+    fireEvent.click(within(popup).getByRole("button", { name: "Close" }));
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Season 2" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Watch episode 1" }));
+    const second = await screen.findByRole("dialog");
+    expect(await within(second).findByLabelText("Season")).toHaveValue("2");
+    expect(within(second).getByRole("heading", { name: /Other provider pages/ })).toBeInTheDocument();
+    expect(within(second).getByRole("link", { name: /Open external page/ })).toHaveAttribute("href", "https://player.example/s2e1");
   });
 
-  it("shows the per-series Fetch links action for admins", async () => {
+  it("shows the per-series popup search for admins", async () => {
     mocks.useAuth.mockReturnValue({ user: { id: "admin", role: "admin" } });
     render(<TVDetail />);
-    expect(await screen.findByRole("button", { name: "Fetch links" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Watch series" }));
+    expect(await screen.findByRole("button", { name: "Search again" })).toBeInTheDocument();
   });
 
   beforeEach(() => {

@@ -22,22 +22,34 @@ export function isDirectFileLink(value: string): boolean {
 }
 
 export function isResolvablePlayer(link: WatchSourceLink): boolean {
+  const url = mediaUrl(link.url);
+  if (!url || link.kind !== "watch" || url.search || !["movie", "episode"].includes(link.scope)) return false;
+  if (url.origin === "https://hubstream.art") return url.pathname === "/" && /^#[a-zA-Z0-9]{6,32}$/.test(url.hash);
+  return !url.hash && (
+    (link.scope === "movie" && url.origin === "https://play4u.org" && /^\/tt\d+\/?$/.test(url.pathname)) ||
+    (url.origin === "https://hdstream4u.com" && /^\/file\/[a-z0-9]{12}\/?$/.test(url.pathname))
+  );
+}
+
+/** Only this provider's literal ID entry is a supported redirect source. */
+export function isGreenMotorsUrl(value: string): boolean {
+  const url = mediaUrl(value);
+  if (!url || !["https://greenmotors.club", "https://greenmotors.cc"].includes(url.origin) || url.pathname !== "/" || url.hash ||
+      !/^\?id=[^&]+$/.test(url.search)) return false;
   try {
-    const url = new URL(link.url);
-    return link.kind === "watch" && link.scope === "movie" && url.origin === "https://play4u.org" &&
-      !url.username && !url.password && !url.search && !url.hash && /^\/tt\d+\/?$/.test(url.pathname);
+    const id = decodeURIComponent(url.search.slice(4));
+    return id.length >= 8 && id.length <= 8192 && /^[A-Za-z0-9+/_=-]+$/.test(id);
   } catch { return false; }
 }
 
 export function isResolvableDownload(link: WatchSourceLink): boolean {
-  try {
-    const url = mediaUrl(link.url);
-    return !!url && link.kind === "download" && ["movie", "episode", "season"].includes(link.scope) &&
-      !url.search && !url.hash && (
-        (url.origin === "https://hubdrive.pics" && /^\/file\/\d+\/?$/.test(url.pathname)) ||
-        (["https://hubcdn.club", "https://hubcdn.wiki"].includes(url.origin) && /^\/file\/[a-zA-Z0-9]+\/?$/.test(url.pathname))
-      );
-  } catch { return false; }
+  const url = mediaUrl(link.url);
+  return !!url && link.kind === "download" && ["movie", "episode", "season"].includes(link.scope) &&
+    (isGreenMotorsUrl(link.url) || (!url.search && !url.hash && (
+      (url.origin === "https://hubcloud.ist" && /^\/drive\/[a-z0-9]+\/?$/.test(url.pathname)) ||
+      (url.origin === "https://hubdrive.pics" && /^\/file\/\d+\/?$/.test(url.pathname)) ||
+      (["https://hubcdn.club", "https://hubcdn.wiki"].includes(url.origin) && /^\/file\/[a-zA-Z0-9]+\/?$/.test(url.pathname))
+    )));
 }
 
 /** A destination published on multiple source pages only needs one option. */

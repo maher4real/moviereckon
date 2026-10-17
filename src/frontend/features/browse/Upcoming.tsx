@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useRef, useState, memo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { motion } from "motion/react";
-import { CalendarDays, Film, Play, Star, Tv } from "lucide-react";
+import { CalendarDays, Film, Tv } from "lucide-react";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import {
   discoverMovies,
@@ -13,22 +12,19 @@ import {
   Movie,
   TVShow,
   Genre,
-  getPosterUrl,
-  getLanguageBadgeClass,
   DiscoverFilters,
 } from "@/shared/lib/tmdb";
 import Header from "@/frontend/components/Header";
 import Footer from "@/frontend/components/Footer";
 import {
-  AppPageSkeleton,
   UpcomingTimelineSkeleton,
   InlineLoadMoreSkeleton,
 } from "@/frontend/components/AppSkeletons";
-import MediaImage from "@/frontend/components/MediaImage";
 import { Button } from "@/frontend/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/frontend/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/frontend/components/ui/card";
+import { BrowseFilters, BrowseHeader, BrowsePosterCard, type ActiveFilter, type BrowseCategory, type BrowseSelect } from "@/frontend/components/browse/BrowseLayout";
 import { cn, formatLocalDate, isAnimeLike } from "@/shared/lib/utils";
+import { getNextTmdbPage, useCanonicalSearchParams, useLoadMoreOnScroll } from "@/frontend/hooks/useBrowseFeed";
+import { BOLLYWOOD_LANGUAGE_OPTIONS, SERIES_LANGUAGE_OPTIONS } from "@/shared/lib/catalogue";
 import {
   BOLLYWOOD_LANGUAGE_LIST,
   parseUpcomingFilterState,
@@ -56,26 +52,7 @@ const MOVIE_SECTION_OPTIONS: { value: MovieSectionFilter; label: string }[] = [
   { value: "hollywood", label: "Hollywood" },
 ];
 
-const LANGUAGE_OPTIONS = [
-  { value: "all", label: "All Languages" },
-  { value: "en", label: "English" },
-  { value: "hi", label: "Hindi" },
-  { value: "ko", label: "Korean" },
-  { value: "ja", label: "Japanese" },
-  { value: "ta", label: "Tamil" },
-  { value: "te", label: "Telugu" },
-  { value: "es", label: "Spanish" },
-  { value: "fr", label: "French" },
-];
-
-const BOLLYWOOD_LANGUAGE_OPTIONS = [
-  { value: "all", label: "All Languages" },
-  { value: "hi", label: "Hindi" },
-  { value: "gu", label: "Gujarati" },
-  { value: "ta", label: "Tamil" },
-  { value: "te", label: "Telugu" },
-  { value: "kn", label: "Kannada" },
-];
+const LANGUAGE_OPTIONS = SERIES_LANGUAGE_OPTIONS;
 const BOLLYWOOD_LANGUAGE_CODES = new Set<string>(BOLLYWOOD_LANGUAGE_LIST);
 const CALENDAR_TIMELINE_DAYS = 180;
 
@@ -112,63 +89,11 @@ const getRelativeReleaseLabel = (date: Date) => {
   return `${Math.abs(diffDays)} days ago`;
 };
 
-const PosterCard = memo(({ item, onClick }: { item: Movie | TVShow; onClick: () => void }) => {
-  const isTV = isTVShow(item);
-  const title = isTV ? item.name : item.title;
-  const year = getReleaseDate(item)?.split("-")[0] || "";
-
-  return (
-    <motion.div
-      onClick={onClick}
-      whileHover={{ y: -6 }}
-      whileTap={{ scale: 0.985 }}
-      transition={{ type: "spring", stiffness: 360, damping: 30 }}
-      className="cursor-pointer group"
-    >
-      <div className="relative aspect-[2/3] rounded-lg overflow-hidden poster-card">
-        <MediaImage
-          src={getPosterUrl(item.poster_path, "medium")}
-          alt={title}
-          className="w-full h-full object-cover"
-          loading="lazy"
-          fallbackSrc="/fallbacks/poster.svg"
-        />
-        <div className="absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <motion.div
-            className="poster-play-button"
-            initial={false}
-            whileHover={{ scale: 1.08 }}
-            transition={{ type: "spring", stiffness: 420, damping: 24 }}
-          >
-            <Play className="h-5 w-5 fill-current" />
-          </motion.div>
-        </div>
-
-        {item.vote_average > 0 && (
-          <div className="rating-badge absolute top-2 right-2">
-            <Star className="h-3 w-3 fill-current" />
-            {item.vote_average.toFixed(1)}
-          </div>
-        )}
-
-        <div className={cn("language-badge absolute top-2 left-2", getLanguageBadgeClass(item.original_language))}>
-          {item.original_language.toUpperCase()}
-        </div>
-
-        <div className="absolute bottom-2 left-2 px-2 py-1 rounded bg-black/70 text-[10px] font-semibold uppercase tracking-wide">
-          {isTV ? "Series" : "Movie"}
-        </div>
-      </div>
-
-      <h3 className="mt-2 font-medium text-sm line-clamp-1 group-hover:text-primary transition-colors">
-        {title}
-      </h3>
-      <p className="text-xs text-muted-foreground">{year}</p>
-    </motion.div>
-  );
-});
-
-PosterCard.displayName = "PosterCard";
+const UPCOMING_SECTIONS: BrowseCategory<UpcomingSection>[] = [
+  { value: "all", label: "Everything", Icon: CalendarDays },
+  { value: "movies", label: "Movies", Icon: Film },
+  { value: "series", label: "Series", Icon: Tv },
+];
 
 export default function Upcoming() {
   const { user } = useAuth();
@@ -197,10 +122,7 @@ export default function Upcoming() {
     [filterState, searchParamString],
   );
 
-  useEffect(() => {
-    if (canonicalSearchParamString === searchParamString) return;
-    setSearchParams(new URLSearchParams(canonicalSearchParamString), { replace: true });
-  }, [canonicalSearchParamString, searchParamString, setSearchParams]);
+  useCanonicalSearchParams(canonicalSearchParamString, searchParamString, setSearchParams);
 
   const updateFilterState = (changes: Partial<UpcomingFilterState>) => {
     const nextState = normalizeUpcomingFilterState({ ...filterState, ...changes });
@@ -373,10 +295,7 @@ export default function Upcoming() {
         total_results: (upcomingMovies.total_results || 0) + (upcomingSeries.total_results || 0),
       };
     },
-    getNextPageParam: (lastPage) => {
-      if (!lastPage?.page || !lastPage?.total_pages) return undefined;
-      return lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined;
-    },
+    getNextPageParam: getNextTmdbPage,
     staleTime: 1000 * 60 * 5,
     enabled: !!user,
   });
@@ -455,22 +374,13 @@ export default function Upcoming() {
     selectedFilterDate,
   ]);
 
-  useEffect(() => {
-    const node = calendarLoadMoreRef.current;
-    if (!node || !hasNextPage) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting && !isFetchingNextPage && !upcomingError) {
-          fetchNextPage();
-        }
-      },
-      { rootMargin: "500px 0px" },
-    );
-
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage, upcomingError, filteredUpcoming.length]);
+  useLoadMoreOnScroll({
+    sentinel: calendarLoadMoreRef,
+    enabled: Boolean(hasNextPage) && !isFetchingNextPage && !upcomingError,
+    onLoadMore: fetchNextPage,
+    rootMargin: "500px 0px",
+    revision: filteredUpcoming.length,
+  });
 
   const releaseDateKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -570,6 +480,45 @@ export default function Upcoming() {
     selectedFilterDate,
   ]);
 
+  const upcomingSelects: BrowseSelect[] = section === "movies" ? [
+    {
+      id: "market", label: "Market", value: movieSectionFilter, options: MOVIE_SECTION_OPTIONS,
+      onChange: (value) => updateFilterState({ movieSectionFilter: value as MovieSectionFilter }),
+    },
+    ...(movieSectionFilter === "bollywood" ? [{
+      id: "language", label: "Language", value: bollywoodLanguage, options: BOLLYWOOD_LANGUAGE_OPTIONS,
+      onChange: (value: string) => updateFilterState({ bollywoodLanguage: value }),
+    }] : []),
+    {
+      id: "genre", label: "Genre", value: movieGenre || "all",
+      options: [{ value: "all", label: "All genres" }, ...(movieGenres || []).map((genre: Genre) => ({ value: String(genre.id), label: genre.name }))],
+      onChange: (value) => updateFilterState({ movieGenre: value === "all" ? "" : value }),
+    },
+  ] : section === "series" ? [
+    {
+      id: "region", label: "Watch region", value: watchRegion, options: UPCOMING_WATCH_REGION_OPTIONS,
+      onChange: (value) => updateFilterState({ watchRegion: value as UpcomingFilterState["watchRegion"] }),
+    },
+    { id: "platform", label: "Platform", value: seriesOtt, options: providerOptions, onChange: (value) => updateFilterState({ seriesOtt: value }) },
+    { id: "language", label: "Language", value: seriesLanguage, options: LANGUAGE_OPTIONS, onChange: (value) => updateFilterState({ seriesLanguage: value }) },
+    {
+      id: "genre", label: "Genre", value: seriesGenre || "all",
+      options: [{ value: "all", label: "All genres" }, ...(tvGenres || []).map((genre: Genre) => ({ value: String(genre.id), label: genre.name }))],
+      onChange: (value) => updateFilterState({ seriesGenre: value === "all" ? "" : value }),
+    },
+  ] : [];
+
+  const labelFor = (options: ReadonlyArray<{ value: string; label: string }>, value: string) => options.find((option) => option.value === value)?.label;
+  const upcomingActiveFilters: ActiveFilter[] = [
+    ...(section === "movies" && movieSectionFilter !== "all" ? [{ key: "market", label: labelFor(MOVIE_SECTION_OPTIONS, movieSectionFilter) || movieSectionFilter, onClear: () => updateFilterState({ movieSectionFilter: "all" }) }] : []),
+    ...(section === "movies" && movieSectionFilter === "bollywood" && bollywoodLanguage !== "all" ? [{ key: "blang", label: labelFor(BOLLYWOOD_LANGUAGE_OPTIONS, bollywoodLanguage) || bollywoodLanguage, onClear: () => updateFilterState({ bollywoodLanguage: "all" }) }] : []),
+    ...(section === "movies" && movieGenre ? [{ key: "mgenre", label: movieGenres?.find((genre: Genre) => String(genre.id) === movieGenre)?.name || "Genre", onClear: () => updateFilterState({ movieGenre: "" }) }] : []),
+    ...(section === "series" && seriesOtt !== "all" ? [{ key: "ott", label: labelFor(providerOptions, seriesOtt) || seriesOtt, onClear: () => updateFilterState({ seriesOtt: "all" }) }] : []),
+    ...(section === "series" && seriesLanguage !== "all" ? [{ key: "slang", label: labelFor(LANGUAGE_OPTIONS, seriesLanguage) || seriesLanguage, onClear: () => updateFilterState({ seriesLanguage: "all" }) }] : []),
+    ...(section === "series" && seriesGenre ? [{ key: "sgenre", label: tvGenres?.find((genre: Genre) => String(genre.id) === seriesGenre)?.name || "Genre", onClear: () => updateFilterState({ seriesGenre: "" }) }] : []),
+    ...(selectedFilterDate !== "all" ? [{ key: "date", label: selectedReleaseDateLabel, onClear: () => updateFilterState({ selectedFilterDate: "all" }) }] : []),
+  ];
+
   const handleItemClick = (item: Movie | TVShow) => {
     const isTV = isTVShow(item);
     const fromPath = `${location.pathname}${location.search}${location.hash}`;
@@ -582,180 +531,28 @@ export default function Upcoming() {
     <div className="app-page flex flex-col pb-20 md:pb-0">
       <Header />
 
-      <main className="page-main">
+      <main className="flex-1 pb-12">
+        <BrowseHeader
+          kicker="Release calendar"
+          title="Upcoming"
+          description="Every movie and series release in the next six months, day by day. Filter by section, language, platform and genre."
+          icon={CalendarDays}
+          backdropPath={filteredUpcoming.find((item) => item.backdrop_path)?.backdrop_path}
+          resultLabel={!isLoading && filteredUpcoming.length ? `${filteredUpcoming.length} titles across ${activeReleaseDateGroups.length} dates` : null}
+        />
         <div className="container mx-auto px-4">
-          <div className="page-heading mb-2">
-            <div className="page-heading-icon">
-              <CalendarDays className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="page-kicker">Release Calendar</p>
-              <h1 className="page-title">Upcoming</h1>
-            </div>
-          </div>
-          <p className="text-muted-foreground mb-6">
-            Explore upcoming movies and series by section-specific filters.
-          </p>
-
-          <div className="filter-panel">
-            <div className="filter-row">
-              {[
-                { value: "all", label: "All", Icon: CalendarDays },
-                { value: "movies", label: "Movies", Icon: Film },
-                { value: "series", label: "Series", Icon: Tv },
-              ].map((entry) => {
-                const active = section === entry.value;
-                return (
-                  <Button
-                    key={entry.value}
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => updateFilterState({ section: entry.value as UpcomingSection })}
-                    className={cn("filter-chip", active && "filter-chip-active")}
-                  >
-                    <entry.Icon className="h-4 w-4" />
-                    {entry.label}
-                  </Button>
-                );
-              })}
-            </div>
-          </div>
-
-          {section === "movies" && (
-            <div className="filter-panel space-y-3">
-              <div className="filter-row">
-                {MOVIE_SECTION_OPTIONS.map((option) => {
-                  const active = movieSectionFilter === option.value;
-                  return (
-                    <Button
-                      key={option.value}
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => updateFilterState({ movieSectionFilter: option.value })}
-                      className={cn("filter-chip", active && "filter-chip-active")}
-                    >
-                      {option.label}
-                    </Button>
-                  );
-                })}
-              </div>
-
-              <div className="flex gap-3 flex-wrap">
-                {movieSectionFilter === "bollywood" && (
-                  <Select
-                    value={bollywoodLanguage}
-                    onValueChange={(value) => updateFilterState({ bollywoodLanguage: value })}
-                  >
-                    <SelectTrigger className="select-surface w-[170px]">
-                      <SelectValue placeholder="Language" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover border-border z-50">
-                      {BOLLYWOOD_LANGUAGE_OPTIONS.map((language) => (
-                        <SelectItem key={language.value} value={language.value}>
-                          {language.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-
-                <Select
-                  value={movieGenre}
-                  onValueChange={(value) => updateFilterState({ movieGenre: value === "all" ? "" : value })}
-                >
-                  <SelectTrigger className="select-surface w-[170px]">
-                    <SelectValue placeholder="Movie Genre" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border-border z-50">
-                    <SelectItem value="all">All Genres</SelectItem>
-                    {movieGenres?.map((genre: Genre) => (
-                      <SelectItem key={genre.id} value={String(genre.id)}>
-                        {genre.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-
-          {section === "series" && (
-            <div className="filter-panel flex flex-wrap gap-3">
-              <Select
-                value={watchRegion}
-                onValueChange={(value) =>
-                  updateFilterState({ watchRegion: value as UpcomingFilterState["watchRegion"] })
-                }
-              >
-                <SelectTrigger aria-label="Watch region" className="select-surface w-[170px]">
-                  <SelectValue placeholder="Watch Region" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover border-border z-50">
-                  {UPCOMING_WATCH_REGION_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select
-                value={seriesOtt}
-                onValueChange={(value) => updateFilterState({ seriesOtt: value })}
-              >
-                <SelectTrigger className="select-surface w-[170px]">
-                  <SelectValue placeholder="OTT Platform" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover border-border z-50">
-                  {providerOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select
-                value={seriesLanguage}
-                onValueChange={(value) => updateFilterState({ seriesLanguage: value })}
-              >
-                <SelectTrigger className="select-surface w-[170px]">
-                  <SelectValue placeholder="Language" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover border-border z-50">
-                  {LANGUAGE_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select
-                value={seriesGenre}
-                onValueChange={(value) => updateFilterState({ seriesGenre: value === "all" ? "" : value })}
-              >
-                <SelectTrigger className="select-surface w-[170px]">
-                  <SelectValue placeholder="Series Genre" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover border-border z-50">
-                  <SelectItem value="all">All Genres</SelectItem>
-                  {tvGenres?.map((genre: Genre) => (
-                    <SelectItem key={genre.id} value={String(genre.id)}>
-                      {genre.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {section === "series" && (
-            <p className="mt-3 text-xs text-muted-foreground">
-              Platform choices use TMDB&apos;s catalog for the selected watch region when available, with a curated
-              supported fallback. Availability is title-specific and independent of original language.
-            </p>
-          )}
+          <BrowseFilters
+            categories={UPCOMING_SECTIONS}
+            activeCategory={section}
+            onCategory={(value) => updateFilterState({ section: value })}
+            genres={section === "movies" ? movieGenres : section === "series" ? tvGenres : undefined}
+            selectedGenre={section === "movies" ? movieGenre : seriesGenre}
+            onGenre={(value) => updateFilterState(section === "movies" ? { movieGenre: value } : { seriesGenre: value })}
+            selects={upcomingSelects}
+            activeFilters={upcomingActiveFilters}
+            onReset={() => updateFilterState({ movieSectionFilter: "all", bollywoodLanguage: "all", movieGenre: "", seriesGenre: "", seriesOtt: "all", seriesLanguage: "all", selectedFilterDate: "all" })}
+            note={section === "series" ? "Platform availability comes from TMDB for the selected watch region and varies by title." : section === "all" ? "Pick Movies or Series for genre, language and platform filters." : undefined}
+          />
 
           {isLoading ? (
             <UpcomingTimelineSkeleton />
@@ -773,20 +570,11 @@ export default function Upcoming() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="surface-panel px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/90">
-                  Date-wise Schedule
-                </p>
-                <h3 className="mt-1 text-lg font-semibold text-foreground">{selectedReleaseDateLabel}</h3>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {activeReleaseDateGroups.length} release dates and {filteredUpcoming.length} titles loaded.
-                </p>
-              </div>
-
-              <div className="surface-panel overflow-hidden">
+              <div className="upcoming-date-strip surface-panel overflow-hidden">
                 <div className="flex items-center justify-between gap-3 border-b border-border/70 bg-background/40 px-4 py-2.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground/85">
-                    Full Calendar Timeline
+                  <p className="text-xs font-semibold text-foreground/90">
+                    {selectedReleaseDateLabel}
+                    <span className="ml-2 font-normal text-muted-foreground">{activeReleaseDateGroups.length} dates · {filteredUpcoming.length} titles</span>
                   </p>
                   <p className="hidden sm:flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                     <span className="h-1.5 w-1.5 rounded-full bg-primary" />
@@ -863,37 +651,32 @@ export default function Upcoming() {
                     <div
                       key={group.dateKey}
                     >
-                      <Card
-                        className={cn(
-                          "surface-panel bg-card/45",
-                          isSelected && "border-primary/60 ring-1 ring-primary/25",
-                        )}
-                      >
-                        <CardHeader className="pb-2">
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <div>
-                              <CardTitle className="text-base">{formatDateHeading(group.date)}</CardTitle>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {getRelativeReleaseLabel(group.date)}
-                              </p>
-                            </div>
-                            <span className="rounded-full border border-border/70 bg-background/75 px-2.5 py-1 text-xs font-medium text-foreground">
-                              {group.items.length} {group.items.length === 1 ? "release" : "releases"}
-                            </span>
+                      <section className={cn("upcoming-day", isSelected && "upcoming-day-selected")} aria-label={formatDateHeading(group.date)}>
+                        <header className="upcoming-day-head">
+                          <div className="upcoming-day-badge" aria-hidden="true">
+                            <span className="text-[10px] font-bold uppercase tracking-wider">{group.date.toLocaleDateString("en-US", { month: "short" })}</span>
+                            <span className="text-2xl font-black leading-none">{group.date.getDate()}</span>
                           </div>
-                        </CardHeader>
-                        <CardContent className="pt-0">
-                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-3">
-                            {group.items.map((item) => (
-                              <PosterCard
-                                key={`${item.id}-${isTVShow(item) ? "tv" : "movie"}-${group.dateKey}`}
-                                item={item}
-                                onClick={() => handleItemClick(item)}
-                              />
-                            ))}
+                          <div className="min-w-0 flex-1">
+                            <h2 className="text-base font-bold">{formatDateHeading(group.date)}</h2>
+                            <p className="text-xs text-muted-foreground">{getRelativeReleaseLabel(group.date)}</p>
                           </div>
-                        </CardContent>
-                      </Card>
+                          <span className="pref-count">{group.items.length} {group.items.length === 1 ? "release" : "releases"}</span>
+                        </header>
+                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-6">
+                          {group.items.map((item) => (
+                            <BrowsePosterCard
+                              key={`${item.id}-${isTVShow(item) ? "tv" : "movie"}-${group.dateKey}`}
+                              title={isTVShow(item) ? item.name : item.title}
+                              posterPath={item.poster_path}
+                              rating={item.vote_average}
+                              language={item.original_language}
+                              tag={isTVShow(item) ? "Series" : "Movie"}
+                              onClick={() => handleItemClick(item)}
+                            />
+                          ))}
+                        </div>
+                      </section>
                     </div>
                   );
                 })
@@ -914,7 +697,7 @@ export default function Upcoming() {
                     variant="outline"
                     onClick={() => setCalendarGroupLimit((current) => current + 8)}
                   >
-                    Show More Dates
+                    Show more dates
                   </Button>
                 </div>
               )}
@@ -926,7 +709,7 @@ export default function Upcoming() {
                     onClick={() => fetchNextPage()}
                     disabled={isFetchingNextPage}
                   >
-                    {isFetchingNextPage ? "Loading..." : "Load More From API"}
+                    {isFetchingNextPage ? "Loading…" : "Load more releases"}
                   </Button>
                 </div>
               )}

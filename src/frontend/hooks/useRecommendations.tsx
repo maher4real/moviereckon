@@ -16,11 +16,12 @@ export interface RecommendationHookOptions {
   exploration?: "familiar" | "adventurous";
 }
 
-// Roll out the durable feed explicitly. Production and unset environments
-// keep the legacy endpoint; setting NEXT_PUBLIC_RECOMMENDATIONS_V2=true opts
-// into v2. There is deliberately no silent v2-to-legacy fallback because
-// doing so would drop strict filters and invalidate cursor semantics.
-export const RECOMMENDATIONS_V2_ENABLED = process.env.NEXT_PUBLIC_RECOMMENDATIONS_V2 === "true";
+// The durable v2 feed is the default. The legacy endpoint is kept only as a
+// rollback kill switch: building with NEXT_PUBLIC_RECOMMENDATIONS_LEGACY=true
+// restores it. There is deliberately no silent v2-to-legacy fallback at runtime
+// because that would drop strict filters and invalidate cursor semantics.
+// Remove the legacy handler once v2 has run in production without incident.
+export const RECOMMENDATIONS_V2_ENABLED = process.env.NEXT_PUBLIC_RECOMMENDATIONS_LEGACY !== "true";
 
 interface RecommendationResult {
   items: (Movie | TVShow)[];

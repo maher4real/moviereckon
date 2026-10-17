@@ -8,6 +8,9 @@ export interface WatchSourceIdentity {
 export interface DirectMediaSource {
   url: string;
   format: "mp4" | "webm" | "hls";
+  referrerPolicy?: "no-referrer";
+  // Validated provider playlist metadata; media still loads from its public CDN.
+  hlsPlaylist?: string;
   label: string;
 }
 
@@ -28,6 +31,7 @@ export interface WatchSourceLink {
   kind: "download" | "watch" | "collection";
   // A player page is never presented as a verified direct media stream.
   verification: "unverified";
+  releaseYear?: number | null;
   quality: string | null;
   resolution: number | null;
   codec: "H.264" | "HEVC" | "AV1" | null;
@@ -60,7 +64,7 @@ export interface ContentWatchSources {
   contentId: number;
   contentType: SourceMediaType;
   sources: Array<{
-    provider: "hdhub";
+    provider: "hdhub" | "4khdhub";
     sourcePage: string;
     title: string;
     checkedAt: string | null;
@@ -74,3 +78,9 @@ export interface FetchContentSourcesResult {
   importedPages: number;
   errors: number;
 }
+
+export type SourceSearchEvent =
+  | { type: "content"; content: ContentWatchSources }
+  | { type: "progress"; message: string }
+  | { type: "complete"; result: FetchContentSourcesResult }
+  | { type: "error"; message: string };

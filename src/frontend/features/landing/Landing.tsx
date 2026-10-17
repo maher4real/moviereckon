@@ -19,14 +19,13 @@ import {
   Search,
   SlidersHorizontal,
   Sparkles,
-  Star,
   Tv,
 } from "lucide-react";
 import { useReducedMotion } from "motion/react";
 import { Link } from "react-router-dom";
 
 import BrandLogo from "@/frontend/components/BrandLogo";
-import MediaImage from "@/frontend/components/MediaImage";
+import PosterShowcase, { type ShowcaseSlide } from "@/frontend/components/PosterShowcase";
 import { Button } from "@/frontend/components/ui/button";
 import { Separator } from "@/frontend/components/ui/separator";
 import { useAuth } from "@/frontend/hooks/useAuth";
@@ -42,15 +41,7 @@ import { cn } from "@/shared/lib/utils";
 // Every field except id/src/title/eyebrow comes from TMDB and is only present
 // for live data. The built-in fallback posters never carry a rating or blurb,
 // so the page never shows details it cannot back up.
-type LandingPoster = {
-  id: string;
-  src: string;
-  title: string;
-  eyebrow: string;
-  rating?: number;
-  overview?: string;
-  year?: string;
-};
+type LandingPoster = ShowcaseSlide;
 
 const pillars = [
   {
@@ -137,41 +128,6 @@ const features = [
   },
 ] as const;
 
-const heroPositions = [
-  "left-[1%] top-[25%] -rotate-[10deg]",
-  "left-[18%] top-[8%] -rotate-[4deg]",
-  "left-1/2 top-[15%] z-10 -translate-x-1/2 rotate-[1.5deg]",
-  "right-[17%] top-[7%] rotate-[6deg]",
-  "right-[0%] top-[27%] rotate-[11deg]",
-] as const;
-
-function PosterFrame({ poster, featured = false }: { poster: LandingPoster; featured?: boolean }) {
-  return (
-    <figure
-      className={cn(
-        "group/poster relative aspect-[2/3] shrink-0 overflow-hidden border border-white/12 bg-card shadow-[0_30px_70px_rgba(0,0,0,0.55)] transition-[border-color,box-shadow] duration-500 hover:border-primary/45 hover:shadow-[0_34px_90px_hsl(var(--primary)/0.16)]",
-        featured ? "w-38 rounded-[1.35rem] sm:w-48 xl:w-56" : "w-28 rounded-2xl sm:w-36 xl:w-42",
-      )}
-    >
-      <MediaImage
-        src={poster.src}
-        alt={`${poster.title} poster`}
-        className="size-full object-cover saturate-[0.82] transition-[filter,transform] duration-700 ease-out group-hover/poster:scale-[1.035] group-hover/poster:saturate-110"
-        width={featured ? 342 : 185}
-        height={featured ? 513 : 278}
-        fallbackSrc="/fallbacks/poster.svg"
-        priority={featured}
-        fadeIn
-      />
-      <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(120deg,rgba(255,255,255,0.12),transparent_25%,transparent_70%,rgba(225,29,72,0.08))] opacity-70 transition-opacity group-hover/poster:opacity-100" />
-      <figcaption className="absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-linear-to-t from-black via-black/82 to-transparent px-3 pt-16 pb-3.5 sm:px-4 sm:pb-4">
-        <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-primary sm:text-[10px]">{poster.eyebrow}</span>
-        <span className="truncate text-xs font-semibold text-white sm:text-sm">{poster.title}</span>
-      </figcaption>
-    </figure>
-  );
-}
-
 export default function Landing() {
   const { user } = useAuth();
   const reduceMotion = useReducedMotion();
@@ -255,8 +211,7 @@ export default function Landing() {
 
   const destination = user ? "/home" : "/auth";
   const primaryLabel = user ? "Open MovieReckon" : "Get started";
-  const heroPosters = posters.slice(0, 5);
-  const spotlight = posters[2] ?? posters[0];
+  const heroPosters = posters.slice(0, 7);
 
   useEffect(() => {
     if (reduceMotion || !landingRef.current) return;
@@ -282,8 +237,7 @@ export default function Landing() {
         .fromTo("[data-hero='headline'] > span", { autoAlpha: 0, y: 48 }, { autoAlpha: 1, y: 0, duration: 0.7, stagger: 0.11 }, "-=0.2")
         .fromTo("[data-hero='copy']", { autoAlpha: 0, y: 24 }, { autoAlpha: 1, y: 0, duration: 0.55 }, "-=0.38")
         .fromTo("[data-hero='actions']", { autoAlpha: 0, y: 20 }, { autoAlpha: 1, y: 0, duration: 0.5 }, "-=0.3")
-        .fromTo("[data-parallax='poster']", { autoAlpha: 0, y: 46 }, { autoAlpha: 1, y: 0, duration: 0.7, stagger: 0.075 }, "-=0.52")
-        .fromTo("[data-parallax='spotlight']", { autoAlpha: 0, y: 24, scale: 0.97 }, { autoAlpha: 1, y: 0, scale: 1, duration: 0.55 }, "-=0.34");
+        .fromTo("[data-hero='showcase']", { autoAlpha: 0, y: 46, scale: 0.97 }, { autoAlpha: 1, y: 0, scale: 1, duration: 0.8 }, "-=0.52");
 
       gsap.to("[data-parallax='ambient']", {
         yPercent: 18,
@@ -291,12 +245,11 @@ export default function Landing() {
         scrollTrigger: { trigger: "[data-section='hero']", start: "top top", end: "bottom top", scrub: 1.2 },
       });
 
-      gsap.utils.toArray<HTMLElement>("[data-parallax='poster']").forEach((poster, index) => {
-        gsap.to(poster, {
-          yPercent: 8 + index * 5,
-          ease: "none",
-          scrollTrigger: { trigger: "[data-section='hero']", start: "top top", end: "bottom top", scrub: 0.9 + index * 0.12 },
-        });
+      // Parallax the showcase wrapper only; the slides own their transforms.
+      gsap.to("[data-hero='showcase']", {
+        yPercent: 10,
+        ease: "none",
+        scrollTrigger: { trigger: "[data-section='hero']", start: "top top", end: "bottom top", scrub: 1 },
       });
 
       gsap.utils.toArray<HTMLElement>("[data-reveal]").forEach((element) => {
@@ -346,7 +299,7 @@ export default function Landing() {
       </header>
 
       <main id="landing-main">
-        <section data-section="hero" className="relative flex min-h-[52rem] items-center overflow-hidden px-4 pb-20 pt-28 sm:min-h-[58rem] sm:px-6 sm:pt-32 lg:min-h-screen lg:px-8 lg:pb-12">
+        <section data-section="hero" className="relative flex min-h-svh items-center overflow-hidden px-4 pb-16 pt-28 sm:px-6 sm:pb-20 sm:pt-32 lg:min-h-screen lg:px-8 lg:pb-12">
           <div data-parallax="ambient" aria-hidden="true" className="absolute -inset-x-20 -top-28 h-[110%]">
             <div className="absolute left-[8%] top-[12%] size-[28rem] rounded-full bg-primary/18 blur-[120px]" />
             <div className="absolute right-[2%] top-[18%] size-[34rem] rounded-full bg-[#620414]/32 blur-[140px]" />
@@ -354,14 +307,14 @@ export default function Landing() {
           <div aria-hidden="true" className="landing-vignette absolute inset-0" />
           <div aria-hidden="true" className="landing-rule-grid absolute inset-0 opacity-40" />
 
-          <div className="relative mx-auto grid w-full max-w-7xl items-center gap-10 lg:grid-cols-[0.94fr_1.06fr] lg:gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+          <div className="relative mx-auto grid w-full max-w-7xl items-center gap-10 lg:grid-cols-[0.94fr_1.06fr] lg:gap-6 xl:grid-cols-[0.9fr_1.1fr]">
             <div className="relative z-20 flex max-w-3xl flex-col items-start gap-7 lg:pr-4">
               <div data-hero="eyebrow" className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.24em] text-white/60">
                 <span className="h-px w-8 bg-primary" />
                 Movie and TV recommendations
               </div>
 
-              <h1 data-hero="headline" className="max-w-4xl text-[clamp(3.65rem,8.5vw,8.4rem)] font-black leading-[0.79] tracking-[-0.072em]">
+              <h1 data-hero="headline" className="max-w-4xl text-[clamp(2.9rem,11vw,8.4rem)] lg:text-[clamp(4.5rem,7.4vw,8.4rem)] font-black leading-[0.79] tracking-[-0.072em]">
                 <span className="block">Stop scrolling.</span>
                 <span className="mt-[0.12em] block pb-[0.08em] text-primary drop-shadow-[0_16px_36px_hsl(var(--primary)/0.16)]">Start watching.</span>
               </h1>
@@ -386,36 +339,9 @@ export default function Landing() {
               </div>
             </div>
 
-            <div className="relative mx-auto h-[26rem] w-full max-w-2xl sm:h-[39rem] lg:h-[43rem]" aria-label="Trending movie and television posters">
-              <div aria-hidden="true" className="absolute left-1/2 top-1/2 h-3/4 w-3/4 -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary/15 bg-primary/8 blur-2xl" />
-              {heroPosters.map((poster, index) => (
-                <div key={poster.id} data-parallax="poster" className={cn("absolute will-change-transform", heroPositions[index] || heroPositions[0])}>
-                  <PosterFrame poster={poster} featured={index === 2} />
-                </div>
-              ))}
-
-              {spotlight && (spotlight.rating !== undefined || spotlight.overview) && (
-                <div data-parallax="spotlight" className="absolute bottom-1 left-1/2 z-30 w-[min(92%,25rem)] -translate-x-1/2 sm:bottom-5 sm:left-auto sm:right-0 sm:w-[23rem] sm:translate-x-0 lg:-right-3">
-                  <div className="landing-glass-card p-4 sm:p-5">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Trending this week</span>
-                      {spotlight.rating !== undefined && (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-[#f6c453]/25 bg-[#f6c453]/10 px-2 py-1 text-[10px] font-bold text-[#f6c453]">
-                          <Star className="size-3 fill-current" aria-hidden="true" />
-                          {spotlight.rating.toFixed(1)} on TMDB
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-3 text-lg font-bold tracking-tight text-white">
-                      {spotlight.title}
-                      {spotlight.year && <span className="ml-2 text-sm font-medium text-white/45">{spotlight.year}</span>}
-                    </p>
-                    {spotlight.overview && (
-                      <p className="mt-1.5 line-clamp-2 text-sm leading-6 text-white/56">{spotlight.overview}</p>
-                    )}
-                  </div>
-                </div>
-              )}
+            <div data-hero="showcase" className="relative mx-auto w-full max-w-2xl overflow-x-clip py-2 lg:overflow-visible">
+              <div aria-hidden="true" className="absolute left-1/2 top-[38%] h-2/3 w-3/4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/12 blur-3xl" />
+              <PosterShowcase slides={heroPosters} label="Trending movies and series" className="landing-showcase" />
             </div>
           </div>
         </section>

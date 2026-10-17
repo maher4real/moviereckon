@@ -15,6 +15,7 @@ function dependencies() {
     identity: vi.fn().mockResolvedValue({ title: "Weapons", originalTitle: "Weapons", imdbId: "tt26581740" }),
     lookup: vi.fn().mockResolvedValue(saved),
     repository: vi.fn().mockResolvedValue({}),
+    archive: vi.fn().mockResolvedValue({ urls: [], errors: 0 }),
     fetchDocument: vi.fn(async (url: string): Promise<SourceResponse> => ({ html: url === `${config.baseUrl}/` ?
       `<a href="${movieUrl}">Weapons</a><a href="${olderUrl}">Weapons</a>` :
       url === olderUrl ? html.replaceAll("tt26581740", "tt0000001") : html,
@@ -27,6 +28,22 @@ function dependencies() {
 beforeEach(() => vi.clearAllMocks());
 
 describe("fetch links for one title", () => {
+  it("emits all saved sources even if identity lookup fails before the saved read completes", async () => {
+    const deps = dependencies();
+    deps.identity.mockRejectedValue(new Error("TMDB unavailable"));
+    let finish!: (value: typeof saved) => void;
+    deps.lookup.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    const emit = vi.fn();
+    let settled = false;
+    const search = fetchContentSources(1078605, "movie", undefined, config, deps, emit).catch((error) => { settled = true; return error; });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    finish(saved);
+    expect(await search).toBeInstanceOf(Error);
+    expect(emit).toHaveBeenCalledWith({ type: "content", content: saved });
+    expect(deps.run).not.toHaveBeenCalled();
+  });
+
   it("imports only candidates matching the selected IMDb/TMDB identity and reuses fetched HTML", async () => {
     const deps = dependencies();
     const result = await fetchContentSources(1078605, "movie", undefined, config, deps);
@@ -37,6 +54,16 @@ describe("fetch links for one title", () => {
     expect(await importerDependencies.fetchDocument(movieUrl)).toMatchObject({ html, etag: '"v1"' });
     await expect(importerDependencies.fetchDocument(olderUrl)).rejects.toThrow("not validated");
     expect(deps.fetchDocument).toHaveBeenCalledTimes(3);
+  });
+
+  it("imports archived releases beyond the old twelve-candidate cap and reports incomplete discovery", async () => {
+    const deps = dependencies();
+    const urls = Array.from({ length: 15 }, (_, i) => `${config.baseUrl}/weapons-2025-release-${i}/`);
+    deps.archive.mockResolvedValue({ urls, errors: 1 });
+    deps.fetchDocument.mockImplementation(async (url) => ({ html: url === `${config.baseUrl}/` ? "" : html, etag: null, lastModified: null }));
+    const result = await fetchContentSources(1078605, "movie", undefined, config, deps);
+    expect(result.status).toBe("partial");
+    expect(deps.run.mock.calls[0][0].urls).toHaveLength(15);
   });
 
   it("rejects a supplied page for another title without writing mappings", async () => {

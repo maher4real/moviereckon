@@ -30,6 +30,7 @@ import {
 } from "@/frontend/components/ui/alert-dialog";
 import { useToast } from "@/frontend/hooks/use-toast";
 import { cn } from "@/shared/lib/utils";
+import { LANGUAGE_LABELS, genreName } from "@/shared/lib/catalogue";
 
 type FeedMode = "legacy" | "v2";
 export type TasteSignal = "positive" | "negative";
@@ -47,19 +48,6 @@ export interface YourTastePanelProps {
   ) => Promise<mongoClient.FeedbackMutationResult>;
 }
 
-const GENRE_LABELS: Record<number, string> = {
-  12: "Adventure", 14: "Fantasy", 16: "Animation", 18: "Drama", 27: "Horror",
-  28: "Action", 35: "Comedy", 36: "History", 37: "Western", 53: "Thriller",
-  80: "Crime", 99: "Documentary", 878: "Sci-Fi", 9648: "Mystery", 10402: "Music",
-  10749: "Romance", 10751: "Family", 10752: "War", 10759: "Action & Adventure",
-  10762: "Kids", 10765: "Sci-Fi & Fantasy",
-};
-
-const LANGUAGE_LABELS: Record<string, string> = {
-  ar: "Arabic", de: "German", en: "English", es: "Spanish", fr: "French", gu: "Gujarati",
-  hi: "Hindi", it: "Italian", ja: "Japanese", kn: "Kannada", ko: "Korean", ml: "Malayalam",
-  pt: "Portuguese", ru: "Russian", ta: "Tamil", te: "Telugu", tr: "Turkish", zh: "Chinese",
-};
 
 function isTitleResult(item: MultiSearchResult): item is Movie | TVShow {
   return item.media_type !== "person" && ("title" in item || "name" in item);
@@ -326,7 +314,7 @@ export default function YourTastePanel({
           <p className="mt-1 text-xs text-muted-foreground">These are the genres and languages you chose directly.</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {profile.explicit.genres.map((genre) => (
-              <Badge key={`genre-${genre}`} variant="secondary">{GENRE_LABELS[genre] || `Genre ${genre}`}</Badge>
+              <Badge key={`genre-${genre}`} variant="secondary">{genreName(genre)}</Badge>
             ))}
             {profile.explicit.languages.map((language) => (
               <Badge key={`language-${language}`} variant="secondary">{LANGUAGE_LABELS[language] || language.toUpperCase()}</Badge>
@@ -342,7 +330,7 @@ export default function YourTastePanel({
           <p className="mt-1 text-xs text-muted-foreground">These weights are inferred from activity and can be cleared independently.</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {learnedGenres.map(({ id, weight }) => (
-              <Badge key={`learned-genre-${id}`} variant="outline">{GENRE_LABELS[id] || `Genre ${id}`} · {weight.toFixed(1)}</Badge>
+              <Badge key={`learned-genre-${id}`} variant="outline">{genreName(id)} · {weight.toFixed(1)}</Badge>
             ))}
             {learnedLanguages.map(([language, weight]) => (
               <Badge key={`learned-language-${language}`} variant="outline">{LANGUAGE_LABELS[language] || language.toUpperCase()} · {weight.toFixed(1)}</Badge>
@@ -358,7 +346,7 @@ export default function YourTastePanel({
         <div className="mt-4 rounded-xl border border-destructive/20 bg-destructive/5 p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-destructive"><Eraser className="h-4 w-4" /> Signals you have rejected</div>
           <div className="mt-3 flex flex-wrap gap-2">
-            {avoidedGenres.map(({ id, weight }) => <Badge key={`avoided-genre-${id}`} variant="outline" className="border-destructive/30 text-destructive">{GENRE_LABELS[id] || `Genre ${id}`} · {weight.toFixed(1)}</Badge>)}
+            {avoidedGenres.map(({ id, weight }) => <Badge key={`avoided-genre-${id}`} variant="outline" className="border-destructive/30 text-destructive">{genreName(id)} · {weight.toFixed(1)}</Badge>)}
             {avoidedLanguages.map(([language, weight]) => <Badge key={`avoided-language-${language}`} variant="outline" className="border-destructive/30 text-destructive">{LANGUAGE_LABELS[language] || language.toUpperCase()} · {weight.toFixed(1)}</Badge>)}
           </div>
         </div>

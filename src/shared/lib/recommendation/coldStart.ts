@@ -39,6 +39,7 @@ const ERA_RANGES: Record<Era, [number, number]> = {
   new: [2020, 9999],
 };
 
+const SHARE_SCALE = 1.0;
 const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
 
 export function buildMoodGenreBoost(moods: Mood[]): Record<string, number> {
@@ -78,14 +79,43 @@ export function smoothedRating(voteAverage: number, voteCount: number): number {
     (RATING_PRIOR_VOTES / (votes + RATING_PRIOR_VOTES)) * RATING_PRIOR_MEAN;
 }
 
+/**
+ * Quality is always the vote-smoothed rating. Tiny samples are noisy no matter
+ * how much we know about the viewer, so a 9.8 from six votes never outranks a
+ * 7.6 from thousands. `confidence` is kept for call-site compatibility.
+ */
 export function coldStartQuality(
   item: { voteAverage: number; voteCount: number },
-  confidence: number,
+  _confidence?: number,
 ): number {
-  const raw = clamp01(item.voteAverage / 10);
-  const smoothed = clamp01(smoothedRating(item.voteAverage, item.voteCount) / 10);
-  const weight = clamp01(confidence);
-  return clamp01(weight * raw + (1 - weight) * smoothed);
+  return clamp01(smoothedRating(item.voteAverage, item.voteCount) / 10);
+}
+
+/**
+ * How well an item's keys (genres or a language) match a weighted affinity map.
+ *
+ * Absolute weights grow with activity, so squashing their raw sum saturates
+ * every genre to ~1 for an active viewer and taste stops ranking anything.
+ * Instead each key is scored relative to the viewer's strongest key (0..1),
+ * blending the item's best key with its average so off-taste extra genres
+ * count against it, then scaled by overall signal strength so a thin profile
+ * still carries less certainty than a rich one.
+ */
+export function relativeAffinity(
+  weights: Record<string, number> | undefined,
+  keys: Array<string | number>,
+  multiplier: number,
+  scale: number,
+): number {
+  if (!weights || keys.length === 0) return 0;
+  let max = 0;
+  for (const value of Object.values(weights)) if (value > max) max = value;
+  if (max <= 0) return 0;
+  const shares = keys.map((key) => Math.max(0, weights[String(key)] || 0) / max);
+  const total = shares.reduce((sum, value) => sum + value, 0);
+  if (total <= 0) return 0;
+  const strength = 1 - Math.exp(-(max * multiplier) / scale);
+  return clamp01((1 - Math.exp(-total / SHARE_SCALE)) / (1 - Math.exp(-1 / SHARE_SCALE)) * strength);
 }
 
 export function paceScore(pace: Pace | null | undefined, runtime: number | null): number {

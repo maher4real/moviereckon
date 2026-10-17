@@ -25,7 +25,7 @@ describe("direct playback controls", () => {
     expect(document.querySelector("video")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /Play here/ }));
     const video = await screen.findByLabelText("Video for Example");
-    expect(video).toHaveAttribute("src", "https://media.example/movie.m3u8");
+    await waitFor(() => expect(video).toHaveAttribute("src", "https://media.example/movie.m3u8"));
     expect(mocks.resolve).toHaveBeenCalledWith(identity, "player", expect.any(AbortSignal));
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
     fireEvent.error(video);

@@ -15,7 +15,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.user.mockResolvedValue({ id: "viewer" }); mocks.origin.mockReturnValue(true); mocks.ajax.mockReturnValue(true);
   mocks.limit.mockResolvedValue({ allowed: true });
-  mocks.lookup.mockResolvedValue({ sources: [{ links: [savedLink] }] });
+  mocks.lookup.mockResolvedValue({ sources: [{ title: "Example", links: [savedLink] }] });
   mocks.resolve.mockResolvedValue([{ url: "https://media.example/video.m3u8", format: "hls", label: "Auto" }]);
 });
 
@@ -44,7 +44,18 @@ describe("saved source resolution endpoint", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(mocks.lookup).toHaveBeenCalledWith(42, "movie");
-    expect(mocks.resolve).toHaveBeenCalledWith(savedLink, { contentId: 42, contentType: "movie" });
+    expect(mocks.resolve).toHaveBeenCalledWith(savedLink, { contentId: 42, contentType: "movie" }, undefined, "Example");
+  });
+  it("routes newly supported providers using the saved content identity", async () => {
+    const download = { ...savedLink, url: "https://greenmotors.club/?id=YXJjaGl2ZQ==", kind: "download", scope: "movie" };
+    mocks.lookup.mockResolvedValueOnce({ sources: [{ title: "Example", links: [download] }] });
+    mocks.downloads.mockResolvedValueOnce([{ filename: "Example.2026.720p.mkv" }]);
+    expect((await POST(request())).status).toBe(200);
+    expect(mocks.downloads).toHaveBeenCalledWith(download, "Example");
+    const player = { ...savedLink, url: "https://hubstream.art/#abc123", kind: "watch", scope: "movie" };
+    mocks.lookup.mockResolvedValueOnce({ sources: [{ title: "Example", links: [player] }] });
+    expect((await POST(request())).status).toBe(200);
+    expect(mocks.resolve).toHaveBeenCalledWith(player, { contentId: 42, contentType: "movie" }, undefined, "Example");
   });
   it("rejects supplied URLs, nonexistent or wrong-title links, unsupported hosts and host failures", async () => {
     expect((await POST(request({ ...input, url: "http://127.0.0.1" }))).status).toBe(400);

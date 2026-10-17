@@ -86,12 +86,13 @@ describe("quality prior", () => {
     expect(smoothedRating(9, 0)).toBe(6.5);
   });
 
-  it("uses the smoothed value with no history and the raw value with full history", () => {
+  it("uses the smoothed value regardless of how much history the viewer has", () => {
     const junk = { voteAverage: 9.8, voteCount: 6 };
     const solid = { voteAverage: 7.6, voteCount: 4000 };
     expect(coldStartQuality(junk, 0)).toBeLessThan(coldStartQuality(solid, 0));
-    expect(coldStartQuality(junk, 1)).toBeGreaterThan(coldStartQuality(solid, 1));
-    expect(coldStartQuality(junk, 1)).toBeCloseTo(0.98);
+    // Tiny vote samples stay noisy for experienced viewers too.
+    expect(coldStartQuality(junk, 1)).toBeLessThan(coldStartQuality(solid, 1));
+    expect(coldStartQuality(solid, 1)).toBeCloseTo(smoothedRating(7.6, 4000) / 10, 5);
   });
 
   it("stays within 0..1 for odd inputs", () => {

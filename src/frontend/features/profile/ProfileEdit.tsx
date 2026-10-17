@@ -2,7 +2,6 @@ import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Footer from "@/frontend/components/Footer";
 import Header from "@/frontend/components/Header";
-import { AppPageSkeleton } from "@/frontend/components/AppSkeletons";
 import { Avatar, AvatarFallback, AvatarImage } from "@/frontend/components/ui/avatar";
 import { Badge } from "@/frontend/components/ui/badge";
 import { Button } from "@/frontend/components/ui/button";

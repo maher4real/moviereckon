@@ -1,0 +1,193 @@
+/* Landing page, nav links, glass cards */
+@layer components {
+  .landing-cinema {
+    position: relative;
+    isolation: isolate;
+    background:
+      radial-gradient(circle at 12% 2%, hsl(var(--primary) / 0.12), transparent 30rem),
+      linear-gradient(180deg, hsl(20 6% 3%), hsl(var(--background)) 42%, hsl(20 6% 2%));
+  }
+
+  .landing-kicker {
+    @apply text-[10px] font-bold uppercase tracking-[0.24em] text-primary sm:text-[11px];
+  }
+
+  .landing-nav-link {
+    @apply relative rounded-sm py-2 text-xs font-semibold uppercase tracking-[0.14em] text-white/45 transition-colors duration-300 hover:text-white;
+  }
+
+  .landing-nav-link::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 1px;
+    background: hsl(var(--primary));
+    transform: scaleX(0);
+    transform-origin: right;
+    transition: transform 300ms var(--ease-fluid);
+  }
+
+  .landing-nav-link:hover::after,
+  .landing-nav-link:focus-visible::after {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+
+  .landing-glass-card {
+    border: 1px solid hsl(var(--foreground) / 0.09);
+    border-radius: 1.25rem;
+    background:
+      linear-gradient(145deg, hsl(var(--foreground) / 0.055), transparent 42%),
+      radial-gradient(circle at 92% 8%, hsl(var(--primary) / 0.09), transparent 18rem),
+      hsl(var(--card) / 0.62);
+    box-shadow:
+      0 24px 70px hsl(0 0% 0% / 0.3),
+      inset 0 1px 0 hsl(var(--foreground) / 0.055);
+    -webkit-backdrop-filter: blur(18px) saturate(1.15);
+    backdrop-filter: blur(18px) saturate(1.15);
+    transition:
+      border-color 500ms var(--ease-fluid),
+      background-color 500ms var(--ease-fluid),
+      box-shadow 500ms var(--ease-fluid),
+      transform 500ms var(--ease-fluid);
+  }
+
+  .landing-glass-card:hover {
+    border-color: hsl(var(--primary) / 0.3);
+    box-shadow:
+      0 30px 90px hsl(0 0% 0% / 0.38),
+      0 0 48px hsl(var(--primary) / 0.08),
+      inset 0 1px 0 hsl(var(--foreground) / 0.09);
+  }
+
+  .landing-content-section {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .landing-section-band {
+    position: relative;
+    isolation: isolate;
+    border-block: 1px solid hsl(var(--foreground) / 0.06);
+    background:
+      radial-gradient(circle at 82% 8%, hsl(var(--primary) / 0.09), transparent 24rem),
+      linear-gradient(180deg, hsl(var(--foreground) / 0.018), transparent 28%, hsl(var(--foreground) / 0.012));
+  }
+
+  .landing-app-shell {
+    border: 1px solid hsl(var(--foreground) / 0.11);
+    background:
+      radial-gradient(circle at 84% 8%, hsl(var(--primary) / 0.13), transparent 24rem),
+      linear-gradient(145deg, hsl(var(--foreground) / 0.045), transparent 35%),
+      hsl(20 6% 4% / 0.94);
+    box-shadow:
+      0 44px 120px hsl(0 0% 0% / 0.5),
+      0 0 0 1px hsl(var(--primary) / 0.035),
+      inset 0 1px 0 hsl(var(--foreground) / 0.07);
+    -webkit-backdrop-filter: blur(24px) saturate(1.18);
+    backdrop-filter: blur(24px) saturate(1.18);
+  }
+
+  .landing-feature-card {
+    border: 1px solid hsl(var(--foreground) / 0.075);
+    border-radius: 1rem;
+    background:
+      linear-gradient(145deg, hsl(var(--foreground) / 0.038), transparent 48%),
+      hsl(var(--card) / 0.42);
+    box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.035);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    transition:
+      transform 450ms var(--ease-fluid),
+      border-color 450ms var(--ease-fluid),
+      background-color 450ms var(--ease-fluid),
+      box-shadow 450ms var(--ease-fluid);
+  }
+
+  .landing-feature-card:hover {
+    transform: translateY(-3px);
+    border-color: hsl(var(--primary) / 0.24);
+    background-color: hsl(var(--card) / 0.68);
+    box-shadow:
+      0 24px 60px hsl(0 0% 0% / 0.28),
+      0 0 34px hsl(var(--primary) / 0.055),
+      inset 0 1px 0 hsl(var(--foreground) / 0.06);
+  }
+
+  .landing-liquid-full {
+    width: 100% !important;
+    max-width: 100%;
+  }
+
+  .liquid-glass-auto-content {
+    height: auto !important;
+    min-height: min-content;
+    overflow: visible !important;
+  }
+
+  .landing-hero-recommendation-content {
+    padding: 1rem !important;
+  }
+
+  .landing-final-cta-content {
+    padding: 1.75rem !important;
+  }
+
+  @media (min-width: 40rem) {
+    .landing-hero-recommendation-content {
+      padding: 1.25rem !important;
+    }
+
+    .landing-final-cta-content {
+      padding: 3rem !important;
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .landing-final-cta-content {
+      padding: 4rem !important;
+    }
+  }
+
+  .landing-rule-grid {
+    background-image:
+      linear-gradient(90deg, hsl(var(--foreground) / 0.035) 1px, transparent 1px),
+      linear-gradient(hsl(var(--foreground) / 0.025) 1px, transparent 1px);
+    background-size: 6rem 6rem;
+    -webkit-mask-image: linear-gradient(to bottom, black, transparent 88%);
+    mask-image: linear-gradient(to bottom, black, transparent 88%);
+  }
+
+  .landing-vignette {
+    background:
+      linear-gradient(90deg, hsl(var(--background) / 0.62), transparent 43%, hsl(var(--background) / 0.08) 72%, hsl(var(--background) / 0.48)),
+      linear-gradient(180deg, hsl(var(--background) / 0.24), transparent 38%, hsl(var(--background)) 100%);
+  }
+
+  .landing-grain {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.9'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 180px 180px;
+  }
+
+  .landing-poster-rail {
+    overscroll-behavior-inline: contain;
+    scrollbar-color: hsl(var(--primary) / 0.45) transparent;
+    scrollbar-width: thin;
+  }
+
+  .landing-poster-rail::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .landing-poster-rail::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .landing-poster-rail::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: hsl(var(--primary) / 0.45);
+  }
+}
