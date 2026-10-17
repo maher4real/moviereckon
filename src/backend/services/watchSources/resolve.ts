@@ -6,6 +6,7 @@ import type { DirectMediaSource, WatchSourceIdentity, WatchSourceLink } from "@/
 import { fetchSourceDocument } from "./http";
 import { resolveHubStreamMedia } from "./hubStream";
 import { parseHdStreamMedia } from "./packedPlayer";
+import { resolveHdStreamMedia } from "./hdStream";
 import { publicLink } from "./parser";
 
 const playerData = z.object({
@@ -35,7 +36,7 @@ export function parsePlayerMedia(html: string, pageUrl: string, identity: WatchS
 }
 
 export async function resolveWatchMedia(link: WatchSourceLink, identity: WatchSourceIdentity,
-  fetchDocument = fetchSourceDocument, title?: string): Promise<DirectMediaSource[]> {
+  fetchDocument = fetchSourceDocument, title?: string, verifyHdStream = resolveHdStreamMedia): Promise<DirectMediaSource[]> {
   // Never turn a season pack or a multi-episode collection into one episode.
   if (link.scope !== "movie" && link.scope !== "episode") return [];
   const format = directMediaFormat(link.url);
@@ -47,8 +48,17 @@ export async function resolveWatchMedia(link: WatchSourceLink, identity: WatchSo
   }
   if (new URL(link.url).origin === "https://hdstream4u.com") {
     if ((link.scope === "movie") !== (identity.contentType === "movie")) return [];
-    const result = await fetchDocument(link.url, "https://hdstream4u.com");
-    return parseHdStreamMedia(result.html || "", link.url);
+    const signal = AbortSignal.timeout(48_000);
+    // A published CDN can be unavailable while another freshly issued host
+    // works. Refresh the provider page once, within the same request deadline.
+    for (let attempt = 0; attempt < 2 && !signal.aborted; attempt++) {
+      const result = await fetchDocument(link.url, "https://hdstream4u.com", {}, { signal });
+      const candidates = parseHdStreamMedia(result.html || "", link.url);
+      if (!candidates.length) return [];
+      const sources = await verifyHdStream(candidates, undefined, signal);
+      if (sources.length) return sources;
+    }
+    return [];
   }
   if (identity.contentType !== "movie") return [];
   // Fixed origin, no arbitrary-URL fetch or traversal of ad/redirect chains.

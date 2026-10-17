@@ -329,15 +329,15 @@ export default function TVDetail() {
       <DetailHero media={media} title={tvShow.name} backdropPath={tvShow.backdrop_path} />
 
       {/* Content */}
-      <div className="detail-content-shell container mx-auto px-4 -mt-48 md:-mt-64 relative z-10 pb-12">
-        <div className="flex flex-col md:flex-row gap-8">
+      <div className="detail-content-shell container mx-auto px-4 relative z-10 pb-10">
+        <div className="detail-header flex flex-col gap-6 md:flex-row lg:gap-8">
           <DetailPoster title={tvShow.name} posterPath={tvShow.poster_path} />
 
           <div className="flex-1 min-w-0">
             <DetailTitle title={tvShow.name} tagline={tvShow.tagline} posterPath={tvShow.poster_path} share={shareDetails} />
 
             {/* Meta Info */}
-            <div className="detail-metadata mb-6">
+            <div className="detail-metadata mb-4">
               <div className="flex flex-wrap gap-2">
                 {tvShow.vote_average > 0 && (
                   <MetaChip icon={Star} tone="rating">
@@ -382,15 +382,15 @@ export default function TVDetail() {
 
         <DetailSectionNav sections={sectionLinks} />
 
-        <div className="grid gap-12">
+        <div className="grid grid-cols-1 gap-6 md:gap-8">
           <DetailSection id="overview" title="Overview" icon={AlignLeft}>
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="grid grid-cols-1 gap-5 md:gap-6">
               <div className="min-w-0">
-                <p className="max-w-[72ch] whitespace-pre-wrap break-words text-base leading-8 text-foreground/80">
+                <p className="max-w-[72ch] whitespace-pre-wrap break-words text-base leading-7 text-foreground/80">
                   {tvShow.overview || "No overview available."}
                 </p>
                 {keywords.length > 0 && (
-                  <div className="mt-6">
+                  <div className="mt-4">
                     <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
                       <Tag className="size-4" aria-hidden="true" />Keywords
                     </h3>
@@ -406,7 +406,7 @@ export default function TVDetail() {
             </div>
           </DetailSection>
 
-          <div id="watch" className="detail-section grid gap-6">
+          <div id="watch" className="detail-section grid grid-cols-1 gap-4">
             <WhereToWatch providers={providers} link={watchLink} />
             <DeferredWatchSources contentId={tvShow.id} contentType="tv" title={tvShow.name} />
           </div>
@@ -418,10 +418,10 @@ export default function TVDetail() {
                   value={String(selectedSeason)}
                   onValueChange={(value) => setSelectedSeason(Number(value))}
                 >
-                  <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 mb-6">
+                  <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 mb-4">
                     <TabsList className="inline-flex h-auto w-auto gap-1 rounded-full border border-white/10 bg-card/70 p-1">
                       {seasons.map((season) => (
-                        <TabsTrigger key={season.season_number} value={String(season.season_number)} className="min-h-9 rounded-full px-4 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                        <TabsTrigger key={season.season_number} value={String(season.season_number)} className="min-h-11 rounded-full px-4 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                           Season {season.season_number}
                         </TabsTrigger>
                       ))}
@@ -540,13 +540,13 @@ export default function TVDetail() {
           )}
 
           {(cast.length > 0 || crewAsCast.length > 0) && (
-            <div id="cast" className="detail-section">
+            <div id="cast" className="detail-section grid grid-cols-1 gap-6">
               <CastList cast={cast} title="Cast" />
               <CastList cast={crewAsCast} title="Crew" />
             </div>
           )}
 
-          <div id="reviews" className="detail-section">
+          <div id="reviews" className="detail-section [&>section]:mt-0">
             <div ref={communitySectionRef} className="h-px" />
             {shouldRenderCommunity ? (
               <Suspense fallback={<div className="detail-skeleton-card" />}>

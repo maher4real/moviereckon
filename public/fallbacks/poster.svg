@@ -1,40 +1,51 @@
-<svg width="684" height="1026" viewBox="0 0 684 1026" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="684" height="1026" viewBox="0 0 684 1026" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Poster unavailable</title>
+  <desc id="desc">A charcoal cinema poster with a red film frame and MovieReckon branding.</desc>
   <defs>
-    <linearGradient id="bg" x1="38" y1="72" x2="646" y2="978" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#0E141D"/>
-      <stop offset="0.46" stop-color="#090E15"/>
-      <stop offset="1" stop-color="#03060A"/>
+    <linearGradient id="paper" x1="0" y1="0" x2="684" y2="1026" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#202020"/>
+      <stop offset="1" stop-color="#0C0C0C"/>
     </linearGradient>
-    <radialGradient id="mist" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(198 210) rotate(60) scale(342 286)">
-      <stop stop-color="#7E91A8" stop-opacity="0.03"/>
-      <stop offset="1" stop-color="#7E91A8" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(342 513) rotate(90) scale(280 320)">
-      <stop stop-color="#EE3C3C" stop-opacity="0.14"/>
-      <stop offset="1" stop-color="#EE3C3C" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="mark" x1="258" y1="419" x2="426" y2="607" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FF6B6B"/>
-      <stop offset="0.6" stop-color="#EE3C3C"/>
-      <stop offset="1" stop-color="#C92121"/>
+    <linearGradient id="frame" x1="220" y1="300" x2="464" y2="570" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F04444"/>
+      <stop offset="1" stop-color="#A81D26"/>
     </linearGradient>
+    <pattern id="lines" width="8" height="8" patternUnits="userSpaceOnUse">
+      <path d="M0 0H8" stroke="#FFF" stroke-opacity="0.018"/>
+    </pattern>
   </defs>
+  <path fill="url(#paper)" d="M0 0H684V1026H0z"/>
+  <path fill="url(#lines)" d="M0 0H684V1026H0z"/>
+  <rect x="32" y="32" width="620" height="962" rx="4" stroke="#FFF" stroke-opacity="0.09" stroke-width="2"/>
+  <path d="M64 96H124" stroke="#E32B36" stroke-width="6"/>
+  <path d="M560 96H620" stroke="#FFF" stroke-opacity="0.18" stroke-width="2"/>
 
-  <rect width="684" height="1026" rx="32" fill="url(#bg)"/>
-  <rect width="684" height="1026" rx="32" fill="url(#mist)"/>
-  <rect width="684" height="1026" rx="32" fill="url(#glow)"/>
-
-  <circle cx="342" cy="513" r="112" fill="#EE3C3C" fill-opacity="0.07"/>
-  <circle cx="342" cy="513" r="84" stroke="#EE3C3C" stroke-opacity="0.16" stroke-width="2"/>
-
-  <g stroke="url(#mark)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="265" y="436" width="154" height="154" rx="22"/>
-    <path d="M304 436V590"/>
-    <path d="M380 436V590"/>
-    <path d="M265 474H304"/>
-    <path d="M265 513H419"/>
-    <path d="M265 552H304"/>
-    <path d="M380 474H419"/>
-    <path d="M380 552H419"/>
+  <!-- Offset outlines recall an empty stack of cinema frames. -->
+  <rect x="204" y="288" width="276" height="318" rx="14" transform="rotate(-10 342 447)" stroke="#FFF" stroke-opacity="0.06" stroke-width="3"/>
+  <rect x="213" y="296" width="258" height="302" rx="12" transform="rotate(6 342 447)" stroke="#FFF" stroke-opacity="0.1" stroke-width="3"/>
+  <rect x="220" y="300" width="244" height="294" rx="12" fill="#151515" stroke="url(#frame)" stroke-width="6"/>
+  <path d="M258 304V590M426 304V590" stroke="url(#frame)" stroke-width="4"/>
+  <g fill="#D6323D">
+    <rect x="231" y="320" width="16" height="24" rx="3"/>
+    <rect x="231" y="366" width="16" height="24" rx="3"/>
+    <rect x="231" y="412" width="16" height="24" rx="3"/>
+    <rect x="231" y="458" width="16" height="24" rx="3"/>
+    <rect x="231" y="504" width="16" height="24" rx="3"/>
+    <rect x="231" y="550" width="16" height="24" rx="3"/>
+    <rect x="437" y="320" width="16" height="24" rx="3"/>
+    <rect x="437" y="366" width="16" height="24" rx="3"/>
+    <rect x="437" y="412" width="16" height="24" rx="3"/>
+    <rect x="437" y="458" width="16" height="24" rx="3"/>
+    <rect x="437" y="504" width="16" height="24" rx="3"/>
+    <rect x="437" y="550" width="16" height="24" rx="3"/>
   </g>
+  <path d="M296 447H388M342 401V493" stroke="#FFF" stroke-opacity="0.16" stroke-width="2"/>
+  <circle cx="342" cy="447" r="30" stroke="#FFF" stroke-opacity="0.16" stroke-width="2"/>
+
+  <g text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+    <text x="342" y="708" fill="#E9E5E2" font-size="40" font-weight="500" letter-spacing="1">Poster unavailable</text>
+    <text x="342" y="758" fill="#96918F" font-size="23" letter-spacing="2">THE STORY IS STILL HERE</text>
+    <text x="342" y="929" fill="#B4ADAA" font-size="24" font-weight="600" letter-spacing="4">MOVIERECKON</text>
+  </g>
+  <path d="M312 861H372" stroke="#E32B36" stroke-width="3"/>
 </svg>

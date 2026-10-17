@@ -71,11 +71,11 @@ export function FactsPanel({ title = "Details", rows }: { title?: string; rows: 
   const visible = rows.filter((row) => row.value !== null && row.value !== undefined && row.value !== "" && row.value !== "N/A");
   if (!visible.length) return null;
   return (
-    <aside className="surface-panel h-fit p-5" aria-label={title}>
-      <h3 className="mb-4 text-sm font-bold uppercase tracking-[0.14em] text-muted-foreground">{title}</h3>
-      <dl className="grid gap-3.5">
+    <aside className="surface-panel min-w-0 h-fit p-4 md:p-5" aria-label={title}>
+      <h3 className="mb-3 text-sm font-bold uppercase tracking-[0.14em] text-muted-foreground">{title}</h3>
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-4">
         {visible.map((row) => (
-          <div key={row.label} className="grid gap-0.5">
+          <div key={row.label} className="min-w-0 space-y-0.5">
             <dt className="flex items-center gap-2 text-xs text-muted-foreground">
               {row.icon && <row.icon className="size-3.5" aria-hidden="true" />}{row.label}
             </dt>

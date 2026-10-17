@@ -29,7 +29,7 @@ export function DetailHero({ media, title, backdropPath }: {
   return (
     <div
       ref={heroMediaRef}
-      className="detail-hero-media relative h-[54vh] sm:h-[60vh] md:h-[70vh] lg:h-[74vh] xl:h-[78vh] overflow-hidden group/hero"
+      className="detail-hero-media relative overflow-hidden group/hero"
     >
       <MediaImage
         src={getBackdropUrl(backdropPath, "large")}

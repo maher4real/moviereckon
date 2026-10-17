@@ -16,11 +16,11 @@ export function DetailPoster({ title, posterPath }: { title: string; posterPath:
       <MediaImage
         src={getPosterUrl(posterPath, "large")}
         alt={title}
-        className="w-[280px] rounded-lg border border-white/10 shadow-2xl shadow-black/45 lg:w-[320px]"
+        className="h-auto w-48 rounded-lg border border-white/10 shadow-2xl shadow-black/45 lg:w-56"
         fallbackSrc="/fallbacks/poster.svg"
         width={500}
         height={750}
-        sizes="(min-width: 1024px) 320px, (min-width: 768px) 280px, 128px"
+        sizes="(min-width: 1024px) 224px, (min-width: 768px) 192px, 96px"
       />
     </div>
   );
@@ -35,27 +35,27 @@ export function DetailTitle({ title, tagline, posterPath, share }: {
 }) {
   return (
     <>
-      <div className="md:hidden flex gap-4 mb-6">
+      <div className="md:hidden flex items-start gap-4 mb-4">
         <MediaImage
           src={getPosterUrl(posterPath, "medium")}
           alt={title}
-          className="w-32 rounded-lg shadow-lg"
+          className="h-auto w-24 shrink-0 rounded-lg shadow-lg sm:w-28"
           fallbackSrc="/fallbacks/poster.svg"
           width={342}
           height={513}
-          sizes="128px"
+          sizes="(min-width: 640px) 112px, 96px"
         />
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold mb-2">{title}</h1>
-          {tagline && <p className="text-muted-foreground italic text-sm">{tagline}</p>}
+        <div className="min-w-0 flex-1">
+          <h1 className="break-words text-2xl font-bold leading-tight mb-2">{title}</h1>
+          {tagline && <p className="break-words text-muted-foreground italic text-sm">{tagline}</p>}
           <ShareContentButton {...share} size="sm" className="detail-share-button mt-3" />
         </div>
       </div>
 
-      <div className="hidden md:block mb-6">
+      <div className="hidden md:block mb-4">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-4xl lg:text-5xl font-bold mb-3">{title}</h1>
+            <h1 className="break-words text-4xl lg:text-5xl font-bold mb-3">{title}</h1>
             {tagline && <p className="text-xl text-muted-foreground italic">{tagline}</p>}
           </div>
           <ShareContentButton {...share} size="sm" className="detail-share-button mt-1 shrink-0" />
@@ -77,9 +77,9 @@ export function DetailActions({ library, hasTrailer, onTrailer, reaction }: {
 }) {
   const { watched, bookmarked, watchAnimating, bookmarkAnimating, markWatched, toggleWatchlist } = library;
   return (
-    <div className="detail-actions mb-8 flex flex-wrap gap-2.5">
+    <div className="detail-actions grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap">
       {hasTrailer && (
-        <Button size="lg" className="brand-primary-button text-primary-foreground action-btn" onClick={onTrailer}>
+        <Button size="lg" className="brand-primary-button col-span-2 text-primary-foreground action-btn" onClick={onTrailer}>
           <Play className="w-5 h-5 mr-2 fill-current" />
           Watch Trailer
         </Button>

@@ -1,8 +1,10 @@
-import { memo, type ElementType, type ReactNode } from "react";
+import { forwardRef, memo, useRef, type ComponentPropsWithoutRef, type ElementType, type ReactNode } from "react";
 import { Play, RotateCcw, SlidersHorizontal, Star, X } from "lucide-react";
 import MediaImage from "@/frontend/components/MediaImage";
 import { Button } from "@/frontend/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/frontend/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/frontend/components/ui/popover";
+import { useMediaQuery } from "@/frontend/hooks/useMediaQuery";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/frontend/components/ui/sheet";
 import { getBackdropUrl, getLanguageBadgeClass, getPosterUrl } from "@/shared/lib/tmdb";
 import { cn } from "@/shared/lib/utils";
@@ -101,10 +103,46 @@ function SelectField({ config, className }: { config: BrowseSelect; className?: 
   );
 }
 
+function FilterPanel({ selects, activeCount, onReset, note }: { selects: BrowseSelect[]; activeCount: number; onReset: () => void; note?: ReactNode }) {
+  return (
+    <div className="grid gap-4">
+      <div className="browse-panel-grid">
+        {selects.map((config) => <SelectField key={config.id} config={config} />)}
+      </div>
+      {note && <p className="text-xs leading-5 text-muted-foreground">{note}</p>}
+      {activeCount > 0 && (
+        <Button variant="ghost" onClick={onReset} className="w-full gap-2 text-muted-foreground">
+          <RotateCcw className="size-4" aria-hidden="true" />Reset filters
+        </Button>
+      )}
+    </div>
+  );
+}
+
+// Radix triggers (`asChild`) pass onClick, aria and a ref to their child, so it must forward them.
+const FilterToggle = forwardRef<HTMLButtonElement, { activeCount: number } & ComponentPropsWithoutRef<typeof Button>>(
+  function FilterToggle({ activeCount, ...props }, ref) {
+    return (
+      <Button ref={ref} variant="outline" className="browse-filter-toggle" aria-label={`Open filters${activeCount ? `, ${activeCount} active` : ""}`} {...props}>
+        <SlidersHorizontal className="size-4" aria-hidden="true" />
+        Filters
+        {activeCount > 0 && <span className="browse-filter-count">{activeCount}</span>}
+      </Button>
+    );
+  },
+);
+
 export function BrowseFilters<T extends string>({
   categories, activeCategory, onCategory, genres, selectedGenre, onGenre, genreDisabled,
   selects, activeFilters, onReset, note,
 }: BrowseFiltersProps<T>) {
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
+  const panelRef = useRef<HTMLDivElement>(null);
+  const hasGenreChips = Boolean(genres && genres.length > 0);
+  // The genre chips below already cover genre, so the dropdown would be a duplicate.
+  const panelSelects = hasGenreChips ? selects.filter((config) => config.id !== "genre") : selects;
+  const panel = <FilterPanel selects={panelSelects} activeCount={activeFilters.length} onReset={onReset} note={note} />;
+
   return (
     <section className="browse-filters" aria-label="Filters">
       <div className="browse-filters-bar">
@@ -120,33 +158,37 @@ export function BrowseFilters<T extends string>({
           })}
         </div>
 
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="outline" className="browse-filter-toggle lg:hidden" aria-label={`Open filters${activeFilters.length ? `, ${activeFilters.length} active` : ""}`}>
-              <SlidersHorizontal className="size-4" aria-hidden="true" />
-              Filters
-              {activeFilters.length > 0 && <span className="browse-filter-count">{activeFilters.length}</span>}
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-2xl border-white/10 bg-card pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
-            <SheetHeader className="text-left">
-              <SheetTitle>Filters</SheetTitle>
-              <SheetDescription>Refine what shows up in the grid.</SheetDescription>
-            </SheetHeader>
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              {selects.map((config) => <SelectField key={config.id} config={config} />)}
-            </div>
-            {activeFilters.length > 0 && (
-              <Button variant="ghost" onClick={onReset} className="mt-5 w-full gap-2 text-muted-foreground">
-                <RotateCcw className="size-4" aria-hidden="true" />Reset filters
-              </Button>
-            )}
-          </SheetContent>
-        </Sheet>
+        {panelSelects.length > 0 && (isDesktop ? (
+          <Popover>
+            <PopoverTrigger asChild><FilterToggle activeCount={activeFilters.length} /></PopoverTrigger>
+            <PopoverContent
+              ref={panelRef}
+              align="end"
+              sideOffset={8}
+              className="browse-panel w-[min(44rem,calc(100vw-2rem))] p-4 outline-none focus:outline-none focus-visible:outline-none"
+              // Focus the panel, not the first dropdown: that drew a heavy ring on open. Tab still reaches every control.
+              onOpenAutoFocus={(event) => { event.preventDefault(); panelRef.current?.focus(); }}
+            >
+              <p className="mb-3 text-sm font-semibold">Filters</p>
+              {panel}
+            </PopoverContent>
+          </Popover>
+        ) : (
+          <Sheet>
+            <SheetTrigger asChild><FilterToggle activeCount={activeFilters.length} /></SheetTrigger>
+            <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-2xl border-white/10 bg-card pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
+              <SheetHeader className="text-left">
+                <SheetTitle>Filters</SheetTitle>
+                <SheetDescription>Refine what shows up in the grid.</SheetDescription>
+              </SheetHeader>
+              <div className="mt-5">{panel}</div>
+            </SheetContent>
+          </Sheet>
+        ))}
       </div>
 
-      {genres && genres.length > 0 && (
-        <div className={cn("filter-row browse-genre-row", genreDisabled && "pointer-events-none opacity-45")} aria-label="Genre" aria-disabled={genreDisabled || undefined}>
+      {hasGenreChips && genres && (
+        <div className={cn("filter-row browse-genre-row carousel-edge-mask", genreDisabled && "pointer-events-none opacity-45")} aria-label="Genre" aria-disabled={genreDisabled || undefined}>
           <button type="button" onClick={() => onGenre("")} disabled={genreDisabled}
             className={cn("browse-genre-chip", !selectedGenre && "browse-genre-chip-active")}>All genres</button>
           {genres.map((genre) => {
@@ -159,11 +201,7 @@ export function BrowseFilters<T extends string>({
         </div>
       )}
 
-      <div className="browse-select-grid hidden lg:grid">
-        {selects.map((config) => <SelectField key={config.id} config={config} />)}
-      </div>
-
-      {(activeFilters.length > 0 || note) && (
+      {activeFilters.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           {activeFilters.map((filter) => (
             <button key={filter.key} type="button" onClick={filter.onClear} className="browse-active-pill" aria-label={`Remove filter ${filter.label}`}>
@@ -173,7 +211,6 @@ export function BrowseFilters<T extends string>({
           {activeFilters.length > 1 && (
             <button type="button" onClick={onReset} className="text-xs font-semibold text-primary hover:underline">Clear all</button>
           )}
-          {note && <p className="basis-full text-xs leading-5 text-muted-foreground">{note}</p>}
         </div>
       )}
     </section>

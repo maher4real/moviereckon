@@ -333,10 +333,10 @@ export default function Search() {
 
       <main className="flex-1 pb-12">
         <section className="search-hero">
-          <div className="container mx-auto max-w-3xl px-4">
-            <p className="page-kicker text-center">Search MovieReckon</p>
-            <h1 className="mt-2 text-center text-3xl font-black tracking-[-0.03em] sm:text-4xl">Find any movie, show or person</h1>
-            <div className="search-field mt-6">
+          <div className="search-container">
+            <p className="page-kicker">Search MovieReckon</p>
+            <h1 className="mt-2 max-w-3xl text-3xl font-bold tracking-[-0.03em] sm:text-4xl">Find any movie, show or person</h1>
+            <div className="search-field mt-6 max-w-3xl">
               <SearchIcon className="pointer-events-none absolute left-5 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <Input
                 type="text"
@@ -351,7 +351,7 @@ export default function Search() {
                   setDebouncedQuery(submitted);
                   saveRecentSearch(submitted);
                 }}
-                className="h-14 rounded-full border-white/12 bg-card/80 pl-13 pr-14 text-base shadow-[0_18px_50px_hsl(0_0%_0%/0.35)] transition-colors focus-visible:border-primary/60 md:text-lg"
+                className="h-14 rounded-xl border-white/12 bg-card/80 pl-13 pr-14 text-base transition-colors focus-visible:border-primary/60 focus-visible:ring-1 focus-visible:ring-offset-0 md:text-lg"
                 autoFocus
               />
               {query && (
@@ -368,11 +368,11 @@ export default function Search() {
             </div>
 
             {hasSearchQuery && (
-              <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-                <Tabs value={filterType} onValueChange={updateFilterType}>
-                  <TabsList className="h-auto gap-1 rounded-full border border-white/10 bg-card/70 p-1">
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <Tabs value={filterType} onValueChange={updateFilterType} className="w-full sm:w-auto">
+                  <TabsList className="grid h-auto w-full grid-cols-4 gap-1 rounded-xl border border-white/10 bg-card/70 p-1">
                     {([["all", "All"], ["movie", "Movies"], ["tv", "TV Shows"], ["person", "Cast"]] as const).map(([value, label]) => (
-                      <TabsTrigger key={value} value={value} className="min-h-9 rounded-full px-4 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">{label}</TabsTrigger>
+                      <TabsTrigger key={value} value={value} className="min-h-11 min-w-0 rounded-lg px-2 sm:px-4 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">{label}</TabsTrigger>
                     ))}
                   </TabsList>
                 </Tabs>
@@ -386,11 +386,11 @@ export default function Search() {
           </div>
         </section>
 
-        <div className="container mx-auto px-4">
+        <div className="search-container">
           {/* Content */}
           {!normalizedQuery ? (
             <div className="grid gap-10">
-              <div className="mx-auto grid w-full max-w-3xl gap-6 md:grid-cols-2">
+              <div className="grid w-full gap-6 md:grid-cols-2">
                 {recentSearches.length > 0 && (
                   <section className="surface-panel p-5" aria-labelledby="recent-searches">
                     <div className="mb-4 flex items-center justify-between">
@@ -423,7 +423,7 @@ export default function Search() {
                 </section>
               </div>
 
-              <nav className="mx-auto grid w-full max-w-3xl grid-cols-2 gap-3 sm:grid-cols-4" aria-label="Quick browse">
+              <nav className="grid w-full grid-cols-2 gap-3 sm:grid-cols-4" aria-label="Quick browse">
                 {[
                   { href: "/movies?category=trending", label: "Trending films", icon: TrendingUp },
                   { href: "/series?category=popular", label: "Popular series", icon: Tv },
@@ -437,7 +437,7 @@ export default function Search() {
                 ))}
               </nav>
 
-              <div className="-mx-4 sm:mx-0">
+              <div className="min-w-0">
                 <GenreRail enabled />
               </div>
             </div>

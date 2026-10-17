@@ -4,9 +4,21 @@
     position: fixed;
     inset: 0 0 auto;
     z-index: 50;
-    background: linear-gradient(180deg, hsl(var(--background) / 0.96), hsl(var(--background) / 0.78) 60%, transparent);
+    isolation: isolate;
     transition: background-color 180ms, box-shadow 180ms;
   }
+
+  .app-header::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 -4rem;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(180deg, hsl(0 0% 0% / 0.98) 0%, hsl(0 0% 0% / 0.9) 35%, hsl(0 0% 0% / 0.6) 60%, hsl(0 0% 0% / 0.22) 80%, hsl(0 0% 0% / 0) 100%);
+    transition: opacity 180ms;
+  }
+
+  .app-header[data-scrolled="true"]::before { opacity: 0; }
 
   .app-header[data-scrolled="true"] {
     background: hsl(var(--background) / 0.96);
@@ -44,7 +56,7 @@
   .app-nav-link-active { color: hsl(var(--foreground)); font-weight: 650; background: hsl(var(--foreground) / 0.1); box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.08); }
   .app-nav-link-active::after { content: ""; position: absolute; bottom: 5px; left: 50%; width: 4px; height: 4px; border-radius: 999px; background: hsl(var(--primary)); transform: translateX(-50%); box-shadow: 0 0 8px hsl(var(--primary) / 0.8); }
   .poster-hover-scrim { background: linear-gradient(0deg, hsl(0 0% 0% / 0.78), hsl(0 0% 0% / 0.25) 55%, transparent); }
-  .header-search { color: hsl(var(--foreground) / 0.7); border: 1px solid hsl(var(--foreground) / 0.13); border-radius: 8px; background: hsl(var(--background) / 0.4); }
+  .header-search { color: hsl(var(--foreground) / 0.8); border: 0; background: transparent; }
 
   .streaming-hero { position: relative; min-height: 580px; height: 68svh; max-height: 760px; overflow: hidden; background: hsl(var(--card)); }
   .hero-artwork { width: 100%; height: 100%; object-fit: cover; object-position: center 35%; }
@@ -111,7 +123,6 @@
   @media (max-width: 767px) {
     .app-header-inner { min-height: 4rem; gap: 0.25rem; padding-inline: 1rem; }
     .app-header[data-scrolled="true"] { backdrop-filter: none; }
-    .header-search { border-color: transparent; background: transparent; }
     .streaming-hero { min-height: 540px; height: 64svh; max-height: 620px; }
     .hero-artwork { object-position: 62% top; }
     .hero-scrim { background: linear-gradient(0deg, hsl(var(--background)) 1%, hsl(var(--background) / 0.94) 20%, hsl(var(--background) / 0.56) 53%, hsl(var(--background) / 0.1) 82%), linear-gradient(180deg, hsl(var(--background) / 0.35), transparent 28%); }

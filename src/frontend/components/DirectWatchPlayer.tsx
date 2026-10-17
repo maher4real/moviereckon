@@ -1,20 +1,28 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type Hls from "hls.js";
 import { Play } from "lucide-react";
-import { directMediaFormat } from "@/shared/lib/watchSources";
+import { directMediaFormat, isResolvablePlayer } from "@/shared/lib/watchSources";
 import type { DirectMediaSource, WatchSourceIdentity, WatchSourceLink } from "@/shared/types/watchSources";
 import { resolveWatchLink } from "@/frontend/lib/mongodbClient";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 
-function MediaPlayer({ source, context }: { source: DirectMediaSource; context: string }) {
+function MediaPlayer({ source, context, onFailure }: { source: DirectMediaSource; context: string; onFailure: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
-  const [error, setError] = useState(false);
+  const failureRef = useRef(onFailure);
+  useEffect(() => { failureRef.current = onFailure; }, [onFailure]);
+  const failedRef = useRef(false);
+  const fail = useCallback(() => {
+    if (failedRef.current) return;
+    failedRef.current = true;
+    failureRef.current();
+  }, []);
   const [qualities, setQualities] = useState<Array<{ index: number; label: string }>>([]);
   const [audio, setAudio] = useState<Array<{ index: number; label: string }>>([]);
   useEffect(() => {
     const video = videoRef.current!;
+    failedRef.current = false;
     let cancelled = false;
     const playlistUrl = source.format === "hls" && source.hlsPlaylist ?
       URL.createObjectURL(new Blob([source.hlsPlaylist], { type: "application/vnd.apple.mpegurl" })) : null;
@@ -26,7 +34,7 @@ function MediaPlayer({ source, context }: { source: DirectMediaSource; context: 
         if (cancelled) return;
         if (!Hls.isSupported()) {
           if (video.canPlayType("application/vnd.apple.mpegurl")) video.src = playbackUrl;
-          else setError(true);
+          else fail();
           return;
         }
         const hls = new Hls({ maxBufferLength: 30, maxMaxBufferLength: 60,
@@ -36,7 +44,7 @@ function MediaPlayer({ source, context }: { source: DirectMediaSource; context: 
           } : {}),
         });
         hlsRef.current = hls;
-        hls.on(Hls.Events.ERROR, (_, data) => { if (data.fatal) { setError(true); hls.destroy(); } });
+        hls.on(Hls.Events.ERROR, (_, data) => { if (!cancelled && data.fatal) fail(); });
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           setQualities(hls.levels.map((level, index) => ({ index, label: level.height ? `${level.height}p` : `Quality ${index + 1}` })));
         });
@@ -45,21 +53,21 @@ function MediaPlayer({ source, context }: { source: DirectMediaSource; context: 
         });
         hls.loadSource(playbackUrl);
         hls.attachMedia(video);
-      }).catch(() => { if (!cancelled) setError(true); });
+      }).catch(() => { if (!cancelled) fail(); });
     }
     return () => {
       cancelled = true;
+      failedRef.current = true;
       hlsRef.current?.destroy();
       hlsRef.current = null;
       video.removeAttribute("src");
       video.load();
       if (playlistUrl) URL.revokeObjectURL(playlistUrl);
     };
-  }, [source.url, source.format, source.referrerPolicy, source.hlsPlaylist]);
+  }, [source.url, source.format, source.referrerPolicy, source.hlsPlaylist, fail]);
   return <div className="space-y-3">
     <video ref={videoRef} controls autoPlay playsInline preload="none" aria-label={`Video for ${context}`}
-      className="aspect-video w-full rounded-lg bg-black" onError={() => setError(true)} />
-    {error && <p role="alert" className="text-sm text-destructive">This stream could not play here. It may have expired, be blocked by the host, or use an unsupported format. Try loading it again or choose another source.</p>}
+      className="aspect-video w-full rounded-lg bg-black" onError={fail} />
     <div className="flex flex-wrap gap-3 text-sm">
       {qualities.length > 1 && <label>Quality <select className="rounded border border-border bg-background p-2" defaultValue="-1"
         onChange={(event) => { if (hlsRef.current) hlsRef.current.currentLevel = Number(event.target.value); }}>
@@ -75,44 +83,77 @@ function MediaPlayer({ source, context }: { source: DirectMediaSource; context: 
   </div>;
 }
 
-export default function DirectWatchPlayer({ link, identity, context, media, inline = false }: { link: WatchSourceLink; identity?: WatchSourceIdentity; context: string; media?: DirectMediaSource; inline?: boolean }) {
+export default function DirectWatchPlayer({ link, identity, context, media, inline = false, fallbackLinks = [] }: { link: WatchSourceLink; identity?: WatchSourceIdentity; context: string; media?: DirectMediaSource; inline?: boolean; fallbackLinks?: WatchSourceLink[] }) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sources, setSources] = useState<DirectMediaSource[]>([]);
   const [selected, setSelected] = useState(0);
   const [attempt, setAttempt] = useState(0);
+  const [provider, setProvider] = useState(link.host);
+  const [progress, setProgress] = useState("Loading stream…");
   const requestRef = useRef<AbortController | null>(null);
-  useEffect(() => () => requestRef.current?.abort(), []);
-  async function play() {
-    if (requestRef.current) return;
-    const controller = new AbortController();
+  const sessionRef = useRef<{ controller: AbortController; links: WatchSourceLink[]; cursor: number } | null>(null);
+  useEffect(() => () => sessionRef.current?.controller.abort(), []);
+  async function nextProvider(session: NonNullable<typeof sessionRef.current>) {
+    const { controller } = session;
     requestRef.current = controller;
-    setOpen(true); setPending(true); setError(null); setSources([]); setSelected(0); setAttempt((value) => value + 1);
+    setPending(true); setError(null); setSources([]); setSelected(0);
+    let message = "No working direct stream is available from these providers. Search again for updated links.";
     try {
-      const format = directMediaFormat(link.url);
-      const next = media ? [media] : format ? [{ url: link.url, format, label: link.quality || link.label }] :
-        identity ? await resolveWatchLink(identity, link.id, controller.signal) : [];
-      if (!controller.signal.aborted) {
-        if (!next.length) setError("No supported direct stream is available from this source.");
-        setSources(next);
+      while (session.cursor < session.links.length && !controller.signal.aborted) {
+        const candidate = session.links[session.cursor++];
+        setProgress(session.cursor === 1 ? "Loading stream…" : `Trying another provider (${session.cursor}/${session.links.length})…`);
+        try {
+          const format = directMediaFormat(candidate.url);
+          const next = media && candidate.id === link.id ? [media] : format ? [{ url: candidate.url, format, label: candidate.quality || candidate.label }] :
+            identity ? await resolveWatchLink(identity, candidate.id, controller.signal) : [];
+          if (controller.signal.aborted) return;
+          if (!next.length) continue;
+          setProvider(candidate.host); setSources(next); setAttempt((value) => value + 1);
+          return;
+        } catch (failure) {
+          if (controller.signal.aborted) return;
+          if (failure instanceof Error) message = failure.message;
+        }
       }
-    } catch (failure) {
-      if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : "Unable to load this stream");
+      if (!controller.signal.aborted) setError(message);
     } finally {
       if (requestRef.current === controller) { requestRef.current = null; setPending(false); }
     }
   }
+  function play() {
+    if (requestRef.current) return;
+    sessionRef.current?.controller.abort();
+    // Fallbacks come from this title's saved results. Never substitute another
+    // episode, an episode range or a season pack for the requested episode.
+    const alternatives = media ? [] : fallbackLinks.filter((candidate) => candidate.scope === link.scope &&
+      (link.scope === "movie" || (link.scope === "episode" && candidate.season === link.season && candidate.episode === link.episode)) &&
+      (isResolvablePlayer(candidate) || directMediaFormat(candidate.url)));
+    const links = [link, ...alternatives].filter((candidate, index, all) => all.findIndex((other) => other.id === candidate.id || other.url === candidate.url) === index).slice(0, 8);
+    const session = { controller: new AbortController(), links, cursor: 0 };
+    sessionRef.current = session;
+    setOpen(true);
+    void nextProvider(session);
+  }
+  function playbackFailed() {
+    const session = sessionRef.current;
+    if (!session || session.controller.signal.aborted || requestRef.current) return;
+    if (selected + 1 < sources.length) { setSelected(selected + 1); return; }
+    if (session.cursor < session.links.length) { void nextProvider(session); return; }
+    setSources([]);
+    setError("This stream could not play here. The available providers failed or their links expired. Load stream again for fresh links, or search again for another release.");
+  }
   function close() {
-    setOpen(false); requestRef.current?.abort(); requestRef.current = null; setSources([]); setPending(false);
+    setOpen(false); sessionRef.current?.controller.abort(); requestRef.current = null; setSources([]); setPending(false);
   }
   const playerBody = <div className="space-y-3">
-        {pending && <p role="status">Loading stream…</p>}
+        {pending && <p role="status">{progress}</p>}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         {sources.length > 1 && <label className="text-sm">Stream <select value={selected} onChange={(event) => setSelected(Number(event.target.value))}>
           {sources.map((source, index) => <option key={index} value={index}>{source.label}</option>)}
         </select></label>}
-        {open && sources[selected] && <MediaPlayer key={`${attempt}:${selected}`} source={sources[selected]} context={context} />}
+        {open && sources[selected] && <><p className="text-xs text-muted-foreground">Playing from {provider}</p><MediaPlayer key={`${attempt}:${selected}`} source={sources[selected]} context={context} onFailure={playbackFailed} /></>}
         {!pending && <Button type="button" variant="outline" onClick={() => void play()}>Load stream again</Button>}
   </div>;
   return <>
@@ -127,7 +168,7 @@ export default function DirectWatchPlayer({ link, identity, context, media, inli
       {playerBody}
     </section> : <Dialog open={open} onOpenChange={(value) => {
       setOpen(value);
-      if (!value) { requestRef.current?.abort(); requestRef.current = null; setSources([]); setPending(false); }
+      if (!value) close();
     }}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
         <DialogTitle className="pr-6">Watch {context}</DialogTitle>

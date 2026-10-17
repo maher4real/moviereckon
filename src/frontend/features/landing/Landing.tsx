@@ -199,7 +199,10 @@ export default function Landing() {
       if (tvItems[index]) mixed.push(tvItems[index]);
     }
 
-    if (mixed.length > 0) return mixed;
+    // The same title can come from both trending and regional lists; show it once.
+    const seen = new Set<string>();
+    const unique = mixed.filter((poster) => (seen.has(poster.src) ? false : (seen.add(poster.src), true)));
+    if (unique.length > 0) return unique;
 
     return TMDB_FALLBACK_POSTERS.map((poster, index) => ({
       id: `fallback-${index}`,

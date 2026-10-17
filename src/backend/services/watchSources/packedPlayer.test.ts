@@ -29,11 +29,27 @@ describe("HDStream published data", () => {
   it("resolves saved single-episode pages but never substitutes season packs or mismatched media types", async () => {
     const link = parseSourcePage(`<h1>Example (Season 1)</h1><h2>DOWNLOAD LINKS</h2><h3>Episode 2</h3><a href="${page}">Watch</a>`, "https://source.example/show/").links[0];
     const fetchDocument = vi.fn().mockResolvedValue({ html });
-    expect(await resolveWatchMedia(link, { contentId: 321, contentType: "tv" }, fetchDocument)).toHaveLength(1);
-    expect(fetchDocument).toHaveBeenCalledWith(page, "https://hdstream4u.com");
+    const verify = vi.fn(async (candidates) => candidates);
+    expect(await resolveWatchMedia(link, { contentId: 321, contentType: "tv" }, fetchDocument, undefined, verify)).toHaveLength(1);
+    expect(fetchDocument).toHaveBeenCalledWith(page, "https://hdstream4u.com", {}, { signal: expect.any(AbortSignal) });
+    expect(verify).toHaveBeenCalledWith(parseHdStreamMedia(html, page), undefined, expect.any(AbortSignal));
     fetchDocument.mockClear();
     expect(await resolveWatchMedia({ ...link, scope: "season" }, { contentId: 321, contentType: "tv" }, fetchDocument)).toEqual([]);
     expect(await resolveWatchMedia(link, { contentId: 321, contentType: "movie" }, fetchDocument)).toEqual([]);
     expect(fetchDocument).not.toHaveBeenCalled();
+  });
+  it("refreshes short-lived CDN candidates once after failed verification, with one shared deadline", async () => {
+    const link = parseSourcePage(`<h1>Example (2025)</h1><h2>DOWNLOAD LINKS</h2><a href="${page}">Watch</a>`, "https://source.example/movie/").links[0];
+    const fetchDocument = vi.fn().mockResolvedValue({ html });
+    const sources = [{ url: "https://media.example/working.m3u8", format: "hls" as const, label: "1080p" }];
+    const verify = vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce(sources);
+    expect(await resolveWatchMedia(link, { contentId: 321, contentType: "movie" }, fetchDocument, undefined, verify)).toEqual(sources);
+    expect(fetchDocument).toHaveBeenCalledTimes(2);
+    expect(verify).toHaveBeenCalledTimes(2);
+    expect(fetchDocument.mock.calls[0][3].signal).toBe(fetchDocument.mock.calls[1][3].signal);
+    verify.mockReset().mockResolvedValue([]);
+    fetchDocument.mockClear();
+    expect(await resolveWatchMedia(link, { contentId: 321, contentType: "movie" }, fetchDocument, undefined, verify)).toEqual([]);
+    expect(fetchDocument).toHaveBeenCalledTimes(2);
   });
 });

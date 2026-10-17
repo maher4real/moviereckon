@@ -36,11 +36,11 @@ function CastList({ cast, title = "Top Cast" }: CastListProps) {
   const fromPath = `${location.pathname}${location.search}${location.hash}`;
 
   return (
-    <div className="mb-10">
+    <div className="min-w-0">
       <h2 className="text-xl font-semibold mb-4">{title}</h2>
 
-      <ScrollArea className="w-full">
-        <div className="grid grid-flow-col grid-rows-2 auto-cols-[130px] sm:auto-cols-[145px] lg:auto-cols-[160px] gap-3 pb-4 pr-2">
+      <ScrollArea className="min-w-0 w-full">
+        <div className="grid grid-flow-col auto-cols-[130px] sm:auto-cols-[145px] lg:auto-cols-[160px] gap-3 pb-4 pr-2">
           {cast.map((actor, index) => (
             <CastCard
               key={`${actor.id}-${actor.character}-${index}`}

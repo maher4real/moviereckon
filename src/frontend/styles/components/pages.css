@@ -31,15 +31,20 @@
 
   /* Search */
   .search-hero { padding: 6.5rem 0 2.25rem; background: radial-gradient(ellipse at 50% 0%, hsl(var(--primary) / 0.16), transparent 34rem); }
+  .search-container { width: 100%; max-width: 1600px; margin-inline: auto; padding-inline: 3rem; }
   .search-field { position: relative; }
+  @media (max-width: 1023px) { .search-container { padding-inline: 2rem; } }
+  @media (max-width: 639px) { .search-container { padding-inline: 1rem; } }
   .search-shortcut { display: flex; min-height: 5.5rem; flex-direction: column; justify-content: center; gap: 0.5rem; border: 1px solid hsl(var(--foreground) / 0.09); border-radius: 1rem; padding: 1rem; background: hsl(var(--card) / 0.7); text-align: left; font-size: 0.875rem; font-weight: 600; transition: border-color 160ms, transform 180ms var(--ease-fluid); }
   .search-shortcut:hover { border-color: hsl(var(--primary) / 0.45); transform: translateY(-2px); }
   @media (max-width: 767px) { .search-hero { padding: 5.5rem 0 1.75rem; } }
 
   /* Detail pages */
+  .detail-hero-media { height: 20rem; }
+  .detail-content-shell { margin-top: -10rem; }
   .detail-section { scroll-margin-top: 8.5rem; }
-  .detail-section-nav { position: sticky; top: 4.5rem; z-index: 25; margin: 0.5rem 0 2rem; border-block: 1px solid hsl(var(--foreground) / 0.08); padding-block: 0.5rem; background: hsl(var(--background) / 0.9); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
-  .detail-section-link { display: inline-flex; min-height: 2.5rem; align-items: center; white-space: nowrap; border-radius: 999px; padding-inline: 1rem; color: hsl(var(--muted-foreground)); font-size: 0.875rem; font-weight: 600; transition: color 160ms, background-color 160ms; }
+  .detail-section-nav { position: sticky; top: 4.5rem; z-index: 25; margin: 1.25rem 0; border-block: 1px solid hsl(var(--foreground) / 0.08); padding-block: 0.5rem; background: hsl(var(--background) / 0.9); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+  .detail-section-link { display: inline-flex; min-height: 2.75rem; align-items: center; white-space: nowrap; border-radius: 999px; padding-inline: 1rem; color: hsl(var(--muted-foreground)); font-size: 0.875rem; font-weight: 600; transition: color 160ms, background-color 160ms; }
   .detail-section-link:hover { color: hsl(var(--foreground)); background: hsl(var(--foreground) / 0.06); }
   .detail-section-link-active { color: hsl(var(--foreground)); background: hsl(var(--primary) / 0.16); box-shadow: inset 0 0 0 1px hsl(var(--primary) / 0.4); }
   .detail-meta-chip { display: inline-flex; align-items: center; gap: 0.375rem; border: 1px solid hsl(var(--foreground) / 0.14); border-radius: 999px; padding: 0.35rem 0.8rem; background: hsl(var(--card) / 0.7); color: hsl(var(--foreground) / 0.9); font-size: 0.75rem; font-weight: 600; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
@@ -54,8 +59,13 @@
   .tv-episode-card:hover { border-color: hsl(var(--primary) / 0.4); background: hsl(var(--card)); }
   .tv-episode-card > button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
   .detail-skeleton-card { height: 10rem; border: 1px solid hsl(var(--border) / 0.7); border-radius: 0.75rem; background: linear-gradient(90deg, hsl(var(--card)), hsl(var(--muted) / 0.6), hsl(var(--card))); background-size: 200% 100%; animation: shimmer 2s infinite linear; }
+  @media (min-width: 768px) {
+    .detail-hero-media { height: clamp(22rem, 45svh, 30rem); }
+    .detail-content-shell { margin-top: -12rem; }
+  }
   @media (max-width: 767px) {
     .detail-section-nav { top: 4rem; margin-inline: -1rem; padding-inline: 1rem; -webkit-backdrop-filter: none; backdrop-filter: none; background: hsl(var(--background) / 0.97); }
+    .detail-actions > button { min-width: 0; padding-inline: 0.75rem; white-space: normal; line-height: 1.25; }
   }
   @media (prefers-reduced-motion: reduce) { .detail-skeleton-card { animation: none; } }
 

@@ -79,8 +79,8 @@ export default function Header() {
           ))}
         </nav>
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-          <Button variant="ghost" onClick={() => goTo("/search")} onPointerEnter={preloadSearch} onFocus={preloadSearch} className="header-search size-11 p-0 xl:w-auto xl:gap-2.5 xl:px-3.5" aria-label="Open search">
-            <Search className="size-[19px]" aria-hidden="true" /><span className="hidden text-sm xl:inline">Search titles</span>
+          <Button variant="ghost" size="icon" onClick={() => goTo("/search")} onPointerEnter={preloadSearch} onFocus={preloadSearch} className="header-search size-11 p-0 hover:bg-transparent hover:text-foreground" aria-label="Open search">
+            <Search className="size-5" aria-hidden="true" />
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

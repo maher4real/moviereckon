@@ -319,15 +319,15 @@ export default function MovieDetail() {
       <DetailHero media={media} title={movie.title} backdropPath={movie.backdrop_path} />
 
       {/* Content */}
-      <div className="detail-content-shell container mx-auto px-4 -mt-48 md:-mt-64 relative z-10 pb-12">
-        <div className="flex flex-col md:flex-row gap-8">
+      <div className="detail-content-shell container mx-auto px-4 relative z-10 pb-10">
+        <div className="detail-header flex flex-col gap-6 md:flex-row lg:gap-8">
           <DetailPoster title={movie.title} posterPath={movie.poster_path} />
 
           <div className="flex-1 min-w-0">
             <DetailTitle title={movie.title} tagline={movie.tagline} posterPath={movie.poster_path} share={shareDetails} />
 
             {/* Meta Info */}
-            <div className="detail-metadata mb-6">
+            <div className="detail-metadata mb-4">
               <div className="flex flex-wrap gap-2">
                 {movie.vote_average > 0 && (
                   <MetaChip icon={Star} tone="rating">
@@ -369,15 +369,15 @@ export default function MovieDetail() {
 
         <DetailSectionNav sections={sectionLinks} />
 
-        <div className="grid gap-12">
+        <div className="grid grid-cols-1 gap-6 md:gap-8">
           <DetailSection id="overview" title="Overview" icon={AlignLeft}>
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="grid grid-cols-1 gap-5 md:gap-6">
               <div className="min-w-0">
-                <p className="max-w-[72ch] whitespace-pre-wrap break-words text-base leading-8 text-foreground/80">
+                <p className="max-w-[72ch] whitespace-pre-wrap break-words text-base leading-7 text-foreground/80">
                   {movie.overview || "No overview available."}
                 </p>
                 {keywords.length > 0 && (
-                  <div className="mt-6">
+                  <div className="mt-4">
                     <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
                       <Tag className="size-4" aria-hidden="true" />Keywords
                     </h3>
@@ -393,19 +393,19 @@ export default function MovieDetail() {
             </div>
           </DetailSection>
 
-          <div id="watch" className="detail-section grid gap-6">
+          <div id="watch" className="detail-section grid grid-cols-1 gap-4">
             <WhereToWatch providers={providers} link={watchLink} />
             <DeferredWatchSources contentId={movie.id} contentType="movie" title={movie.title} />
           </div>
 
           {(cast.length > 0 || crewAsCast.length > 0) && (
-            <div id="cast" className="detail-section">
+            <div id="cast" className="detail-section grid grid-cols-1 gap-6">
               <CastList cast={cast} title="Cast" />
               <CastList cast={crewAsCast} title="Crew" />
             </div>
           )}
 
-          <div id="reviews" className="detail-section">
+          <div id="reviews" className="detail-section [&>section]:mt-0">
             <div ref={communitySectionRef} className="h-px" />
             {shouldRenderCommunity ? (
               <Suspense fallback={<div className="detail-skeleton-card" />}>

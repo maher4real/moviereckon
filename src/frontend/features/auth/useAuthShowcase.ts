@@ -50,7 +50,9 @@ export function useAuthShowcase() {
     for (let index = 0; index < 3; index += 1) {
       [movies[index], bollywood[index], series[index]].forEach((item) => { if (item) mixed.push(item); });
     }
-    if (mixed.length) return mixed;
+    const seen = new Set<string>();
+    const unique = mixed.filter((slide) => (seen.has(slide.src) ? false : (seen.add(slide.src), true)));
+    if (unique.length) return unique;
     return TMDB_FALLBACK_POSTERS.slice(0, 7).map((poster, index) => ({
       id: `fallback-${index}`, src: getPosterUrl(poster.path, "medium"), title: poster.title, eyebrow: poster.eyebrow,
     }));

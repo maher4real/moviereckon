@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import BrandLogo from "@/frontend/components/BrandLogo";
-import MediaImage from "@/frontend/components/MediaImage";
+import PosterWall from "@/frontend/components/PosterWall";
 import { useAuth } from "@/frontend/hooks/useAuth";
 import { useIsMobile } from "@/frontend/hooks/use-mobile";
 import {
@@ -27,8 +27,8 @@ const INITIAL_TRANSFORM = {
   y: 0,
   scale: 1,
 };
-const ROW_COUNT = 4;
-const POSTERS_PER_ROW = 9;
+const ROW_COUNT = 3;
+const POSTERS_PER_ROW = 8;
 const isAuthRoute = (pathname: string) =>
   pathname === "/" || pathname.startsWith("/auth");
 
@@ -69,7 +69,7 @@ export default function AuthTransitionOverlay() {
   });
 
   const backgroundPosters = useMemo(() => {
-    const maxItems = 24;
+    const maxItems = 36;
 
     const moviePosters = (trendingMovies || [])
       .filter((item) => item.poster_path)
@@ -138,17 +138,6 @@ export default function AuthTransitionOverlay() {
       src: getPosterUrl(poster.path, "small"),
     }));
   }, [bollywoodData, trendingMovies, trendingTV]);
-
-  const posterRows = useMemo(() => {
-    const total = backgroundPosters.length || 1;
-
-    return Array.from({ length: ROW_COUNT }, (_, rowIndex) => {
-      const start = (rowIndex * 7) % total;
-      return Array.from({ length: POSTERS_PER_ROW }, (_, offset) => {
-        return backgroundPosters[(start + offset) % total];
-      });
-    });
-  }, [backgroundPosters]);
 
   const clearPendingWork = useCallback(() => {
     if (timerRef.current !== null) {
@@ -315,40 +304,14 @@ export default function AuthTransitionOverlay() {
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 scale-[1.08] -rotate-2">
           <div
-            className="flex h-full flex-col justify-center gap-3 opacity-84"
+            className="h-full opacity-84"
             style={{
               filter: hasRemotePosterArt
                 ? "saturate(1.18) contrast(1.08) brightness(1.02)"
                 : "saturate(1.08) contrast(1.04) brightness(0.96)",
             }}
           >
-            {posterRows.map((row, rowIndex) => (
-              <div
-                key={`overlay-row-${rowIndex}`}
-                className={cn(
-                  "auth-poster-row",
-                  rowIndex % 2 === 1 && "auth-poster-row-reverse",
-                )}
-                style={{ animationDuration: `${38 + rowIndex * 4}s` }}
-              >
-                {[...row, ...row].map((poster, index) => (
-                  <div
-                    key={`${poster.id}-${rowIndex}-${index}`}
-                    className="auth-poster-tile"
-                  >
-                    <MediaImage
-                      src={poster.src}
-                      alt=""
-                      aria-hidden="true"
-                      className="h-full w-full object-cover"
-                      fallbackSrc="/fallbacks/poster.svg"
-                      priority={rowIndex === 0 && index < POSTERS_PER_ROW}
-                      loading={rowIndex === 0 ? "eager" : "lazy"}
-                    />
-                  </div>
-                ))}
-              </div>
-            ))}
+            <PosterWall posters={backgroundPosters} rows={ROW_COUNT} maxPerRow={POSTERS_PER_ROW} baseDuration={38} eager={false} />
           </div>
         </div>
 

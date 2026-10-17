@@ -1,5 +1,5 @@
 import BrandLogo from "@/frontend/components/BrandLogo";
-import MediaImage from "@/frontend/components/MediaImage";
+import PosterWall from "@/frontend/components/PosterWall";
 import { Skeleton } from "@/frontend/components/ui/skeleton";
 import { getPosterUrl } from "@/shared/lib/tmdb";
 import { TMDB_FALLBACK_POSTERS } from "@/shared/lib/tmdbFallbacks";
@@ -81,7 +81,7 @@ export function UpcomingTimelineSkeleton({
 export function CenteredAppSkeleton() {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
-      <LoadingPosterCarouselBackdrop rowCount={3} postersPerRow={8} />
+      <LoadingPosterCarouselBackdrop />
 
       <div className="relative z-10 flex flex-col items-center justify-center gap-5" role="status">
         <BrandLogo size="xl" animated />
@@ -93,62 +93,17 @@ export function CenteredAppSkeleton() {
 }
 
 // Static, API-independent posters so the loading screen is never an empty grid.
-const LOADING_POSTER_SOURCES = TMDB_FALLBACK_POSTERS.map((poster) =>
-  getPosterUrl(poster.path, "small"),
-);
+const LOADING_POSTERS = TMDB_FALLBACK_POSTERS.map((poster, index) => ({
+  id: `loading-poster-${index}`,
+  src: getPosterUrl(poster.path, "small"),
+}));
 
-interface LoadingPosterCarouselBackdropProps {
-  rowCount?: number;
-  postersPerRow?: number;
-}
-
-function LoadingPosterCarouselBackdrop({
-  rowCount = 3,
-  postersPerRow = 8,
-}: LoadingPosterCarouselBackdropProps) {
+function LoadingPosterCarouselBackdrop() {
   return (
     <div className="absolute inset-0 overflow-hidden">
       <div className="absolute inset-0 scale-110 -rotate-2">
-        <div
-          className="flex h-full flex-col justify-center gap-3 opacity-62"
-          style={{ filter: "saturate(1.12) contrast(1.04) brightness(0.92)" }}
-        >
-          {Array.from({ length: rowCount }).map((_, rowIndex) => (
-            <div
-              key={`loading-poster-row-${rowIndex}`}
-              className={cn(
-                "auth-poster-row",
-                rowIndex % 2 === 1 && "auth-poster-row-reverse",
-              )}
-              style={{ animationDuration: `${34 + rowIndex * 4}s` }}
-            >
-              {Array.from({ length: postersPerRow * 2 }).map(
-                (_, posterIndex) => (
-                  <div
-                    key={`loading-poster-tile-${rowIndex}-${posterIndex}`}
-                    className="auth-poster-tile"
-                  >
-                    <MediaImage
-                      src={
-                        LOADING_POSTER_SOURCES[
-                          (rowIndex * 2 + posterIndex) %
-                            LOADING_POSTER_SOURCES.length
-                        ]
-                      }
-                      alt=""
-                      aria-hidden="true"
-                      width={146}
-                      height={219}
-                      className="h-full w-full bg-card object-cover"
-                      fallbackSrc="/fallbacks/poster.svg"
-                      loading="eager"
-                      priority={rowIndex === 0 && posterIndex < postersPerRow}
-                    />
-                  </div>
-                ),
-              )}
-            </div>
-          ))}
+        <div className="h-full opacity-62" style={{ filter: "saturate(1.12) contrast(1.04) brightness(0.92)" }}>
+          <PosterWall posters={LOADING_POSTERS} rows={3} />
         </div>
       </div>
       <div className="absolute inset-0 bg-black/24" />

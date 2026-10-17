@@ -405,7 +405,7 @@
   }
 
   .auth-poster-tile {
-    width: clamp(88px, 9vw, 146px);
+    width: var(--poster-tile-w, clamp(88px, 9vw, 146px));
     aspect-ratio: 2 / 3;
     @apply rounded-md overflow-hidden border border-white/10 shadow-lg shadow-black/30;
   }

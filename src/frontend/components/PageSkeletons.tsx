@@ -149,49 +149,49 @@ export function DetailSkeleton() {
   return (
     <Live label="Loading details" className="app-page pb-20 md:pb-0 overflow-x-hidden">
       <SkeletonHeader />
-      <div className="detail-hero-media relative h-[54vh] sm:h-[60vh] md:h-[70vh] lg:h-[74vh] xl:h-[78vh] overflow-hidden">
+      <div className="detail-hero-media relative overflow-hidden">
         <Skeleton className="absolute inset-0 rounded-none" />
         <div className="absolute inset-0 hero-gradient" />
       </div>
-      <div className="detail-content-shell container mx-auto px-4 -mt-48 md:-mt-64 relative z-10 pb-12">
-        <div className="flex flex-col gap-8 md:flex-row">
-          <Skeleton className="hidden aspect-2/3 w-[280px] shrink-0 rounded-lg md:block lg:w-[320px]" />
+      <div className="detail-content-shell container mx-auto px-4 relative z-10 pb-10">
+        <div className="detail-header flex flex-col gap-6 md:flex-row lg:gap-8">
+          <Skeleton className="hidden aspect-2/3 w-48 shrink-0 rounded-lg md:block lg:w-56" />
           <div className="min-w-0 flex-1">
-            <div className="mb-6 flex gap-4 md:hidden">
-              <Skeleton className="aspect-2/3 w-32 rounded-lg" />
+            <div className="mb-4 flex items-start gap-4 md:hidden">
+              <Skeleton className="aspect-2/3 w-24 shrink-0 rounded-lg sm:w-28" />
               <div className="flex-1">
                 <Skeleton className="h-7 w-4/5" />
                 <Skeleton className="mt-3 h-4 w-2/3" />
               </div>
             </div>
             <Skeleton className="mb-3 hidden h-12 w-3/5 md:block" />
-            <Skeleton className="mb-6 hidden h-5 w-2/5 md:block" />
+            <Skeleton className="mb-4 hidden h-5 w-2/5 md:block" />
             <div className="mb-4 flex flex-wrap gap-2">
               {[16, 12, 14, 20, 16].map((width, index) => (
                 <Skeleton key={index} className="h-8 rounded-full" style={{ width: `${width * 4}px` }} />
               ))}
             </div>
-            <div className="mb-8 flex flex-wrap gap-2.5">
-              <Skeleton className="h-12 w-40 rounded-lg" />
-              <Skeleton className="h-12 w-32 rounded-lg" />
-              <Skeleton className="h-12 w-44 rounded-lg" />
+            <div className="grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap">
+              <Skeleton className="h-12 w-full rounded-lg sm:w-40" />
+              <Skeleton className="h-12 w-full rounded-lg sm:w-32" />
+              <Skeleton className="h-12 w-full rounded-lg sm:w-44" />
             </div>
           </div>
         </div>
-        <div className="mt-2 mb-8 flex gap-2 overflow-hidden border-y border-border/40 py-2">
+        <div className="my-5 flex gap-2 overflow-hidden border-y border-border/40 py-2">
           {Array.from({ length: 5 }).map((_, index) => (
-            <Skeleton key={index} className="h-10 w-28 shrink-0 rounded-full" />
+            <Skeleton key={index} className="h-11 w-28 shrink-0 rounded-full" />
           ))}
         </div>
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-5 md:gap-6">
+          <div className="max-w-[72ch] space-y-3">
             <Skeleton className="h-6 w-32" />
             {[100, 96, 92, 98, 60].map((width, index) => (
               <Skeleton key={index} className="h-4" style={{ width: `${width}%` }} />
             ))}
           </div>
-          <div className="skeleton-surface space-y-4 p-5">
-            {Array.from({ length: 5 }).map((_, index) => (
+          <div className="skeleton-surface grid grid-cols-2 gap-x-6 gap-y-4 p-4 sm:grid-cols-3 md:p-5 lg:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, index) => (
               <div key={index} className="space-y-1.5">
                 <Skeleton className="h-3 w-20" />
                 <Skeleton className="h-4 w-4/5" />

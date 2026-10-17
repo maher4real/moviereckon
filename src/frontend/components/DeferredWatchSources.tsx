@@ -21,7 +21,7 @@ function DeferredContent(props: DetailWatchProps) {
   const primary = !props.variant || props.variant === "content";
   const label = props.variant === "episode" ? `Watch episode ${props.episode}` :
     props.variant === "season" ? `Watch season ${props.season}` : props.contentType === "movie" ? "Watch movie" : "Watch series";
-  return <div className={primary ? "mb-8" : "px-4 py-3"}>
+  return <div className={primary ? undefined : "px-4 py-3"}>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild><Button type="button" variant={primary ? "default" : "outline"} className="min-h-11 gap-2 px-5">
         <Play className="h-4 w-4" aria-hidden="true" />{label}

@@ -23,7 +23,7 @@ import {
   USERNAME_REGEX,
 } from "@/frontend/lib/profileEditor";
 import { cn } from "@/shared/lib/utils";
-import { ArrowLeft, Camera, UserRound } from "lucide-react";
+import { ArrowLeft, Camera, Check, UserRound } from "lucide-react";
 
 export default function ProfileEdit() {
   const {
@@ -42,7 +42,7 @@ export default function ProfileEdit() {
 
   useEffect(() => {
     setUsernameInput(profile?.username || user?.username || "");
-    setAvatarInput(normalizeAvatarValue(profile?.avatar_url || ""));
+    setAvatarInput(normalizeAvatarValue(profile?.avatar_url || user?.avatar_url || ""));
   }, [profile?.avatar_url, profile?.username, user?.avatar_url, user?.username]);
 
   const displayName = profile?.username || user?.username || "User";
@@ -55,7 +55,7 @@ export default function ProfileEdit() {
         createDefaultAvatarDataUrl(candidate.id),
       ),
     ) || null;
-  const selectedAvatarValue = normalizedAvatarInput || currentAvatar || "";
+  const selectedAvatarValue = normalizedAvatarInput;
   const previewAvatar = selectedAvatarValue || undefined;
   const isDefaultAvatar = Boolean(selectedDefaultAvatar);
   const isUploadedAvatar =
@@ -448,52 +448,62 @@ export default function ProfileEdit() {
                 </section>
               </div>
 
-              <section className="rounded-3xl border border-border/70 bg-card/65 p-5 shadow-sm">
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Avatar Gallery
-                  </p>
-                  {isDefaultAvatar ? (
-                    <Badge className="bg-primary/15 text-primary hover:bg-primary/15">
-                      Selected
-                    </Badge>
-                  ) : null}
+              <section aria-labelledby="avatar-gallery-title" className="overflow-hidden rounded-2xl border border-white/10 bg-card/60">
+                <div className="border-b border-white/8 px-4 py-5 sm:px-6">
+                  <p className="mb-1 text-xs font-medium uppercase tracking-[0.16em] text-primary">Make it yours</p>
+                  <h2 id="avatar-gallery-title" className="text-xl font-semibold tracking-tight">Choose your avatar</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Pick a face for your next film night.</p>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 md:grid-cols-4 xl:grid-cols-6">
-                  {DEFAULT_AVATAR_OPTIONS.map((candidate) => {
-                    const candidateValue = createDefaultAvatarDataUrl(candidate.id);
-                    const isSelected = isDefaultAvatarSelected(
-                      normalizedAvatarInput,
-                      candidateValue,
-                    );
+                <div className="space-y-7 px-3 py-6 sm:px-5">
+                  {[
+                    { id: "cinema", title: "Cinema portraits", description: "A little main-character energy.", prefix: "cinema-" },
+                    { id: "colour", title: "Colour characters", description: "Bright faces, big personalities.", prefix: "net-" },
+                  ].map((collection) => (
+                    <div key={collection.id} role="group" aria-labelledby={`avatar-${collection.id}`}>
+                      <div className="mb-4 px-1">
+                        <h3 id={`avatar-${collection.id}`} className="text-sm font-semibold">{collection.title}</h3>
+                        <p className="mt-1 text-xs text-muted-foreground">{collection.description}</p>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                        {DEFAULT_AVATAR_OPTIONS.filter((candidate) => candidate.id.startsWith(collection.prefix)).map((candidate) => {
+                          const candidateValue = createDefaultAvatarDataUrl(candidate.id);
+                          const isSelected = isDefaultAvatarSelected(normalizedAvatarInput, candidateValue);
+                          return (
+                            <button
+                              key={candidate.id}
+                              type="button"
+                              aria-label={`Choose ${candidate.label} avatar`}
+                              aria-pressed={isSelected}
+                              disabled={isSavingProfile || isProcessingAvatar}
+                              onClick={() => setAvatarInput(candidateValue)}
+                              className={cn(
+                                "group flex min-w-0 flex-col items-center gap-3 rounded-xl border p-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-wait disabled:opacity-50",
+                                isSelected ? "border-primary/60 bg-primary/10" : "border-transparent hover:border-white/15 hover:bg-white/5",
+                              )}
+                            >
+                              <span className="relative block aspect-square w-full max-w-20">
+                                <img src={candidate.path} alt="" width={80} height={80} className={cn("h-full w-full rounded-full object-cover ring-2 ring-offset-4 ring-offset-card", isSelected ? "ring-primary" : "ring-white/10 group-hover:ring-white/30")} />
+                                {isSelected && <span className="absolute -bottom-1 -right-1 flex size-6 items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground"><Check className="size-3.5" strokeWidth={3} aria-hidden="true" /></span>}
+                              </span>
+                              <span className={cn("w-full truncate text-center text-xs font-medium", isSelected ? "text-foreground" : "text-muted-foreground group-hover:text-foreground")}>{candidate.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
 
-                    return (
-                      <button
-                        key={candidate.id}
-                        type="button"
-                        onClick={() => setAvatarInput(candidateValue)}
-                        className={cn(
-                          "group rounded-3xl border border-border bg-background/70 p-2 text-left transition-all hover:-translate-y-0.5 hover:border-primary hover:bg-background",
-                          isSelected && "border-primary ring-2 ring-primary/25",
-                        )}
-                      >
-                        <div className="relative mb-2 overflow-hidden rounded-2xl border border-border/60 bg-muted/40">
-                          {isSelected ? (
-                            <span className="absolute right-1.5 top-1.5 z-10 rounded-full bg-background/90 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-primary">
-                              ✓
-                            </span>
-                          ) : null}
-                          <img
-                            src={candidate.path}
-                            alt={candidate.label}
-                            className="h-24 w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                          />
-                        </div>
-                        <p className="truncate text-xs font-medium">{candidate.label}</p>
-                      </button>
-                    );
-                  })}
+                <div className="flex items-center gap-3 border-t border-white/8 bg-background/40 px-4 py-4 sm:px-6" aria-live="polite">
+                  <Avatar className="size-10 shrink-0 border border-white/10">
+                    <AvatarImage src={previewAvatar} alt="" />
+                    <AvatarFallback>{getInitials(usernameInput || displayName)}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{selectedDefaultAvatar ? `${selectedDefaultAvatar.label} selected` : avatarStatusLabel}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{hasChanges ? "Looking good? Select Save Changes to keep it." : "Choose an avatar to preview it here."}</p>
+                  </div>
                 </div>
               </section>
             </section>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
 import { ChevronLeft, ChevronRight, Pause, Play, Star } from "lucide-react";
 import { useReducedMotion } from "motion/react";
 import MediaImage from "@/frontend/components/MediaImage";
@@ -49,8 +49,14 @@ function isKeyboardFocus(target: EventTarget) {
   }
 }
 
-export default function PosterShowcase({ slides, label, interval = 6000, className, hideCaption = false, onActiveChange }: PosterShowcaseProps) {
+export default function PosterShowcase({ slides: rawSlides, label, interval = 6000, className, hideCaption = false, onActiveChange }: PosterShowcaseProps) {
   const reduceMotion = useReducedMotion();
+  // The same title can arrive from several lists (trending and regional picks), so
+  // collapse repeats by poster before building the carousel.
+  const slides = useMemo(() => {
+    const seen = new Set<string>();
+    return rawSlides.filter((slide) => (seen.has(slide.src) ? false : (seen.add(slide.src), true)));
+  }, [rawSlides]);
   const total = slides.length;
   const [active, setActive] = useState(0);
   const [userPaused, setUserPaused] = useState(false);

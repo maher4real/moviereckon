@@ -80,7 +80,7 @@ export default function DetailWatchSection({ contentId, contentType, title, seas
           {rows.length ? <ol className="divide-y divide-border">{rows.map((link, index) => <li key={link.id} className="flex min-w-0 items-start gap-3 py-4 first:pt-0">
             <span className="mt-3 w-6 shrink-0 font-mono text-xs text-muted-foreground">{String(index + 1).padStart(2, "0")}</span>
             <div className="min-w-0 flex-1">{tab === "watch" ? <>
-              <DirectWatchPlayer inline link={link} identity={identity} context={title} />
+              <DirectWatchPlayer inline link={link} identity={identity} context={title} fallbackLinks={watch} />
               <p className="mt-2 break-words text-xs text-muted-foreground">{metadata(link)}</p>
             </> : isResolvableDownload(link) ? <ResolveDownloadButton inlinePlayer link={link} identity={identity} /> : <>
               <a href={link.url} target="_blank" rel="noopener noreferrer" download className="inline-flex min-h-11 items-center text-sm underline">Open file · {link.label}</a>

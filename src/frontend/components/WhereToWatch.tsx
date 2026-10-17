@@ -88,8 +88,8 @@ function WhereToWatch({ providers, link }: WhereToWatchProps) {
   };
 
   return (
-    <div className="mb-8">
-      <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+    <div className="space-y-3">
+      <h2 className="text-xl font-semibold flex items-center gap-2">
         <ExternalLink className="w-5 h-5" />
         Where to Watch
       </h2>
