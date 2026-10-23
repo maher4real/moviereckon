@@ -10,6 +10,8 @@ import type { WatchSourceLink } from "@/shared/types/watchSources";
 import { Button } from "./ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import WatchLinkButton from "./WatchLinkButton";
+import ExternalWatchProviders from "./ExternalWatchProviders";
+import { externalWatchProviders } from "@/shared/lib/externalWatchProviders";
 import ResolveDownloadButton from "./ResolveDownloadButton";
 import LoadingIndicator from "./LoadingIndicator";
 import WatchMetaChips, { watchLinkScope } from "./WatchMetaChips";
@@ -89,9 +91,12 @@ export default function DetailWatchSection({ contentId, contentType, title, seas
   const notice = search.isError ? (search.error instanceof Error ? search.error.message : "Search unavailable. Try again.") :
     search.data?.status === "partial" ? "Some providers could not finish." :
     search.data?.status === "busy" ? "Catalog update running. Try again shortly." : null;
+  const providerSeason = selectedSeason === "all" ? undefined : Number(selectedSeason);
+  const providerEpisode = selectedSeason === "all" || selectedEpisode === "all" ? undefined : Number(selectedEpisode);
+  const playerCount = externalWatchProviders(identity, providerSeason, providerEpisode).length;
   const tabs = [
-    { value: "download", label: "Download", Icon: Download, rows: downloads },
-    { value: "watch", label: "Watch", Icon: Play, rows: watch },
+    { value: "download", label: "Download", Icon: Download, rows: downloads, other: external.filter((link) => link.kind !== "watch") },
+    { value: "watch", label: "Watch", Icon: Play, rows: watch, other: external.filter((link) => link.kind === "watch") },
   ] as const;
   const groupBy = contentType === "tv" ? (rows: WatchSourceLink[]) => groupByEpisode(rows, selectedSeason !== "all") : null;
   // Inside an episode group the S/E chip only repeats the heading.
@@ -118,14 +123,15 @@ export default function DetailWatchSection({ contentId, contentType, title, seas
     </div>}
     <Tabs defaultValue="download">
       <TabsList aria-label="Link type" className="grid h-12 w-full grid-cols-2 rounded-xl">
-        {tabs.map(({ value, label, Icon, rows }) => <TabsTrigger key={value} value={value} className="min-h-10 gap-2 rounded-lg">
+        {tabs.map(({ value, label, Icon, rows, other }) => <TabsTrigger key={value} value={value} className="min-h-10 gap-2 rounded-lg">
           <Icon className="h-4 w-4" aria-hidden="true" />{label}
-          <span className="rounded-full bg-foreground/10 px-1.5 text-[11px] font-semibold tabular-nums">{rows.length}</span>
+          <span className="rounded-full bg-foreground/10 px-1.5 text-[11px] font-semibold tabular-nums">{rows.length + other.length + (value === "watch" ? playerCount : 0)}</span>
         </TabsTrigger>)}
       </TabsList>
-      {tabs.map(({ value: tab, Icon, rows }) => {
-        const other = external.filter((link) => tab === "watch" ? link.kind === "watch" : link.kind !== "watch");
+      {tabs.map(({ value: tab, Icon, rows, other }) => {
         return <TabsContent key={tab} value={tab} className="mt-4">
+          {tab === "watch" && <ExternalWatchProviders identity={identity} title={title}
+            season={providerSeason} episode={providerEpisode} />}
           {rows.length ? <LinkList links={rows} groupBy={groupBy} className="space-y-3" renderLink={(link, grouped) => <li key={link.id} className="min-w-0 rounded-xl border border-border/70 bg-card/50 p-3 sm:p-4">
             {tab === "watch" ? <>
               <WatchLinkButton link={link} context={title} />
@@ -144,9 +150,9 @@ export default function DetailWatchSection({ contentId, contentType, title, seas
                   <Download className="h-4 w-4" aria-hidden="true" />Open file
                 </a>
               </div>}
-          </li>} /> : <div className="flex min-h-36 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/70 px-4 text-center">
+          </li>} /> : tab === "download" && other.length === 0 && <div className="flex min-h-36 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/70 px-4 text-center">
             <Icon className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
-            <p className="text-sm text-muted-foreground">{search.isFetching ? "Searching…" : `No ${tab} links yet`}</p>
+            <p className="text-sm text-muted-foreground">{search.isFetching ? "Searching…" : "No download links yet"}</p>
           </div>}
           {other.length > 0 && <section aria-label="Other provider pages" className="mt-5">
             <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

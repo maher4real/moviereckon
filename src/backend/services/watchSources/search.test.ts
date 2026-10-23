@@ -1,8 +1,11 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ fetch: vi.fn() }));
 vi.mock("./contentImport", () => ({ fetchContentSources: mocks.fetch }));
 import { searchContentSources } from "./search";
 const config = { baseUrl: "https://new8.hdhub4u.cl", batchSize: 20, concurrency: 3, discoveryPages: 2, refreshHours: 24, budgetMs: 210000 };
+beforeEach(() => {
+  for (const provider of ["MOVIESMOD", "BOLLYFLIX", "UHDMOVIES"]) vi.stubEnv(`WATCH_${provider}_ENABLED`, "false");
+});
 afterEach(() => { vi.resetAllMocks(); vi.unstubAllEnvs(); });
 describe("independent catalog searches", () => {
   it("keeps streamed results when another catalog fails or returns an older snapshot", async () => {

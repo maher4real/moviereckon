@@ -5,7 +5,7 @@ import { getImporterConfig, sourcePageUrl, type ImporterConfig } from "./config"
 import { fetchSourceDocument, type SourceResponse } from "./http";
 import { createContentMatcher, type MatchResult } from "./matcher";
 import { normalizeSourceTitle } from "./parser";
-import { catalogProvider, catalogIndexUrl, discoverCatalogPages, parseCatalogPage } from "./catalogs";
+import { CATALOG_NAMES, catalogProvider, catalogIndexUrl, discoverCatalogPages, parseCatalogPage } from "./catalogs";
 import { discoverArchive } from "./discovery";
 import { runSourceImport } from "./importer";
 import { createSourceRepository, lookupContentSources, type SourceRepository } from "./store";
@@ -56,7 +56,7 @@ export async function fetchContentSources(
   const [identityResult, saved] = await Promise.all([identityLookup, savedLookup]);
   if ("error" in identityResult) throw identityResult.error;
   const identity = identityResult.identity;
-  emit({ type: "progress", message: `Searching ${catalogProvider(config) === "hdhub" ? "HDHub" : "4KHDHub"} for matching releases…` });
+  emit({ type: "progress", message: `Searching ${CATALOG_NAMES[catalogProvider(config)]} for matching releases…` });
   const candidates = new Set<string>();
   let errors = 0;
   let repository: SourceRepository | undefined;
@@ -68,7 +68,8 @@ export async function fetchContentSources(
     const titles = [...new Set([identity.title, identity.originalTitle].map(normalizeSourceTitle).filter(Boolean))];
     const matchesTitle = (url: string) => {
       try {
-        const slug = normalizeSourceTitle(decodeURIComponent(new URL(url).pathname));
+        const path = decodeURIComponent(new URL(url).pathname);
+        const slug = normalizeSourceTitle(["moviesmod", "bollyflix", "uhdmovies"].includes(catalogProvider(config)) ? path.replace(/^\/download-/i, "/") : path);
         return titles.some((title) => slug === title || slug.startsWith(`${title} `));
       } catch { return false; }
     };
@@ -100,7 +101,7 @@ export async function fetchContentSources(
   const snapshots = new Map<string, { response: SourceResponse; parsed: ParsedSourcePage; matching: MatchResult }>();
   const urls = [...candidates].slice(0, 100);
   if (urls.length < candidates.size) errors++;
-  emit({ type: "progress", message: `Checking ${urls.length} candidate releases from ${catalogProvider(config) === "hdhub" ? "HDHub" : "4KHDHub"}…` });
+  emit({ type: "progress", message: `Checking ${urls.length} candidate releases from ${CATALOG_NAMES[catalogProvider(config)]}…` });
   let cursor = 0;
   await Promise.all(Array.from({ length: Math.min(config.concurrency, urls.length) }, async () => {
     while (cursor < urls.length && Date.now() - started < config.budgetMs - 30_000) {

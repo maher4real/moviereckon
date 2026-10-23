@@ -1,3 +1,5 @@
+export type WatchCatalogProvider = "hdhub" | "4khdhub" | "moviesmod" | "bollyflix" | "uhdmovies";
+
 export type SourceMediaType = "movie" | "tv";
 
 export interface WatchSourceIdentity {
@@ -64,7 +66,7 @@ export interface ContentWatchSources {
   contentId: number;
   contentType: SourceMediaType;
   sources: Array<{
-    provider: "hdhub" | "4khdhub";
+    provider: WatchCatalogProvider;
     sourcePage: string;
     title: string;
     checkedAt: string | null;

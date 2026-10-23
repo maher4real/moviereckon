@@ -390,6 +390,11 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/** For chrome that may render outside the provider (e.g. in isolated tests). */
+export function useOptionalWatchlist() {
+  return useContext(WatchlistContext);
+}
+
 export function useWatchlist() {
   const ctx = useContext(WatchlistContext);
   if (!ctx) throw new Error("useWatchlist must be used within WatchlistProvider");

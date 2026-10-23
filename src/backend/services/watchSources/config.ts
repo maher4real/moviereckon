@@ -1,9 +1,10 @@
 import "server-only";
+import type { WatchCatalogProvider } from "@/shared/types/watchSources";
 import { publicLink } from "./parser";
 
 export interface ImporterConfig {
   baseUrl: string;
-  provider?: "hdhub" | "4khdhub";
+  provider?: WatchCatalogProvider;
   batchSize: number;
   concurrency: number;
   discoveryPages: number;
@@ -36,12 +37,28 @@ export function getImporterConfig(): ImporterConfig {
 export function sourcePageUrl(value: string, config: ImporterConfig): string {
   const url = publicLink(value, config.baseUrl);
   if (!url || url.origin !== config.baseUrl || url.search || url.hash ||
-      !/^\/[^/]+\/$/.test(url.pathname)) throw new Error("Source page must be on HDHUB_BASE_URL with a single post path");
+      !/^\/[^/]+\/$/.test(url.pathname)) throw new Error("Source page must be on the configured catalog origin with a single post path");
   return url.href;
 }
 
 /** Independent catalogs use separate queue identities and leases. */
 export function getCatalogConfigs(config = getImporterConfig()): ImporterConfig[] {
-  return process.env.WATCH_4KHDHUB_ENABLED === "false" ? [config] :
-    [config, { ...config, provider: "4khdhub", baseUrl: "https://4khdhub.one" }];
+  const catalogs: ImporterConfig[] = [config];
+  const additional = [
+    { provider: "4khdhub", key: "4KHDHUB", origin: "https://4khdhub.one" },
+    { provider: "moviesmod", key: "MOVIESMOD", origin: "https://moviesmod.uk.com" },
+    { provider: "bollyflix", key: "BOLLYFLIX", origin: "https://bollyflix.co.za" },
+    { provider: "uhdmovies", key: "UHDMOVIES", origin: "https://uhdmovies.us.org" },
+  ] as const;
+  for (const { provider, key, origin } of additional) {
+    if (process.env[`WATCH_${key}_ENABLED`] === "false") continue;
+    const originKey = provider === "4khdhub" ? "FOUR_KHDHUB_BASE_URL" : `${key}_BASE_URL`;
+    const value = process.env[originKey] || origin;
+    const base = publicLink(value, value);
+    if (!base || base.protocol !== "https:" || base.search || base.hash || base.pathname !== "/") {
+      throw new Error(`${originKey} must be a public HTTPS origin`);
+    }
+    catalogs.push({ ...config, provider, baseUrl: base.origin });
+  }
+  return catalogs;
 }

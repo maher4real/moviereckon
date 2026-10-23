@@ -199,3 +199,50 @@ REA investigation of Prahaar identified all nine published entries, including tw
 These are provider-specific adapters, reusable across matching content, rather than an unconditional promise of every internet host. Provider protocol changes, challenges, deleted files and unavailable releases remain possible. Automated checks cover filenames, HTTP headers/ranges and HLS playlists; they do not establish the video contents, language or complete playback.
 
 Live verification on 2026-10-17 found all nine published Prahaar entries: seven download rows resolving to 13 final file mirrors, plus HDStream and HubStream watch providers. Chrome playback advanced for HDStream and both HubStream qualities (720p and 1080p). UI checks used fixture API responses with real media, confirmed no requests before opening the popup, and checked desktop/mobile layouts; they did not establish live authentication, TMDB or MongoDB coverage. Downloads were validated by matching filenames and file headers, not by downloading entire films. A separate GreenMotors entry from the Weapons 4K catalog also resolved through its directly wrapped HubCloud destination. HubStream's blocked native-media route and HDStream's CORS-incompatible proxy are not offered as working fallbacks.
+
+### Additional providers
+
+The popup also searches **MoviesMod**, **BollyFlix**, and **UHDMovies**. Each catalog
+has its own queue identity and lease, runs independently, and must pass the same
+IMDb/TMDB or exact title/year matching checks before its links are saved. The
+WordPress adapters read published release rows, retain quality/codec/size and
+explicit season/episode scope, and exclude navigation, recommendations and trailers.
+Search uses each catalog's public title search and recent pages. Download-prefixed
+post slugs are normalized for candidate selection; a title match alone never
+establishes identity. These catalogs also participate in scheduled imports.
+
+| Variable | Default |
+| --- | --- |
+| `MOVIESMOD_BASE_URL` | `https://moviesmod.uk.com` |
+| `BOLLYFLIX_BASE_URL` | `https://bollyflix.co.za` |
+| `UHDMOVIES_BASE_URL` | `https://uhdmovies.us.org` |
+| `FOUR_KHDHUB_BASE_URL` | `https://4khdhub.one` |
+
+Use `WATCH_MOVIESMOD_ENABLED=false`, `WATCH_BOLLYFLIX_ENABLED=false`,
+`WATCH_UHDMOVIES_ENABLED=false`, or `WATCH_4KHDHUB_ENABLED=false` to disable a
+catalog independently. Origin overrides must be public HTTPS origins; cross-origin
+redirects remain rejected. The origins and published movie/series layouts were
+checked on 2026-10-23. Domain rotation requires updating the corresponding setting.
+
+**More watch providers** adds [VidLink](https://vidlink.pro/#api) using its
+documented TMDB movie and exact-episode routes. These are external player choices,
+labeled as availability unverified, not imported or verified media. Series viewing
+requires a selected episode or the Watch action on an episode detail. An unselected
+episode never defaults to episode one. The providers open only when clicked, in a new tab without an opener
+or app referrer. No iframe or provider scripts are added to MovieReckon.
+
+Published download buttons from the new catalogs may lead to link collections or
+external pages. The existing direct-file resolver still accepts only its supported
+hosts and validates filenames and headers. New external pages are not presented
+as verified direct downloads; no general-purpose ad-chain traversal was added.
+
+Series identity handling also reads 4KHDHub's title-matched Open Graph year and
+normalizes explicit series year ranges to their first broadcast year. This avoids
+losing otherwise valid series releases without weakening unique title/year matching.
+
+VidSrc and VidFast were evaluated but excluded: direct VidSrc launches became blank
+pages, and VidFast returned a blocked response in the test browser. VidLink loaded
+matching movie and episode media and advanced playback for Weapons and Breaking Bad
+S1 E1 during a short browser check on 2026-10-23. The check used keyboard playback
+controls because an ad overlay intercepted pointer clicks; third-party ads and
+availability remain provider-controlled. Published catalog links are not guarantees of final-file access.

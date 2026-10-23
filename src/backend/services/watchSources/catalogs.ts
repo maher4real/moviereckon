@@ -1,12 +1,15 @@
 import { load } from "cheerio";
+import { discoverWordpressPages, parseWordpressPage } from "./wordpressCatalog";
 import type { ImporterConfig } from "./config";
-import { discoverSourcePages, parseSourcePage, publicLink } from "./parser";
+import { discoverSourcePages, normalizeSourceTitle, parseSourcePage, publicLink } from "./parser";
 
 export const FOUR_K_ORIGIN = "https://4khdhub.one";
+export const CATALOG_NAMES = { hdhub: "HDHub", "4khdhub": "4KHDHub", moviesmod: "MoviesMod", bollyflix: "BollyFlix", uhdmovies: "UHDMovies" } as const;
 export const catalogProvider = (config: ImporterConfig) => config.provider || "hdhub";
 
 export function discoverCatalogPages(html: string, config: ImporterConfig): string[] {
   if (catalogProvider(config) === "hdhub") return discoverSourcePages(html, config.baseUrl);
+  if (catalogProvider(config) !== "4khdhub") return discoverWordpressPages(html, config.baseUrl);
   const $ = load(html);
   return [...new Set($("a.movie-card[href]").toArray().flatMap((node) => {
     const url = publicLink($(node).attr("href") || "", config.baseUrl);
@@ -17,11 +20,17 @@ export function discoverCatalogPages(html: string, config: ImporterConfig): stri
 
 export function parseCatalogPage(html: string, url: string, config: ImporterConfig) {
   if (catalogProvider(config) === "hdhub") return parseSourcePage(html, url);
+  if (catalogProvider(config) !== "4khdhub") return parseWordpressPage(html, url);
   const $ = load(html);
   // Adapt only published file rows. Never include related titles or navigation.
   const page = load("<main><h1></h1><h2>Download Links</h2></main>");
   let title = $("h1").first().text();
-  if (/-series-\d+\/$/.test(new URL(url).pathname)) title += " Series";
+  // This catalog keeps the release year in Open Graph metadata, outside h1.
+  const ogTitle = $("meta[property='og:title']").attr("content") || "";
+  const ogIdentity = ogTitle.match(/^(.*?)\s*\(((?:19|20)\d{2})\)/);
+  if (!/\((?:19|20)\d{2}\)/.test(title) && ogIdentity &&
+      normalizeSourceTitle(ogIdentity[1]) === normalizeSourceTitle(title)) title += ` (${ogIdentity[2]})`;
+  if (/-series-\d+\/$/.test(new URL(url).pathname)) title += " (Season)";
   page("h1").text(title);
   $(".download-item").each((_, row) => {
     const metadata = $(row).find(".file-title").first().text() || $(row).find(".download-header").text();

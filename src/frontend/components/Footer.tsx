@@ -58,7 +58,8 @@ export default function Footer() {
     <footer className="relative mt-auto border-t border-border/70 bg-background">
       <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-card/30 to-transparent" />
 
-      <div className="container relative mx-auto px-4 py-10 md:py-12">
+      {/* Bottom space keeps the last row clear of the mobile nav and the desktop watchlist button. */}
+      <div className="container relative mx-auto px-4 pt-10 pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))] md:pt-12 md:pb-24">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,2fr)]">
           <div className="max-w-sm py-2">
             <Link to="/home" className="mb-3 inline-flex items-center">

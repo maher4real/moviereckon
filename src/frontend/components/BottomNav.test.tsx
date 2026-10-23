@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("motion/react", () => ({
   motion: {
@@ -9,7 +9,12 @@ vi.mock("motion/react", () => ({
   },
 }));
 
+const watchlist = vi.hoisted(() => ({ current: null as null | { items: Array<{ watched: boolean }>; isOpen: boolean; openPanel: () => void } }));
+vi.mock("@/frontend/hooks/useWatchlist", () => ({ useOptionalWatchlist: () => watchlist.current }));
+
 import BottomNav from "./BottomNav";
+
+beforeEach(() => { watchlist.current = null; });
 
 function renderAt(path: string) {
   return render(
@@ -20,21 +25,23 @@ function renderAt(path: string) {
 }
 
 describe("BottomNav", () => {
-  it("renders six tabs and marks the active route", () => {
+  it("renders the route tabs and marks the active route", () => {
     renderAt("/reckon");
     const links = screen.getAllByRole("link");
-    expect(links.map((link) => link.textContent)).toEqual(["Home", "Reckon", "Movies", "Series", "Upcoming", "Search"]);
+    expect(links.map((link) => link.textContent)).toEqual(["Home", "Reckon", "Movies", "Series", "Upcoming"]);
     expect(screen.getByRole("link", { name: "Reckon" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Home" })).not.toHaveAttribute("aria-current");
   });
 
-  it("hides only Search below 400px (the header keeps a search button) and uses five columns", () => {
+  it("uses a Watchlist tab instead of a floating button and hides no tab on narrow phones", () => {
+    const openPanel = vi.fn();
+    watchlist.current = { items: [{ watched: false }, { watched: false }, { watched: true }], isOpen: false, openPanel };
     renderAt("/home");
-    // Tailwind compiles max-[400px]: to width < 400px, so 399px and fractions below 400 get five tabs.
-    const hidden = screen.getAllByRole("link").filter((link) => link.className.includes("max-[400px]:hidden"));
-    expect(hidden.map((link) => link.textContent)).toEqual(["Search"]);
-    expect(screen.getByRole("navigation").innerHTML).toContain("max-[400px]:grid-cols-5");
-    expect(screen.getByRole("navigation").innerHTML).not.toContain("max-[399px]");
+    const tab = screen.getByRole("button", { name: "Watchlist, 2 unwatched" });
+    expect(tab).toHaveAttribute("data-watchlist-target");
+    fireEvent.click(tab);
+    expect(openPanel).toHaveBeenCalledOnce();
+    expect(screen.getByRole("navigation").innerHTML).not.toMatch(/max-\[\d+px\]:(hidden|grid-cols-5)/);
   });
 
   it("keeps Upcoming visible at every width so it is always one tap away", () => {

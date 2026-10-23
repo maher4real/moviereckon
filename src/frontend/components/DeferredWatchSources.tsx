@@ -30,7 +30,7 @@ function DeferredContent(props: DetailWatchProps) {
         <div className="border-b border-border px-5 py-5 pr-12 sm:px-6">
           <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-primary">Watch & download</p>
           <DialogTitle className="break-words text-xl sm:text-2xl">{props.title}</DialogTitle>
-          <DialogDescription className="mt-2">Choose a source. Links are checked when you play or download.</DialogDescription>
+          <DialogDescription className="mt-2">Choose a provider to watch or download.</DialogDescription>
         </div>
         <Suspense fallback={<LoadingIndicator label="Opening link search…" className="min-h-48 justify-center" />}>
           <DetailWatchSection {...props} />

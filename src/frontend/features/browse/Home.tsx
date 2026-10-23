@@ -16,6 +16,8 @@ import {
   getNowPlayingMovies,
   getUpcomingMovies,
   getUpcomingTVShows,
+  getTrendingTVShows,
+  getIndianTVShows,
   Movie,
   TVShow,
 } from "@/shared/lib/tmdb";
@@ -24,10 +26,13 @@ import HeroBanner from "@/frontend/components/HeroBanner";
 import ContentCarousel from "@/frontend/components/ContentCarousel";
 import Footer from "@/frontend/components/Footer";
 import GenreRail from "@/frontend/components/GenreRail";
+import Top10Row from "@/frontend/components/Top10Row";
 import TodaysPicksDialog from "@/frontend/components/TodaysPicksDialog";
 import { useTodaysPicksGate } from "@/frontend/hooks/useTodaysPicksGate";
 import { useWatchlist } from "@/frontend/hooks/useWatchlist";
 import { buildPickPool } from "./todaysPicksSource";
+import { buildTop10, homeItemKey, interleaveBlend, libraryItemToCard, type HomeItem } from "./homeBlend";
+import { loadBecauseYouWatched, loadBlendedGenreLists, loadNewReleaseLists } from "./homeSources";
 import {
   TrendingUp,
   Film,
@@ -37,6 +42,10 @@ import {
   Clapperboard,
   Award,
   Globe,
+  Sparkles,
+  Bookmark,
+  Flame,
+  Laugh,
 } from "lucide-react";
 import { announceHomeHeroReady } from "@/frontend/lib/startupSound";
 import { formatLocalDate, isAnimeLike } from "@/shared/lib/utils";
@@ -197,6 +206,51 @@ export default function Home() {
     enabled: loadSecondaryShelves,
   });
 
+  const { data: trendingSeries, isLoading: trendingSeriesLoading } = useQuery({
+    queryKey: ["trending-tv-week"],
+    queryFn: () => getTrendingTVShows("week"),
+    ...queryConfig,
+  });
+
+  const { data: indianSeriesData, isLoading: indianSeriesLoading } = useQuery({
+    queryKey: ["indian-tv"],
+    queryFn: () => getIndianTVShows(),
+    ...queryConfig,
+    enabled: loadSecondaryShelves,
+  });
+
+  const { data: newReleaseLists, isLoading: newReleasesLoading } = useQuery({
+    queryKey: ["home-new-releases"],
+    queryFn: loadNewReleaseLists,
+    ...queryConfig,
+    enabled: loadSecondaryShelves,
+  });
+
+  // Most recent finished title seeds a "Because you watched" row.
+  const becauseSeed = watchHistory[0]
+    ? { id: watchHistory[0].content_id, type: watchHistory[0].content_type, title: watchHistory[0].title }
+    : null;
+  const { data: becauseItems = [], isLoading: becauseLoading } = useQuery({
+    queryKey: ["because-you-watched", becauseSeed?.type, becauseSeed?.id],
+    queryFn: () => loadBecauseYouWatched(becauseSeed!),
+    ...queryConfig,
+    enabled: loadSecondaryShelves && Boolean(becauseSeed),
+  });
+
+  const { data: actionLists, isLoading: actionLoading } = useQuery({
+    queryKey: ["home-blend-genre", "28|53"],
+    queryFn: () => loadBlendedGenreLists("28|53"),
+    ...queryConfig,
+    enabled: loadTertiaryShelves,
+  });
+
+  const { data: comedyLists, isLoading: comedyLoading } = useQuery({
+    queryKey: ["home-blend-genre", "35"],
+    queryFn: () => loadBlendedGenreLists("35"),
+    ...queryConfig,
+    enabled: loadTertiaryShelves,
+  });
+
   const { data: topRatedData, isLoading: topRatedLoading } = useQuery({
     queryKey: ["top-rated-movies"],
     queryFn: () => getTopRatedMovies(),
@@ -347,11 +401,16 @@ export default function Home() {
     [tvShowsData],
   );
 
-  // Hero movies (top 5 trending)
-  const heroMovies = useMemo(
-    () => (filteredTrendingMovies.length > 0 ? filteredTrendingMovies : HOME_FALLBACK_MOVIES).slice(0, 5),
-    [filteredTrendingMovies],
-  );
+  // Hero: trending Hollywood blended with this season's Bollywood releases.
+  const heroMovies = useMemo(() => {
+    const withBackdrop = (items: HomeItem[] | undefined) =>
+      (items || []).filter((item): item is Movie => "title" in item && Boolean(item.backdrop_path));
+    const blended = interleaveBlend(
+      [withBackdrop(filteredTrendingMovies), withBackdrop(newReleaseLists?.[1])],
+      { limit: 6 },
+    ) as Movie[];
+    return (blended.length > 0 ? blended : filteredTrendingMovies.length > 0 ? filteredTrendingMovies : HOME_FALLBACK_MOVIES).slice(0, 6);
+  }, [filteredTrendingMovies, newReleaseLists]);
   const currentHeroMovie = heroMovies[heroIndex % heroMovies.length];
   const neighborHeroMovies = useMemo(
     () => heroMovies.length > 1
@@ -383,6 +442,29 @@ export default function Home() {
 
     return () => clearInterval(interval);
   }, [heroMovies.length, reduceHomeMotion, isHeroPlaying, isHeroInteracting]);
+
+  const top10 = useMemo(() => buildTop10(filteredTrendingMovies, trendingSeries), [filteredTrendingMovies, trendingSeries]);
+  const top10Keys = useMemo(() => new Set(top10.map(homeItemKey)), [top10]);
+  // New releases skip the Top 10 so the two rows do not repeat each other.
+  const newReleases = useMemo(
+    () => interleaveBlend(newReleaseLists || [], { limit: 30, exclude: top10Keys }),
+    [newReleaseLists, top10Keys],
+  );
+  const blendedSeries = useMemo(
+    () => interleaveBlend([trendingSeries, filteredTvShows, indianSeriesData?.results], { limit: 30 }),
+    [filteredTvShows, indianSeriesData, trendingSeries],
+  );
+  const actionBlend = useMemo(() => interleaveBlend(actionLists || []), [actionLists]);
+  const comedyBlend = useMemo(() => interleaveBlend(comedyLists || []), [comedyLists]);
+  const southIndian = useMemo(
+    () => interleaveBlend([teluguData?.results, tamilData?.results]),
+    [tamilData, teluguData],
+  );
+  const becauseRow = useMemo(() => interleaveBlend([becauseItems], { limit: 24 }), [becauseItems]);
+  const myList = useMemo(
+    () => watchlistItems.filter((item) => !item.watched).map(libraryItemToCard),
+    [watchlistItems],
+  );
 
   // Get recently watched for recommendations - memoized
   const recentlyWatched = useMemo(() => {
@@ -482,6 +564,31 @@ export default function Home() {
           {/* Content Sections */}
           <main id="main-content" className="home-collections">
             <div className="space-y-10 md:space-y-12">
+              {recentlyWatched.length > 0 && (
+                <MemoizedCarousel
+                  title="Continue Watching"
+                  icon={History}
+                  items={recentlyWatched as (Movie | TVShow)[]}
+                  isLoading={false}
+                  type="mixed"
+                  viewAllHref="/profile"
+                  showViewAllCard={false}
+                />
+              )}
+
+              <Top10Row title="Top 10 This Week" items={top10} isLoading={top10.length === 0 && trendingSeriesLoading} />
+
+              {(secondaryShelvesPending || newReleasesLoading || newReleases.length > 0) && (
+                <MemoizedCarousel
+                  title="New on MovieReckon"
+                  icon={Sparkles}
+                  items={newReleases}
+                  isLoading={secondaryShelvesPending || newReleasesLoading}
+                  type="mixed"
+                  viewAllHref="/movies?category=now_playing"
+                />
+              )}
+
               {reckonItems.length > 0 && (
                 <MemoizedCarousel
                   title={isPersonalized ? "Reckon For You" : "Top Picks"}
@@ -495,134 +602,144 @@ export default function Home() {
                 />
               )}
 
-          {/* Continue Watching */}
-          {recentlyWatched.length > 0 && (
-            <MemoizedCarousel
-              title="Continue Watching"
-              icon={History}
-              items={recentlyWatched as (Movie | TVShow)[]}
-              isLoading={false}
-              type="mixed"
-              viewAllHref="/profile"
-            />
-          )}
+              {becauseSeed && (becauseLoading || becauseRow.length > 0) && (
+                <MemoizedCarousel
+                  title={`Because you watched ${becauseSeed.title}`}
+                  items={becauseRow}
+                  isLoading={secondaryShelvesPending || becauseLoading}
+                  type="mixed"
+                  showViewAllCard={false}
+                  viewAllHref={`/${becauseSeed.type}/${becauseSeed.id}`}
+                />
+              )}
 
-          {/* Trending Now */}
-          <MemoizedCarousel
-            title="Trending Now"
-            icon={TrendingUp}
-            items={trendingShelfItems as (Movie | TVShow)[]}
-            isLoading={false}
-            type="movie"
-            viewAllHref="/movies?category=trending"
-            priorityImages={reckonItems.length === 0}
-          />
+              {myList.length > 0 && (
+                <MemoizedCarousel
+                  title="My List"
+                  icon={Bookmark}
+                  items={myList}
+                  isLoading={false}
+                  type="mixed"
+                  viewAllHref="/profile"
+                  showViewAllCard={false}
+                />
+              )}
 
-          {/* Now Playing */}
-          {(secondaryShelvesPending || filteredNowPlaying.length > 0 || nowPlayingLoading) && (
-            <MemoizedCarousel
-              title="Now Playing"
-              icon={Clapperboard}
-              items={filteredNowPlaying as (Movie | TVShow)[]}
-              isLoading={secondaryShelvesPending || nowPlayingLoading}
-              type="movie"
-              viewAllHref="/movies?category=now_playing"
-            />
-          )}
+              <MemoizedCarousel
+                title="Trending Now"
+                icon={TrendingUp}
+                items={trendingShelfItems as (Movie | TVShow)[]}
+                isLoading={false}
+                type="movie"
+                viewAllHref="/movies?category=trending"
+                priorityImages={reckonItems.length === 0}
+              />
 
-          {/* Trending TV Series */}
-          <MemoizedCarousel
-            title="Trending TV Series"
-            icon={Tv}
-            items={filteredTvShows as (Movie | TVShow)[]}
-            isLoading={secondaryShelvesPending || tvLoading}
-            type="tv"
-            viewAllHref="/series?category=popular"
-          />
+              <MemoizedCarousel
+                title="Binge-worthy Series"
+                icon={Tv}
+                items={blendedSeries}
+                isLoading={blendedSeries.length === 0 && (secondaryShelvesPending || tvLoading || indianSeriesLoading)}
+                type="tv"
+                viewAllHref="/series?category=popular"
+              />
 
-          {/* Bollywood Hits */}
-          <MemoizedCarousel
-            title="Bollywood Hits"
-            icon={Film}
-            items={bollywoodData?.results as (Movie | TVShow)[]}
-            isLoading={secondaryShelvesPending || bollywoodLoading}
-            type="movie"
-            viewAllHref="/movies?category=bollywood"
-          />
+              {(secondaryShelvesPending || filteredNowPlaying.length > 0 || nowPlayingLoading) && (
+                <MemoizedCarousel
+                  title="In Cinemas"
+                  icon={Clapperboard}
+                  items={filteredNowPlaying as (Movie | TVShow)[]}
+                  isLoading={secondaryShelvesPending || nowPlayingLoading}
+                  type="movie"
+                  viewAllHref="/movies?category=now_playing"
+                />
+              )}
 
-          {/* Hollywood Blockbusters */}
-          <MemoizedCarousel
-            title="Hollywood Blockbusters"
-            icon={Globe}
-            items={hollywoodData?.results as (Movie | TVShow)[]}
-            isLoading={secondaryShelvesPending || hollywoodLoading}
-            type="movie"
-            viewAllHref="/movies?category=hollywood"
-          />
+              <MemoizedCarousel
+                title="Bollywood Hits"
+                icon={Film}
+                items={bollywoodData?.results as (Movie | TVShow)[]}
+                isLoading={secondaryShelvesPending || bollywoodLoading}
+                type="movie"
+                viewAllHref="/movies?category=bollywood"
+              />
 
-          {/* Top Rated */}
-          <MemoizedCarousel
-            title="Top Rated"
-            icon={Award}
-            items={filteredTopRatedMovies as (Movie | TVShow)[]}
-            isLoading={secondaryShelvesPending || topRatedLoading}
-            type="movie"
-            viewAllHref="/movies?sort=vote_average.desc"
-          />
+              <MemoizedCarousel
+                title="Hollywood Blockbusters"
+                icon={Globe}
+                items={hollywoodData?.results as (Movie | TVShow)[]}
+                isLoading={secondaryShelvesPending || hollywoodLoading}
+                type="movie"
+                viewAllHref="/movies?category=hollywood"
+              />
 
-          <div ref={tertiarySentinelRef} aria-hidden="true" />
+              <div ref={tertiarySentinelRef} aria-hidden="true" />
 
-          {/* Browse by genre */}
-          <GenreRail enabled={loadTertiaryShelves} />
+              {(tertiaryShelvesPending || actionLoading || actionBlend.length > 0) && (
+                <MemoizedCarousel
+                  title="Action & Thrillers"
+                  icon={Flame}
+                  items={actionBlend}
+                  isLoading={tertiaryShelvesPending || actionLoading}
+                  type="movie"
+                  viewAllHref="/movies?genre=28"
+                />
+              )}
 
-          {/* Upcoming */}
-          {(tertiaryShelvesPending || filteredUpcoming.length > 0 || upcomingLoading) && (
-            <MemoizedCarousel
-              title="Upcoming"
-              icon={CalendarDays}
-              items={filteredUpcoming as (Movie | TVShow)[]}
-              isLoading={tertiaryShelvesPending || upcomingLoading}
-              type="mixed"
-              viewAllHref="/upcoming"
-            />
-          )}
+              {(tertiaryShelvesPending || comedyLoading || comedyBlend.length > 0) && (
+                <MemoizedCarousel
+                  title="Comedies"
+                  icon={Laugh}
+                  items={comedyBlend}
+                  isLoading={tertiaryShelvesPending || comedyLoading}
+                  type="movie"
+                  viewAllHref="/movies?genre=35"
+                />
+              )}
 
-          {/* Tamil Cinema */}
-          {tamilData?.results && tamilData.results.length > 0 && (
-            <MemoizedCarousel
-              title="Tamil Cinema"
-              icon={Film}
-              items={tamilData.results as (Movie | TVShow)[]}
-              isLoading={tamilLoading}
-              type="movie"
-              viewAllHref="/movies?category=bollywood&lang=ta"
-            />
-          )}
+              <MemoizedCarousel
+                title="Critically Acclaimed"
+                icon={Award}
+                items={filteredTopRatedMovies as (Movie | TVShow)[]}
+                isLoading={secondaryShelvesPending || topRatedLoading}
+                type="movie"
+                viewAllHref="/movies?sort=vote_average.desc"
+              />
 
-          {/* Telugu Cinema */}
-          {teluguData?.results && teluguData.results.length > 0 && (
-            <MemoizedCarousel
-              title="Telugu Cinema"
-              icon={Film}
-              items={teluguData.results as (Movie | TVShow)[]}
-              isLoading={teluguLoading}
-              type="movie"
-              viewAllHref="/movies?category=bollywood&lang=te"
-            />
-          )}
+              {(southIndian.length > 0 || tamilLoading || teluguLoading) && (
+                <MemoizedCarousel
+                  title="South Indian Hits"
+                  icon={Film}
+                  items={southIndian}
+                  isLoading={southIndian.length === 0 && (tamilLoading || teluguLoading)}
+                  type="movie"
+                  viewAllHref="/movies?category=bollywood&lang=te"
+                />
+              )}
 
-          {/* Gujarati Cinema */}
-          {gujaratiData?.results && gujaratiData.results.length > 0 && (
-            <MemoizedCarousel
-              title="Gujarati Cinema"
-              icon={Film}
-              items={gujaratiData.results as (Movie | TVShow)[]}
-              isLoading={gujaratiLoading}
-              type="movie"
-              viewAllHref="/movies?category=bollywood&lang=gu"
-            />
-          )}
+              {gujaratiData?.results && gujaratiData.results.length > 0 && (
+                <MemoizedCarousel
+                  title="Gujarati Cinema"
+                  icon={Film}
+                  items={gujaratiData.results as (Movie | TVShow)[]}
+                  isLoading={gujaratiLoading}
+                  type="movie"
+                  viewAllHref="/movies?category=bollywood&lang=gu"
+                />
+              )}
 
+              {(tertiaryShelvesPending || filteredUpcoming.length > 0 || upcomingLoading) && (
+                <MemoizedCarousel
+                  title="Coming Soon"
+                  icon={CalendarDays}
+                  items={filteredUpcoming as (Movie | TVShow)[]}
+                  isLoading={tertiaryShelvesPending || upcomingLoading}
+                  type="mixed"
+                  viewAllHref="/upcoming"
+                />
+              )}
+
+              <GenreRail enabled={loadTertiaryShelves} />
             </div>
           </main>
 

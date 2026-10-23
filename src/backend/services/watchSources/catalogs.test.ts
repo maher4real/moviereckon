@@ -21,3 +21,16 @@ describe("4KHDHub catalog", () => {
     expect(page.links[0]).toMatchObject({ season: 2, episode: 3, scope: "episode" });
   });
 });
+
+
+describe("4KHDHub identity metadata", () => {
+  it("uses a matching Open Graph release year without adding Series to the canonical title", () => {
+    const page = parseCatalogPage(`<meta property="og:title" content="Breaking Bad (2008) - 4K-HDHub"><h1>Breaking Bad</h1><div class="download-item"><div class="file-title">Breaking.Bad.S02E03.1080p.x264.mkv</div><a href="https://hubdrive.pics/file/123">Download HubDrive</a></div>`, `${config.baseUrl}/breaking-bad-series-1/`, config);
+    expect(page).toMatchObject({ title: "Breaking Bad", year: 2008, mediaType: "tv" });
+    expect(page.links[0]).toMatchObject({ season: 2, episode: 3, scope: "episode" });
+  });
+  it("does not borrow a year from another title's metadata", () => {
+    const page = parseCatalogPage(`<meta property="og:title" content="Other (2025) - 4K-HDHub"><h1>Example</h1>`, `${config.baseUrl}/example-series-1/`, config);
+    expect(page).toMatchObject({ title: "Example", year: null, mediaType: "tv" });
+  });
+});

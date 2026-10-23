@@ -82,6 +82,10 @@
   .home-collections { position: relative; z-index: 1; margin-top: -1.5rem; padding-block: 0 5rem; }
   .content-shelf { max-width: 1600px; margin-inline: auto; padding-inline: 3rem; }
   .shelf-heading { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.6rem; }
+  .top10-item { display: flex; align-items: flex-end; }
+  .top10-rank { margin-right: -1.1rem; font-size: 9.5rem; font-weight: 900; line-height: 0.78; letter-spacing: -0.08em; color: hsl(var(--background)); -webkit-text-stroke: 3px hsl(var(--foreground) / 0.55); paint-order: stroke fill; user-select: none; }
+  .top10-poster { position: relative; z-index: 1; width: 130px; box-shadow: -10px 0 24px hsl(0 0% 0% / 0.45); }
+  @media (min-width: 1024px) { .top10-poster { width: 150px; } .top10-rank { font-size: 11rem; } }
   .shelf-view-all { display: inline-flex; min-height: 44px; align-items: center; gap: 7px; border-radius: 6px; padding-inline: 8px; color: hsl(var(--muted-foreground)); font-size: 0.8125rem; font-weight: 500; transition: color 160ms; }
   .shelf-view-all:hover { color: hsl(var(--foreground)); }
   .shelf-arrow { display: inline-flex; width: 44px; height: 44px; flex-shrink: 0; align-items: center; justify-content: center; border: 1px solid hsl(var(--foreground) / 0.14); border-radius: 50%; background: hsl(var(--foreground) / 0.035); color: hsl(var(--foreground) / 0.82); transition: background-color 160ms, border-color 160ms, color 160ms; }
@@ -156,6 +160,8 @@
     .reckon-filters-sticky { top: 4rem; -webkit-backdrop-filter: none; backdrop-filter: none; background: hsl(var(--background) / 0.97); }
     .tonight-grid { grid-template-columns: none; grid-auto-columns: 85%; grid-auto-flow: column; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px 2px 12px; scrollbar-width: thin; }
     .shelf-heading { gap: 0.5rem; margin-bottom: 0.25rem; }
+    .top10-rank { margin-right: -0.8rem; font-size: 6.5rem; -webkit-text-stroke-width: 2px; }
+    .top10-poster { width: 96px; }
     .shelf-view-all { font-size: 0.75rem; padding-inline: 4px; }
   }
 

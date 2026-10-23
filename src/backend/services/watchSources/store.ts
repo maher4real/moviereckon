@@ -2,11 +2,11 @@ import "server-only";
 import { createHash } from "node:crypto";
 import type { Db } from "mongodb";
 import { connectToDatabase } from "@/backend/api/lib/mongodb";
-import type { ParsedSourcePage, SourceContentMatch, ContentWatchSources } from "@/shared/types/watchSources";
+import type { ParsedSourcePage, SourceContentMatch, ContentWatchSources, WatchCatalogProvider } from "@/shared/types/watchSources";
 
 export interface SourcePageRecord {
   _id: string;
-  provider: "hdhub" | "4khdhub";
+  provider: WatchCatalogProvider;
   url: string;
   status: "queued" | "matched" | "pending" | "review" | "error";
   parsed: ParsedSourcePage | null;
@@ -55,14 +55,14 @@ export interface SourceRepository {
 }
 
 // Identity is independent of the rotating source domain; URLs are refreshed on discovery.
-export const sourcePageId = (url: string, provider: "hdhub" | "4khdhub" = "hdhub") => createHash("sha256").update(`${provider}:${new URL(url).pathname}`).digest("hex");
+export const sourcePageId = (url: string, provider: WatchCatalogProvider = "hdhub") => createHash("sha256").update(`${provider}:${new URL(url).pathname}`).digest("hex");
 
-export async function createSourceRepository(provider: "hdhub" | "4khdhub" = "hdhub"): Promise<SourceRepository> {
+export async function createSourceRepository(provider: WatchCatalogProvider = "hdhub"): Promise<SourceRepository> {
   const { db } = await connectToDatabase();
   return mongoSourceRepository(db, provider);
 }
 
-export async function mongoSourceRepository(db: Db, provider: "hdhub" | "4khdhub" = "hdhub"): Promise<SourceRepository> {
+export async function mongoSourceRepository(db: Db, provider: WatchCatalogProvider = "hdhub"): Promise<SourceRepository> {
   const pages = db.collection<SourcePageRecord>("watch_source_pages");
   const discovery = db.collection<DiscoveryRecord>("watch_source_discovery");
   const state = db.collection<{ _id: string; token?: string; leaseUntil: Date; lastRun?: ImportSummary }>("watch_import_state");
