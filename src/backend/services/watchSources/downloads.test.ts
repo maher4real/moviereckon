@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { filenameMatchesSource, finalStorageUrl, parseCdnFile, resolveSourceDownloads } from "./downloads";
+import { filenameMatchesSource, finalStorageUrl, parseCdnFile, resolveSourceDownloads, verifyDirectDownload } from "./downloads";
 import { parseSourcePage } from "./parser";
 import type { fetchSourceDocument } from "./http";
 
@@ -162,5 +162,23 @@ describe("final file resolution through published provider pages", () => {
     const fetchDocument = vi.fn().mockResolvedValueOnce({ html: cdnHtml(expired) });
     const request = vi.fn().mockResolvedValue(response());
     expect(await resolveSourceDownloads(link, "The Trap", { fetchDocument, request })).toEqual([]);
+  });
+});
+
+
+describe("direct saved file verification", () => {
+  it("checks a trusted file and rejects removed files, HTML and the wrong episode", async () => {
+    const request = vi.fn().mockResolvedValueOnce(response()).mockResolvedValueOnce(response(filename, "text/html"))
+      .mockResolvedValueOnce(response(filename.replace("S01E01", "S01E02"))).mockResolvedValueOnce(response(filename, "application/octet-stream", 404));
+    expect(await verifyDirectDownload({ ...link, url: file }, "The Trap", request)).toHaveLength(1);
+    for (let index = 0; index < 3; index++) expect(await verifyDirectDownload({ ...link, url: file }, "The Trap", request)).toEqual([]);
+  });
+  it("never probes arbitrary or private URLs, or substitutes episode ranges", async () => {
+    const request = vi.fn();
+    for (const url of ["https://evil.example/video.mp4", "https://127.0.0.1/video.mp4"]) {
+      expect(await verifyDirectDownload({ ...link, url }, "The Trap", request)).toEqual([]);
+    }
+    expect(await verifyDirectDownload({ ...link, url: file, scope: "episode-range" }, "The Trap", request)).toEqual([]);
+    expect(request).not.toHaveBeenCalled();
   });
 });

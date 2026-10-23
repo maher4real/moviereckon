@@ -38,6 +38,7 @@ const STATIC_ROUTES: Record<string, StaticRoute> = {
   "/upcoming": { title: "Upcoming releases", description: "Release calendar for upcoming movies and series." },
   "/search": { title: "Search", description: "Search movies, TV shows and people." },
   "/reckon": { title: "Reckon", description: "Recommendations that learn from what you like." },
+  "/welcome": { title: "Welcome", description: "Pick your languages and genres so MovieReckon is personal from the first screen." },
   "/reckon/preferences": { title: "Taste preferences", description: "Choose the languages and genres Reckon uses to build your feed." },
   "/profile": { title: "Profile", description: "Your watchlist, history and settings." },
   "/profile/edit": { title: "Edit profile", description: "Update your username and avatar." },

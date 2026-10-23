@@ -135,7 +135,7 @@ Live app: `https://moviereckon.vercel.app/`
   - `/api/tmdb`
   - `/api/health`
 - CORS allowlist and security headers
-- In-memory rate limiting for auth endpoints
+- Shared MongoDB rate limiting in production; bounded local counters in development
 - TMDB proxy/data fetching for movie/TV catalogs and metadata
 
 ## Tech Stack
@@ -243,7 +243,9 @@ Optional auth/email variables:
 
 ### Production Security Requirements
 
-Production uses bounded per-instance in-memory rate limiting. Set:
+Production uses shared MongoDB rate-limit buckets with atomic counters and TTL
+cleanup. Requests fail closed with `503` when the shared limiter is unavailable.
+Development and tests use bounded per-instance counters. Set:
 
 - `RBAC_ENFORCE_DB=true`
 - `SESSION_BINDING_STRICT=true`
@@ -352,6 +354,11 @@ Other:
 ## Deployment
 
 Recommended: Vercel.
+
+The backend uses Next.js Node.js Functions with Fluid compute, the existing
+MongoDB database, Vercel Blob for avatars, and authenticated Cron imports.
+See [Backend architecture](docs/backend-architecture.md) for workload choices,
+connection limits, execution budgets, and deployment validation.
 
 - Build command: `npm run build`
 - Start command: `npm run start`

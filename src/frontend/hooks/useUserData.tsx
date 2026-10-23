@@ -53,6 +53,8 @@ export interface UserPreferences {
   moods?: Mood[];
   pace?: Pace | null;
   eras?: Era[];
+  /** Set once taste onboarding is saved or skipped; null while pending. */
+  onboarding_completed_at?: string | null;
 }
 
 export type PreferenceUpdate = Partial<
@@ -66,7 +68,7 @@ export type PreferenceUpdate = Partial<
     | "pace"
     | "eras"
   >
->;
+> & { onboarding_completed?: boolean };
 
 export type FeedbackType = mongoClient.FeedbackType;
 

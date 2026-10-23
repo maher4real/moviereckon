@@ -1,3 +1,4 @@
+import type { WatchSourceLink } from "@/shared/types/watchSources";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import TVDetail from "./TVDetail";
@@ -11,6 +12,11 @@ const mocks = vi.hoisted(() => ({
   useUserData: vi.fn(),
   useWatchlist: vi.fn(),
 }));
+
+vi.mock("@/frontend/hooks/useWorkingWatchLinks", () => ({ useWorkingWatchLinks: (links: WatchSourceLink[]) => ({
+  confirmed: links.map((link) => ({ link, check: { checkedAt: "2026-10-24T00:00:00Z", downloads: [] } })),
+  isChecking: false, isError: false, refresh: vi.fn(), reject: vi.fn(),
+}) }));
 
 vi.mock("@tanstack/react-query", () => ({
   useQuery: mocks.useQuery,
@@ -127,10 +133,10 @@ describe("TVDetail", () => {
         still_path: null, air_date: null, vote_average: 0, overview: "A test episode", runtime: 40,
       })) }, isLoading: false };
       if (options.queryKey[0] === "watch-sources") return { data: { sources: [{ links: [
-        { id: "ep1", label: "WATCH", url: "https://player.example/s1e1", host: "player.example", kind: "watch", scope: "episode", season: 1, episode: 1 },
-        { id: "ep2", label: "WATCH", url: "https://player.example/s2e1", host: "player.example", kind: "watch", scope: "episode", season: 2, episode: 1 },
-        { id: "pack1", label: "720p season pack", url: "https://download.example/s1", host: "download.example", kind: "download", scope: "season", season: 1 },
-        { id: "pack2", label: "1080p season pack", url: "https://download.example/s2", host: "download.example", kind: "download", scope: "season", season: 2 },
+        { id: "ep1", label: "WATCH", url: "https://hdstream4u.com/file/s1e1abcdefgh", host: "player.example", kind: "watch", scope: "episode", season: 1, episode: 1 },
+        { id: "ep2", label: "WATCH", url: "https://hdstream4u.com/file/s2e1abcdefgh", host: "player.example", kind: "watch", scope: "episode", season: 2, episode: 1 },
+        { id: "pack1", label: "720p season pack", url: "https://hubcdn.club/file/season1", host: "download.example", kind: "download", scope: "season", season: 1 },
+        { id: "pack2", label: "1080p season pack", url: "https://hubcdn.club/file/season2", host: "download.example", kind: "download", scope: "season", season: 2 },
       ] }] }, isLoading: false, isError: false };
       return query(options);
     });
@@ -141,8 +147,7 @@ describe("TVDetail", () => {
     expect(await within(popup).findByLabelText("Season")).toHaveValue("1");
     expect(within(popup).getByLabelText("Episode")).toHaveValue("1");
     fireEvent.mouseDown(within(popup).getByRole("tab", { name: /Watch/ }), { button: 0, ctrlKey: false });
-    expect(within(popup).getByRole("heading", { name: /Other provider pages/ })).toBeInTheDocument();
-    expect(within(popup).getByRole("link", { name: /Open external page/ })).toHaveAttribute("href", "https://player.example/s1e1");
+    expect(within(popup).getByRole("link", { name: /Watch .*:/ })).toHaveAttribute("href", "https://hdstream4u.com/file/s1e1abcdefgh");
     expect(within(popup).queryByRole("link", { name: /season pack/ })).not.toBeInTheDocument();
     fireEvent.click(within(popup).getByRole("button", { name: "Close" }));
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Season 2" }));
@@ -150,19 +155,18 @@ describe("TVDetail", () => {
     const second = await screen.findByRole("dialog");
     expect(await within(second).findByLabelText("Season")).toHaveValue("2");
     fireEvent.mouseDown(within(second).getByRole("tab", { name: /Watch/ }), { button: 0, ctrlKey: false });
-    expect(within(second).getByRole("heading", { name: /Other provider pages/ })).toBeInTheDocument();
-    expect(within(second).getByRole("link", { name: /Open external page/ })).toHaveAttribute("href", "https://player.example/s2e1");
+    expect(within(second).getByRole("link", { name: /Watch .*:/ })).toHaveAttribute("href", "https://hdstream4u.com/file/s2e1abcdefgh");
   });
 
   it("groups series watch and download links by episode", async () => {
     const query = mocks.useQuery.getMockImplementation()!;
     mocks.useQuery.mockImplementation((options) => {
       if (options.queryKey[0] === "watch-sources") return { data: { sources: [{ links: [
-        { id: "e2", label: "WATCH E2", url: "https://player.example/s1e2", host: "player.example", kind: "watch", scope: "episode", season: 1, episode: 2 },
-        { id: "e1", label: "WATCH E1", url: "https://player.example/s1e1", host: "player.example", kind: "watch", scope: "episode", season: 1, episode: 1 },
-        { id: "e1b", label: "WATCH E1 mirror", url: "https://mirror.example/s1e1", host: "mirror.example", kind: "watch", scope: "episode", season: 1, episode: 1 },
-        { id: "pack", label: "720p season pack", url: "https://download.example/s1", host: "download.example", kind: "download", scope: "season", season: 1 },
-        { id: "pack2", label: "1080p season pack", url: "https://download.example/s2", host: "download.example", kind: "download", scope: "season", season: 2 },
+        { id: "e2", label: "WATCH E2", url: "https://hdstream4u.com/file/s1e2abcdefgh", host: "player.example", kind: "watch", scope: "episode", season: 1, episode: 2 },
+        { id: "e1", label: "WATCH E1", url: "https://hdstream4u.com/file/s1e1abcdefgh", host: "player.example", kind: "watch", scope: "episode", season: 1, episode: 1 },
+        { id: "e1b", label: "WATCH E1 mirror", url: "https://hdstream4u.com/file/s1e1ijklmnop", host: "mirror.example", kind: "watch", scope: "episode", season: 1, episode: 1 },
+        { id: "pack", label: "720p season pack", url: "https://hubcdn.club/file/season1", host: "download.example", kind: "download", scope: "season", season: 1 },
+        { id: "pack2", label: "1080p season pack", url: "https://hubcdn.club/file/season2", host: "download.example", kind: "download", scope: "season", season: 2 },
       ] }] }, isLoading: false, isError: false };
       return query(options);
     });
@@ -177,7 +181,7 @@ describe("TVDetail", () => {
     const episodeHeadings = within(popup).getAllByRole("heading", { level: 4 });
     expect(episodeHeadings.map((heading) => heading.textContent)).toEqual(["S1 · E12", "S1 · E21"]);
     const firstEpisode = episodeHeadings[0].closest("section")!;
-    expect(within(firstEpisode).getAllByRole("link", { name: /Open external page/ })).toHaveLength(2);
+    expect(within(firstEpisode).getAllByRole("link", { name: /Watch .*:/ })).toHaveLength(2);
   });
 
   it("shows the per-series popup search for admins", async () => {

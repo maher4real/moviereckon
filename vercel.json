@@ -1,6 +1,17 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
+  "fluid": true,
   "outputDirectory": ".next",
+  "functions": {
+    "src/pages/api/health.ts": { "maxDuration": 30 },
+    "src/pages/api/tmdb.ts": { "maxDuration": 30 },
+    "src/pages/api/tmdb-image.ts": { "maxDuration": 30 },
+    "src/pages/api/auth/**/*.ts": { "maxDuration": 60 },
+    "src/pages/api/better-auth/**/*.ts": { "maxDuration": 60 },
+    "src/pages/api/admin/**/*.ts": { "maxDuration": 30 },
+    "src/pages/api/user/**/*.ts": { "maxDuration": 300 }
+  },
   "crons": [
     { "path": "/api/import/watch-sources", "schedule": "0 0 * * *" }
   ],

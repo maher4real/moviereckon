@@ -1,3 +1,4 @@
+import type { WatchSourceLink } from "@/shared/types/watchSources";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import MovieDetail from "./MovieDetail";
@@ -11,6 +12,11 @@ const mocks = vi.hoisted(() => ({
   useUserData: vi.fn(),
   useWatchlist: vi.fn(),
 }));
+
+vi.mock("@/frontend/hooks/useWorkingWatchLinks", () => ({ useWorkingWatchLinks: (links: WatchSourceLink[]) => ({
+  confirmed: links.map((link) => ({ link, check: { checkedAt: "2026-10-24T00:00:00Z", downloads: [] } })),
+  isChecking: false, isError: false, refresh: vi.fn(), reject: vi.fn(),
+}) }));
 
 vi.mock("@tanstack/react-query", () => ({
   useQuery: mocks.useQuery,
@@ -108,10 +114,10 @@ const movie = {
 };
 
 describe("MovieDetail", () => {
-  it("shows saved movie players in a popup to regular users", async () => {
+  it("shows checked movie players in a popup to regular users", async () => {
     const query = mocks.useQuery.getMockImplementation()!;
     mocks.useQuery.mockImplementation((options) => options.queryKey[0] === "watch-sources" ? {
-      data: { sources: [{ links: [{ id: "movie-watch", label: "WATCH", url: "https://player.example/movie", host: "player.example",
+      data: { sources: [{ links: [{ id: "movie-watch", label: "WATCH", url: "https://hdstream4u.com/file/movie1234567", host: "player.example",
         kind: "watch", scope: "movie", quality: "1080p", codec: "H.264", size: null }] }] },
       isLoading: false, isError: false,
     } : query(options));
@@ -120,8 +126,7 @@ describe("MovieDetail", () => {
     fireEvent.click(screen.getByRole("button", { name: "Watch movie" }));
     expect(await screen.findByRole("dialog", { name: "Dune: Part Two" })).toBeInTheDocument();
     fireEvent.mouseDown(await screen.findByRole("tab", { name: /Watch/ }), { button: 0, ctrlKey: false });
-    expect(await screen.findByRole("heading", { name: /Other provider pages/ })).toBeInTheDocument();
-    expect(await screen.findByRole("link", { name: /Open external page/ })).toHaveAttribute("href", "https://player.example/movie");
+    expect(await screen.findByRole("link", { name: /Watch .*:/ })).toHaveAttribute("href", "https://hdstream4u.com/file/movie1234567");
     expect(await screen.findByRole("button", { name: "Search again" })).toBeInTheDocument();
   });
 

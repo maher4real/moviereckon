@@ -24,11 +24,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(403).json({ error: "Origin not allowed" });
   }
 
-  // Legacy CORS fallback (disabled for security):
-  // res.setHeader("Access-Control-Allow-Origin", "*");
-  // res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  // res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -59,7 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({
       status: "healthy",
       latency_ms: latency,
-      rate_limit: "local-memory",
+      rate_limit: process.env.NODE_ENV === "production" ? "mongodb" : "local-memory",
       security_telemetry: process.env.SECURITY_TELEMETRY_ENABLED !== "false",
       timestamp: new Date().toISOString(),
     });

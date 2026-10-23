@@ -7,9 +7,9 @@ import { Button } from "./ui/button";
 import LoadingIndicator from "./LoadingIndicator";
 import WatchMetaChips, { watchLinkScope } from "./WatchMetaChips";
 
-export default function ResolveDownloadButton({ link, identity, hideScope = false, className }: { link: WatchSourceLink; identity: WatchSourceIdentity; hideScope?: boolean; className?: string }) {
+export default function ResolveDownloadButton({ link, identity, hideScope = false, className, initialFiles = [], onUnavailable }: { link: WatchSourceLink; identity: WatchSourceIdentity; hideScope?: boolean; className?: string; initialFiles?: ResolvedDownload[]; onUnavailable?: () => void }) {
   const [pending, setPending] = useState(false);
-  const [files, setFiles] = useState<ResolvedDownload[]>([]);
+  const [files, setFiles] = useState<ResolvedDownload[]>(initialFiles);
   const [error, setError] = useState<string | null>(null);
   const [clock, setClock] = useState(() => Date.now());
   const request = useRef<AbortController | null>(null);
@@ -29,10 +29,10 @@ export default function ResolveDownloadButton({ link, identity, hideScope = fals
       const next = await resolveDownloadLink(identity, link.id, controller.signal);
       if (!controller.signal.aborted) {
         setClock(Date.now()); setFiles(next);
-        if (!next.length) setError("No working file could be confirmed. Try another source.");
+        if (!next.length) { setError("No working file could be confirmed. Try another source."); onUnavailable?.(); }
       }
     } catch (failure) {
-      if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : "Unable to get this file link");
+      if (!controller.signal.aborted) { setError(failure instanceof Error ? failure.message : "Unable to get this file link"); onUnavailable?.(); }
     } finally {
       if (!controller.signal.aborted) { setPending(false); request.current = null; }
     }

@@ -1,19 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, Check, Film, Globe, LoaderCircle, RotateCcw, Sparkles } from "lucide-react";
 import Header from "@/frontend/components/Header";
 import { Button } from "@/frontend/components/ui/button";
 import { useToast } from "@/frontend/hooks/use-toast";
 import { useUserData } from "@/frontend/hooks/useUserData";
+import { useAuth } from "@/frontend/hooks/useAuth";
+import { rememberOnboarded } from "@/frontend/components/OnboardingGate";
 import { GenrePicker, LanguagePicker, PREF_GENRES, PREF_LANGUAGES, useGenreArtwork } from "./ReckonPreferences";
 
 const sameSet = <T,>(a: T[], b: T[]) => a.length === b.length && a.every((value) => b.includes(value));
 const toggle = <T,>(list: T[], value: T) => (list.includes(value) ? list.filter((item) => item !== value) : [...list, value]);
 
-export default function PreferencesPage() {
+export default function PreferencesPage({ mode = "edit" }: { mode?: "edit" | "onboarding" }) {
+  const onboarding = mode === "onboarding";
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user, profile } = useAuth();
   const { preferences, updatePreferences } = useUserData();
   const { data: artwork, isLoading: artworkLoading } = useGenreArtwork();
   const savedLangs = useMemo(() => preferences?.preferred_languages ?? [], [preferences]);
@@ -22,7 +28,8 @@ export default function PreferencesPage() {
   const [genres, setGenres] = useState<number[]>(savedGenres);
   const [hydrated, setHydrated] = useState(preferences !== null);
   const [saving, setSaving] = useState(false);
-  const returnTo = (location.state as { from?: string } | null)?.from || "/reckon";
+  const returnTo = (location.state as { from?: string } | null)?.from || (onboarding ? "/home" : "/reckon");
+  const firstName = (profile?.username || user?.username || "").trim().split(/\s+/)[0];
 
   // Preferences load asynchronously; seed the form once, never overwrite edits.
   useEffect(() => {
@@ -34,19 +41,39 @@ export default function PreferencesPage() {
 
   const dirty = !sameSet(langs, savedLangs) || !sameSet(genres, savedGenres);
   const isFirstSetup = savedLangs.length === 0 && savedGenres.length === 0;
+  // Onboarding needs at least one of each so the very first feed is personal.
+  const canSave = onboarding
+    ? langs.length > 0 && genres.length > 0
+    : dirty && (langs.length > 0 || genres.length > 0);
 
-  const save = async () => {
+  // Cached feeds were built from the old taste; drop them so every surface rebuilds.
+  const refreshFeeds = () => queryClient.invalidateQueries({
+    predicate: ({ queryKey }) => {
+      const head = String(queryKey[0] ?? "");
+      return head.startsWith("recommendations-feed") || head === "recommendation-taste";
+    },
+  });
+
+  const finish = async (picks: { preferred_languages: string[]; preferred_genres: number[] } | null) => {
     setSaving(true);
     try {
-      await updatePreferences({ preferred_languages: langs, preferred_genres: genres });
-      toast({ title: "Preferences saved", description: "Your Reckon feed is being rebuilt around them." });
-      navigate(returnTo, { replace: true, state: { preferencesUpdated: true } });
+      await updatePreferences({ ...(picks || {}), ...(onboarding ? { onboarding_completed: true } : {}) });
+      if (onboarding) rememberOnboarded(user?.id);
+      await refreshFeeds();
+      if (picks) {
+        toast({
+          title: onboarding ? "Your feed is ready" : "Preferences saved",
+          description: onboarding ? "Everything you see now starts from your taste." : "Your Reckon feed is being rebuilt around them.",
+        });
+      }
+      navigate(returnTo, { replace: true, state: { preferencesUpdated: Boolean(picks) } });
     } catch {
       toast({ title: "Could not save preferences", description: "Please try again.", variant: "destructive" });
     } finally {
       setSaving(false);
     }
   };
+  const save = () => finish({ preferred_languages: langs, preferred_genres: genres });
 
   const selectedLanguageNames = PREF_LANGUAGES.filter((l) => langs.includes(l.code)).map((l) => l.label);
   const selectedGenreNames = PREF_GENRES.filter((g) => genres.includes(g.id)).map((g) => g.name);
@@ -57,13 +84,23 @@ export default function PreferencesPage() {
       <main className="flex-1 pb-40">
         <section className="pref-hero">
           <div className="reckon-container">
-            <button type="button" onClick={() => navigate(returnTo)} className="inline-flex min-h-11 items-center gap-2 rounded-lg text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
-              <ArrowLeft className="size-4" aria-hidden="true" />Back to Reckon
-            </button>
-            <p className="page-kicker mt-4">{isFirstSetup ? "Set up Reckon" : "Your taste"}</p>
-            <h1 className="mt-2 text-balance text-4xl font-black tracking-[-0.04em] sm:text-5xl">What do you love to watch?</h1>
+            {onboarding ? (
+              <p className="page-kicker">Welcome to MovieReckon</p>
+            ) : (
+              <>
+                <button type="button" onClick={() => navigate(returnTo)} className="inline-flex min-h-11 items-center gap-2 rounded-lg text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+                  <ArrowLeft className="size-4" aria-hidden="true" />Back to Reckon
+                </button>
+                <p className="page-kicker mt-4">{isFirstSetup ? "Set up Reckon" : "Your taste"}</p>
+              </>
+            )}
+            <h1 className="mt-2 text-balance text-4xl font-black tracking-[-0.04em] sm:text-5xl">
+              {onboarding && firstName ? `${firstName}, what do you love to watch?` : "What do you love to watch?"}
+            </h1>
             <p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground">
-              Pick the languages you watch in and the genres you reach for. Reckon weights these heavily, then keeps learning from what you like and skip.
+              {onboarding
+                ? "Pick your languages and a few genres. Your home page, Top picks and Reckon feed are built from them from the very first screen, then keep learning from what you like and skip. You can change this any time."
+                : "Pick the languages you watch in and the genres you reach for. Reckon weights these heavily, then keeps learning from what you like and skip."}
             </p>
           </div>
         </section>
@@ -100,18 +137,24 @@ export default function PreferencesPage() {
           <div className="min-w-0 flex-1">
             <p className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="size-4 text-primary" aria-hidden="true" />{langs.length} languages · {genres.length} genres</p>
             <p className="truncate text-xs text-muted-foreground">
-              {[...selectedLanguageNames, ...selectedGenreNames].join(", ") || "Nothing selected yet"}
+              {[...selectedLanguageNames, ...selectedGenreNames].join(", ") ||
+                (onboarding ? "Pick at least one language and one genre" : "Nothing selected yet")}
             </p>
           </div>
           <div className="flex gap-2">
-            {dirty && (
+            {onboarding && (
+              <Button variant="ghost" onClick={() => void finish(null)} disabled={saving} className="min-h-11 text-muted-foreground">
+                Skip for now
+              </Button>
+            )}
+            {!onboarding && dirty && (
               <Button variant="ghost" onClick={() => { setLangs(savedLangs); setGenres(savedGenres); }} disabled={saving} className="min-h-11 gap-2 text-muted-foreground">
                 <RotateCcw className="size-4" aria-hidden="true" />Undo
               </Button>
             )}
-            <Button onClick={() => void save()} disabled={saving || !dirty || (langs.length === 0 && genres.length === 0)} className="brand-primary-button min-h-11 flex-1 gap-2 rounded-full px-6 sm:flex-none">
+            <Button onClick={() => void save()} disabled={saving || !canSave} className="brand-primary-button min-h-11 flex-1 gap-2 rounded-full px-6 sm:flex-none">
               {saving ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <Check className="size-4" aria-hidden="true" />}
-              {saving ? "Saving…" : isFirstSetup ? "Build my feed" : "Save preferences"}
+              {saving ? "Saving…" : onboarding || isFirstSetup ? "Build my feed" : "Save preferences"}
             </Button>
           </div>
         </div>

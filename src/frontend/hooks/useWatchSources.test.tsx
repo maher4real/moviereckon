@@ -8,10 +8,10 @@ import FetchWatchLinksButton from "@/frontend/components/FetchWatchLinksButton";
 import { WatchLinksSection } from "@/frontend/components/WatchSourceLinks";
 import { useWatchSources } from "./useWatchSources";
 
-const mocks = vi.hoisted(() => ({ read: vi.fn(), import: vi.fn(), auth: vi.fn() }));
-vi.mock("@/frontend/lib/mongodbClient", () => ({ getWatchSources: mocks.read, fetchWatchLinks: mocks.import }));
+const mocks = vi.hoisted(() => ({ read: vi.fn(), import: vi.fn(), auth: vi.fn(), check: vi.fn() }));
+vi.mock("@/frontend/lib/mongodbClient", () => ({ getWatchSources: mocks.read, fetchWatchLinks: mocks.import, checkWatchLinks: mocks.check }));
 vi.mock("@/frontend/hooks/useAuth", () => ({ useAuth: mocks.auth }));
-const link: WatchSourceLink = { id: "movie", label: "WATCH", url: "https://player.example/42", host: "player.example", kind: "watch",
+const link: WatchSourceLink = { id: "movie", label: "WATCH", url: "https://hdstream4u.com/file/abcdefgh1234", host: "player.example", kind: "watch",
   verification: "unverified", quality: null, resolution: null, codec: null, bitDepth: null, size: null, formats: [], languages: [],
   scope: "movie", season: null, episode: null, episodeEnd: null };
 const content: ContentWatchSources = { contentId: 42, contentType: "movie", sources: [{
@@ -22,7 +22,7 @@ function Detail({ id }: { id: number }) {
   const sources = useWatchSources(id, "movie");
   return <>
     <FetchWatchLinksButton key={id} contentId={id} contentType="movie" title="Example" />
-    <WatchLinksSection heading="Saved players" context={`movie ${id}`} links={contentSourceLinks(sources.data)}
+    <WatchLinksSection identity={{ contentId: id, contentType: "movie" }} heading="Saved players" context={`movie ${id}`} links={contentSourceLinks(sources.data)}
       isLoading={sources.isLoading} isError={sources.isError} />
   </>;
 }
@@ -36,6 +36,7 @@ function provider(client: QueryClient) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.auth.mockReturnValue({ user: { role: "user" } });
+  mocks.check.mockImplementation(async (_identity, ids: string[]) => ids.map((linkId) => ({ linkId, url: link.url, available: true, downloads: [], checkedAt: new Date().toISOString(), validUntil: new Date(Date.now() + 120_000).toISOString() })));
   mocks.read.mockResolvedValue(content);
 });
 
@@ -69,7 +70,7 @@ describe("saved source queries", () => {
     render(<Detail id={42} />, { wrapper: provider(client) });
     await screen.findByText("No watch links available yet.");
     fireEvent.click(screen.getByRole("button", { name: "Fetch links" }));
-    await screen.findByText("1 link available for this title.");
+    await screen.findByText("1 source found. Checking availability.");
     const saved = await screen.findByRole("region", { name: "Saved players" });
     await waitFor(() => expect(within(saved).getByRole("link", { name: /Watch movie 42/ })).toHaveAttribute("href", link.url));
     expect(mocks.read).toHaveBeenCalledTimes(1);

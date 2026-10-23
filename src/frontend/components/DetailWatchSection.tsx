@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, ExternalLink, Play, RefreshCw } from "lucide-react";
+import { Download, Play, RefreshCw } from "lucide-react";
 import { contentSourceLinks, directMediaFormat, episodeSourceLinks, isDirectFileLink, isResolvableDownload, isResolvablePlayer } from "@/shared/lib/watchSources";
 import { useWatchSources, watchSourcesQueryKey } from "@/frontend/hooks/useWatchSources";
 import { searchWatchLinks } from "@/frontend/lib/mongodbClient";
@@ -10,8 +10,7 @@ import type { WatchSourceLink } from "@/shared/types/watchSources";
 import { Button } from "./ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import WatchLinkButton from "./WatchLinkButton";
-import ExternalWatchProviders from "./ExternalWatchProviders";
-import { externalWatchProviders } from "@/shared/lib/externalWatchProviders";
+import { useWorkingWatchLinks } from "@/frontend/hooks/useWorkingWatchLinks";
 import ResolveDownloadButton from "./ResolveDownloadButton";
 import LoadingIndicator from "./LoadingIndicator";
 import WatchMetaChips, { watchLinkScope } from "./WatchMetaChips";
@@ -84,19 +83,17 @@ export default function DetailWatchSection({ contentId, contentType, title, seas
   if (episode !== undefined && String(season) === selectedSeason && !episodes.includes(episode)) episodes.push(episode);
   const filtered = selectedSeason === "all" ? links : selectedEpisode === "all" ? links.filter((link) => String(link.season) === selectedSeason) :
     episodeSourceLinks(links, Number(selectedSeason), Number(selectedEpisode));
-  const watch = filtered.filter((link) => (link.scope === "movie" || link.scope === "episode") && !!(directMediaFormat(link.url) || isResolvablePlayer(link)));
-  const downloads = filtered.filter((link) => isResolvableDownload(link) || isDirectFileLink(link.url));
-  const external = filtered.filter((link) => !watch.includes(link) && !downloads.includes(link));
+  const working = useWorkingWatchLinks(filtered, identity);
+  const confirmed = working.confirmed.map(({ link }) => link);
+  const watch = confirmed.filter((link) => (link.scope === "movie" || link.scope === "episode") && !!(directMediaFormat(link.url) || isResolvablePlayer(link)));
+  const downloads = confirmed.filter((link) => isResolvableDownload(link) || isDirectFileLink(link.url));
   // Only problems get a line of copy; a finished search speaks through the results.
   const notice = search.isError ? (search.error instanceof Error ? search.error.message : "Search unavailable. Try again.") :
     search.data?.status === "partial" ? "Some providers could not finish." :
     search.data?.status === "busy" ? "Catalog update running. Try again shortly." : null;
-  const providerSeason = selectedSeason === "all" ? undefined : Number(selectedSeason);
-  const providerEpisode = selectedSeason === "all" || selectedEpisode === "all" ? undefined : Number(selectedEpisode);
-  const playerCount = externalWatchProviders(identity, providerSeason, providerEpisode).length;
   const tabs = [
-    { value: "download", label: "Download", Icon: Download, rows: downloads, other: external.filter((link) => link.kind !== "watch") },
-    { value: "watch", label: "Watch", Icon: Play, rows: watch, other: external.filter((link) => link.kind === "watch") },
+    { value: "download", label: "Download", Icon: Download, rows: downloads },
+    { value: "watch", label: "Watch", Icon: Play, rows: watch },
   ] as const;
   const groupBy = contentType === "tv" ? (rows: WatchSourceLink[]) => groupByEpisode(rows, selectedSeason !== "all") : null;
   // Inside an episode group the S/E chip only repeats the heading.
@@ -105,11 +102,12 @@ export default function DetailWatchSection({ contentId, contentType, title, seas
   return <div className="min-h-0 overflow-y-auto px-5 pb-5 sm:px-6">
     <div className="flex items-center justify-between gap-3 py-4">
       <div aria-live="polite" className="min-w-0 text-xs text-muted-foreground">
-        {search.isFetching ? <LoadingIndicator label={progress} /> :
+        {working.isChecking ? <LoadingIndicator label={`Checking links… ${working.checkedCount}/${working.totalCount}`} /> : search.isFetching ? <LoadingIndicator label={progress} /> :
+          working.isError ? <p className="text-amber-500">Could not finish checking links. Try again.</p> :
           notice ? <p className="text-amber-500">{notice}</p> :
-          <p><span className="font-semibold tabular-nums text-foreground">{links.length}</span> links</p>}
+          <p><span className="font-semibold tabular-nums text-foreground">{confirmed.length}</span> checked links</p>}
       </div>
-      <Button type="button" variant="outline" size="icon" aria-label="Search again" title="Search again" className="h-11 w-11 shrink-0 rounded-full" disabled={search.isFetching} onClick={() => void search.refetch()}>
+      <Button type="button" variant="outline" size="icon" aria-label="Search again" title="Search again" className="h-11 w-11 shrink-0 rounded-full" disabled={search.isFetching} onClick={() => { working.refresh(); void search.refetch(); }}>
         <RefreshCw className={cn("h-4 w-4", search.isFetching && "animate-spin")} aria-hidden="true" />
       </Button>
     </div>
@@ -123,15 +121,13 @@ export default function DetailWatchSection({ contentId, contentType, title, seas
     </div>}
     <Tabs defaultValue="download">
       <TabsList aria-label="Link type" className="grid h-12 w-full grid-cols-2 rounded-xl">
-        {tabs.map(({ value, label, Icon, rows, other }) => <TabsTrigger key={value} value={value} className="min-h-10 gap-2 rounded-lg">
+        {tabs.map(({ value, label, Icon, rows }) => <TabsTrigger key={value} value={value} className="min-h-10 gap-2 rounded-lg">
           <Icon className="h-4 w-4" aria-hidden="true" />{label}
-          <span className="rounded-full bg-foreground/10 px-1.5 text-[11px] font-semibold tabular-nums">{rows.length + other.length + (value === "watch" ? playerCount : 0)}</span>
+          <span className="rounded-full bg-foreground/10 px-1.5 text-[11px] font-semibold tabular-nums">{rows.length}</span>
         </TabsTrigger>)}
       </TabsList>
-      {tabs.map(({ value: tab, Icon, rows, other }) => {
+      {tabs.map(({ value: tab, Icon, rows }) => {
         return <TabsContent key={tab} value={tab} className="mt-4">
-          {tab === "watch" && <ExternalWatchProviders identity={identity} title={title}
-            season={providerSeason} episode={providerEpisode} />}
           {rows.length ? <LinkList links={rows} groupBy={groupBy} className="space-y-3" renderLink={(link, grouped) => <li key={link.id} className="min-w-0 rounded-xl border border-border/70 bg-card/50 p-3 sm:p-4">
             {tab === "watch" ? <>
               <WatchLinkButton link={link} context={title} />
@@ -139,7 +135,8 @@ export default function DetailWatchSection({ contentId, contentType, title, seas
                 {link.quality && <span className="text-sm font-semibold">{link.quality}</span>}
                 <WatchMetaChips link={link} skip={chipSkip(link, grouped)} />
               </div>
-            </> : isResolvableDownload(link) ? <ResolveDownloadButton hideScope={grouped} className="py-0 first:pt-0 last:pb-0" link={link} identity={identity} /> :
+            </> : isResolvableDownload(link) ? <ResolveDownloadButton key={working.confirmed.find((item) => item.link.id === link.id)!.check.checkedAt}
+              initialFiles={working.confirmed.find((item) => item.link.id === link.id)!.check.downloads} onUnavailable={() => working.reject(link)} hideScope={grouped} className="py-0 first:pt-0 last:pb-0" link={link} identity={identity} /> :
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0 flex-1 space-y-2">
                   <p className="text-sm font-semibold">{link.quality || link.label}</p>
@@ -150,26 +147,11 @@ export default function DetailWatchSection({ contentId, contentType, title, seas
                   <Download className="h-4 w-4" aria-hidden="true" />Open file
                 </a>
               </div>}
-          </li>} /> : tab === "download" && other.length === 0 && <div className="flex min-h-36 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/70 px-4 text-center">
+          </li>} /> : <div className="flex min-h-36 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/70 px-4 text-center">
             <Icon className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
-            <p className="text-sm text-muted-foreground">{search.isFetching ? "Searching…" : "No download links yet"}</p>
+            <p className="text-sm text-muted-foreground">{working.isChecking ? "Checking links…" : search.isFetching ? "Searching…" : `No working ${tab} links found`}</p>
           </div>}
-          {other.length > 0 && <section aria-label="Other provider pages" className="mt-5">
-            <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Other provider pages <span className="tabular-nums">{other.length}</span>
-              <span className="rounded border border-amber-500/40 px-1.5 py-px text-[10px] normal-case tracking-normal text-amber-500">may show ads</span>
-            </h3>
-            <LinkList links={other} groupBy={groupBy} className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border/70" renderLink={(link, grouped) => <li key={link.id}>
-              <a href={link.url} target="_blank" rel="noopener noreferrer" aria-label={`Open external page · ${link.label}`}
-                className="flex min-h-11 items-center gap-3 px-3 py-3 transition-colors hover:bg-foreground/5">
-                <span className="min-w-0 flex-1 space-y-1.5">
-                  <span className="block truncate text-sm font-medium">{link.label}</span>
-                  <WatchMetaChips link={link} skip={chipSkip(link, grouped)} />
-                </span>
-                <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-              </a>
-            </li>} />
-          </section>}
+
         </TabsContent>;
       })}
     </Tabs>

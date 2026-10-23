@@ -158,3 +158,12 @@ export async function resolveSourceDownloads(link: WatchSourceLink, title: strin
   const checks = await Promise.allSettled(unique.map((url) => checkFile(url, link, title, signal, dependencies.request)));
   return checks.flatMap((result) => result.status === "fulfilled" && result.value ? [result.value] : []);
 }
+
+/** Probe an already-published file only on the same fixed storage allowlist. */
+export async function verifyDirectDownload(link: WatchSourceLink, title: string, request: typeof fetch = fetch): Promise<ResolvedDownload[]> {
+  if (!["movie", "episode", "season"].includes(link.scope)) return [];
+  const url = finalStorageUrl(link.url);
+  if (!url) return [];
+  const file = await checkFile(url, link, title, AbortSignal.timeout(8000), request);
+  return file ? [file] : [];
+}

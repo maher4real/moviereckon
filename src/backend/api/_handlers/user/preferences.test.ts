@@ -174,6 +174,45 @@ describe("user preferences endpoint", () => {
     expect(mocks.markTasteProfileStale).toHaveBeenCalledWith(expect.anything(), "user-1");
   });
 
+  describe("taste onboarding", () => {
+    async function get(doc: Record<string, unknown>) {
+      mocks.connectToDatabase.mockResolvedValue({
+        db: { collection: vi.fn(() => ({ findOneAndUpdate: vi.fn(async () => doc) })) },
+      });
+      const res = createResponse();
+      await handler({ method: "GET", headers: {} } as any, res);
+      return (res.body as { data: { onboarding_completed_at: string | null } }).data.onboarding_completed_at;
+    }
+
+    it("is pending for a brand-new account", async () => {
+      expect(await get(baseDoc({ preferred_languages: [], preferred_genres: [] }))).toBeNull();
+    });
+
+    it("counts legacy accounts with saved taste as done", async () => {
+      expect(await get(baseDoc({ updated_at: "2026-02-02T00:00:00.000Z" }))).toBe("2026-02-02T00:00:00.000Z");
+    });
+
+    it("reports a stored completion even when nothing was picked (skipped)", async () => {
+      expect(await get(baseDoc({ preferred_languages: [], preferred_genres: [], onboarding_completed_at: "2026-03-03T00:00:00.000Z" })))
+        .toBe("2026-03-03T00:00:00.000Z");
+    });
+
+    it("stamps completion once and accepts a skip with no picks", async () => {
+      const { updateOne } = mockPut(baseDoc({ preferred_languages: [], preferred_genres: [] }));
+      expect((await put({ onboarding_completed: true })).statusCode).toBe(200);
+      expect((updateOne.mock.calls[0] as any)[1].$set).toHaveProperty("onboarding_completed_at");
+
+      const again = mockPut(baseDoc({ onboarding_completed_at: "2026-03-03T00:00:00.000Z" }));
+      await put({ preferred_languages: ["hi"], onboarding_completed: true });
+      expect((again.updateOne.mock.calls[0] as any)[1].$set).not.toHaveProperty("onboarding_completed_at");
+    });
+
+    it("rejects a non-boolean completion flag", async () => {
+      mockPut(baseDoc());
+      expect((await put({ onboarding_completed: "yes" })).statusCode).toBe(400);
+    });
+  });
+
   it("accepts a PUT with only new fields", async () => {
     mockPut(baseDoc());
     expect((await put({ moods: ["funny"] })).statusCode).toBe(200);

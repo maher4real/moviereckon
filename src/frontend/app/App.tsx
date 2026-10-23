@@ -35,6 +35,7 @@ import { RouteSkeleton } from "@/frontend/components/PageSkeletons";
 import BottomNav from "@/frontend/components/BottomNav";
 import type { MongoUser } from "@/frontend/lib/mongodbClient";
 import ProtectedRoute from "@/frontend/components/ProtectedRoute";
+import OnboardingGate from "@/frontend/components/OnboardingGate";
 
 const routeLoaders = {
   auth: () => import("@/frontend/features/auth/Auth"),
@@ -285,7 +286,7 @@ const App = ({
                           <Route path="/s/:id" element={<ShortContentRedirect contentType="tv" />} />
 
                           {/* Protected routes */}
-                          <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+                          <Route path="/home" element={<ProtectedRoute><OnboardingGate><Home /></OnboardingGate></ProtectedRoute>} />
                           <Route path="/upcoming" element={<ProtectedRoute><Upcoming /></ProtectedRoute>} />
                           <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
                           <Route path="/movie/:id" element={<ProtectedRoute><MovieDetail /></ProtectedRoute>} />
@@ -293,7 +294,8 @@ const App = ({
                           <Route path="/person/:id" element={<ProtectedRoute><PersonDetail /></ProtectedRoute>} />
                           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                           <Route path="/profile/edit" element={<ProtectedRoute><ProfileEdit /></ProtectedRoute>} />
-                          <Route path="/reckon" element={<ProtectedRoute><Reckon /></ProtectedRoute>} />
+                          <Route path="/reckon" element={<ProtectedRoute><OnboardingGate><Reckon /></OnboardingGate></ProtectedRoute>} />
+                          <Route path="/welcome" element={<ProtectedRoute><PreferencesPage mode="onboarding" /></ProtectedRoute>} />
                           <Route path="/reckon/preferences" element={<ProtectedRoute><PreferencesPage /></ProtectedRoute>} />
                           <Route path="/movies" element={<ProtectedRoute><Movies /></ProtectedRoute>} />
                           <Route path="/series" element={<ProtectedRoute><Series /></ProtectedRoute>} />

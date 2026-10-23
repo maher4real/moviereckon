@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ContentWatchSources, FetchContentSourcesResult, SourceSearchEvent, WatchSourceLink } from "@/shared/types/watchSources";
 import DeferredWatchSources from "./DeferredWatchSources";
 
-const mocks = vi.hoisted(() => ({ read: vi.fn(), search: vi.fn() }));
-vi.mock("@/frontend/lib/mongodbClient", () => ({ getWatchSources: mocks.read, searchWatchLinks: mocks.search }));
+const mocks = vi.hoisted(() => ({ read: vi.fn(), search: vi.fn(), check: vi.fn() }));
+vi.mock("@/frontend/lib/mongodbClient", () => ({ getWatchSources: mocks.read, searchWatchLinks: mocks.search, checkWatchLinks: mocks.check }));
 let client: QueryClient;
 const content: ContentWatchSources = { contentId: 42, contentType: "movie", sources: [] };
 const result: FetchContentSourcesResult = { status: "not_found", content, importedPages: 0, errors: 0 };
@@ -17,6 +17,9 @@ const populated: ContentWatchSources = { ...content, sources: [{ provider: "hdhu
 beforeEach(() => {
   vi.clearAllMocks();
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  mocks.check.mockImplementation(async (_identity, ids) => ids.map((id: string) => ({ linkId: id, url: populated.sources[0].links.find((item) => item.id === id)?.url,
+    available: true, checkedAt: new Date().toISOString(), validUntil: new Date(Date.now() + 120_000).toISOString(),
+    downloads: id === "download" ? [{ url: "https://file.example/video.mkv", filename: "Example.720p.mkv", sizeBytes: 1234, contentType: "video/x-matroska", checkedAt: new Date().toISOString(), expiresAt: null }] : [] })));
   mocks.read.mockResolvedValue(content);
   mocks.search.mockResolvedValue(result);
 });
@@ -31,7 +34,7 @@ const showTab = (name: RegExp) => fireEvent.mouseDown(screen.getByRole("tab", { 
 describe("watch source popup", () => {
   it("does no work before opening, searches automatically, reuses recent results and resets on title navigation", async () => {
     const rendered = render(view());
-    expect(mocks.read).not.toHaveBeenCalled(); expect(mocks.search).not.toHaveBeenCalled();
+    expect(mocks.read).not.toHaveBeenCalled(); expect(mocks.search).not.toHaveBeenCalled(); expect(mocks.check).not.toHaveBeenCalled();
     await open();
     await waitFor(() => expect(mocks.search).toHaveBeenCalledOnce());
     expect(screen.getByRole("dialog", { name: "Example" })).toBeInTheDocument();

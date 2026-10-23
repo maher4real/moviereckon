@@ -32,7 +32,7 @@ describe("buildRouteMetadata", () => {
   });
 
   it("keeps signed-in and account pages out of search results", async () => {
-    for (const path of ["/home", "/movies", "/series", "/upcoming", "/search", "/reckon", "/reckon/preferences", "/profile", "/profile/edit", "/auth", "/forgot-password", "/feedback", "/person/12"]) {
+    for (const path of ["/home", "/movies", "/series", "/upcoming", "/search", "/reckon", "/reckon/preferences", "/welcome", "/profile", "/profile/edit", "/auth", "/forgot-password", "/feedback", "/person/12"]) {
       const meta = await buildRouteMetadata(path);
       expect(robotsOf(meta), path).toEqual({ index: false, follow: false });
     }

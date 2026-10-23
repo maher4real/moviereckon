@@ -86,3 +86,13 @@ export type SourceSearchEvent =
   | { type: "progress"; message: string }
   | { type: "complete"; result: FetchContentSourcesResult }
   | { type: "error"; message: string };
+
+/** Evidence from a bounded file or stream check, never from an HTML status alone. */
+export interface WatchLinkCheck {
+  linkId: string;
+  url: string;
+  available: boolean;
+  checkedAt: string;
+  validUntil: string;
+  downloads: ResolvedDownload[];
+}

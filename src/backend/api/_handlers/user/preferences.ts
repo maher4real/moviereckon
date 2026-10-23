@@ -45,6 +45,16 @@ const EXTRA_DEFAULTS: TastePreferenceExtras = {
   eras: [],
 };
 
+/**
+ * When the viewer finished (or skipped) taste onboarding. Accounts created
+ * before onboarding existed count as done once they have chosen anything.
+ */
+function onboardingCompletedAt(prefs: Record<string, any> | null | undefined): string | null {
+  if (typeof prefs?.onboarding_completed_at === "string") return prefs.onboarding_completed_at;
+  const hasExplicitTaste = (prefs?.preferred_languages?.length || 0) > 0 || (prefs?.preferred_genres?.length || 0) > 0;
+  return hasExplicitTaste ? prefs?.updated_at || prefs?.created_at || null : null;
+}
+
 function serializePreferences(prefs: Record<string, any> | null | undefined, userId: string) {
   return {
     id: prefs?._id?.toString(),
@@ -58,6 +68,7 @@ function serializePreferences(prefs: Record<string, any> | null | undefined, use
     moods: prefs?.moods || EXTRA_DEFAULTS.moods,
     pace: prefs?.pace ?? EXTRA_DEFAULTS.pace,
     eras: prefs?.eras || EXTRA_DEFAULTS.eras,
+    onboarding_completed_at: onboardingCompletedAt(prefs),
     created_at: prefs?.created_at,
     updated_at: prefs?.updated_at,
   };
@@ -145,9 +156,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const preferredLanguages = normalizeLanguages(body.preferred_languages);
       const preferredGenres = normalizeGenres(body.preferred_genres);
       const extras = parseTastePreferenceFields(body);
+      const completesOnboarding = body.onboarding_completed === true;
 
       if (
         !extras.ok ||
+        (body.onboarding_completed !== undefined && typeof body.onboarding_completed !== "boolean") ||
         (body.preferred_languages !== undefined && preferredLanguages === null) ||
         (body.preferred_genres !== undefined && preferredGenres === null)
       ) {
@@ -157,7 +170,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (
         preferredLanguages === null &&
         preferredGenres === null &&
-        Object.keys(extras.updates).length === 0
+        Object.keys(extras.updates).length === 0 &&
+        !completesOnboarding
       ) {
         return res.status(400).json({ error: "At least one preference field is required" });
       }
@@ -177,6 +191,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       else insertDefaults.preferred_languages = [];
       if (preferredGenres !== null) updates.preferred_genres = preferredGenres;
       else insertDefaults.preferred_genres = [];
+      // Saving or skipping onboarding stamps it once; later edits keep the date.
+      if (completesOnboarding && typeof existing?.onboarding_completed_at !== "string") {
+        updates.onboarding_completed_at = now;
+      }
 
       // Liked beats disliked, whichever list this request touched.
       const finalPreferred =

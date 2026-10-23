@@ -317,7 +317,8 @@ export default function Auth() {
           setVerificationBanner(null);
           triggerAuthTransition();
           queueStartupSound();
-          navigate("/home");
+          // A brand-new account picks its taste before the first feed loads.
+          navigate("/welcome");
         }
       } else {
         const { error, code } = await signIn(email, password, signinCaptchaToken);

@@ -1,6 +1,6 @@
 /**
  * MongoDB Connection Helper
- * Uses globalThis caching to prevent multiple connections in serverless environment
+ * Shares one connection attempt and bounded pool per Node.js function instance.
  */
 import { MongoClient, Db, ObjectId } from "mongodb";
 
@@ -14,10 +14,10 @@ type GenericDocument = Record<string, unknown>;
 // Use globalThis for connection caching in serverless environment
 declare global {
   var mongoConnection: CachedConnection | undefined;
+  var mongoConnectionPromise: Promise<CachedConnection> | undefined;
   var mongoIndexBootstrapPromise: Promise<void> | undefined;
 }
 
-let cached = globalThis.mongoConnection;
 const INDEX_BOOTSTRAP_DISABLED = process.env.MONGODB_SKIP_INDEX_BOOTSTRAP === "true";
 
 function getMongoConfig() {
@@ -32,10 +32,16 @@ function getMongoConfig() {
     throw new Error("Please define MONGODB_URI environment variable");
   }
 
+  const maxPoolSize = Number(process.env.MONGODB_MAX_POOL_SIZE ?? 10);
+  if (!Number.isInteger(maxPoolSize) || maxPoolSize < 1 || maxPoolSize > 100) {
+    throw new Error("MONGODB_MAX_POOL_SIZE must be an integer between 1 and 100");
+  }
+
   return {
     uri,
     dbName: process.env.MONGODB_DB_NAME || "moviereckon",
     tlsInsecure,
+    maxPoolSize,
   };
 }
 
@@ -227,9 +233,14 @@ async function ensureMongoIndexes(db: Db): Promise<void> {
 }
 
 export async function connectToDatabase(): Promise<CachedConnection> {
-  if (cached) {
-    await ensureMongoIndexes(cached.db);
-    return cached;
+  if (globalThis.mongoConnection) {
+    return globalThis.mongoConnection;
+  }
+
+  // Fluid compute handles concurrent requests in one instance. Cache the
+  // in-flight attempt before waiting, so cold requests cannot create extra pools.
+  if (globalThis.mongoConnectionPromise) {
+    return globalThis.mongoConnectionPromise;
   }
 
   // Ensure common Atlas options exist on the connection string.
@@ -244,6 +255,11 @@ export async function connectToDatabase(): Promise<CachedConnection> {
   if (!params.has("tls") && !params.has("ssl")) params.set("tls", "true");
 
   const client = new MongoClient(uri.toString(), {
+    maxPoolSize: mongoConfig.maxPoolSize,
+    minPoolSize: 0,
+    maxConnecting: 2,
+    maxIdleTimeMS: 60_000,
+    waitQueueTimeoutMS: 5_000,
     // Fail fast in serverless when the cluster/network is misconfigured
     serverSelectionTimeoutMS: 10_000,
     connectTimeoutMS: 10_000,
@@ -257,14 +273,25 @@ export async function connectToDatabase(): Promise<CachedConnection> {
         }
       : {}),
   });
-  await client.connect();
-  const db = client.db(mongoConfig.dbName);
-  await ensureMongoIndexes(db);
+  globalThis.mongoConnectionPromise = (async () => {
+    try {
+      await client.connect();
+      const db = client.db(mongoConfig.dbName);
+      await ensureMongoIndexes(db);
+      const connection = { client, db };
+      globalThis.mongoConnection = connection;
+      return connection;
+    } catch (error) {
+      // A transient connection failure must not poison every later request.
+      // Close the failed pool, preserving the original error if close also fails.
+      await client.close().catch(() => undefined);
+      globalThis.mongoConnectionPromise = undefined;
+      globalThis.mongoIndexBootstrapPromise = undefined;
+      throw error;
+    }
+  })();
 
-  cached = { client, db };
-  globalThis.mongoConnection = cached;
-
-  return cached;
+  return globalThis.mongoConnectionPromise;
 }
 
 // Export ObjectId for use in handlers

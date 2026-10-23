@@ -3,18 +3,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import FetchWatchLinksButton from "./FetchWatchLinksButton";
 import type { FetchContentSourcesResult, WatchSourceLink } from "@/shared/types/watchSources";
 
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), fetch: vi.fn(), setQueryData: vi.fn() }));
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), fetch: vi.fn(), setQueryData: vi.fn(), check: vi.fn() }));
 vi.mock("@tanstack/react-query", () => ({ useQueryClient: () => ({ setQueryData: mocks.setQueryData }) }));
 vi.mock("@/frontend/hooks/useAuth", () => ({ useAuth: mocks.auth }));
-vi.mock("@/frontend/lib/mongodbClient", () => ({ fetchWatchLinks: mocks.fetch }));
-const link: WatchSourceLink = { id: "watch", label: "Player 1", url: "https://player.example/42", host: "player.example", kind: "watch", verification: "unverified",
+vi.mock("@/frontend/lib/mongodbClient", () => ({ fetchWatchLinks: mocks.fetch, checkWatchLinks: mocks.check }));
+const link: WatchSourceLink = { id: "watch", label: "Player 1", url: "https://hdstream4u.com/file/abcdefgh1234", host: "player.example", kind: "watch", verification: "unverified",
   quality: null, resolution: null, codec: null, bitDepth: null, size: null, formats: [], languages: [], scope: "movie", season: null, episode: null, episodeEnd: null };
 const result: FetchContentSourcesResult = { status: "imported", importedPages: 1, errors: 0, content: { contentId: 42, contentType: "movie", sources: [{
   provider: "hdhub", sourcePage: "https://source.example/title/", checkedAt: null, title: "Example", links: [link,
-    { ...link, id: "download", label: "1080p HEVC", url: "https://download.example/42", kind: "download", quality: "1080p" }],
+    { ...link, id: "download", label: "1080p HEVC", url: "https://hubcdn.club/file/example", kind: "download", quality: "1080p" }],
 }] } };
 
-beforeEach(() => { vi.clearAllMocks(); mocks.auth.mockReturnValue({ user: { role: "user" } }); mocks.fetch.mockResolvedValue(result); });
+beforeEach(() => { vi.clearAllMocks(); mocks.check.mockImplementation(async (_identity, ids: string[]) => ids.map((linkId) => ({ linkId, url: result.content.sources[0].links.find((item) => item.id === linkId)!.url, available: true, downloads: [], checkedAt: new Date().toISOString(), validUntil: new Date(Date.now() + 120_000).toISOString() }))); mocks.auth.mockReturnValue({ user: { role: "user" } }); mocks.fetch.mockResolvedValue(result); });
 
 describe("Fetch links action", () => {
   it("fetches the selected movie and displays separate watch and quality options", async () => {
@@ -23,7 +23,7 @@ describe("Fetch links action", () => {
     expect(mocks.fetch).toHaveBeenCalledWith(42, "movie", undefined, expect.any(AbortSignal));
     expect(await screen.findByRole("link", { name: /Player 1/ })).toHaveAttribute("href", link.url);
     expect(screen.getByRole("region", { name: "Download options" })).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("2 links available");
+    expect(screen.getByRole("status")).toHaveTextContent("2 sources found");
     expect(mocks.setQueryData).toHaveBeenCalledWith(["watch-sources", "movie", 42], result.content);
   });
   it("prevents duplicate clicks while a request is pending", async () => {

@@ -5,7 +5,7 @@
  * The client is split by area under `./api/*`; this module re-exports all of
  * it so existing imports keep working.
  */
-import type { ContentWatchSources, DirectMediaSource, FetchContentSourcesResult, ResolvedDownload, SourceMediaType, SourceSearchEvent, WatchSourceIdentity } from "@/shared/types/watchSources";
+import type { ContentWatchSources, WatchLinkCheck, DirectMediaSource, FetchContentSourcesResult, ResolvedDownload, SourceMediaType, SourceSearchEvent, WatchSourceIdentity } from "@/shared/types/watchSources";
 import { fetchWithAuth } from "./api/http";
 
 export * from "./api/http";
@@ -109,4 +109,20 @@ export async function readSourceSearchEvents(
     if (!complete) throw new Error("Search interrupted. Try again to find remaining links.");
     return complete;
   } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
+}
+
+export async function checkWatchLinks(identity: WatchSourceIdentity, linkIds: string[], signal?: AbortSignal, force = false): Promise<WatchLinkCheck[]> {
+  const response = await fetchWithAuth("/api/watch-sources/check", {
+    method: "POST", signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(55_000)]) : AbortSignal.timeout(55_000),
+    body: JSON.stringify({ ...identity, linkIds, ...(force ? { force: true } : {}) }),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    const retryAfter = Number(response.headers.get("Retry-After"));
+    throw Object.assign(new Error(data?.error || "Unable to check links"), {
+      retryAfterMs: Number.isFinite(retryAfter) ? Math.min(60_000, Math.max(0, retryAfter * 1000)) : 0,
+    });
+  }
+  if (!Array.isArray(data?.checks)) throw new Error("The link check was incomplete");
+  return data.checks;
 }

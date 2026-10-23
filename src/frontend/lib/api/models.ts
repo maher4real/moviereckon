@@ -85,6 +85,8 @@ export interface UserPreferences {
   moods?: Mood[];
   pace?: Pace | null;
   eras?: Era[];
+  /** Set once taste onboarding is saved or skipped; null while pending. */
+  onboarding_completed_at?: string | null;
 }
 
 export type FeedbackType = "give_it_a_go" | "one_time_watch" | "must_watch" | "skip" | "not_now";

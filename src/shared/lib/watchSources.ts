@@ -70,3 +70,9 @@ export function episodeSourceLinks(links: WatchSourceLink[], season: number, epi
       link.episode <= episode && link.episodeEnd >= episode)
   ));
 }
+
+/** Unknown external pages cannot establish media availability and remain hidden. */
+export function canCheckWatchLink(link: WatchSourceLink): boolean {
+  return isResolvableDownload(link) || isDirectFileLink(link.url) || isResolvablePlayer(link) ||
+    ((link.scope === "movie" || link.scope === "episode") && directMediaFormat(link.url) === "hls");
+}

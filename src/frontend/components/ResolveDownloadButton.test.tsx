@@ -17,9 +17,7 @@ afterEach(() => cleanup());
 
 describe("final download link action", () => {
   it("distinguishes generic provider labels by resolution and codec", () => {
-    render(<WatchSourceOptions identity={identity} context="Episode 1" links={[
-      { ...link, label: "Instant" }, { ...link, id: "1080p", label: "Instant", quality: "1080p", resolution: 1080 },
-    ]} />);
+    render(<><ResolveDownloadButton identity={identity} link={{ ...link, label: "Instant" }} /><ResolveDownloadButton identity={identity} link={{ ...link, id: "1080p", label: "Instant", quality: "1080p", resolution: 1080 }} /></>);
     expect(screen.getByRole("button", { name: "Get file link: S1 E1 · 720p · Instant · H.264" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Get file link: S1 E1 · 1080p · Instant · H.264" })).toBeInTheDocument();
   });
@@ -74,12 +72,21 @@ describe("final download link action", () => {
     const signal = mocks.resolve.mock.calls[0][2] as AbortSignal;
     unmount(); expect(signal.aborted).toBe(true);
   });
-  it("offers a resolver beside supported download qualities, while a generic ad-page link stays external", () => {
-    render(<WatchSourceOptions identity={identity} context="Episode 1" links={[link,
+  it("keeps unsupported ad pages out of the list", () => {
+    render(<WatchSourceOptions identity={identity} context="Episode 1" links={[
       { ...link, id: "other", url: "https://other.example/page", host: "other.example" },
     ]} />);
-    expect(screen.getAllByRole("button", { name: /Get file link/ })).toHaveLength(1);
-    expect(screen.getByRole("button", { name: /S1 E1/ })).toBeInTheDocument();
-    expect(screen.getByText(/External sites/).closest("details")).not.toHaveAttribute("open");
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Get file link/ })).not.toBeInTheDocument();
+  });
+  it("reuses checked files immediately and removes the source when refreshing fails", async () => {
+    const unavailable = vi.fn();
+    mocks.resolve.mockRejectedValueOnce(new Error("File removed"));
+    render(<ResolveDownloadButton identity={identity} link={link} initialFiles={[file]} onUnavailable={unavailable} />);
+    expect(screen.getByRole("link", { name: "Download file" })).toHaveAttribute("href", file.url);
+    expect(mocks.resolve).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /Get file link/ }));
+    await screen.findByRole("alert"); expect(unavailable).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 });

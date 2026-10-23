@@ -109,7 +109,7 @@ export async function fetchUserPreferences(): Promise<UserPreferences | null> {
   }
 }
 
-export async function updateUserPreferences(prefs: Partial<UserPreferences>): Promise<UserPreferences | null> {
+export async function updateUserPreferences(prefs: Partial<UserPreferences> & { onboarding_completed?: boolean }): Promise<UserPreferences | null> {
   const response = await fetchWithAuth("/api/user/preferences", {
     method: "PUT",
     body: JSON.stringify(prefs),

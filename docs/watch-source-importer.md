@@ -224,12 +224,9 @@ catalog independently. Origin overrides must be public HTTPS origins; cross-orig
 redirects remain rejected. The origins and published movie/series layouts were
 checked on 2026-10-23. Domain rotation requires updating the corresponding setting.
 
-**More watch providers** adds [VidLink](https://vidlink.pro/#api) using its
-documented TMDB movie and exact-episode routes. These are external player choices,
-labeled as availability unverified, not imported or verified media. Series viewing
-requires a selected episode or the Watch action on an episode detail. An unselected
-episode never defaults to episode one. The providers open only when clicked, in a new tab without an opener
-or app referrer. No iframe or provider scripts are added to MovieReckon.
+External player shortcuts such as VidLink are no longer listed unconditionally.
+A successful HTML response or a valid-looking TMDB player URL does not establish
+that media is available for the requested title and episode.
 
 Published download buttons from the new catalogs may lead to link collections or
 external pages. The existing direct-file resolver still accepts only its supported
@@ -246,3 +243,36 @@ matching movie and episode media and advanced playback for Weapons and Breaking 
 S1 E1 during a short browser check on 2026-10-23. The check used keyboard playback
 controls because an ad overlay intercepted pointer clicks; third-party ads and
 availability remain provider-controlled. Published catalog links are not guarantees of final-file access.
+
+### Working links only (2026-10-24)
+
+Opening the popup still triggers discovery across all enabled catalogs. Discovery
+and availability checking continue after the first successful source; every
+supported candidate is checked, and failed batches do not stop later batches.
+Rows and tab counts include only successfully checked links. Pending, failed,
+expired, unsupported and unverified external pages stay hidden.
+
+`POST /api/watch-sources/check` accepts the selected content identity and at most
+four saved link IDs, never arbitrary URLs. It requires the same authenticated,
+same-origin AJAX checks as resolution and limits requests to 20 batches/minute.
+Checks use the existing filename, episode, MIME, expiry and trusted storage
+validation for downloads, or validated playlists plus media-byte probes for
+streams. Extracting a URL from a player page alone is insufficient. Full media
+is not buffered or proxied. Generic player and collection pages without a
+reliable media checker remain hidden even when their HTML loads successfully.
+
+Successful checks are cached for at most two minutes, shortened to 30 seconds
+before a signed file expires. Failed checks are cached for 30 seconds. Cache
+identity includes the title, content identity, saved URL and link metadata;
+concurrent requests for the same source share a probe. The client checks batches
+progressively, respects API cooldowns, cancels stale episode/title requests and
+reuses final download files immediately. Expired evidence removes a row until it
+passes again. Search again forces fresh checks; a failed manual file refresh
+removes that source. Closing the popup stops client work.
+
+Live validation confirmed a Weapons HubCDN download and HDStream stream and
+rejected a Play4u source without validated media evidence. Browser UI checks used
+synthetic check responses to verify pending/failed/unknown-source hiding, refresh
+removal, exact episode scope, and desktop/mobile layouts. This does not establish
+live authenticated MongoDB/TMDB coverage or guarantee that a provider stays online
+after a recent successful check.

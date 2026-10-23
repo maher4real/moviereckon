@@ -1,53 +1,48 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { contentSourceLinks } from "@/shared/lib/watchSources";
 import type { ContentWatchSources, WatchSourceLink } from "@/shared/types/watchSources";
 import { EpisodeWatchLinks, WatchLinksSection } from "./WatchSourceLinks";
-
-const watch: WatchSourceLink = { id: "ep1", label: "WATCH", url: "https://player.example/one", host: "player.example", kind: "watch",
+const mocks = vi.hoisted(() => ({ check: vi.fn() }));
+vi.mock("@/frontend/lib/mongodbClient", () => ({ checkWatchLinks: mocks.check }));
+const watch: WatchSourceLink = { id: "ep1", label: "WATCH", url: "https://hdstream4u.com/file/abcdefgh1234", host: "hdstream4u.com", kind: "watch",
   verification: "unverified", quality: "720p", resolution: 720, codec: "H.264", bitDepth: null, size: null,
   formats: [], languages: ["english"], scope: "episode", season: 1, episode: 1, episodeEnd: null };
-
+let contentId = 200;
+beforeEach(() => {
+  vi.resetAllMocks(); contentId++;
+  mocks.check.mockImplementation(async (_identity, ids: string[]) => ids.map((linkId) => ({ linkId, url: watch.url, available: true, downloads: [],
+    checkedAt: new Date().toISOString(), validUntil: new Date(Date.now() + 120_000).toISOString() })));
+});
 describe("saved watch links on detail pages", () => {
-  it("keeps episode players separate from other seasons, other episodes and season packs", () => {
-    render(<EpisodeWatchLinks season={1} episode={1} links={[watch,
+  it("checks only the exact episode and keeps other episodes and packs out", async () => {
+    render(<EpisodeWatchLinks identity={{ contentId, contentType: "tv" }} season={1} episode={1} links={[watch,
       { ...watch, id: "ep2", episode: 2 }, { ...watch, id: "s2", season: 2 },
       { ...watch, id: "pack", scope: "season", episode: null }, { ...watch, id: "series", scope: "series", season: null },
     ]} />);
-    const links = screen.getAllByRole("link");
-    expect(links).toHaveLength(1);
-    expect(links[0]).toHaveAttribute("href", watch.url);
-    expect(links[0]).toHaveAttribute("target", "_blank");
-    expect(links[0]).toHaveAttribute("rel", "noopener noreferrer");
+    const link = await screen.findByRole("link", { name: /Watch season 1 episode 1/ });
+    expect(link).toHaveAttribute("href", watch.url); expect(link).toHaveAttribute("target", "_blank");
+    expect(screen.getAllByRole("link")).toHaveLength(1);
+    expect(mocks.check.mock.calls[0][1]).toEqual(["ep1"]);
   });
-
-  it("labels a multi-episode player as a range instead of implying a single episode", () => {
-    render(<EpisodeWatchLinks season={1} episode={2} links={[
+  it("hides uncheckable ranges and unknown external pages", () => {
+    render(<EpisodeWatchLinks identity={{ contentId, contentType: "tv" }} season={1} episode={2} links={[
       { ...watch, id: "range", scope: "episode-range", episode: 1, episodeEnd: 3 },
+      { ...watch, id: "unknown", episode: 2, url: "https://player.example/page" },
     ]} />);
-    expect(screen.getByRole("link", { name: /Episodes 1–3/ })).toHaveTextContent("Episodes 1–3");
+    expect(screen.queryByRole("link")).not.toBeInTheDocument(); expect(mocks.check).not.toHaveBeenCalled();
   });
-
   it("shows missing episodes without a substitute player", () => {
-    render(<EpisodeWatchLinks season={1} episode={9} links={[watch]} />);
-    expect(screen.getByText("Watch link unavailable for this episode.")).toBeInTheDocument();
+    render(<EpisodeWatchLinks identity={{ contentId, contentType: "tv" }} season={1} episode={9} links={[watch]} />);
+    expect(screen.getByText("No working links found.")).toBeInTheDocument(); expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+  it("does not expose saved URLs when identity or successful verification is missing", async () => {
+    const view = render(<WatchLinksSection heading="Watch movie" context="Example" links={[{ ...watch, scope: "movie" }]} />);
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    mocks.check.mockResolvedValue([]);
+    view.rerender(<WatchLinksSection identity={{ contentId, contentType: "movie" }} heading="Watch movie" context="Example" links={[{ ...watch, scope: "movie" }]} />);
+    await screen.findByText("No working links found."); expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
-
-  it("makes download qualities expandable without displaying them as watch players", () => {
-    render(<WatchLinksSection heading="Watch movie" context="Example" links={[{ ...watch, scope: "movie" },
-      { ...watch, id: "download", kind: "download", scope: "movie", label: "1080p HEVC", url: "https://download.example/file", quality: "1080p", codec: "HEVC", size: "2GB" },
-    ]} />);
-    const section = screen.getByRole("region", { name: "Watch movie" });
-    expect(within(section).getByRole("link", { name: /^Watch Example/ })).toHaveAttribute("href", watch.url);
-    const download = within(section).getByText("Download options (1)");
-    const details = download.closest("details")!;
-    expect(details).not.toHaveAttribute("open");
-    fireEvent.click(download);
-    expect(details).toHaveAttribute("open");
-    expect(within(section).getByRole("link", { name: /^Download Example/ })).toHaveAttribute("href", "https://download.example/file");
-  });
-
   it("reports loading, empty and unavailable states and allows a retry", () => {
     const retry = vi.fn();
     const view = render(<WatchLinksSection heading="Watch movie" context="Example" links={[]} isLoading />);
@@ -55,13 +50,11 @@ describe("saved watch links on detail pages", () => {
     view.rerender(<WatchLinksSection heading="Watch movie" context="Example" links={[]} />);
     expect(screen.getByText("No watch links available yet.")).toBeInTheDocument();
     view.rerender(<WatchLinksSection heading="Watch movie" context="Example" links={[]} isError onRetry={retry} />);
-    fireEvent.click(screen.getByRole("button", { name: "Retry watch links" }));
-    expect(retry).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "Retry watch links" })); expect(retry).toHaveBeenCalledOnce();
   });
-
   it("deduplicates the same imported destination across multiple source pages", () => {
     const source = { provider: "hdhub" as const, sourcePage: "https://source.example/title/", title: "Example", checkedAt: null, links: [watch] };
-    const content: ContentWatchSources = { contentId: 42, contentType: "tv", sources: [source, { ...source, sourcePage: "https://source.example/another/" }] };
+    const content: ContentWatchSources = { contentId, contentType: "tv", sources: [source, { ...source, sourcePage: "https://source.example/another/" }] };
     expect(contentSourceLinks(content)).toEqual([watch]);
   });
 });
