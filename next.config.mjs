@@ -4,7 +4,8 @@ const nextConfig = {
   serverExternalPackages: ["@grpc/grpc-js", "@grpc/proto-loader"],
   images: {
     formats: ["image/avif", "image/webp"],
-    minimumCacheTTL: 86400,
+    // TMDB/avatar URLs are content-addressed, so optimized variants can live long.
+    minimumCacheTTL: 2592000,
     remotePatterns: [
       { protocol: "https", hostname: "image.tmdb.org" },
       { protocol: "https", hostname: "**.public.blob.vercel-storage.com" },

@@ -1,10 +1,10 @@
-import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Play, Info, Star, Pause, ChevronLeft, ChevronRight } from "lucide-react";
 import { Movie, getBackdropUrl, getLanguageLabel } from "@/shared/lib/tmdb";
 import { Button } from "@/frontend/components/ui/button";
-import MediaImage from "@/frontend/components/MediaImage";
+import MediaImage, { preloadMediaImage } from "@/frontend/components/MediaImage";
 import { cn } from "@/shared/lib/utils";
 
 interface HeroBannerProps {
@@ -20,16 +20,30 @@ interface HeroBannerProps {
   onTogglePlayback?: () => void;
   onInteractionChange?: (active: boolean) => void;
   slideDuration?: number;
+  /** Slides reachable next (autoplay/arrows); their backdrops are fetched ahead of time. */
+  neighborMovies?: Array<Movie | undefined>;
 }
 
 const SWIPE_THRESHOLD = 48;
 
-export default function HeroBanner({ movie, isLoading, currentIndex, totalSlides, onDotClick, onStep, onBackdropReady, isPlaying = true, onTogglePlayback, onInteractionChange, slideDuration = 8000 }: HeroBannerProps) {
+export default function HeroBanner({ movie, isLoading, currentIndex, totalSlides, onDotClick, onStep, onBackdropReady, isPlaying = true, onTogglePlayback, onInteractionChange, slideDuration = 8000, neighborMovies }: HeroBannerProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const reduceMotion = useReducedMotion();
   const [interacting, setInteracting] = useState(false);
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
+  const neighborBackdrops = (neighborMovies ?? [])
+    .filter(neighbor => neighbor?.backdrop_path && neighbor.id !== movie?.id)
+    .map(neighbor => getBackdropUrl(neighbor!.backdrop_path, "large"))
+    .join("|");
+  // Fetch neighbouring backdrops while the current slide is on screen, so the
+  // crossfade reveals a decoded image instead of an empty frame.
+  useEffect(() => {
+    if (!neighborBackdrops) return;
+    for (const src of neighborBackdrops.split("|")) {
+      preloadMediaImage(src, { sizes: "100vw", fetchPriority: "low" });
+    }
+  }, [neighborBackdrops]);
   const from = `${location.pathname}${location.search}${location.hash}`;
   if (isLoading || !movie) return <div className="streaming-hero hero-skeleton" aria-label="Loading featured movies" aria-busy="true" />;
 

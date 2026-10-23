@@ -34,7 +34,7 @@ export function DetailHero({ media, title, backdropPath }: {
       <MediaImage
         src={getBackdropUrl(backdropPath, "large")}
         alt={`${title} visual`}
-        className="absolute inset-0 w-full h-full object-cover"
+        className="absolute inset-0 w-full h-full object-cover object-[center_25%]"
         fallbackSrc="/fallbacks/backdrop.svg"
         width={1280}
         height={720}

@@ -130,6 +130,8 @@ export interface RecommendationExplanation {
     diversityPenalty: number;
   };
   seedTitle: string | null;
+  /** Shared by titles of one franchise; Pick Tonight shows one per franchise. */
+  franchiseKey?: string;
 }
 
 export interface PersonalizedRecommendationsPayload {

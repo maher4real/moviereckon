@@ -1,3 +1,4 @@
+import { smoothedRating } from "./coldStart";
 import { getContentKey, normalizeTmdbItem } from "./normalizers";
 import {
   calculatePopularityCap,
@@ -509,7 +510,7 @@ function baseFallbackRanking(
   return candidates
     .filter((item) => !seenKeys.has(item.key))
     .map((item) => {
-      const qualityComponent = (Math.max(0, item.voteAverage) / 10) * 0.6;
+      const qualityComponent = (Math.max(0, smoothedRating(item.voteAverage, item.voteCount)) / 10) * 0.6;
       const popularityComponent = Math.min(1, item.popularity / 150) * 0.4;
       const preferredGenreMatches = item.genreIds.filter((genreId) =>
         preferredGenreSet.has(genreId),

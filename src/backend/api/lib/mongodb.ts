@@ -184,12 +184,6 @@ async function ensureMongoIndexes(db: Db): Promise<void> {
       name: "rate_limit_buckets_updated_desc",
     });
 
-    await createIndexSafe(db, "theater_movies", { createdAt: -1 }, {
-      name: "theater_movies_created_desc",
-    });
-    await createIndexSafe(db, "theater_movies", { genre: 1 }, {
-      name: "theater_movies_genre",
-    });
 
     // Recommendation v2 is durable state, so its indexes are provisioned with
     // the rest of the deployment schema instead of on a user-facing request.

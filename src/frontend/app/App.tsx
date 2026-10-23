@@ -52,10 +52,6 @@ const routeLoaders = {
   movies: () => import("@/frontend/features/browse/Movies"),
   series: () => import("@/frontend/features/browse/Series"),
   infoPage: () => import("@/frontend/features/info/InfoPage"),
-  theaterHome: () => import("@/frontend/features/theater/TheaterHome"),
-  theaterDetail: () => import("@/frontend/features/theater/TheaterDetail"),
-  theaterPlayer: () => import("@/frontend/features/theater/TheaterPlayer"),
-  theaterAdmin: () => import("@/frontend/features/theater/TheaterAdmin"),
   verifyEmail: () => import("@/frontend/features/auth/VerifyEmail"),
   forgotPassword: () => import("@/frontend/features/auth/ForgotPassword"),
   resetPassword: () => import("@/frontend/features/auth/ResetPassword"),
@@ -77,10 +73,6 @@ const NotFound = lazy(routeLoaders.notFound);
 const Movies = lazy(routeLoaders.movies);
 const Series = lazy(routeLoaders.series);
 const InfoPage = lazy(routeLoaders.infoPage);
-const TheaterHome = lazy(routeLoaders.theaterHome);
-const TheaterDetail = lazy(routeLoaders.theaterDetail);
-const TheaterPlayer = lazy(routeLoaders.theaterPlayer);
-const TheaterAdmin = lazy(routeLoaders.theaterAdmin);
 const VerifyEmail = lazy(routeLoaders.verifyEmail);
 const ForgotPassword = lazy(routeLoaders.forgotPassword);
 const ResetPassword = lazy(routeLoaders.resetPassword);
@@ -197,7 +189,6 @@ const protectedBottomNavRouteRoots = [
   "/reckon",
   "/movies",
   "/series",
-  "/theater",
 ];
 
 const publicBottomNavRouteRoots = [
@@ -216,10 +207,6 @@ function isRouteRootMatch(pathname: string, roots: string[]) {
 }
 
 function isProtectedBottomNavRoute(pathname: string) {
-  if (/^\/theater\/[^/]+\/play\/?$/.test(pathname)) {
-    return false;
-  }
-
   return (
     isRouteRootMatch(pathname, protectedBottomNavRouteRoots) ||
     protectedBottomNavDetailPrefixes.some((prefix) => pathname.startsWith(prefix))
@@ -316,12 +303,6 @@ const App = ({
                           <Route path="/faq" element={<InfoPage page="faq" />} />
                           <Route path="/terms" element={<InfoPage page="terms" />} />
                           <Route path="/privacy" element={<InfoPage page="privacy" />} />
-                          <Route path="/admin" element={<Navigate to="/theater/admin" replace />} />
-                          {/* Theater Mode routes */}
-                          <Route path="/theater" element={<ProtectedRoute><TheaterHome /></ProtectedRoute>} />
-                          <Route path="/theater/admin" element={<ProtectedRoute requiredRole="admin"><TheaterAdmin /></ProtectedRoute>} />
-                          <Route path="/theater/:id" element={<ProtectedRoute><TheaterDetail /></ProtectedRoute>} />
-                          <Route path="/theater/:id/play" element={<ProtectedRoute><TheaterPlayer /></ProtectedRoute>} />
                           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                           <Route path="*" element={<NotFound />} />
                           </RouteTransition>

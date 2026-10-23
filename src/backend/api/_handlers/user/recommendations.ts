@@ -9,6 +9,7 @@ import { getUserFromRequest } from "../../lib/auth.js";
 import { consumeRateLimit, getClientIp } from "../../lib/rate-limit.js";
 import { emitSecurityEvent } from "../../lib/abuse-telemetry.js";
 import type { Movie, TVShow } from "@/shared/lib/tmdb";
+import { isReleased } from "@/shared/lib/recommendation/feedRanking";
 import {
   discoverServerMovies,
   discoverServerTVShows,
@@ -544,15 +545,10 @@ function filterCandidatesForRequestContext(
   items: UnifiedContentItem[],
   requestContext: RecommendationRequestContext,
 ): UnifiedContentItem[] {
-  if (
-    requestContext.contentType === "all" &&
-    !requestContext.genreId &&
-    !requestContext.language
-  ) {
-    return items;
-  }
-
+  const now = Date.now();
   return items.filter((item) => {
+    // Upcoming and undated titles cannot be watched yet.
+    if (!isReleased(item.releaseDate, now)) return false;
     if (requestContext.contentType !== "all" && item.type !== requestContext.contentType) {
       return false;
     }

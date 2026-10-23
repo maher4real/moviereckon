@@ -1,3 +1,4 @@
+import { smoothedRating } from "./coldStart";
 import { addSourceTag, mergeNormalizedItems, normalizeTmdbItems } from "./normalizers";
 import { calculatePopularityMedian } from "./scoring";
 import {
@@ -14,7 +15,7 @@ function candidatePriority(item: UnifiedContentItem): number {
     (item.directors.length + item.creators.length > 0 ? 4 : 0) +
     (item.runtime ? 2 : 0);
 
-  return item.popularity * 0.6 + item.voteAverage * 4 + metadataDepth;
+  return item.popularity * 0.6 + smoothedRating(item.voteAverage, item.voteCount) * 4 + metadataDepth;
 }
 
 function languageBucketKey(item: UnifiedContentItem): string {

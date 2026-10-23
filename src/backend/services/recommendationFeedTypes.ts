@@ -62,6 +62,8 @@ export interface SourceState {
   tvExploreTotalPages: number | null;
   movieTasteInterests?: TasteInterestState[];
   tvTasteInterests?: TasteInterestState[];
+  movieExploreInterests?: TasteInterestState[];
+  tvExploreInterests?: TasteInterestState[];
 }
 
 export interface TasteInterestState {

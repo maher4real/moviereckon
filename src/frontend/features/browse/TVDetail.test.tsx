@@ -140,6 +140,7 @@ describe("TVDetail", () => {
     const popup = await screen.findByRole("dialog");
     expect(await within(popup).findByLabelText("Season")).toHaveValue("1");
     expect(within(popup).getByLabelText("Episode")).toHaveValue("1");
+    fireEvent.mouseDown(within(popup).getByRole("tab", { name: /Watch/ }), { button: 0, ctrlKey: false });
     expect(within(popup).getByRole("heading", { name: /Other provider pages/ })).toBeInTheDocument();
     expect(within(popup).getByRole("link", { name: /Open external page/ })).toHaveAttribute("href", "https://player.example/s1e1");
     expect(within(popup).queryByRole("link", { name: /season pack/ })).not.toBeInTheDocument();
@@ -148,8 +149,35 @@ describe("TVDetail", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Watch episode 1" }));
     const second = await screen.findByRole("dialog");
     expect(await within(second).findByLabelText("Season")).toHaveValue("2");
+    fireEvent.mouseDown(within(second).getByRole("tab", { name: /Watch/ }), { button: 0, ctrlKey: false });
     expect(within(second).getByRole("heading", { name: /Other provider pages/ })).toBeInTheDocument();
     expect(within(second).getByRole("link", { name: /Open external page/ })).toHaveAttribute("href", "https://player.example/s2e1");
+  });
+
+  it("groups series watch and download links by episode", async () => {
+    const query = mocks.useQuery.getMockImplementation()!;
+    mocks.useQuery.mockImplementation((options) => {
+      if (options.queryKey[0] === "watch-sources") return { data: { sources: [{ links: [
+        { id: "e2", label: "WATCH E2", url: "https://player.example/s1e2", host: "player.example", kind: "watch", scope: "episode", season: 1, episode: 2 },
+        { id: "e1", label: "WATCH E1", url: "https://player.example/s1e1", host: "player.example", kind: "watch", scope: "episode", season: 1, episode: 1 },
+        { id: "e1b", label: "WATCH E1 mirror", url: "https://mirror.example/s1e1", host: "mirror.example", kind: "watch", scope: "episode", season: 1, episode: 1 },
+        { id: "pack", label: "720p season pack", url: "https://download.example/s1", host: "download.example", kind: "download", scope: "season", season: 1 },
+        { id: "pack2", label: "1080p season pack", url: "https://download.example/s2", host: "download.example", kind: "download", scope: "season", season: 2 },
+      ] }] }, isLoading: false, isError: false };
+      return query(options);
+    });
+    render(<TVDetail />);
+    fireEvent.click(screen.getByRole("button", { name: "Watch series" }));
+    const popup = await screen.findByRole("dialog");
+
+    const packHeadings = (await within(popup).findAllByRole("heading", { level: 4 })).map((heading) => heading.textContent);
+    expect(packHeadings).toEqual(["Season 1 pack1", "Season 2 pack1"]);
+
+    fireEvent.mouseDown(within(popup).getByRole("tab", { name: /Watch/ }), { button: 0, ctrlKey: false });
+    const episodeHeadings = within(popup).getAllByRole("heading", { level: 4 });
+    expect(episodeHeadings.map((heading) => heading.textContent)).toEqual(["S1 · E12", "S1 · E21"]);
+    const firstEpisode = episodeHeadings[0].closest("section")!;
+    expect(within(firstEpisode).getAllByRole("link", { name: /Open external page/ })).toHaveLength(2);
   });
 
   it("shows the per-series popup search for admins", async () => {

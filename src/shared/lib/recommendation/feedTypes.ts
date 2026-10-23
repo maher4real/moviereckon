@@ -30,6 +30,8 @@ export interface FeedExplanation {
     negativePenalty?: number;
   };
   seedTitle: string | null;
+  /** Shared by titles of one franchise (collection or linked series). */
+  franchiseKey?: string;
 }
 
 export interface FeedResponse {

@@ -163,7 +163,9 @@ export default function PosterShowcase({ slides: rawSlides, label, interval = 60
                 sizes="(max-width: 640px) 46vw, 240px"
                 fallbackSrc="/fallbacks/poster.svg"
                 priority={index === 0}
-                loading={distance <= 1 ? "eager" : "lazy"}
+                // Load one slot beyond what is visible, so a poster is ready
+                // before rotation brings it into view.
+                loading={distance <= VISIBLE_RADIUS + 1 ? "eager" : "lazy"}
                 draggable={false}
               />
               <span aria-hidden="true" className="poster-showcase-sheen" />

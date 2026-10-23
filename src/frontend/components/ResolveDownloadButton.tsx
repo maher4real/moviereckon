@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { Download, RefreshCw } from "lucide-react";
 import type { ResolvedDownload, WatchSourceIdentity, WatchSourceLink } from "@/shared/types/watchSources";
 import { resolveDownloadLink } from "@/frontend/lib/mongodbClient";
+import { cn } from "@/shared/lib/utils";
 import { Button } from "./ui/button";
-import DirectWatchPlayer from "./DirectWatchPlayer";
 import LoadingIndicator from "./LoadingIndicator";
+import WatchMetaChips, { watchLinkScope } from "./WatchMetaChips";
 
-export default function ResolveDownloadButton({ link, identity, inlinePlayer = false }: { link: WatchSourceLink; identity: WatchSourceIdentity; inlinePlayer?: boolean }) {
+export default function ResolveDownloadButton({ link, identity, hideScope = false, className }: { link: WatchSourceLink; identity: WatchSourceIdentity; hideScope?: boolean; className?: string }) {
   const [pending, setPending] = useState(false);
   const [files, setFiles] = useState<ResolvedDownload[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -38,14 +39,14 @@ export default function ResolveDownloadButton({ link, identity, inlinePlayer = f
   }
   const scope = link.scope === "episode" ? `S${link.season} E${link.episode}` : link.scope === "season" ? `Season ${link.season} pack` : "";
   const label = [scope, link.quality && !link.label.includes(link.quality) ? link.quality : "", link.label, link.codec].filter(Boolean).join(" · ");
-  return <div className="min-w-0 space-y-3 py-4 first:pt-2 last:pb-0">
+  return <div className={cn("min-w-0 space-y-3 py-4 first:pt-2 last:pb-0", className)}>
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 space-y-2">
         <p className="text-sm font-semibold">{link.quality || link.label}</p>
-        <p className="mt-1 break-words text-xs text-muted-foreground">{[scope, link.label !== link.quality ? link.label : "", link.codec && !link.label.includes(link.codec) ? link.codec : "", link.size, link.host].filter(Boolean).join(" · ")}</p>
+        <WatchMetaChips link={link} skip={[link.quality, hideScope ? watchLinkScope(link) : null]} />
       </div>
-      <Button type="button" variant="outline" disabled={pending} onClick={() => void resolve()}
-        className="min-h-11 shrink-0" aria-label={`Get file link: ${label}`}>
+      <Button type="button" variant={files.length ? "outline" : "default"} disabled={pending} onClick={() => void resolve()}
+        className="min-h-11 shrink-0 rounded-lg" aria-label={`Get file link: ${label}`}>
         {files.length ? <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" /> : <Download className="mr-2 h-4 w-4" aria-hidden="true" />}
         {pending ? "Finding file…" : files.length ? "Refresh link" : "Get file link"}
       </Button>
@@ -62,10 +63,7 @@ export default function ResolveDownloadButton({ link, identity, inlinePlayer = f
         <Download className="h-4 w-4" aria-hidden="true" />Download file{available.length > 1 ? ` · Server ${index + 1}` : ""}
         {file.sizeBytes ? <span className="text-xs">({(file.sizeBytes / 1024 ** 2).toFixed(1)} MB)</span> : null}
       </a>)}</div>
-      {available.map((file, index) => (file.contentType === "video/mp4" || file.contentType === "video/webm") &&
-        (link.scope === "movie" || link.scope === "episode") && <DirectWatchPlayer key={`play:${file.url}`} link={link} inline={inlinePlayer}
-          context={file.filename} media={{ url: file.url, format: file.contentType === "video/mp4" ? "mp4" : "webm", label: `Server ${index + 1}` }} />)}
-      <p className="text-xs text-muted-foreground">{available[0].expiresAt ? `Link expires ${new Date(available[0].expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. Refresh it if needed.` : "Refresh the file link if it stops working."}</p>
+      {available[0].expiresAt && <p className="text-xs text-muted-foreground">Expires {new Date(available[0].expiresAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>}
     </div>}
   </div>;
 }

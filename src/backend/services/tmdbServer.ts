@@ -14,11 +14,14 @@ import type {
   PersonDetails,
   MovieReleaseDatesResponse,
   SeasonDetails,
+  TMDBReview,
   TVShow,
   TVShowDetails,
   Video,
   WatchProviders,
 } from "@/shared/lib/tmdb";
+
+import { applyReleasedOnlyPolicy, withReleasedOnlyParams } from "@/shared/lib/releaseFilter";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 
@@ -89,7 +92,7 @@ async function fetchTMDB<T>(
   const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
   url.searchParams.set("api_key", apiKey);
 
-  Object.entries(params).forEach(([key, value]) => {
+  Object.entries(withReleasedOnlyParams(endpoint, params)).forEach(([key, value]) => {
     if (value === undefined || value === null || value === "") return;
     url.searchParams.set(key, String(value));
   });
@@ -112,7 +115,7 @@ async function fetchTMDB<T>(
     throw new Error(message);
   }
 
-  return data as T;
+  return applyReleasedOnlyPolicy(endpoint, params, data) as T;
 }
 
 export async function getServerTrendingMovies(
@@ -242,6 +245,15 @@ export async function getServerMovieKeywords(movieId: number): Promise<MovieKeyw
 
 export async function getServerTVShowDetails(tvId: number, timeoutMs?: number): Promise<TVShowDetails> {
   return fetchTMDB<TVShowDetails>(`/tv/${tvId}`, {}, timeoutMs);
+}
+
+export async function getServerReviews(
+  contentType: "movie" | "tv",
+  contentId: number,
+  page = 1,
+  timeoutMs?: number,
+): Promise<{ results: TMDBReview[]; total_pages: number }> {
+  return fetchTMDB<{ results: TMDBReview[]; total_pages: number }>(`/${contentType}/${contentId}/reviews`, { page }, timeoutMs);
 }
 
 export async function getServerTVExternalIds(tvId: number, timeoutMs?: number): Promise<{ imdb_id: string | null }> {

@@ -416,6 +416,8 @@ export default function MovieDetail() {
                   posterPath={movie.poster_path}
                   genres={movie.genres.map((genre) => genre.id)}
                   language={movie.original_language}
+                  voteAverage={movie.vote_average}
+                  voteCount={movie.vote_count}
                 />
               </Suspense>
             ) : (
@@ -431,7 +433,7 @@ export default function MovieDetail() {
                 isLoading={similarLoading}
                 type="movie"
                 viewAllHref="/movies"
-              />
+                />
             </div>
           )}
         </div>

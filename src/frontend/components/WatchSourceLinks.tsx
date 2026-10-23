@@ -2,7 +2,7 @@ import { Download, ExternalLink, Play } from "lucide-react";
 import { directMediaFormat, episodeSourceLinks, isDirectFileLink, isResolvableDownload, isResolvablePlayer } from "@/shared/lib/watchSources";
 import type { WatchSourceIdentity, WatchSourceLink } from "@/shared/types/watchSources";
 import { Button } from "@/frontend/components/ui/button";
-import DirectWatchPlayer from "./DirectWatchPlayer";
+import WatchLinkButton from "./WatchLinkButton";
 import ResolveDownloadButton from "./ResolveDownloadButton";
 import LoadingIndicator from "./LoadingIndicator";
 import type { ReactNode } from "react";
@@ -39,9 +39,9 @@ export function WatchSourceOptions({ links, context, identity }: { links: WatchS
   return (
     <>
       {direct.length > 0 ? <div className="grid gap-2 sm:grid-cols-2">
-        {direct.map((link) => <DirectWatchPlayer key={link.id} link={link} identity={identity}
+        {direct.map((link) => <WatchLinkButton key={link.id} link={link}
           context={link.scope === "episode" && context !== `season ${link.season} episode ${link.episode}` ? `${context} · S${link.season} E${link.episode}` : context} />)}
-      </div> : links.length > 0 && <p className="text-sm text-muted-foreground">{resolvable.length ? "Check a file below for download and compatible playback." : "Direct playback is not available from these sources."}</p>}
+      </div> : links.length > 0 && <p className="text-sm text-muted-foreground">{resolvable.length ? "Check a file below for download and compatible playback." : "No watch links from these sources."}</p>}
       {files.length > 0 && <div className="mt-3 space-y-2">
         {files.map((link) => <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" download
           className="block break-words text-sm underline">Open / save file · {link.scope === "episode" ? `S${link.season} E${link.episode} · ` : link.scope === "season" ? `Season ${link.season} pack · ` : link.scope === "episode-range" ? `Episodes ${link.episode}–${link.episodeEnd} · ` : ""}{link.label}</a>)}

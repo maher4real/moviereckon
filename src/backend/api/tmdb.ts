@@ -4,6 +4,7 @@
  */
 import type { VercelRequest, VercelResponse } from "./lib/http";
 import { installGlobalSafeLogging } from "@/shared/lib/safeLogging";
+import { applyReleasedOnlyPolicy, withReleasedOnlyParams } from "@/shared/lib/releaseFilter";
 import {
   applyApiCors,
   applyDefaultSecurityHeaders,
@@ -234,6 +235,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // Hide unreleased titles outside upcoming views (adds a release-date cap to discover).
+    for (const [key, value] of Object.entries(withReleasedOnlyParams(endpoint, params) ?? {})) {
+      if (value !== params?.[key]) url.searchParams.set(key, String(value));
+    }
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
     const response = await fetch(url.toString(), { signal: controller.signal });
@@ -255,7 +261,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `public, s-maxage=${cacheProfile.sMaxAge}, stale-while-revalidate=${cacheProfile.staleWhileRevalidate}`,
     );
 
-    return res.status(200).json(payload);
+    return res.status(200).json(applyReleasedOnlyPolicy(endpoint, params, payload));
   } catch (error) {
     if (error instanceof RateLimitUnavailableError) throw error;
     console.error("TMDB proxy error:", error);

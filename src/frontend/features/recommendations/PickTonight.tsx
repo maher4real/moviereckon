@@ -21,7 +21,6 @@ import { ToastAction } from "@/frontend/components/ui/toast";
 import { useToast } from "@/frontend/hooks/use-toast";
 import ContentCard from "@/frontend/components/ContentCard";
 import { Button } from "@/frontend/components/ui/button";
-import { Input } from "@/frontend/components/ui/input";
 import { cn } from "@/shared/lib/utils";
 
 type ContentItem = Movie | TVShow;
@@ -35,6 +34,13 @@ interface PickRuntimeLookup {
   byKey: Record<string, number>;
   failedCount: number;
 }
+
+const RUNTIME_OPTIONS: Array<{ label: string; minutes: number | null }> = [
+  { label: "Any length", minutes: null },
+  { label: "≤ 90m", minutes: 90 },
+  { label: "≤ 2h", minutes: 120 },
+  { label: "≤ 2.5h", minutes: 150 },
+];
 
 export function pickItemKey(item: ContentItem): string {
   return `${"title" in item ? "movie" : "tv"}_${item.id}`;
@@ -57,6 +63,21 @@ export function selectEligiblePickItems(
     if (maxMinutes === null) return true;
     const runtime = runtimeByKey[key];
     return Number.isFinite(runtime) && runtime > 0 && runtime <= maxMinutes;
+  });
+}
+
+/** Keep the first (best-ranked) title of each franchise, in feed order. */
+export function onePerFranchise(
+  items: ContentItem[],
+  explanationById: Readonly<Record<string, RecommendationExplanation>>,
+): ContentItem[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const franchise = explanationById[pickItemKey(item)]?.franchiseKey;
+    if (!franchise) return true;
+    if (seen.has(franchise)) return false;
+    seen.add(franchise);
+    return true;
   });
 }
 
@@ -205,13 +226,15 @@ function PickTonightCard({
   const reasons = explanation?.reasons?.map((reason) => reason.label).filter(Boolean) || [];
 
   return (
-    <article className="tonight-card min-w-0 snap-start">
+    <article className="tonight-card flex min-w-0 snap-start flex-col">
       <ContentCard item={item} type="mixed" showActions={false} variant="landscape" />
-      <div className="mt-2 min-h-10 text-sm leading-relaxed text-muted-foreground" aria-label={`Why ${title} was picked`}>
-        <p className="line-clamp-2">{reasons.length > 0 ? reasons.slice(0, 2).join(" · ") : "Discovery pick"}</p>
-        {runtime && <p className="mt-1 flex items-center gap-1.5 text-xs"><Clock3 className="h-3 w-3" /> {runtime} min{contentType === "tv" ? " / episode" : ""}</p>}
-      </div>
-      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_44px_44px] gap-2" aria-label={`${title} actions`}>
+      <ul className="mt-3 flex min-h-6 flex-wrap gap-1.5" aria-label={`Why ${title} was picked`}>
+        {(reasons.length > 0 ? reasons.slice(0, 2) : ["Discovery pick"]).map((reason) => (
+          <li key={reason} className="tonight-reason">{reason}</li>
+        ))}
+        {runtime && <li className="tonight-reason gap-1"><Clock3 className="size-3" aria-hidden="true" />{runtime} min{contentType === "tv" ? " / ep" : ""}</li>}
+      </ul>
+      <div className="mt-auto grid grid-cols-[minmax(0,1fr)_44px_44px] gap-2 pt-4" aria-label={`${title} actions`}>
         <Button type="button" variant={saved ? "outline" : "default"} aria-pressed={saved} onClick={(event) => void handleSave(event)} className="min-h-11 gap-2 px-3 text-sm">
           <Save className="h-3.5 w-3.5" /> {saved ? "Saved" : "Save"}
         </Button>
@@ -221,13 +244,14 @@ function PickTonightCard({
         <Button type="button" size="icon" variant="outline" aria-pressed={watched} aria-label={watched ? "Watched" : "Already watched"} title={watched ? "Watched" : "Already watched"} disabled={watched} onClick={(event) => void handleWatched(event)} className="size-11">
           <Check className="size-4" />
         </Button>
-        <div className="col-span-3 flex items-center justify-between gap-2">
-        <Button type="button" variant="ghost" disabled={pendingFeedback !== null} onClick={(event) => void handleFeedback("skip", event)} className="min-h-11 px-2 text-xs text-muted-foreground hover:text-foreground">
-          Not for me
-        </Button>
-        <Button type="button" variant="ghost" disabled={pendingFeedback !== null} onClick={(event) => void handleFeedback("not_now", event)} className="min-h-11 px-2 text-xs text-muted-foreground">
-          Not now
-        </Button>
+        <div className="col-span-3 -ml-2 flex items-center gap-1">
+          <Button type="button" variant="ghost" disabled={pendingFeedback !== null} onClick={(event) => void handleFeedback("skip", event)} className="min-h-11 px-2 text-xs text-muted-foreground hover:text-foreground">
+            Not for me
+          </Button>
+          <span className="text-muted-foreground/40" aria-hidden="true">·</span>
+          <Button type="button" variant="ghost" disabled={pendingFeedback !== null} onClick={(event) => void handleFeedback("not_now", event)} className="min-h-11 px-2 text-xs text-muted-foreground hover:text-foreground">
+            Not now
+          </Button>
         </div>
       </div>
     </article>
@@ -243,13 +267,8 @@ export default function PickTonight({
 }) {
   const { isWatched, isLiked, getFeedback } = useUserData();
   const { isInWatchlist } = useWatchlist();
-  const [timeInput, setTimeInput] = useState("");
+  const [maxMinutes, setMaxMinutes] = useState<number | null>(null);
   const [offset, setOffset] = useState(0);
-  const maxMinutes = useMemo(() => {
-    if (!timeInput.trim()) return null;
-    const parsed = Number(timeInput);
-    return Number.isInteger(parsed) && parsed >= 15 ? Math.min(parsed, 360) : null;
-  }, [timeInput]);
 
   const excludedKeys = useMemo(() => {
     const excluded = new Set<string>();
@@ -298,8 +317,8 @@ export default function PickTonight({
   const runtimeByKey = runtimeLookup.byKey;
 
   const eligibleItems = useMemo(
-    () => selectEligiblePickItems(items, excludedKeys, runtimeByKey, maxMinutes),
-    [excludedKeys, items, maxMinutes, runtimeByKey],
+    () => onePerFranchise(selectEligiblePickItems(items, excludedKeys, runtimeByKey, maxMinutes), explanationById),
+    [excludedKeys, explanationById, items, maxMinutes, runtimeByKey],
   );
   useEffect(() => {
     setOffset((current) => current >= eligibleItems.length ? 0 : current);
@@ -308,46 +327,31 @@ export default function PickTonight({
   if (items.length === 0) return null;
 
   const picks = eligibleItems.slice(offset, offset + 3);
-  const hasTimeError = timeInput.trim().length > 0 && maxMinutes === null;
   const hasPartialRuntimeError = maxMinutes !== null && runtimeLookup.failedCount > 0 && !runtimeError;
 
   return (
-    <section className="pick-tonight mb-10" aria-labelledby="pick-tonight-heading">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <h2 id="pick-tonight-heading" className="text-2xl font-semibold tracking-tight">Pick Tonight</h2>
-          <p className="sr-only mt-2 max-w-[62ch] text-sm leading-relaxed text-muted-foreground sm:not-sr-only">Three choices from your feed, excluding titles already watched, liked, saved, or rated.</p>
+    <section className="pick-tonight mb-12" aria-labelledby="pick-tonight-heading">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <p className="page-kicker">Tonight&apos;s shortlist</p>
+          <h2 id="pick-tonight-heading" className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Pick Tonight</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Three fresh picks you haven&apos;t watched, saved or rated.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <label htmlFor="pick-tonight-time" className="whitespace-nowrap text-sm text-muted-foreground">Up to</label>
-          <Input
-            id="pick-tonight-time"
-            type="number"
-            min={15}
-            max={360}
-            step={5}
-            value={timeInput}
-            onChange={(event) => setTimeInput(event.target.value)}
-            placeholder="Any"
-            aria-label="Maximum runtime in minutes"
-            className="h-11 w-20 text-base"
-          />
-          <span className="text-xs text-muted-foreground">min</span>
-          {timeInput && (
-            <Button
+        <div className="tonight-runtime" role="group" aria-label="Maximum runtime">
+          {RUNTIME_OPTIONS.map(({ label, minutes }) => (
+            <button
+              key={label}
               type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setTimeInput("")}
-              className="min-h-11 px-2 text-xs"
+              aria-pressed={maxMinutes === minutes}
+              onClick={() => setMaxMinutes(minutes)}
+              className="tonight-runtime-option"
             >
-              Clear
-            </Button>
-          )}
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {hasTimeError && <p className="mt-3 text-xs text-destructive" role="alert">Enter at least 15 minutes, or clear the time filter.</p>}
       {maxMinutes !== null && isLoadingRuntime && <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground" role="status"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking real runtimes…</p>}
       {maxMinutes !== null && runtimeError && <p className="mt-3 text-xs text-destructive" role="alert">Runtime details could not be loaded. Clear the filter to browse all eligible picks.</p>}
       {hasPartialRuntimeError && <p className="mt-3 text-xs text-muted-foreground" role="status">Some runtime details were unavailable; showing choices with a confirmed runtime.</p>}
@@ -376,9 +380,9 @@ export default function PickTonight({
         </>
       ) : maxMinutes !== null && runtimeError ? null : maxMinutes !== null && !isLoadingRuntime ? (
         <p className="mt-4 rounded-lg border border-border/60 bg-card/40 p-3 text-xs text-muted-foreground" role="status">No eligible title has a known runtime within {maxMinutes} minutes.</p>
-      ) : !hasTimeError ? (
+      ) : (
         <p className="mt-4 rounded-lg border border-border/60 bg-card/40 p-3 text-xs text-muted-foreground" role="status">No new eligible titles are in the loaded feed yet.</p>
-      ) : null}
+      )}
     </section>
   );
 }

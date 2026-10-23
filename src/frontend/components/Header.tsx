@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Search, Menu, X, User, Home, Tv, Clapperboard, LogOut, Sparkles, CalendarDays, Film, ListVideo, SlidersHorizontal, UserPen } from "lucide-react";
+import { Search, Menu, X, User, Home, Tv, Clapperboard, LogOut, Sparkles, CalendarDays, ListVideo, SlidersHorizontal, UserPen } from "lucide-react";
 import { useWatchlist } from "@/frontend/hooks/useWatchlist";
 import {
   DropdownMenu,
@@ -23,7 +23,6 @@ const navLinks = [
   { href: "/movies", label: "Movies", icon: Clapperboard },
   { href: "/series", label: "Series", icon: Tv },
   { href: "/upcoming", label: "Upcoming", icon: CalendarDays },
-  { href: "/theater", label: "Theater", icon: Film },
 ];
 const accountLinks = [
   { href: "/profile", label: "Profile", icon: User },

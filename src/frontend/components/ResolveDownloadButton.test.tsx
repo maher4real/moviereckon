@@ -49,18 +49,13 @@ describe("final download link action", () => {
       expect(screen.queryByRole("link", { name: "Download file" })).not.toBeInTheDocument();
     } finally { now.mockRestore(); }
   });
-  it("offers in-app playback for a resolved MP4 without loading media before play", async () => {
+  it("never plays a resolved MP4 inside the app — only offers the download", async () => {
     mocks.resolve.mockResolvedValue([{ ...file, contentType: "video/mp4", filename: "The.Trap.S01E01.720p.x264.mp4" }]);
     render(<ResolveDownloadButton identity={identity} link={link} />);
     fireEvent.click(screen.getByRole("button", { name: /Get file link/ }));
-    const play = await screen.findByRole("button", { name: /Play here/ });
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    const load = vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
-    try {
-      await act(async () => fireEvent.click(play));
-      expect(screen.getByLabelText(/Video for/)).toHaveAttribute("src", file.url);
-      cleanup();
-    } finally { load.mockRestore(); }
+    expect(await screen.findByRole("link", { name: "Download file" })).toHaveAttribute("href", file.url);
+    expect(screen.queryByRole("button", { name: /Play here/ })).not.toBeInTheDocument();
+    expect(document.querySelector("video")).toBeNull();
   });
   it("shows a host error and retains the explicit retry action", async () => {
     mocks.resolve.mockRejectedValueOnce(new Error("No matching file could be confirmed"));

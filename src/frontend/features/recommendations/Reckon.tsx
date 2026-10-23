@@ -6,7 +6,7 @@ import React, {
   useRef,
   useCallback,
 } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useRecommendations } from "@/frontend/hooks/useRecommendations";
 import { useAuth } from "@/frontend/hooks/useAuth";
@@ -41,9 +41,9 @@ import {
 import { cn } from "@/shared/lib/utils";
 import { useLoadMoreOnScroll } from "@/frontend/hooks/useBrowseFeed";
 import { GENRE_NAMES, LANGUAGE_LABELS, PREFERENCE_GENRE_IDS } from "@/shared/lib/catalogue";
+import { isReleased } from "@/shared/lib/recommendation/feedRanking";
 import PickTonight from "./PickTonight";
 import MediaImage from "@/frontend/components/MediaImage";
-import YourTastePanel, { type TasteSignal } from "./YourTastePanel";
 
 type ContentTypeFilter = "all" | "movie" | "tv";
 type RecommendationTypeFilter =
@@ -126,8 +126,7 @@ function getRecommendationKey(item: Movie | TVShow): string {
 
 export default function Reckon() {
   const { user } = useAuth();
-  const { preferences, setFeedback } = useUserData();
-  const queryClient = useQueryClient();
+  const { preferences } = useUserData();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const tastePreferencesKey = [
     ...(preferences?.preferred_genres || []),
@@ -164,14 +163,8 @@ export default function Reckon() {
     }
   }, [tasteSnapshot?.controls.explorationMode]);
 
-  const applyTasteSnapshot = useCallback((snapshot: mongoClient.RecommendationTasteSnapshot | null) => {
-    if (!snapshot) return;
-    setExplorationMode(snapshot.controls.explorationMode);
-    queryClient.setQueryData(tasteQueryKey, snapshot);
-  }, [queryClient, tasteQueryKey]);
-
   const {
-    items: recommendations,
+    items: rawRecommendations,
     isLoading: reckonLoading,
     isRefreshing,
     isFetchingNextPage,
@@ -194,51 +187,13 @@ export default function Reckon() {
     sortOrder,
     exploration: explorationMode,
   });
-
-  const handleExplorationChange = useCallback(async (mode: mongoClient.TasteExplorationMode) => {
-    if (feedMode === "legacy") return;
-    const snapshot = await mongoClient.updateRecommendationTasteControls({ explorationMode: mode });
-    if (!snapshot) throw new Error("taste_controls_update_failed");
-    applyTasteSnapshot(snapshot);
-    await refreshRecommendations();
-  }, [applyTasteSnapshot, feedMode, refreshRecommendations]);
-
-  const handleForgetLearning = useCallback(async (key: string, excluded: boolean) => {
-    const snapshot = await mongoClient.updateRecommendationTasteControls(
-      excluded ? { restoreLearningKey: key } : { excludeLearningKey: key },
-    );
-    if (!snapshot) throw new Error("taste_learning_update_failed");
-    applyTasteSnapshot(snapshot);
-    await refreshRecommendations();
-  }, [applyTasteSnapshot, refreshRecommendations]);
-
-  const handleResetLearned = useCallback(async () => {
-    const snapshot = await mongoClient.resetRecommendationTaste();
-    if (!snapshot) throw new Error("taste_reset_failed");
-    applyTasteSnapshot(snapshot);
-    await refreshRecommendations();
-  }, [applyTasteSnapshot, refreshRecommendations]);
-
-  const handleTitleSignal = useCallback(async (item: Movie | TVShow, signal: TasteSignal) => {
-    const contentType = "title" in item ? "movie" : "tv";
-    const title = "title" in item ? item.title : item.name;
-    const result = await setFeedback({
-      content_id: item.id,
-      content_type: contentType,
-      feedback_type: signal === "positive" ? "give_it_a_go" : "skip",
-      title,
-      poster_path: item.poster_path,
-      genres: item.genre_ids || [],
-      language: item.original_language || "en",
-    });
-    if (result.ok) {
-      queryClient.invalidateQueries({ queryKey: tasteQueryKey });
-      const refreshed = await refetchTaste();
-      applyTasteSnapshot(refreshed.data || null);
-      await refreshRecommendations();
-    }
-    return result;
-  }, [applyTasteSnapshot, queryClient, refetchTaste, refreshRecommendations, setFeedback, tasteQueryKey]);
+  // Persisted feed pages can outlive a release-date change; never show a
+  // title that is not out yet.
+  const recommendations = useMemo(
+    () => rawRecommendations.filter((item) =>
+      isReleased("title" in item ? item.release_date : item.first_air_date)),
+    [rawRecommendations],
+  );
 
   const [extraItems, setExtraItems] = useState<(Movie | TVShow)[]>([]);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
@@ -479,7 +434,6 @@ export default function Reckon() {
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {tasteSnapshot && <a href="#your-taste-heading" className="inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm text-white/75 transition-colors hover:bg-white/10 hover:text-white"><Sparkles className="size-4" />Your taste</a>}
                 <Button variant="outline" onClick={openPreferences} className="min-h-11 gap-2 rounded-full border-white/20 bg-white/5 px-4 backdrop-blur-sm hover:bg-white/10">
                   <SlidersHorizontal className="size-4" />Preferences
                 </Button>
@@ -546,8 +500,8 @@ export default function Reckon() {
                 {hasActiveFilters && <Button variant="ghost" onClick={clearFilters} className="col-span-2 min-h-11 text-muted-foreground">Clear filters</Button>}
               </div>
             </div>
-            {feedMode === "v2" && <div className="mt-3 flex gap-2 overflow-x-auto" role="group" aria-label="Recommendation category">
-              {RECOMMENDATION_TYPES.map(({id,label,description,Icon}) => <button key={id} type="button" title={description} aria-pressed={recTypeFilter === id} onClick={() => setRecTypeFilter(id)} className={cn("min-h-11 shrink-0 rounded-lg px-3 text-sm transition-colors", recTypeFilter === id ? "bg-primary/12 text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Icon className="mr-2 inline size-4" />{label}</button>)}
+            {feedMode === "v2" && <div className="reckon-chip-row" role="group" aria-label="Recommendation category">
+              {RECOMMENDATION_TYPES.map(({id,label,description,Icon}) => <button key={id} type="button" title={description} aria-pressed={recTypeFilter === id} onClick={() => setRecTypeFilter(id)} className={cn("reckon-chip", recTypeFilter === id && "reckon-chip-active")}><Icon className="size-3.5" aria-hidden="true" />{label}</button>)}
             </div>}
           </div>
 
@@ -677,17 +631,6 @@ export default function Reckon() {
               )}
             </div>
           )}
-          {tasteSnapshot && <div className="mt-12 border-t border-border pt-8">
-          <YourTastePanel
-            snapshot={tasteSnapshot || null}
-            feedMode={feedMode}
-            onEditPreferences={openPreferences}
-            onExplorationChange={handleExplorationChange}
-            onForgetLearning={handleForgetLearning}
-            onResetLearned={handleResetLearned}
-            onTitleSignal={handleTitleSignal}
-          />
-          </div>}
         </div>
       </main>
 

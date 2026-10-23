@@ -1,14 +1,5 @@
-/* Theater, profile, upcoming, search, detail and preference pages */
+/* Profile, upcoming, search, detail and preference pages */
 @layer components {
-  /* Theater */
-  .theater-feature { position: relative; isolation: isolate; overflow: hidden; min-height: 30rem; }
-  .theater-feature-art { position: absolute; inset: -6%; z-index: -2; width: 112%; height: 112%; object-fit: cover; filter: blur(28px) brightness(0.32) saturate(1.4); }
-  .theater-feature-scrim { position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, hsl(var(--background) / 0.96) 25%, hsl(var(--background) / 0.55) 65%, transparent), linear-gradient(0deg, hsl(var(--background)), transparent 50%); }
-  .theater-card-img { transition: filter 250ms ease, transform 500ms var(--ease-fluid); }
-  .theater-card:hover .theater-card-img { filter: saturate(1.12) contrast(1.05); transform: scale(1.04); }
-  .theater-play { opacity: 0; transition: opacity 250ms ease; }
-  .theater-card:hover .theater-play, .theater-card:focus-visible .theater-play { opacity: 1; }
-  .theater-card:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 4px; border-radius: 0.75rem; }
 
   /* Profile */
   .profile-hero { padding: 6.5rem 0 1.5rem; background: radial-gradient(circle at 10% 0%, hsl(var(--primary) / 0.18), transparent 30rem); }
@@ -40,7 +31,7 @@
   @media (max-width: 767px) { .search-hero { padding: 5.5rem 0 1.75rem; } }
 
   /* Detail pages */
-  .detail-hero-media { height: 20rem; }
+  .detail-hero-media { height: 24rem; }
   .detail-content-shell { margin-top: -10rem; }
   .detail-section { scroll-margin-top: 8.5rem; }
   .detail-section-nav { position: sticky; top: 4.5rem; z-index: 25; margin: 1.25rem 0; border-block: 1px solid hsl(var(--foreground) / 0.08); padding-block: 0.5rem; background: hsl(var(--background) / 0.9); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
@@ -60,7 +51,8 @@
   .tv-episode-card > button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
   .detail-skeleton-card { height: 10rem; border: 1px solid hsl(var(--border) / 0.7); border-radius: 0.75rem; background: linear-gradient(90deg, hsl(var(--card)), hsl(var(--muted) / 0.6), hsl(var(--card))); background-size: 200% 100%; animation: shimmer 2s infinite linear; }
   @media (min-width: 768px) {
-    .detail-hero-media { height: clamp(22rem, 45svh, 30rem); }
+    /* Tall enough that a wide 16:9 backdrop/trailer is not cropped through faces. */
+    .detail-hero-media { height: clamp(28rem, 72svh, 52rem); }
     .detail-content-shell { margin-top: -12rem; }
   }
   @media (max-width: 767px) {

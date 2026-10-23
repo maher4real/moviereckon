@@ -420,7 +420,9 @@ describe("recommendations v2 durable protocol", () => {
     release();
     const [winner, loser] = await Promise.all([winnerPromise, loserPromise]);
     expect([winner.statusCode, loser.statusCode].every((status) => status === 200 || status === 503)).toBe(true);
-    expect(mocks.discoverServerMovies.mock.calls.filter((callArgs) => callArgs[0].page === 2)).toHaveLength(1);
+    // One generation only: each explore language lane fetched page 2 once.
+    expect(mocks.discoverServerMovies.mock.calls.filter((callArgs) =>
+      callArgs[0].page === 2 && callArgs[0].with_original_language === "en")).toHaveLength(1);
 
     const replay = await call(nextUrl);
     expect(replay.statusCode).toBe(200);

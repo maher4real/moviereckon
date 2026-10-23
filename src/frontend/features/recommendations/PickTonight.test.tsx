@@ -25,7 +25,7 @@ vi.mock("@/frontend/components/ContentCard", () => ({
   default: () => <div data-testid="pick-content-card" />,
 }));
 
-import { pickItemKey, selectEligiblePickItems } from "./PickTonight";
+import { onePerFranchise, pickItemKey, selectEligiblePickItems } from "./PickTonight";
 import PickTonight from "./PickTonight";
 
 function movie(id: number): Movie {
@@ -92,6 +92,17 @@ describe("Pick Tonight eligibility", () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("keeps one title per franchise in feed order", () => {
+    const items = [movie(1), movie(2), tv(3), movie(4)];
+    const explanation = (franchiseKey?: string) => ({ reasons: [], score: 0, scoreBreakdown: { genre: 0, keywords: 0, people: 0, year: 0, runtime: 0, quality: 0, popularity: 0, novelty: 0, diversityPenalty: 0 }, seedTitle: null, franchiseKey });
+    const kept = onePerFranchise(items, {
+      movie_1: explanation("collection:119"),
+      movie_2: explanation("collection:119"),
+      movie_4: explanation(),
+    });
+    expect(kept.map(pickItemKey)).toEqual(["movie_1", "tv_3", "movie_4"]);
   });
 
   it("excludes consumed titles and unknown runtimes from a time constrained pick", () => {

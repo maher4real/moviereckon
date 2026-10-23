@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { ImgHTMLAttributes, useEffect, useMemo, useRef, useState } from "react";
+import { preload } from "react-dom";
 import { cn } from "@/shared/lib/utils";
 import { buildTmdbImageProxyResponsiveSource } from "@/shared/lib/tmdbImageProxy";
 
@@ -129,6 +130,39 @@ function buildTmdbResponsiveSource(src: string): ResponsiveSource | null {
   }
 }
 
+/**
+ * Warm the browser cache for an image before it is shown (e.g. the next slide
+ * of a carousel), so swapping to it never flashes an empty frame. Uses the same
+ * srcset/sizes MediaImage renders, so the browser fetches the exact candidate
+ * it will later pick. React dedupes repeated calls for the same image.
+ */
+export function preloadMediaImage(
+  src: string | null | undefined,
+  options: {
+    srcSet?: string;
+    sizes?: string;
+    fetchPriority?: "high" | "low" | "auto";
+  } = {},
+): void {
+  if (!src || src.startsWith("data:")) return;
+
+  const responsiveSource = options.srcSet
+    ? null
+    : buildTmdbImageProxyResponsiveSource(src) ?? buildTmdbResponsiveSource(src);
+  const imageSrcSet = options.srcSet ?? responsiveSource?.srcSet;
+
+  preload(src, {
+    as: "image",
+    fetchPriority: options.fetchPriority ?? "auto",
+    ...(imageSrcSet
+      ? {
+          imageSrcSet,
+          imageSizes: options.sizes ?? responsiveSource?.sizes,
+        }
+      : {}),
+  });
+}
+
 export default function MediaImage({
   src,
   srcSet,
@@ -177,6 +211,16 @@ export default function MediaImage({
     () => shouldUseNativeImageElement(resolvedSrc, srcSet),
     [resolvedSrc, srcSet],
   );
+  // Hoist priority (above-the-fold / LCP) images into <head> during SSR so the
+  // browser starts fetching them before it parses the body. next/image does this
+  // itself, so only the native <img> path needs it.
+  if (priority && shouldUseNativeImg) {
+    preloadMediaImage(resolvedSrc, {
+      srcSet,
+      sizes: imgProps.sizes,
+      fetchPriority: "high",
+    });
+  }
   const loading = imgProps.loading ?? (priority ? "eager" : "lazy");
   const fetchPriority = imgProps.fetchPriority ?? (priority ? "high" : "auto");
   const alt = imgProps.alt || "";

@@ -24,7 +24,10 @@ import {
   type UnifiedContentItem,
 } from "@/shared/lib/recommendation";
 import type { TasteProfile } from "@/shared/lib/recommendation/taste";
+import { assignFranchiseKeys, limitPerFranchise } from "@/shared/lib/recommendation/franchise";
+import { enrichFranchiseMetadata } from "@/backend/services/franchiseEnrichment";
 import {
+  balanceLanguageMix,
   hardFilter,
   passesQualityFloor,
   rankCandidatesForTaste,
@@ -58,6 +61,7 @@ import {
   repairBatchCheckpoint,
 } from "@/backend/services/recommendationSessions";
 import {
+  buildExploreInterests,
   buildTasteInterests,
   fetchSeedCandidates,
   fetchSource,
@@ -117,6 +121,8 @@ async function generatePage(
     tvExploreTotalPages: storedSourceState?.tvExploreTotalPages ?? storedSourceState?.tvTotalPages ?? null,
     movieTasteInterests: storedSourceState?.movieTasteInterests?.map((interest) => ({ ...interest })) || buildTasteInterests(profile, "movie"),
     tvTasteInterests: storedSourceState?.tvTasteInterests?.map((interest) => ({ ...interest })) || buildTasteInterests(profile, "tv"),
+    movieExploreInterests: storedSourceState?.movieExploreInterests?.map((interest) => ({ ...interest })) || buildExploreInterests(profile, filters),
+    tvExploreInterests: storedSourceState?.tvExploreInterests?.map((interest) => ({ ...interest })) || buildExploreInterests(profile, filters),
   };
   const candidateMap = new Map<string, UnifiedContentItem>();
   for (const item of session.candidate_buffer || []) {
@@ -140,11 +146,7 @@ async function generatePage(
   const streamPage = (stream: SourceStream): number => sourceState[`${stream}Page`];
   const streamTotalPages = (stream: SourceStream): number | null => sourceState[`${stream}TotalPages`];
   const streamInterests = (stream: SourceStream): TasteInterestState[] =>
-    stream === "movieTaste"
-      ? sourceState.movieTasteInterests || []
-      : stream === "tvTaste"
-        ? sourceState.tvTasteInterests || []
-        : [];
+    sourceState[`${stream}Interests`] || [];
 
   const interestCanContinue = (interest: TasteInterestState): boolean =>
     interest.page <= MAX_SOURCE_PAGE && (interest.totalPages === null || interest.page <= interest.totalPages);
@@ -282,19 +284,37 @@ async function generatePage(
     maxCandidates: 500,
     diversificationTopN: Math.min(120, candidateMap.size),
   });
-  const ranked = rankCandidatesForTaste(
+  const tasteRanked = rankCandidatesForTaste(
     [...candidateMap.values()],
     profile,
     engineRanked,
     { sort: filters.sort, direction: filters.direction, exploration: filters.exploration },
-  ).slice(0, limit);
+  );
+  // Explicit sorts are promises to the viewer; only the default relevance feed
+  // is regrouped by franchise and rebalanced across languages.
+  const isRelevanceFeed = filters.sort === "relevance" && filters.direction !== "asc";
+  let franchiseKeys = new Map<string, string>();
+  let rankedForPage = tasteRanked;
+  if (isRelevanceFeed) {
+    const headSize = Math.min(tasteRanked.length, limit * 2 + 12);
+    const enrichedHead = await enrichFranchiseMetadata(tasteRanked.slice(0, headSize).map(({ item }) => item));
+    rankedForPage = tasteRanked.map((entry, index) =>
+      index < headSize ? { ...entry, item: enrichedHead[index]! } : entry);
+    franchiseKeys = assignFranchiseKeys(enrichedHead);
+    rankedForPage = limitPerFranchise(rankedForPage, limit, franchiseKeys);
+    if (!filters.language) rankedForPage = balanceLanguageMix(rankedForPage, limit);
+  }
+  const ranked = rankedForPage.slice(0, limit);
   const selectedKeys = new Set(ranked.map(({ item }) => item.key));
   const candidateBuffer = [...candidateMap.values()]
     .filter((item) => !selectedKeys.has(item.key))
     .slice(0, 500);
   const items = ranked.map(({ item }) => toDisplayItem(item));
   const explanationById: Record<string, FeedExplanation> = {};
-  ranked.forEach(({ item, explanation }) => { explanationById[item.key] = explanation; });
+  ranked.forEach(({ item, explanation }) => {
+    const franchiseKey = franchiseKeys.get(item.key);
+    explanationById[item.key] = franchiseKey ? { ...explanation, franchiseKey } : explanation;
+  });
   const hasMore = candidateBuffer.length > 0 ||
     enabledStreams.some(({ key }) => sourceCanContinue(key)) || hadFailure;
   const state: FeedState = items.length > 0 ? "ready" : hadFailure ? "retryable" : "exhausted";

@@ -353,6 +353,15 @@ export default function Home() {
     [filteredTrendingMovies],
   );
   const currentHeroMovie = heroMovies[heroIndex % heroMovies.length];
+  const neighborHeroMovies = useMemo(
+    () => heroMovies.length > 1
+      ? [
+          heroMovies[(heroIndex + 1) % heroMovies.length],
+          heroMovies[(heroIndex - 1 + heroMovies.length) % heroMovies.length],
+        ]
+      : [],
+    [heroMovies, heroIndex],
+  );
   const trendingShelfItems = filteredTrendingMovies.length > 0
     ? filteredTrendingMovies
     : HOME_FALLBACK_MOVIES;
@@ -464,6 +473,7 @@ export default function Home() {
             onDotClick={handleDotClick}
             onStep={setHeroIndex}
             onBackdropReady={handleHeroBackdropReady}
+            neighborMovies={neighborHeroMovies}
             isPlaying={isHeroPlaying && !reduceHomeMotion}
             onTogglePlayback={reduceHomeMotion ? undefined : () => setIsHeroPlaying(playing => !playing)}
             onInteractionChange={setIsHeroInteracting}

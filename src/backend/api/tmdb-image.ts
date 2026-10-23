@@ -12,10 +12,14 @@ import { consumeRateLimit, getClientIp } from "./lib/rate-limit.js";
 installGlobalSafeLogging();
 
 // Poster/backdrop images are content-addressed (URL encodes the specific image
-// path) so they never change for a given URL — safe to cache aggressively in
-// the browser as well as at the CDN edge.
-const IMAGE_PROXY_CACHE_CONTROL =
-  "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800";
+// path) so they never change for a given URL — safe to cache for a year in the
+// browser (no revalidation round-trips) and at the CDN edge, which keeps repeat
+// requests away from this function, its rate limiter, and TMDB.
+const IMAGE_PROXY_CACHE_CONTROL = "public, max-age=31536000, immutable";
+const IMAGE_PROXY_CDN_CACHE_CONTROL = "public, max-age=31536000, immutable";
+// A missing image stays missing for a while; cache briefly so broken refs don't
+// re-invoke the function on every render.
+const IMAGE_PROXY_NOT_FOUND_CACHE_CONTROL = "public, max-age=3600, s-maxage=86400";
 const IMAGE_PROXY_IP_LIMIT_MAX = 320;
 const IMAGE_PROXY_IP_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const IMAGE_PROXY_ASSET_LIMIT_MAX = 45;
@@ -115,13 +119,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     clearTimeout(timeout);
 
     if (!upstreamResponse.ok) {
-      return res.status(upstreamResponse.status === 404 ? 404 : 502).end();
+      if (upstreamResponse.status === 404) {
+        res.setHeader("Cache-Control", IMAGE_PROXY_NOT_FOUND_CACHE_CONTROL);
+        return res.status(404).end();
+      }
+      return res.status(502).end();
     }
 
     const contentType = upstreamResponse.headers.get("content-type") || "image/jpeg";
     const body = Buffer.from(await upstreamResponse.arrayBuffer());
 
     res.setHeader("Cache-Control", IMAGE_PROXY_CACHE_CONTROL);
+    res.setHeader("CDN-Cache-Control", IMAGE_PROXY_CDN_CACHE_CONTROL);
     res.setHeader("Content-Type", contentType);
     res.setHeader("Content-Length", String(body.byteLength));
     return res.status(200).send(body);

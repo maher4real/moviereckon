@@ -252,7 +252,7 @@ Production uses bounded per-instance in-memory rate limiting. Set:
 
 `GET /api/health` returns `503` in production when required security controls are missing.
 
-Theater administration uses the normal HttpOnly user session and the current
+Administration uses the normal HttpOnly user session and the current
 database-backed `admin` role. There is no separate admin password or browser-stored
 admin bearer token. Bootstrap an initial administrator with `ADMIN_EMAILS`, then
 manage the persisted user role in MongoDB.

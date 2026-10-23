@@ -68,6 +68,33 @@ export function buildTasteInterests(profile: TasteProfile, type: ContentType): T
   return interests;
 }
 
+// Industries every explore stream samples so the feed mixes Hollywood and
+// Bollywood (plus the viewer's own languages) instead of whatever single
+// language dominates TMDB's global popularity list.
+export const EXPLORE_BASE_LANGUAGES = ["en", "hi"] as const;
+const MAX_EXPLORE_INTERESTS = 4;
+
+export function buildExploreInterests(profile: TasteProfile, filters: FeedFilters): TasteInterestState[] {
+  // A language filter already pins every query to one language.
+  if (filters.language) return [];
+  const learnedLanguages = Object.entries(profile.learned?.languages || profile.inferred.languages || {})
+    .sort(([, left], [, right]) => right - left)
+    .map(([value]) => value);
+  const languages = [...EXPLORE_BASE_LANGUAGES, ...profile.explicit.languages, ...learnedLanguages]
+    .map((value) => value?.trim().toLowerCase())
+    .filter((value): value is string => Boolean(value));
+  return [...new Set(languages)].slice(0, MAX_EXPLORE_INTERESTS).map((language) => ({
+    key: `any|${language}`,
+    language,
+    page: 1,
+    totalPages: null,
+  }));
+}
+
+function todayIso(now = Date.now()): string {
+  return new Date(now).toISOString().slice(0, 10);
+}
+
 export async function fetchSource(
   type: ContentType,
   page: number,
@@ -87,10 +114,20 @@ export async function fetchSource(
           : undefined,
       with_original_language: filters.language
         ? filters.language
-        : profileSource && interest?.language
+        : interest?.language
           ? interest.language
           : undefined,
-        sort_by:
+      // Only titles that are already out. For movies the release-type filter
+      // requires an actual theatrical/digital/physical/TV release on or before
+      // today, which excludes festival-only premieres and delayed titles.
+      ...(type === "movie"
+        ? {
+            "primary_release_date.lte": todayIso(),
+            "release_date.lte": todayIso(),
+            with_release_type: "2|3|4|5|6",
+          }
+        : { "first_air_date.lte": todayIso(), include_null_first_air_dates: false }),
+      sort_by:
         filters.sort === "rating"
           ? `vote_average.${filters.direction}`
           : filters.sort === "release_date"

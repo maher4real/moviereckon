@@ -41,7 +41,6 @@ const STATIC_ROUTES: Record<string, StaticRoute> = {
   "/reckon/preferences": { title: "Taste preferences", description: "Choose the languages and genres Reckon uses to build your feed." },
   "/profile": { title: "Profile", description: "Your watchlist, history and settings." },
   "/profile/edit": { title: "Edit profile", description: "Update your username and avatar." },
-  "/theater": { title: "Theater", description: "The MovieReckon Theater catalogue." },
 };
 
 export interface DetailSummary {
@@ -134,9 +133,7 @@ export async function buildRouteMetadata(pathname: string, loaders: DetailLoader
   const content = /^\/(movie|tv)\/(\d+)$/.exec(path);
   if (content) return detail(content[1] as "movie" | "tv", Number(content[2]), loaders);
 
-  if (/^\/theater\/[^/]+(\/play)?$/.test(path)) return { title: "Theater", robots: NOINDEX };
   if (/^\/person\/\d+$/.test(path)) return { title: "Cast and crew", robots: NOINDEX };
-  if (path.startsWith("/theater")) return { title: "Theater", robots: NOINDEX };
 
   return { title: "Page not found", robots: NOINDEX };
 }

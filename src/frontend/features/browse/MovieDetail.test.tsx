@@ -119,6 +119,7 @@ describe("MovieDetail", () => {
     expect(screen.queryByRole("region", { name: "Watch movie" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Watch movie" }));
     expect(await screen.findByRole("dialog", { name: "Dune: Part Two" })).toBeInTheDocument();
+    fireEvent.mouseDown(await screen.findByRole("tab", { name: /Watch/ }), { button: 0, ctrlKey: false });
     expect(await screen.findByRole("heading", { name: /Other provider pages/ })).toBeInTheDocument();
     expect(await screen.findByRole("link", { name: /Open external page/ })).toHaveAttribute("href", "https://player.example/movie");
     expect(await screen.findByRole("button", { name: "Search again" })).toBeInTheDocument();

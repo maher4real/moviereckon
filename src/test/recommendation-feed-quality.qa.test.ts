@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { normalizeTmdbItem, type UnifiedContentItem } from "@/shared/lib/recommendation";
 import { buildTasteProfile } from "@/shared/lib/recommendation/taste";
 import { passesQualityFloor, rankCandidatesForTaste, scoreCandidate } from "@/backend/api/_handlers/user/recommendations-v2";
+import { balanceLanguageMix, hardFilter } from "@/shared/lib/recommendation/feedRanking";
+import { buildExploreInterests } from "@/backend/services/recommendationSources";
 import { NOW, TRUE_GENRES, buildCatalogue, eventsFromItems, precisionAt } from "./helpers/coldStartFixture";
 
 vi.mock("@/backend/api/lib/mongodb", () => ({ connectToDatabase: vi.fn() }));
@@ -96,5 +98,90 @@ describe("quality floor", () => {
   });
   it("keeps well-voted titles", () => {
     expect(passesQualityFloor(movie({ id: 3, vote_count: 250, release_date: "1999-01-01" }), now)).toBe(true);
+  });
+  it("drops upcoming titles even when hype gave them votes", () => {
+    const nextMonth = new Date(now + 30 * 86_400_000).toISOString().slice(0, 10);
+    expect(passesQualityFloor(movie({ id: 4, vote_count: 900, vote_average: 9, release_date: nextMonth }), now)).toBe(false);
+  });
+  it("drops undated titles", () => {
+    expect(passesQualityFloor(movie({ id: 5, vote_count: 900, release_date: "" }), now)).toBe(false);
+  });
+});
+
+describe("language mix", () => {
+  const entry = (id: number, language: string) => ({ item: movie({ id, original_language: language }), score: 1 - id / 100 });
+
+  it("caps one language so other industries reach the page", () => {
+    const ranked = [...Array.from({ length: 10 }, (_, index) => entry(index + 1, "en")), entry(11, "hi"), entry(12, "hi"), entry(13, "hi")];
+    const page = balanceLanguageMix(ranked, 10).slice(0, 10);
+    expect(page.filter(({ item }) => item.originalLanguage === "hi")).toHaveLength(3);
+    expect(page.filter(({ item }) => item.originalLanguage === "en")).toHaveLength(7);
+  });
+
+  it("tops up in rank order when there is no variety and keeps every item", () => {
+    const ranked = Array.from({ length: 6 }, (_, index) => entry(index + 1, "en"));
+    const balanced = balanceLanguageMix(ranked, 4);
+    expect(balanced.map(({ item }) => item.id)).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+});
+
+describe("explore lanes", () => {
+  const filters = { contentType: "all", recommendationType: "all", genreId: null, language: null, sort: "relevance", direction: "desc", exploration: "familiar" } as const;
+
+  it("always samples Hollywood and Bollywood plus the viewer's languages", () => {
+    const profile = buildTasteProfile([], { preferredLanguages: ["ta"] }, null, NOW);
+    expect(buildExploreInterests(profile, filters).map((interest) => interest.language)).toEqual(["en", "hi", "ta"]);
+  });
+
+  it("defers to an explicit language filter", () => {
+    const profile = buildTasteProfile([], {}, null, NOW);
+    expect(buildExploreInterests(profile, { ...filters, language: "ko" })).toEqual([]);
+  });
+});
+
+describe("engine accuracy", () => {
+  const now = Date.parse(NOW);
+  const allFilters = { contentType: "all", recommendationType: "all", genreId: null, language: null, sort: "relevance", direction: "desc", exploration: "familiar" } as const;
+  const liked = [
+    movie({ id: 7001, title: "The Fellowship of the Ring", genre_ids: [12, 14], original_language: "en" }),
+    movie({ id: 7002, title: "The Two Towers", genre_ids: [12, 14], original_language: "en" }),
+    movie({ id: 7003, title: "Baahubali", genre_ids: [12, 28], original_language: "hi" }),
+  ];
+  const profile = buildTasteProfile(eventsFromItems(liked), { preferredLanguages: ["en", "hi"] }, null, NOW);
+
+  it("names the liked title behind a genre match", () => {
+    const { explanation } = scoreCandidate(movie({ id: 7100, genre_ids: [12, 14] }), profile, "familiar", now);
+    expect(explanation.reasons[0]!.label).toMatch(/^Because you enjoyed /);
+  });
+
+  it("does not repeat the everyday language on every card but names other languages", () => {
+    const english = scoreCandidate(movie({ id: 7101, genre_ids: [12], original_language: "en" }), profile, "familiar", now);
+    const hindi = scoreCandidate(movie({ id: 7102, genre_ids: [12], original_language: "hi" }), profile, "familiar", now);
+    expect(english.explanation.reasons.some((reason) => reason.label.startsWith("In English"))).toBe(false);
+    expect(hindi.explanation.reasons.map((reason) => reason.label)).toContain("In Hindi, one of your languages");
+  });
+
+  it("lifts a well-received new release over an identical older title", () => {
+    const fresh = movie({ id: 7103, genre_ids: [12], vote_average: 7.4, vote_count: 400, release_date: "2026-08-20" });
+    const older = movie({ id: 7104, genre_ids: [12], vote_average: 7.4, vote_count: 400, release_date: "2019-08-20" });
+    expect(scoreCandidate(fresh, profile, "familiar", now).score).toBeGreaterThan(scoreCandidate(older, profile, "familiar", now).score);
+  });
+
+  it("does not lift a poorly received new release", () => {
+    const weakFresh = movie({ id: 7105, genre_ids: [12], vote_average: 4.2, vote_count: 400, release_date: "2026-08-20" });
+    const weakOld = movie({ id: 7106, genre_ids: [12], vote_average: 4.2, vote_count: 400, release_date: "2019-08-20" });
+    expect(scoreCandidate(weakFresh, profile, "familiar", now).score).toBeCloseTo(scoreCandidate(weakOld, profile, "familiar", now).score, 6);
+  });
+
+  it("keeps hype ratings out of Highly Rated", () => {
+    const filters = { ...allFilters, recommendationType: "highrated" } as const;
+    expect(hardFilter(movie({ id: 7107, vote_average: 9, vote_count: 25 }), filters)).toBe(false);
+    expect(hardFilter(movie({ id: 7108, vote_average: 8.4, vote_count: 20000 }), filters)).toBe(true);
+  });
+
+  it("lets a big Hindi release count as trending", () => {
+    const filters = { ...allFilters, recommendationType: "trending" } as const;
+    expect(hardFilter(movie({ id: 7109, original_language: "hi", popularity: 35 }), filters)).toBe(true);
+    expect(hardFilter(movie({ id: 7110, original_language: "en", popularity: 35 }), filters)).toBe(false);
   });
 });

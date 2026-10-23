@@ -557,6 +557,8 @@ export default function TVDetail() {
                   posterPath={tvShow.poster_path}
                   genres={tvShow.genres.map((genre) => genre.id)}
                   language={tvShow.original_language}
+                  voteAverage={tvShow.vote_average}
+                  voteCount={tvShow.vote_count}
                 />
               </Suspense>
             ) : (
@@ -572,7 +574,7 @@ export default function TVDetail() {
                 isLoading={similarLoading}
                 type="tv"
                 viewAllHref="/series"
-              />
+                />
             </div>
           )}
         </div>

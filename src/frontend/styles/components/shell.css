@@ -104,8 +104,20 @@
   .reckon-type-tab { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border-radius: 7px; padding-inline: 16px; color: hsl(var(--muted-foreground)); font-size: 14px; font-weight: 500; }
   .reckon-type-tab:hover { color: hsl(var(--foreground)); }
   .reckon-type-tab-active { background: hsl(var(--primary)); color: #fff; }
-  .reckon-page section[aria-labelledby="your-taste-heading"] button { min-height: 44px; }
   .tonight-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+  .reckon-chip-row { display: flex; gap: 8px; margin-top: 0.75rem; overflow-x: auto; scrollbar-width: none; }
+  .reckon-chip-row::-webkit-scrollbar { display: none; }
+  .reckon-chip { display: inline-flex; flex-shrink: 0; align-items: center; gap: 6px; min-height: 36px; border: 1px solid hsl(var(--foreground) / 0.12); border-radius: 999px; padding-inline: 14px; color: hsl(var(--muted-foreground)); font-size: 13px; font-weight: 500; transition: color 160ms, border-color 160ms, background-color 160ms; }
+  .reckon-chip:hover { border-color: hsl(var(--foreground) / 0.3); color: hsl(var(--foreground)); }
+  .reckon-chip-active, .reckon-chip-active:hover { border-color: hsl(var(--foreground)); background: hsl(var(--foreground)); color: hsl(var(--background)); }
+  @media (pointer: coarse) { .reckon-chip { min-height: 44px; } }
+  .pick-tonight { position: relative; isolation: isolate; overflow: hidden; border: 1px solid hsl(var(--foreground) / 0.08); border-radius: 1.5rem; padding: 1.75rem; background: radial-gradient(ellipse at 0% 0%, hsl(var(--primary) / 0.14), transparent 32rem), linear-gradient(180deg, hsl(var(--card) / 0.85), hsl(var(--card) / 0.35)); }
+  .tonight-runtime { display: inline-flex; gap: 2px; border-radius: 999px; padding: 3px; background: hsl(var(--foreground) / 0.06); }
+  .tonight-runtime-option { min-height: 36px; border-radius: 999px; padding-inline: 14px; color: hsl(var(--muted-foreground)); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; transition: color 160ms, background-color 160ms; }
+  .tonight-runtime-option:hover { color: hsl(var(--foreground)); }
+  .tonight-runtime-option[aria-pressed="true"] { background: hsl(var(--foreground)); color: hsl(var(--background)); }
+  @media (pointer: coarse) { .tonight-runtime-option { min-height: 44px; } }
+  .tonight-reason { display: inline-flex; align-items: center; border-radius: 999px; padding: 0.15rem 0.6rem; background: hsl(var(--foreground) / 0.07); color: hsl(var(--foreground) / 0.78); font-size: 0.75rem; line-height: 1.4; }
   .detail-actions > button { min-height: 48px; padding-inline: 20px; }
   .detail-metadata > div:first-child > span { border-radius: 6px; }
   .detail-credits { border-top: 1px solid hsl(var(--foreground) / 0.1); border-bottom: 1px solid hsl(var(--foreground) / 0.1); }
@@ -140,6 +152,7 @@
     .reckon-container { padding-inline: 1rem; }
     .reckon-page .page-main { padding-top: 5.5rem; }
     .reckon-hero { border-radius: 1.1rem; padding: 1.75rem 1.25rem 1.5rem; }
+    .pick-tonight { border-radius: 1.1rem; padding: 1.25rem 1rem; }
     .reckon-filters-sticky { top: 4rem; -webkit-backdrop-filter: none; backdrop-filter: none; background: hsl(var(--background) / 0.97); }
     .tonight-grid { grid-template-columns: none; grid-auto-columns: 85%; grid-auto-flow: column; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px 2px 12px; scrollbar-width: thin; }
     .shelf-heading { gap: 0.5rem; margin-bottom: 0.25rem; }

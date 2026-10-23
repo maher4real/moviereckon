@@ -25,7 +25,6 @@ describe("RouteSkeleton", () => {
     ["/reckon", ".reckon-hero", "Loading your recommendations"],
     ["/reckon/preferences", ".reckon-hero", "Loading your recommendations"],
     ["/search", ".search-hero", "Loading search"],
-    ["/theater", ".content-grid", "Loading page"],
   ])("matches the layout of %s", (path, selector, label) => {
     const { container } = at(path);
     expect(container.querySelector(selector), `${path} should render ${selector}`).not.toBeNull();

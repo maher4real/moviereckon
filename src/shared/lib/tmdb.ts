@@ -794,6 +794,9 @@ export interface DiscoverFilters {
   "primary_release_date.lte"?: string;
   "first_air_date.gte"?: string;
   "first_air_date.lte"?: string;
+  "release_date.lte"?: string;
+  with_release_type?: string;
+  include_null_first_air_dates?: boolean;
   "vote_average.gte"?: string | number;
   "vote_count.gte"?: string | number;
 }

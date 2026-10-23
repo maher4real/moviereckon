@@ -398,7 +398,8 @@ export function scoreCandidate(
 }
 
 export function isHiddenGem(item: UnifiedContentItem, medianPopularity: number): boolean {
-  return item.voteAverage >= 7 && item.popularity < medianPopularity;
+  // A gem needs enough votes for its rating to mean something.
+  return item.voteAverage >= 7 && item.voteCount >= 50 && item.popularity < medianPopularity;
 }
 
 export function clearRecommendationScoreCache(): void {

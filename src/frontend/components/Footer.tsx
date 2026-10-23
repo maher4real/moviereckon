@@ -22,7 +22,6 @@ export default function Footer() {
         { label: "Movies", href: "/movies" },
         { label: "TV Series", href: "/series" },
         { label: "Upcoming", href: "/upcoming" },
-        { label: "Theater", href: "/theater" },
       ],
     },
     {

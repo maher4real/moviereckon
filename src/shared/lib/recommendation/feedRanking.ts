@@ -4,7 +4,7 @@
  * so it can be tested and reused without the HTTP handler or database.
  */
 import type { Movie, TVShow } from "@/shared/lib/tmdb";
-import { GENRE_PHRASES } from "../catalogue";
+import { GENRE_PHRASES, LANGUAGE_LABELS } from "../catalogue";
 import {
   ERA_LABELS,
   MOOD_LABELS,
@@ -14,6 +14,7 @@ import {
   paceScore,
   preferenceMultiplier,
   relativeAffinity,
+  smoothedRating,
   strongestMood,
   tasteConfidence,
 } from "./coldStart";
@@ -34,10 +35,37 @@ export function dateValue(item: UnifiedContentItem): number {
 
 export const GENRE_LABELS = GENRE_PHRASES;
 
+export const FRESH_WINDOW_DAYS = 180;
+const DAY_MS = 86_400_000;
+
+/** 1 on release day, fading linearly to 0 after FRESH_WINDOW_DAYS; 0 if not out. */
+export function freshness(item: UnifiedContentItem, now = Date.now()): number {
+  const released = item.releaseDate ? Date.parse(item.releaseDate) : Number.NaN;
+  if (!Number.isFinite(released) || released > now) return 0;
+  return Math.max(0, 1 - (now - released) / (FRESH_WINDOW_DAYS * DAY_MS));
+}
+
+function compactCount(value: number): string {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
+  return String(value);
+}
+
+function languageName(code: string): string {
+  return LANGUAGE_LABELS[code] || code.toUpperCase();
+}
+
+/** The language the viewer watches most, or their first explicit pick. */
+function dominantLanguage(profile: TasteProfile): string | null {
+  const learned = Object.entries(profile.inferred.languages || {}).sort(([, left], [, right]) => right - left)[0];
+  return (learned?.[0] || profile.explicit.languages[0] || null)?.toLowerCase() ?? null;
+}
+
 export function scoreCandidate(
   item: UnifiedContentItem,
   profile: TasteProfile,
   exploration: FeedFilters["exploration"] = "familiar",
+  now = Date.now(),
 ): {
   score: number;
   explanation: FeedExplanation;
@@ -86,7 +114,12 @@ export function scoreCandidate(
   const explorationBoost = exploration === "adventurous"
     ? quality * 0.16 + popularity * 0.06 + (1 - boundedGenre) * 0.14 + 0.04
     : quality * 0.1 + popularity * 0.04 + 0.04;
-  const score = profileMatch + explorationBoost + boundedMood * 0.1 + eraBonus + paceBonus + seedSourceBonus -
+  // Recent releases get a small lift, but only when they are not poorly
+  // received; hype alone must not push a weak new title up the feed.
+  const rating = smoothedRating(item.voteAverage, item.voteCount);
+  const fresh = freshness(item, now);
+  const freshnessBonus = rating >= 6.5 ? fresh * 0.06 : 0;
+  const score = profileMatch + explorationBoost + boundedMood * 0.1 + eraBonus + paceBonus + seedSourceBonus + freshnessBonus -
     (boundedNegativeGenre * 0.08 + boundedNegativeLanguage * 0.06 + dislikePenalty);
   const reasons: Array<{ label: string; evidence?: string }> = [];
   const seedKey = seedTag?.slice("seed:".length);
@@ -102,29 +135,41 @@ export function scoreCandidate(
   if (strongestGenre && strongestGenre.weight >= 1) {
     const selected = profile.explicit.genres.includes(strongestGenre.genreId);
     const learned = getLearnedTasteGenreWeight(profile, strongestGenre.genreId);
-    reasons.push({
-      label: selected
-        ? `Matches your selected ${GENRE_LABELS[strongestGenre.genreId] || "genre"}`
-        : learned > 0
-          ? `Matches your ${GENRE_LABELS[strongestGenre.genreId] || "genre"} affinity`
-          : `Matches a preferred ${GENRE_LABELS[strongestGenre.genreId] || "genre"}`,
-    });
+    const phrase = GENRE_LABELS[strongestGenre.genreId] || "this genre";
+    // Naming the title that taught us the taste is the most convincing reason.
     const evidence = profile.evidence.find((entry) =>
       entry.contentType === item.type && entry.signal !== "watchlist" &&
-      entry.key !== item.key && profile.clusters.some((cluster) =>
+      entry.key !== item.key && Boolean(entry.title) && profile.clusters.some((cluster) =>
         cluster.evidence.some((itemEvidence) => itemEvidence.key === entry.key) &&
         cluster.genreIds.includes(strongestGenre.genreId),
       ),
     );
-    if (evidence) reasons[0]!.evidence = `from ${evidence.title}`;
-  }
-  if (language >= 1) {
     reasons.push({
-      label: profile.explicit.languages.includes(item.originalLanguage || "")
-        ? "Matches your selected language"
+      label: evidence && !seedTitle
+        ? `Because you enjoyed ${evidence.title}`
+        : selected
+          ? `Because you love ${phrase}`
+          : learned > 0
+            ? `You often watch ${phrase}`
+            : `Fits your taste for ${phrase}`,
+    });
+  }
+  // Quality and freshness say something concrete about the title itself.
+  if (rating >= 7.6 && item.voteCount >= 500) {
+    reasons.push({ label: `Rated ${item.voteAverage.toFixed(1)} by ${compactCount(item.voteCount)} viewers` });
+  } else if (fresh >= 1 - 60 / FRESH_WINDOW_DAYS && rating >= 6.5) {
+    reasons.push({ label: item.type === "tv" ? "New series" : "New release" });
+  }
+  // A language reason only adds information when it is not the viewer's
+  // everyday language; otherwise every card would repeat the same line.
+  const itemLanguage = item.originalLanguage?.toLowerCase() || "";
+  if (language >= 1 && itemLanguage && itemLanguage !== dominantLanguage(profile)) {
+    reasons.push({
+      label: profile.explicit.languages.includes(itemLanguage)
+        ? `In ${languageName(itemLanguage)}, one of your languages`
         : getLearnedTasteLanguageWeight(profile, item.originalLanguage) > 0
-          ? "Matches a language you often enjoy"
-          : "Matches a preferred language",
+          ? `In ${languageName(itemLanguage)}, a language you watch`
+          : `In ${languageName(itemLanguage)}, a preferred language`,
     });
   }
   if (negativeGenre > 0 || negativeLanguage > 0) {
@@ -133,6 +178,12 @@ export function scoreCandidate(
   const topMood = strongestMood(profile.tone?.moods, item.genreIds);
   if (topMood) reasons.push({ label: `Matches your ${MOOD_LABELS[topMood]} mood` });
   if (era) reasons.push({ label: `From the ${ERA_LABELS[era]} you like` });
+  const exploreLane = item.sourceTags
+    .map((tag) => /^discover:(?:movie|tv)Explore:any\|([a-z]{2,3}):/.exec(tag)?.[1])
+    .find(Boolean);
+  if (reasons.length === 0 && exploreLane) {
+    reasons.push({ label: `Popular in ${languageName(exploreLane)} ${item.type === "tv" ? "TV" : "cinema"}` });
+  }
   if (reasons.length === 0) reasons.push({ label: "Exploration pick" });
   return {
     score,
@@ -239,7 +290,46 @@ export function genreJaccard(left: number[], right: number[]): number {
 export function itemSimilarity(left: UnifiedContentItem, right: UnifiedContentItem): number {
   const sameCollection = left.collectionId !== null && left.collectionId === right.collectionId ? 1 : 0;
   const samePrimary = left.primaryGenreId !== null && left.primaryGenreId === right.primaryGenreId ? 1 : 0;
-  return Math.min(1, sameCollection * 0.7 + samePrimary * 0.15 + genreJaccard(left.genreIds, right.genreIds) * 0.15);
+  // Language counts too, so a page interleaves industries (for example
+  // Hollywood and Bollywood) instead of stacking one language at the top.
+  const sameLanguage = left.originalLanguage && left.originalLanguage === right.originalLanguage ? 1 : 0;
+  return Math.min(
+    1,
+    sameCollection * 0.7 + samePrimary * 0.15 + genreJaccard(left.genreIds, right.genreIds) * 0.15 + sameLanguage * 0.25,
+  );
+}
+
+export const LANGUAGE_MAX_SHARE = 0.65;
+
+/**
+ * Cap how much of one page a single original language may take, so a viewer
+ * whose history is mostly English still sees strong Hindi (and other) titles
+ * mixed in. Items over the cap move just past the page boundary rather than
+ * being dropped; when there is not enough variety the page is topped up in
+ * rank order.
+ */
+export function balanceLanguageMix<T extends { item: UnifiedContentItem }>(
+  ranked: T[],
+  limit: number,
+  maxShare = LANGUAGE_MAX_SHARE,
+): T[] {
+  if (limit <= 0 || ranked.length <= 1) return ranked;
+  const cap = Math.max(1, Math.ceil(limit * maxShare));
+  const counts = new Map<string, number>();
+  const head: T[] = [];
+  const deferred: T[] = [];
+  for (const entry of ranked) {
+    const language = entry.item.originalLanguage || "unknown";
+    const count = counts.get(language) || 0;
+    if (head.length >= limit || count >= cap) {
+      deferred.push(entry);
+      continue;
+    }
+    counts.set(language, count + 1);
+    head.push(entry);
+  }
+  while (head.length < limit && deferred.length > 0) head.push(deferred.shift()!);
+  return [...head, ...deferred];
 }
 
 /**
@@ -309,17 +399,24 @@ export function toDisplayItem(item: UnifiedContentItem): Movie | TVShow {
 export const QUALITY_FLOOR_MIN_VOTES = 10;
 export const QUALITY_FLOOR_FRESH_DAYS = 120;
 
+/** True when the title has a known release/air date that is not in the future. */
+export function isReleased(releaseDate: string | null | undefined, now = Date.now()): boolean {
+  const released = releaseDate ? Date.parse(releaseDate) : Number.NaN;
+  return Number.isFinite(released) && released <= now;
+}
+
 /**
- * Drop catalogue noise: titles that have been out for months yet collected
- * almost no votes. Fresh and upcoming releases pass, since they have not had
- * time to gather votes.
+ * Drop catalogue noise and anything that cannot be watched yet: undated and
+ * upcoming titles never pass. Released titles need a minimum number of votes
+ * unless they came out recently and have not had time to gather them.
  */
 export function passesQualityFloor(item: UnifiedContentItem, now = Date.now()): boolean {
+  if (!isReleased(item.releaseDate, now)) return false;
   if (item.voteCount >= QUALITY_FLOOR_MIN_VOTES) return true;
-  const released = item.releaseDate ? Date.parse(item.releaseDate) : Number.NaN;
-  if (!Number.isFinite(released)) return false;
-  return now - released <= QUALITY_FLOOR_FRESH_DAYS * 86_400_000;
+  return now - Date.parse(item.releaseDate!) <= QUALITY_FLOOR_FRESH_DAYS * 86_400_000;
 }
+
+export const NON_ENGLISH_POPULARITY_SCALE = 0.4;
 
 export function hardFilter(item: UnifiedContentItem, filters: FeedFilters, profile?: TasteProfile): boolean {
   if (filters.contentType !== "all" && item.type !== filters.contentType) return false;
@@ -338,16 +435,21 @@ export function hardFilter(item: UnifiedContentItem, filters: FeedFilters, profi
   }
   if (filters.language && item.originalLanguage !== filters.language) return false;
   const releaseTimestamp = item.releaseDate ? Date.parse(item.releaseDate) : Number.NaN;
+  // TMDB popularity is driven by a mostly English-speaking audience, so a
+  // blockbuster Hindi or Tamil release scores far below a Hollywood one. Scale
+  // the bar so Trending/Popular are not Hollywood-only.
+  const popularityBar = (item.originalLanguage || "en").toLowerCase() === "en" ? 1 : NON_ENGLISH_POPULARITY_SCALE;
   const recentCutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
   switch (filters.recommendationType) {
     case "trending":
-      if (item.popularity <= 50) return false;
+      if (item.popularity <= 50 * popularityBar) return false;
       break;
     case "highrated":
-      if (item.voteAverage < 8) return false;
+      // Vote-smoothed so a 9.0 from a handful of fans does not qualify.
+      if (smoothedRating(item.voteAverage, item.voteCount) < 7.6) return false;
       break;
     case "popular":
-      if (item.popularity < 100) return false;
+      if (item.popularity < 100 * popularityBar) return false;
       break;
     case "newreleases":
       if (!Number.isFinite(releaseTimestamp) || releaseTimestamp <= recentCutoff || releaseTimestamp > Date.now()) return false;

@@ -163,8 +163,40 @@ describe("tmdb image handler", () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("image/jpeg");
     expect(response.headers.get("Cache-Control")).toBe(
-      "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800",
+      "public, max-age=31536000, immutable",
+    );
+    expect(response.headers.get("CDN-Cache-Control")).toBe(
+      "public, max-age=31536000, immutable",
     );
     expect(response.body).toBeInstanceOf(Buffer);
+  });
+
+  it("caches upstream 404s briefly and never caches upstream failures", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 404 }));
+    const { default: handler } = await import("./tmdb-image.js");
+    const notFound = createResponse();
+    await handler(
+      {
+        method: "GET",
+        query: { kind: "poster", size: "w342", ref: encodeTmdbImageRef("/gone.jpg") },
+        headers: {},
+      } as never,
+      notFound as never,
+    );
+    expect(notFound.statusCode).toBe(404);
+    expect(notFound.headers.get("Cache-Control")).toBe("public, max-age=3600, s-maxage=86400");
+
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 500 }));
+    const failed = createResponse();
+    await handler(
+      {
+        method: "GET",
+        query: { kind: "poster", size: "w342", ref: encodeTmdbImageRef("/flaky.jpg") },
+        headers: {},
+      } as never,
+      failed as never,
+    );
+    expect(failed.statusCode).toBe(502);
+    expect(failed.headers.has("Cache-Control")).toBe(false);
   });
 });

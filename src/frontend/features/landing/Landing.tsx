@@ -9,7 +9,6 @@ import {
   ArrowRight,
   Bookmark,
   CalendarDays,
-  Clapperboard,
   Compass,
   Film,
   ListVideo,
@@ -17,7 +16,6 @@ import {
   MonitorPlay,
   Play,
   Search,
-  SlidersHorizontal,
   Sparkles,
   Tv,
 } from "lucide-react";
@@ -290,7 +288,6 @@ export default function Landing() {
             <a className="landing-nav-link" href="#what-it-does">What it does</a>
             <a className="landing-nav-link" href="#how-it-works">How it works</a>
             <a className="landing-nav-link" href="#features">Features</a>
-            <a className="landing-nav-link" href="#theater">Theater</a>
           </nav>
           <Button asChild size="sm" className="rounded-full px-4 shadow-[0_0_25px_hsl(var(--primary)/0.18)]">
             <Link to={destination}>
@@ -417,38 +414,6 @@ export default function Landing() {
                 </article>
               ))}
             </div>
-          </div>
-        </section>
-
-        <section id="theater" className="scroll-mt-24 px-4 pb-20 sm:px-6 sm:pb-28 lg:px-8 lg:pb-32" aria-labelledby="theater-title">
-          <div className="landing-app-shell relative mx-auto grid max-w-7xl gap-10 overflow-hidden rounded-[2rem] p-6 sm:p-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:p-14">
-            <div>
-              <p className="landing-kicker">MovieReckon Theater</p>
-              <h2 id="theater-title" className="mt-4 text-balance text-4xl font-black leading-[0.98] tracking-[-0.05em] sm:text-5xl">A members-only cinema catalogue.</h2>
-              <p className="mt-5 max-w-xl text-pretty text-base leading-7 text-white/52">
-                Theater is a separate catalogue of titles added by the MovieReckon team. Each one has its own page with a description and cast, and plays in a built-in full-screen player. Sign in to browse what is available.
-              </p>
-              <Button asChild variant="outline" className="mt-8 h-12 rounded-full border-white/14 bg-white/[0.035] px-6 hover:bg-white/[0.08]">
-                <Link to={destination}>
-                  {user ? "Open Theater" : "Sign in to browse"}
-                  <ArrowRight data-icon="inline-end" />
-                </Link>
-              </Button>
-            </div>
-            <ul className="grid gap-3">
-              {[
-                { icon: Clapperboard, text: "A catalogue separate from the TMDB-powered browse pages" },
-                { icon: Film, text: "Title pages with description, genre, year and cast" },
-                { icon: SlidersHorizontal, text: "A built-in player, no leaving the app" },
-              ].map((item) => (
-                <li key={item.text} className="landing-feature-card flex items-center gap-4 p-4 sm:p-5">
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-primary">
-                    <item.icon className="size-4" aria-hidden="true" />
-                  </span>
-                  <span className="text-sm leading-6 text-white/62">{item.text}</span>
-                </li>
-              ))}
-            </ul>
           </div>
         </section>
 

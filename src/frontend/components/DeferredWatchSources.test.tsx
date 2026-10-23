@@ -26,6 +26,7 @@ async function open() {
   fireEvent.click(screen.getByRole("button", { name: "Watch movie" }));
   await screen.findByRole("tab", { name: /Watch/ });
 }
+const showTab = (name: RegExp) => fireEvent.mouseDown(screen.getByRole("tab", { name }), { button: 0, ctrlKey: false });
 
 describe("watch source popup", () => {
   it("does no work before opening, searches automatically, reuses recent results and resets on title navigation", async () => {
@@ -52,14 +53,20 @@ describe("watch source popup", () => {
     render(view()); await open();
     await waitFor(() => expect(mocks.search).toHaveBeenCalledOnce());
     act(() => emit({ type: "content", content: populated }));
-    expect(await screen.findByRole("button", { name: /Play here Example/ })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Download/ })).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByRole("button", { name: /Get file link/ })).toBeInTheDocument();
+    showTab(/Watch/);
+    const watchLink = await screen.findByRole("link", { name: /Watch Example/ });
+    expect(watchLink).toHaveAttribute("href", link.url);
+    expect(watchLink).toHaveAttribute("target", "_blank");
+    expect(document.querySelector("video")).toBeNull();
     expect(screen.getByRole("button", { name: "Search again" })).toBeDisabled();
     expect((mocks.read.mock.calls[0][2] as AbortSignal).aborted).toBe(true);
     await act(async () => oldResolve(content));
-    expect(screen.getByRole("button", { name: /Play here Example/ })).toBeInTheDocument();
-    fireEvent.mouseDown(screen.getByRole("tab", { name: /Download/ }), { button: 0, ctrlKey: false });
+    expect(screen.getByRole("link", { name: /Watch Example/ })).toBeInTheDocument();
+    showTab(/Download/);
     expect(await screen.findByRole("button", { name: /Get file link/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Play here Example/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Watch Example/ })).not.toBeInTheDocument();
     await act(async () => finish({ ...result, content: populated, status: "imported" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Search again" })).toBeEnabled());
   });
@@ -68,7 +75,8 @@ describe("watch source popup", () => {
     mocks.search.mockRejectedValueOnce(new Error("Provider offline"));
     render(view()); await open();
     expect(await screen.findByText("Provider offline")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Play here Example/ })).toBeInTheDocument();
+    showTab(/Watch/);
+    expect(await screen.findByRole("link", { name: /Watch Example/ })).toBeInTheDocument();
     mocks.search.mockImplementation(() => new Promise(() => {}));
     fireEvent.click(screen.getByRole("button", { name: "Search again" }));
     await waitFor(() => expect(mocks.search).toHaveBeenCalledTimes(2));

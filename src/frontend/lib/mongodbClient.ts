@@ -15,6 +15,7 @@ export * from "./api/user";
 export * from "./api/feedback";
 export * from "./api/comments";
 export * from "./api/recommendations";
+export * from "./api/meterSources";
 
 export async function resolveDownloadLink(identity: WatchSourceIdentity, linkId: string, signal?: AbortSignal): Promise<ResolvedDownload[]> {
   const response = await fetchWithAuth("/api/watch-sources/resolve", {
