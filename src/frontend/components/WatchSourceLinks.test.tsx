@@ -15,6 +15,18 @@ beforeEach(() => {
     checkedAt: new Date().toISOString(), validUntil: new Date(Date.now() + 120_000).toISOString() })));
 });
 describe("saved watch links on detail pages", () => {
+  it("opens the verified player destination for a wrapped watch link with simple wording", async () => {
+    const row = { ...watch, url: "https://greenmotors.club/?id=abcdefgh", host: "greenmotors.club" };
+    const watchUrl = "https://streamtape.com/e/abcdefgh";
+    mocks.check.mockResolvedValue([{ linkId: row.id, url: row.url, available: true, watchUrl, downloads: [],
+      checkedAt: new Date().toISOString(), validUntil: new Date(Date.now() + 120_000).toISOString() }]);
+    render(<EpisodeWatchLinks identity={{ contentId, contentType: "tv" }} season={1} episode={1} links={[row]} />);
+    const button = await screen.findByRole("link", { name: /Watch season 1 episode 1/ });
+    expect(button).toHaveAttribute("href", watchUrl);
+    expect(button).toHaveAttribute("target", "_blank");
+    expect(button).toHaveTextContent("Watch");
+    expect(button).not.toHaveTextContent(/streamtape|greenmotors/i);
+  });
   it("shows the final download destination without provider branding or release filenames", async () => {
     const link: WatchSourceLink = { ...watch, id: "moviesdrive", kind: "download", scope: "movie", season: null, episode: null,
       url: "https://mdrive.lol/archive/123", host: "mdrive.lol" };

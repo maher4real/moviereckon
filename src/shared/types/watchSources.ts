@@ -13,6 +13,10 @@ export interface DirectMediaSource {
   referrerPolicy?: "no-referrer";
   // Validated provider playlist metadata; media still loads from its public CDN.
   hlsPlaylist?: string;
+  // Set only after a provider adapter checks the file identity and media bytes.
+  mediaVerified?: true;
+  playerUrl?: string;
+  expiresAt?: string;
   label: string;
 }
 
@@ -92,6 +96,7 @@ export interface WatchLinkCheck {
   linkId: string;
   url: string;
   available: boolean;
+  watchUrl?: string;
   checkedAt: string;
   validUntil: string;
   downloads: ResolvedDownload[];

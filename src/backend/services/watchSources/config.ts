@@ -1,7 +1,7 @@
 import "server-only";
 import type { WatchCatalogProvider } from "@/shared/types/watchSources";
 import { publicLink } from "./parser";
-import { moviesDriveDomainPolicy } from "./moviesDriveDomains";
+import { catalogOriginAllowed } from "./catalogDomains";
 
 export interface ImporterConfig {
   baseUrl: string;
@@ -37,7 +37,7 @@ export function getImporterConfig(): ImporterConfig {
 
 export function sourcePageUrl(value: string, config: ImporterConfig): string {
   const url = publicLink(value, config.baseUrl);
-  if (url && config.provider === "moviesdrive" && moviesDriveDomainPolicy("catalog", config.baseUrl).allows(url.origin)) {
+  if (url && catalogOriginAllowed(config, url.origin)) {
     url.host = new URL(config.baseUrl).host;
   }
   if (!url || url.origin !== config.baseUrl || url.search || url.hash ||

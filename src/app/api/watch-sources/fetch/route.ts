@@ -63,7 +63,7 @@ export async function POST(request: Request) {
             }
           };
           // Keep intermediaries from buffering a long provider lookup.
-          emit({ type: "progress", message: "Loading saved links and searching providers…" });
+          emit({ type: "progress", message: "Gathering your options…" });
           const heartbeat = setInterval(() => { if (!disconnected) { try { controller.enqueue(encoder.encode("\n")); } catch { disconnected = true; } } }, 10_000);
           try {
             const result = await searchContentSources(input.contentId, input.contentType, config, emit);

@@ -21,7 +21,7 @@ describe("Fetch links action", () => {
     render(<FetchWatchLinksButton contentId={42} contentType="movie" title="Example" />);
     fireEvent.click(screen.getByRole("button", { name: "Fetch links" }));
     expect(mocks.fetch).toHaveBeenCalledWith(42, "movie", undefined, expect.any(AbortSignal));
-    expect(await screen.findByRole("link", { name: /Player 1/ })).toHaveAttribute("href", link.url);
+    expect(await screen.findByRole("link", { name: /Watch .*: Standard/ })).toHaveAttribute("href", link.url);
     expect(screen.getByRole("region", { name: "Download options" })).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("2 sources found");
     expect(mocks.setQueryData).toHaveBeenCalledWith(["watch-sources", "movie", 42], result.content);
@@ -37,7 +37,7 @@ describe("Fetch links action", () => {
     fireEvent.click(pending);
     expect(mocks.fetch).toHaveBeenCalledTimes(1);
     resolve(result);
-    await screen.findByRole("link", { name: /Player 1/ });
+    await screen.findByRole("link", { name: /Watch .*: Standard/ });
   });
   it("allows a source URL fallback for a series and explains empty discovery", async () => {
     mocks.fetch.mockResolvedValueOnce({ ...result, status: "not_found", content: { sources: [] } });
@@ -48,7 +48,7 @@ describe("Fetch links action", () => {
     fireEvent.change(input, { target: { value: "https://source.example/show/" } });
     fireEvent.click(screen.getByRole("button", { name: "Fetch from page" }));
     expect(mocks.fetch).toHaveBeenLastCalledWith(321, "tv", "https://source.example/show/", expect.any(AbortSignal));
-    await screen.findByRole("link", { name: /Player 1/ });
+    await screen.findByRole("link", { name: /Watch .*: Standard/ });
   });
   it("shows actionable failures and hides the control when signed out", async () => {
     mocks.fetch.mockRejectedValueOnce(new Error("Configure TMDB_API_KEY on the server"));

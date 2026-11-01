@@ -12,23 +12,44 @@ function mediaUrl(value: string): URL | null {
 
 /** A URL shape is a playback candidate, never proof of availability or content. */
 export function directMediaFormat(value: string): "mp4" | "webm" | "hls" | null {
+  if (isAdditionalWatchPlayer(value)) return null;
   const extension = mediaUrl(value)?.pathname.match(/\.(mp4|webm|m3u8)$/i)?.[1].toLowerCase();
   return extension === "m3u8" ? "hls" : extension === "mp4" || extension === "webm" ? extension : null;
 }
 
 export function isDirectFileLink(value: string): boolean {
+  if (isAdditionalWatchPlayer(value)) return false;
   const url = mediaUrl(value);
   return !!url && /\.(mp4|webm|mkv|mov|avi|zip|rar|7z)$/i.test(url.pathname);
 }
 
 export function isResolvablePlayer(link: WatchSourceLink): boolean {
   const url = mediaUrl(link.url);
-  if (!url || link.kind !== "watch" || url.search || !["movie", "episode"].includes(link.scope)) return false;
+  if (!url || link.kind !== "watch" || !["movie", "episode"].includes(link.scope)) return false;
+  if (isAdditionalWatchPlayer(link.url) || isGreenMotorsUrl(link.url)) return true;
+  if (url.search) return false;
   if (url.origin === "https://hubstream.art") return url.pathname === "/" && /^#[a-zA-Z0-9]{6,32}$/.test(url.hash);
   return !url.hash && (
     (link.scope === "movie" && url.origin === "https://play4u.org" && /^\/tt\d+\/?$/.test(url.pathname)) ||
     (url.origin === "https://hdstream4u.com" && /^\/file\/[a-z0-9]{12}\/?$/.test(url.pathname))
   );
+}
+
+/** Known aliases share file IDs; never infer trust from a similar hostname. */
+export function streamtapeFileId(value: string): string | null {
+  const url = mediaUrl(value);
+  if (!url || url.search || url.hash || !["streamtape.com", "streamtape.cc", "stape.fun", "shavetape.cash"].includes(url.hostname)) return null;
+  return url.pathname.match(/^\/(?:e\/([A-Za-z0-9]{6,32})\/?|v\/([A-Za-z0-9]{6,32})(?:\/[^/]{0,1000})?)$/)?.slice(1).find(Boolean) || null;
+}
+
+export function isMultiCloudPlayer(value: string): boolean {
+  const url = mediaUrl(value);
+  return !!url && /^new\d{0,3}\.multicloudlinks\.com$/.test(url.hostname) &&
+    /^\/player\.php\/?$/.test(url.pathname) && /^\?v=[A-Za-z0-9]{6,32}$/.test(url.search) && !url.hash;
+}
+
+export function isAdditionalWatchPlayer(value: string): boolean {
+  return !!streamtapeFileId(value) || isMultiCloudPlayer(value);
 }
 
 /** Only this provider's literal ID entry is a supported redirect source. */

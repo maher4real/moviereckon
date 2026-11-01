@@ -1,5 +1,6 @@
 import { load } from "cheerio";
 import { publicLink } from "./parser";
+import { isAdditionalWatchPlayer } from "@/shared/lib/watchSources";
 
 const MAX_HTML = 1_000_000;
 const MAX_TOKEN = 8192;
@@ -22,8 +23,9 @@ function archiveLink(value: string): URL | null {
     /^\/archives\/[1-9]\d*$/.test(url.pathname) ? url : null;
 }
 
-function mirrorLink(value: string, base: string): URL | null {
+function mirrorLink(value: string, base: string, mode: "download" | "watch" = "download"): URL | null {
   const url = publicLink(value, base);
+  if (mode === "watch") return url && isAdditionalWatchPlayer(url.href) ? url : null;
   if (!url || url.protocol !== "https:" || url.search || url.hash) return null;
   const supported = (url.origin === "https://hubcloud.ist" && /^\/drive\/[a-z0-9]+\/?$/.test(url.pathname)) ||
     (url.origin === "https://hubdrive.pics" && /^\/file\/\d+\/?$/.test(url.pathname)) ||
@@ -32,7 +34,7 @@ function mirrorLink(value: string, base: string): URL | null {
 }
 
 /** Read this provider's published payload as data; never execute its redirect scripts. */
-export function decodeGreenMotorsDestination(html: string): URL | null {
+export function decodeGreenMotorsDestination(html: string, mode: "download" | "watch" = "download"): URL | null {
   if (html.length > MAX_HTML) return null;
   const $ = load(html);
   const tokens = new Set<string>();
@@ -55,7 +57,7 @@ export function decodeGreenMotorsDestination(html: string): URL | null {
     // keys signal an ambiguous payload even though JSON.parse would accept them.
     if (["w", "l", "o"].some((key) => [...json.matchAll(new RegExp(`"${key}"\\s*:`, "g"))].length !== 1)) return null;
     const destination = decodeBase64(fields.o);
-    const url = archiveLink(destination) || mirrorLink(destination, "https://hblinks.lol");
+    const url = archiveLink(destination) || mirrorLink(destination, "https://hblinks.lol", mode);
     return url && destination.startsWith("https://") && url.href === destination ? url : null;
   } catch {
     return null;
@@ -69,13 +71,13 @@ export function decodeGreenMotorsArchive(html: string): URL | null {
 }
 
 /** Archive mirrors remain candidates until the existing resolver verifies the file metadata. */
-export function parseGreenMotorsMirrors(html: string, archiveUrl: string | URL): string[] {
+export function parseGreenMotorsMirrors(html: string, archiveUrl: string | URL, mode: "download" | "watch" = "download"): string[] {
   if (html.length > MAX_HTML || !archiveLink(String(archiveUrl))) return [];
   const $ = load(html);
   const mirrors = new Set<string>();
   $(".entry-content a[href]").each((_, node) => {
     if ($(node).closest("nav,header,footer,aside,#comments,.comments").length) return;
-    const url = mirrorLink($(node).attr("href") || "", String(archiveUrl));
+    const url = mirrorLink($(node).attr("href") || "", String(archiveUrl), mode);
     if (url && mirrors.size < 10) mirrors.add(url.href);
   });
   return [...mirrors];

@@ -1,13 +1,14 @@
 import "server-only";
 import { load } from "cheerio";
 import { z } from "zod";
-import { directMediaFormat, isResolvablePlayer } from "@/shared/lib/watchSources";
+import { directMediaFormat, isAdditionalWatchPlayer, isGreenMotorsUrl, isResolvablePlayer } from "@/shared/lib/watchSources";
 import type { DirectMediaSource, WatchSourceIdentity, WatchSourceLink } from "@/shared/types/watchSources";
 import { fetchSourceDocument } from "./http";
 import { resolveHubStreamMedia } from "./hubStream";
 import { parseHdStreamMedia } from "./packedPlayer";
 import { resolveHdStreamMedia } from "./hdStream";
 import { publicLink } from "./parser";
+import { resolveAdditionalWatchMedia } from "./additionalPlayers";
 
 const playerData = z.object({
   ok: z.literal(true),
@@ -42,6 +43,10 @@ export async function resolveWatchMedia(link: WatchSourceLink, identity: WatchSo
   const format = directMediaFormat(link.url);
   if (format) return [{ url: link.url, format, label: link.quality || link.label }];
   if (!isResolvablePlayer(link)) return [];
+  if (isAdditionalWatchPlayer(link.url) || isGreenMotorsUrl(link.url)) {
+    if (!title || (link.scope === "movie") !== (identity.contentType === "movie")) return [];
+    return resolveAdditionalWatchMedia(link, title, fetchDocument);
+  }
   if (new URL(link.url).origin === "https://hubstream.art") {
     if (!title || (link.scope === "movie") !== (identity.contentType === "movie")) return [];
     return resolveHubStreamMedia(link, title);

@@ -54,4 +54,17 @@ describe("working link checks", () => {
     expect(mocks.direct).toHaveBeenCalledWith(row, "Example");
     expect(mocks.downloads).not.toHaveBeenCalled();
   });
+  it("requires progressive media evidence, returns the canonical player and expires the check with its media", async () => {
+    const row = link({ kind: "watch", url: "https://greenmotors.club/?id=abcdefgh" });
+    const source = { url: "https://streamtape.com/get_video", format: "mp4", label: "1080p",
+      playerUrl: "https://streamtape.com/e/abcdefgh", expiresAt: new Date(Date.now() + 90_000).toISOString() };
+    mocks.watch.mockResolvedValue([source]);
+    expect((await checkWatchLink(row, "Example", identity)).available).toBe(false);
+    mocks.watch.mockResolvedValue([{ ...source, mediaVerified: true }]);
+    const result = await checkWatchLink({ ...row, id: "progressive-verified" }, "Example", identity);
+    expect(result).toMatchObject({ available: true, watchUrl: source.playerUrl });
+    expect(Date.parse(result.validUntil)).toBe(Date.parse(source.expiresAt) - 30_000);
+    mocks.watch.mockResolvedValue([{ ...source, mediaVerified: true, expiresAt: new Date(Date.now() + 1000).toISOString() }]);
+    expect((await checkWatchLink({ ...row, id: "progressive-expired" }, "Example", identity)).available).toBe(false);
+  });
 });

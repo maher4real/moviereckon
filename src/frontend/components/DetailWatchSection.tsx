@@ -89,7 +89,7 @@ export default function DetailWatchSection({ contentId, contentType, title, seas
   const downloads = confirmed.filter((link) => isResolvableDownload(link) || isDirectFileLink(link.url));
   // Only problems get a line of copy; a finished search speaks through the results.
   const notice = search.isError ? "Couldn’t finish the search. Give it another go." :
-    search.data?.status === "partial" ? "There may be more to find. Try again in a moment." :
+    search.data?.status === "partial" ? "Some searches couldn’t finish. Try again." :
     search.data?.status === "busy" ? "Fresh links are on the way. Check back shortly." : null;
   const tabs = [
     { value: "download", label: "Download", Icon: Download, rows: downloads },
@@ -130,7 +130,7 @@ export default function DetailWatchSection({ contentId, contentType, title, seas
         return <TabsContent key={tab} value={tab} className="mt-4">
           {rows.length ? <LinkList links={rows} groupBy={groupBy} className="space-y-3" renderLink={(link, grouped) => <li key={link.id} className="min-w-0 rounded-xl border border-border/70 bg-card/50 p-3 sm:p-4">
             {tab === "watch" ? <>
-              <WatchLinkButton link={link} context={title} />
+              <WatchLinkButton link={link} context={title} watchUrl={working.confirmed.find((item) => item.link.id === link.id)?.check.watchUrl} />
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <WatchMetaChips link={link} skip={[watchLinkScope(link), link.codec]} />
               </div>

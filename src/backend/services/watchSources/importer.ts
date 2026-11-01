@@ -5,7 +5,7 @@ import { getImporterConfig, sourcePageUrl, type ImporterConfig } from "./config"
 import { catalogProvider, catalogIndexUrl, discoverCatalogPages, parseCatalogPage } from "./catalogs";
 import { discoverArchive } from "./discovery";
 import { fetchSourceDocument, type SourceResponse } from "./http";
-import { fetchMoviesDriveDocument } from "./moviesDriveDomains";
+import { catalogFetcher } from "./catalogDomains";
 import { createContentMatcher, type MatchResult } from "./matcher";
 import { normalizeSourceTitle } from "./parser";
 import { createSourceRepository, sourcePageId, type ImportSummary, type SourceRepository, type SourcePageRecord } from "./store";
@@ -39,7 +39,7 @@ export async function previewSourcePages(urls: string[], config = getImporterCon
     while (cursor < validated.length) {
       const index = cursor++;
       const url = validated[index];
-      const fetchDocument = config.provider === "moviesdrive" ? fetchMoviesDriveDocument : fetchSourceDocument;
+      const fetchDocument = catalogFetcher(config);
       const response = await fetchDocument(url, config.baseUrl);
       const parsed = parseCatalogPage(response.html || "", url, config);
       const matching: MatchResult = process.env.TMDB_API_KEY ? await match(parsed) :
@@ -58,7 +58,7 @@ export async function runSourceImport(
 ): Promise<ImportSummary> {
   const deps = dependencies || {
     repository: await createSourceRepository(catalogProvider(config)),
-    fetchDocument: config.provider === "moviesdrive" ? fetchMoviesDriveDocument : fetchSourceDocument,
+    fetchDocument: catalogFetcher(config),
     match: createContentMatcher(), now: () => new Date(), archive: discoverArchive,
   };
   const repo = deps.repository;

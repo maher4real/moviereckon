@@ -24,26 +24,31 @@ export async function checkWatchLink(link: WatchSourceLink, title: string, ident
   const check = async (): Promise<WatchLinkCheck> => {
     let downloads: WatchLinkCheck["downloads"] = [];
     let available = false;
+    let watchUrl: string | undefined;
+    let watchExpiry = Infinity;
     try {
       if (canCheckWatchLink(link)) {
         if (isResolvableDownload(link)) downloads = await dependencies.downloads(link, title);
         else if (isDirectFileLink(link.url)) downloads = await dependencies.direct(link, title);
         else if (isResolvablePlayer(link) || directMediaFormat(link.url) === "hls") {
           const sources = await dependencies.watch(link, identity, undefined, title);
-          // A URL extracted from an HTML page is not proof. Only adapters that
-          // checked the playlist AND media bytes supply hlsPlaylist evidence.
-          const validated = sources.filter((source) => !!source.hlsPlaylist);
+          // A URL or a successful HTML request is not proof of playable media.
+          const validated = sources.filter((source) => (!!source.hlsPlaylist || source.mediaVerified === true) &&
+            (!source.expiresAt || Date.parse(source.expiresAt) > dependencies.now() + 30_000));
           if (!validated.length && sources.length) validated.push(...await dependencies.hls(sources));
           available = validated.length > 0;
+          watchUrl = validated.find((source) => source.playerUrl)?.playerUrl;
+          watchExpiry = Math.min(...validated.flatMap((source) => source.expiresAt ? [Date.parse(source.expiresAt) - 30_000] : []));
         }
       }
     } catch { /* Unreachable, blocked and unconfirmed sources remain hidden. */ }
     const now = dependencies.now();
     downloads = downloads.filter((file) => !file.expiresAt || Date.parse(file.expiresAt) > now + 30_000);
     available ||= downloads.length > 0;
-    const until = Math.min(now + (available ? 120_000 : 30_000),
+    const until = Math.min(now + (available ? 120_000 : 30_000), watchExpiry,
       ...downloads.flatMap((file) => file.expiresAt ? [Date.parse(file.expiresAt) - 30_000] : []));
     const result: WatchLinkCheck = { linkId: link.id, url: link.url, available, downloads,
+      ...(watchUrl ? { watchUrl } : {}),
       checkedAt: new Date(now).toISOString(), validUntil: new Date(until).toISOString() };
     if (dependencies === defaults) {
       for (const [id, value] of cache) if (Date.parse(value.validUntil) <= now) cache.delete(id);

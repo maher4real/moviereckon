@@ -16,7 +16,7 @@ export function WatchSourceOptions({ links, context, identity }: { links: WatchS
     {!working.isChecking && working.confirmed.length === 0 && <p className="text-sm text-muted-foreground">No links just yet. Try again soon.</p>}
     <div className="space-y-3">{working.confirmed.map(({ link, check }) => <div key={`${link.id}:${check.checkedAt}`}>
       {(link.scope === "movie" || link.scope === "episode") && (directMediaFormat(link.url) || isResolvablePlayer(link)) &&
-        <WatchLinkButton link={link} context={context} />}
+        <WatchLinkButton link={link} context={context} watchUrl={check.watchUrl} />}
       {identity && check.downloads.length > 0 && (isResolvableDownload(link) ? <ResolveDownloadButton link={link} identity={identity}
         initialFiles={check.downloads} onUnavailable={() => working.reject(link)} /> : check.downloads.map((file) =>
           <a key={file.url} href={file.url} download target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer"

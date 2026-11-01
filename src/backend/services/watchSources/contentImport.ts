@@ -9,7 +9,7 @@ import { normalizeSourceTitle } from "./parser";
 import { catalogProvider, catalogIndexUrl, discoverCatalogPages, parseCatalogPage } from "./catalogs";
 import { discoverArchive } from "./discovery";
 import { searchMoviesDrive } from "./moviesDrive";
-import { fetchMoviesDriveDocument } from "./moviesDriveDomains";
+import { catalogFetcher } from "./catalogDomains";
 import { runSourceImport } from "./importer";
 import { createSourceRepository, lookupContentSources, type SourceRepository } from "./store";
 
@@ -48,7 +48,7 @@ export async function fetchContentSources(
 ): Promise<FetchContentSourcesResult> {
   const deps = dependencies || { identity: getContentIdentity, lookup: lookupContentSources,
     repository: () => createSourceRepository(catalogProvider(config)),
-    fetchDocument: config.provider === "moviesdrive" ? fetchMoviesDriveDocument : fetchSourceDocument,
+    fetchDocument: catalogFetcher(config),
     match: createContentMatcher(), run: runSourceImport, archive: discoverArchive };
   const started = Date.now();
   const emit = (event: SourceSearchEvent) => { try { onEvent?.(event); } catch { /* disconnected consumer */ } };

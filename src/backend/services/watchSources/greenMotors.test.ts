@@ -10,6 +10,15 @@ const fields = (destination = archive) => ({ w: 10, l: "https://greenmotors.cc/h
 const html = (data: unknown = fields()) => `<script>s('o','${payload(JSON.stringify(data))}',180*1000);dangerous()</script>`;
 
 describe("GreenMotors published redirect data", () => {
+  it("allows watch destinations only in watch mode and keeps downloads and recursive wrappers out", () => {
+    for (const url of ["https://stape.fun/v/abcdef123/Example.mp4", "https://new3.multicloudlinks.com/player.php/?v=abcdef"]) {
+      expect(decodeGreenMotorsDestination(html(fields(url)), "watch")?.href).toBe(url);
+      expect(decodeGreenMotorsDestination(html(fields(url)))).toBeNull();
+    }
+    for (const url of ["https://hubcdn.club/file/abcdef", "https://greenmotors.club/?id=abcdefgh", "https://evil.example/e/abcdef"]) {
+      expect(decodeGreenMotorsDestination(html(fields(url)), "watch")).toBeNull();
+    }
+  });
   it("decodes the archive payload without executing provider JavaScript", () => {
     const dangerous = vi.fn();
     vi.stubGlobal("dangerous", dangerous);

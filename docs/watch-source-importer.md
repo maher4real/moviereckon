@@ -132,13 +132,21 @@ are excluded using a Mongo lease; work stops starting new pages before the
 function deadline and unfinished jobs remain due for the next run.
 
 Changing `HDHUB_BASE_URL` keeps post identities stable across domain rotations.
-Redirects to a different domain fail until that origin is configured explicitly.
+Catalog redirects follow the provider-specific trusted origins described below; unknown domains still require configuration.
 Old pages are periodically refreshed even when they leave the recent-post index.
 Archive URLs enter the durable queue; each scheduled run processes a bounded batch, so initial catalog import completes over multiple runs. Per-title fetch checks matching archive candidates immediately without importing unrelated titles.
 Source layout changes may require parser updates, and scraping success does not
 establish whether third-party playback or iframe embedding works.
 
 ## Direct playback and external pages
+
+### Additional watch players
+
+Streamtape and MultiCloud watch links participate in the same availability checks as the existing players. Streamtape accepts the observed `streamtape.com`, `streamtape.cc`, `stape.fun`, and `shavetape.cash` aliases and opens the canonical embed page for that file ID. MultiCloud accepts its numbered `new` domains and requires redirects to preserve the player route and file ID.
+
+GreenMotors watch buttons can resolve to these players directly or through a published HBLInks archive. Download and watch destination policies remain separate. Archives check every supported mirror in bounded batches, even after one succeeds. No provider scripts execute, no arbitrary redirect hosts are followed, and no full movie files are downloaded by the server.
+
+Each new adapter requires a matching title, release year when supplied, exact episode, resolution and codec, then checks a bounded media prefix for MP4 or WebM. Deleted files, expired URLs, HTML responses, unsupported Matroska files and mismatched releases stay hidden. Checks expire within two minutes or before the signed media URL expires. The check response supplies `watchUrl` so **Watch** opens the verified player instead of the original wrapper. Provider names stay out of the visible action labels.
 
 ### Python resolver and deferred UI
 
@@ -225,7 +233,7 @@ Use `WATCH_MOVIESMOD_ENABLED=false`, `WATCH_BOLLYFLIX_ENABLED=false`,
 `WATCH_UHDMOVIES_ENABLED=false`, `WATCH_MOVIESDRIVE_ENABLED=false`,
 `WATCH_MOVIES4U_ENABLED=false`, `WATCH_ROGMOVIES_ENABLED=false`, or `WATCH_4KHDHUB_ENABLED=false` to disable a
 catalog independently. Origin overrides must be public HTTPS origins; cross-origin
-redirects remain rejected except for the MoviesDrive policy below. The origins and published movie/series layouts were
+redirects remain rejected except for the provider-specific policies below. The origins and published movie/series layouts were
 checked on 2026-10-23. Domain rotation requires updating the corresponding setting.
 
 MoviesDrive was checked on 2026-11-01. Its WordPress search redirects to a JavaScript
@@ -349,3 +357,27 @@ All seven were attempted through the resolver; none produced a verified final fi
 A separately inspected FastDL preparation request was challenged. No new-provider
 final file or browser playback was confirmed. Successful file resolution, mirror fallback,
 and rejection paths are covered by mocked tests; those tests do not establish live availability.
+
+#### Shared catalog domain recovery
+
+On 2026-11-01, live requests reproduced redirects from `new8.hdhub4u.cl` to
+`new10.hdhub4u.cl`, `moviesmod.uk.com` through `moviesmod.meme` to `moviesmod.tw`,
+`bollyflix.co.za` to `bollyflix.church`, and `uhdmovies.us.org` to `uhdmovies.beauty`.
+The shared catalog fetcher now allows these exact per-provider origins. HDHub also
+allows numbered `new<N>.hdhub4u.cl` hosts. Unknown TLDs, other catalogs, non-HTTPS
+redirects, and private destinations are not trusted automatically.
+
+All default search, scheduled-import, and preview requests use this fetcher.
+Published post/sitemap links are rebased to the configured logical origin before
+parsing, preserving saved post identities and same-origin discovery. A successful
+domain-only move is remembered for five minutes; failures evict it. Requests have a
+shared 20-second budget, propagate cancellation, and can fall back from a dead known
+origin to its observed current origin. Explicit custom origins remain operator-controlled.
+Cross-origin validators are discarded and cross-origin 304 responses are rejected.
+
+Live verification recovered 14,318 HDHub post URLs with no sitemap errors and parsed
+Weapons releases in all four affected catalogs. Final header checks confirmed Weapons
+(2025) downloads in 480p, 720p and 1080p through the existing resolver. The Mongoose
+was absent from that complete archive and the other inspected catalog results did not
+match it; this fix does not establish availability for that title. Full-film playback
+and a deployed authenticated search were not verified.

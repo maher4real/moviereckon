@@ -58,7 +58,7 @@ describe("saved source queries", () => {
     mocks.read.mockReturnValue(new Promise(() => {}));
     view.rerender(<Detail id={99} />);
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Loading watch links");
+    expect(screen.getByRole("status")).toHaveTextContent("Gathering your options");
     client.clear();
   });
 
@@ -68,7 +68,7 @@ describe("saved source queries", () => {
     const result: FetchContentSourcesResult = { status: "imported", content, importedPages: 1, errors: 0 };
     mocks.import.mockResolvedValue(result);
     render(<Detail id={42} />, { wrapper: provider(client) });
-    await screen.findByText("No watch links available yet.");
+    await screen.findByText("Nothing to watch here just yet. Try again soon.");
     fireEvent.click(screen.getByRole("button", { name: "Fetch links" }));
     await screen.findByText("1 source found. Checking availability.");
     const saved = await screen.findByRole("region", { name: "Saved players" });
