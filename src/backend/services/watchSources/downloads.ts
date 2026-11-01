@@ -1,6 +1,7 @@
 import "server-only";
 import { load } from "cheerio";
-import { isGreenMotorsUrl, isResolvableDownload } from "@/shared/lib/watchSources";
+import { randomBytes } from "node:crypto";
+import { isFastDlUrl, isNexDriveUrl, isGreenMotorsUrl, isResolvableDownload } from "@/shared/lib/watchSources";
 import type { ResolvedDownload, WatchSourceLink } from "@/shared/types/watchSources";
 import { decodeGreenMotorsDestination, parseGreenMotorsMirrors } from "./greenMotors";
 import { fetchSourceDocument } from "./http";
@@ -106,6 +107,40 @@ export async function resolveSourceDownloads(link: WatchSourceLink, title: strin
   const document = async (url: URL) => (await dependencies.fetchDocument(url.href, url.origin, {}, { signal })).html || "";
   let candidates: URL[] = [];
   const original = new URL(link.url);
+  if (isNexDriveUrl(link.url)) {
+    const response = await dependencies.fetchDocument(original.href, original.origin, {}, { signal,
+      redirectOriginAllowed: (origin) => ["https://nexdrive.help", "https://nexdrive.beer"].includes(origin) });
+    const page = load(response.html || "");
+    const mirrors = page("a[href]").toArray().flatMap((node) => {
+      if (page(node).closest("nav,header,footer,aside").length) return [];
+      const url = publicLink(page(node).attr("href") || "", response.finalUrl || original.href);
+      if (!url || !(isFastDlUrl(url.href) || ["hubcloud.ist", "hubdrive.pics", "hubcdn.club", "hubcdn.wiki"].includes(url.hostname))) return [];
+      const mirror = { ...link, url: url.href, host: url.hostname };
+      return isResolvableDownload(mirror) ? [mirror] : [];
+    });
+    const unique = [...new Map(mirrors.map((mirror) => [mirror.url, mirror])).values()].slice(0, 4);
+    const results = await Promise.allSettled(unique.map((mirror) => resolveSourceDownloads(mirror, title, dependencies, signal)));
+    return [...new Map(results.flatMap((result) => result.status === "fulfilled" ? result.value : []).map((file) => [file.url, file])).values()].slice(0, 8);
+  }
+  if (isFastDlUrl(link.url)) {
+    const page = load(await document(original));
+    const prepare = publicLink(page("a#download-button").attr("href") || "", original.href);
+    if (!prepare || prepare.origin !== original.origin || prepare.pathname !== "/dl/dl.php" || prepare.hash ||
+        prepare.searchParams.get("code") !== original.pathname.split("/").pop() ||
+        !/^[A-Za-z0-9_=-]{8,512}$/.test(prepare.searchParams.get("secret") || "") ||
+        [...prepare.searchParams.keys()].some((key) => !["code", "secret"].includes(key))) return [];
+    prepare.searchParams.set("prepare", "1");
+    prepare.searchParams.set("hash", randomBytes(12).toString("hex"));
+    prepare.searchParams.set("cfs", randomBytes(8).toString("hex"));
+    const response = await dependencies.fetchDocument(prepare.href, original.origin, {}, { signal, format: "json" });
+    const result: unknown = JSON.parse(response.html || "null");
+    if (!result || typeof result !== "object" || !("ok" in result) || result.ok !== true ||
+        !("url" in result) || typeof result.url !== "string") return [];
+    const file = finalStorageUrl(result.url);
+    if (!file) return [];
+    const checked = await checkFile(file, link, title, signal, dependencies.request);
+    return checked ? [checked] : [];
+  }
   if (isGreenMotorsUrl(link.url)) {
     // Canonicalize the observed domain rotation instead of following arbitrary redirects.
     const wrapper = new URL(original.pathname + original.search, "https://greenmotors.cc");

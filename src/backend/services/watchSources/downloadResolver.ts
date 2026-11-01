@@ -4,6 +4,9 @@ import path from "node:path";
 import { z } from "zod";
 import type { ResolvedDownload, WatchSourceLink } from "@/shared/types/watchSources";
 import { filenameMatchesSource, finalStorageUrl, resolveSourceDownloads } from "./downloads";
+import { isFastDlUrl, isNexDriveUrl, isMoviesDriveArchive } from "@/shared/lib/watchSources";
+import { moviesDriveMirrors } from "./moviesDrive";
+import { fetchMoviesDriveArchive } from "./moviesDriveDomains";
 
 const MAX_OUTPUT = 256 * 1024;
 const resultSchema = z.object({ downloads: z.array(z.object({
@@ -79,6 +82,15 @@ function localPython(payload: string): Promise<unknown | null> {
 
 /** Exactly one engine handles a click. Local Python is started only on demand. */
 export async function resolveContentDownloads(link: WatchSourceLink, title: string): Promise<ResolvedDownload[]> {
+  // These published-page adapters live in TypeScript, including when Python is configured.
+  if (isNexDriveUrl(link.url) || isFastDlUrl(link.url)) return resolveSourceDownloads(link, title);
+  if (isMoviesDriveArchive(link.url)) {
+    const document = await fetchMoviesDriveArchive(link.url, "https://mdrive.lol");
+    const mirrors = moviesDriveMirrors(document.html || "", link, title);
+    const results = await Promise.allSettled(mirrors.map((mirror) => resolveContentDownloads(mirror, title)));
+    const files = results.flatMap((result) => result.status === "fulfilled" ? result.value : []);
+    return [...new Map(files.map((file) => [file.url, file])).values()].slice(0, 8);
+  }
   const mode = process.env.WATCH_SOURCE_RESOLVER || "auto";
   if (!["auto", "python", "typescript"].includes(mode)) throw new Error("Invalid WATCH_SOURCE_RESOLVER");
   if (mode === "typescript") return resolveSourceDownloads(link, title);

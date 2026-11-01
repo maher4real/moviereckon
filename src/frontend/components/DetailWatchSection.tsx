@@ -57,7 +57,7 @@ function LinkList({ links, groupBy, className, renderLink }: {
 export default function DetailWatchSection({ contentId, contentType, title, season, episode }: DetailWatchProps) {
   const client = useQueryClient();
   const saved = useWatchSources(contentId, contentType);
-  const [progress, setProgress] = useState("Searching providers…");
+  const [progress, setProgress] = useState("Finding your next play…");
   const [selectedSeason, setSeason] = useState(season === undefined ? "all" : String(season));
   const [selectedEpisode, setEpisode] = useState(episode === undefined ? "all" : String(episode));
   const identity = { contentId, contentType };
@@ -88,9 +88,9 @@ export default function DetailWatchSection({ contentId, contentType, title, seas
   const watch = confirmed.filter((link) => (link.scope === "movie" || link.scope === "episode") && !!(directMediaFormat(link.url) || isResolvablePlayer(link)));
   const downloads = confirmed.filter((link) => isResolvableDownload(link) || isDirectFileLink(link.url));
   // Only problems get a line of copy; a finished search speaks through the results.
-  const notice = search.isError ? (search.error instanceof Error ? search.error.message : "Search unavailable. Try again.") :
-    search.data?.status === "partial" ? "Some providers could not finish." :
-    search.data?.status === "busy" ? "Catalog update running. Try again shortly." : null;
+  const notice = search.isError ? "Couldn’t finish the search. Give it another go." :
+    search.data?.status === "partial" ? "There may be more to find. Try again in a moment." :
+    search.data?.status === "busy" ? "Fresh links are on the way. Check back shortly." : null;
   const tabs = [
     { value: "download", label: "Download", Icon: Download, rows: downloads },
     { value: "watch", label: "Watch", Icon: Play, rows: watch },
@@ -102,10 +102,10 @@ export default function DetailWatchSection({ contentId, contentType, title, seas
   return <div className="min-h-0 overflow-y-auto px-5 pb-5 sm:px-6">
     <div className="flex items-center justify-between gap-3 py-4">
       <div aria-live="polite" className="min-w-0 text-xs text-muted-foreground">
-        {working.isChecking ? <LoadingIndicator label={`Checking links… ${working.checkedCount}/${working.totalCount}`} /> : search.isFetching ? <LoadingIndicator label={progress} /> :
-          working.isError ? <p className="text-amber-500">Could not finish checking links. Try again.</p> :
+        {working.isChecking ? <LoadingIndicator label={`Making sure the links work… ${working.checkedCount}/${working.totalCount}`} /> : search.isFetching ? <LoadingIndicator label={progress} /> :
+          working.isError ? <p className="text-amber-500">Couldn’t check every link. Give it another go.</p> :
           notice ? <p className="text-amber-500">{notice}</p> :
-          <p><span className="font-semibold tabular-nums text-foreground">{confirmed.length}</span> checked links</p>}
+          <p><span className="font-semibold tabular-nums text-foreground">{confirmed.length}</span> {confirmed.length === 1 ? "option ready" : "options ready"}</p>}
       </div>
       <Button type="button" variant="outline" size="icon" aria-label="Search again" title="Search again" className="h-11 w-11 shrink-0 rounded-full" disabled={search.isFetching} onClick={() => { working.refresh(); void search.refetch(); }}>
         <RefreshCw className={cn("h-4 w-4", search.isFetching && "animate-spin")} aria-hidden="true" />
@@ -132,24 +132,23 @@ export default function DetailWatchSection({ contentId, contentType, title, seas
             {tab === "watch" ? <>
               <WatchLinkButton link={link} context={title} />
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                {link.quality && <span className="text-sm font-semibold">{link.quality}</span>}
-                <WatchMetaChips link={link} skip={chipSkip(link, grouped)} />
+                <WatchMetaChips link={link} skip={[watchLinkScope(link), link.codec]} />
               </div>
             </> : isResolvableDownload(link) ? <ResolveDownloadButton key={working.confirmed.find((item) => item.link.id === link.id)!.check.checkedAt}
               initialFiles={working.confirmed.find((item) => item.link.id === link.id)!.check.downloads} onUnavailable={() => working.reject(link)} hideScope={grouped} className="py-0 first:pt-0 last:pb-0" link={link} identity={identity} /> :
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0 flex-1 space-y-2">
-                  <p className="text-sm font-semibold">{link.quality || link.label}</p>
+                  <p className="text-sm font-semibold">{link.quality || "Standard"}</p>
                   <WatchMetaChips link={link} skip={[link.quality, ...chipSkip(link, grouped)]} />
                 </div>
-                <a href={link.url} target="_blank" rel="noopener noreferrer" download aria-label={`Open file · ${link.label}`}
+                <a href={link.url} target="_blank" rel="noopener noreferrer" download aria-label={`Download · ${link.quality || "Standard"}`}
                   className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-border px-4 text-sm font-medium transition-colors hover:bg-foreground/5">
-                  <Download className="h-4 w-4" aria-hidden="true" />Open file
+                  <Download className="h-4 w-4" aria-hidden="true" />Download
                 </a>
               </div>}
           </li>} /> : <div className="flex min-h-36 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/70 px-4 text-center">
             <Icon className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
-            <p className="text-sm text-muted-foreground">{working.isChecking ? "Checking links…" : search.isFetching ? "Searching…" : `No working ${tab} links found`}</p>
+            <p className="text-sm text-muted-foreground">{working.isChecking ? "Making sure the links work…" : search.isFetching ? "Gathering your options…" : tab === "watch" ? "Nothing to watch here just yet. Try again soon." : "No downloads just yet. Try again soon."}</p>
           </div>}
 
         </TabsContent>;

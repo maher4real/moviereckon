@@ -4,7 +4,7 @@ vi.mock("./contentImport", () => ({ fetchContentSources: mocks.fetch }));
 import { searchContentSources } from "./search";
 const config = { baseUrl: "https://new8.hdhub4u.cl", batchSize: 20, concurrency: 3, discoveryPages: 2, refreshHours: 24, budgetMs: 210000 };
 beforeEach(() => {
-  for (const provider of ["MOVIESMOD", "BOLLYFLIX", "UHDMOVIES"]) vi.stubEnv(`WATCH_${provider}_ENABLED`, "false");
+  for (const provider of ["MOVIESMOD", "BOLLYFLIX", "UHDMOVIES", "MOVIES4U", "ROGMOVIES", "MOVIESDRIVE"]) vi.stubEnv(`WATCH_${provider}_ENABLED`, "false");
 });
 afterEach(() => { vi.resetAllMocks(); vi.unstubAllEnvs(); });
 describe("independent catalog searches", () => {
@@ -22,8 +22,8 @@ describe("independent catalog searches", () => {
     expect(result.content.sources[0].checkedAt).toBe(source.checkedAt);
     expect(mocks.fetch).toHaveBeenCalledTimes(2);
   });
-  it("searches all five catalogs after early success and preserves other providers when one fails", async () => {
-    for (const provider of ["4KHDHUB", "MOVIESMOD", "BOLLYFLIX", "UHDMOVIES"]) vi.stubEnv(`WATCH_${provider}_ENABLED`, "true");
+  it("searches all eight catalogs after early success and preserves other providers when one fails", async () => {
+    for (const provider of ["4KHDHUB", "MOVIESMOD", "BOLLYFLIX", "UHDMOVIES", "MOVIES4U", "ROGMOVIES", "MOVIESDRIVE"]) vi.stubEnv(`WATCH_${provider}_ENABLED`, "true");
     mocks.fetch.mockImplementation(async (_id, _type, _url, catalog) => {
       const provider = catalog.provider || "hdhub";
       if (provider === "bollyflix") throw new Error("Provider offline");
@@ -31,9 +31,9 @@ describe("independent catalog searches", () => {
         sources: [{ provider, sourcePage: `${catalog.baseUrl}/title/`, title: "Example", checkedAt: "2026-10-24T00:00:00Z", links: [] }] } };
     });
     const result = await searchContentSources(42, "movie", config);
-    expect(mocks.fetch).toHaveBeenCalledTimes(5);
-    expect(result.content.sources.map((source) => source.provider)).toEqual(["hdhub", "4khdhub", "moviesmod", "uhdmovies"]);
-    expect(result).toMatchObject({ status: "partial", importedPages: 4, errors: 1 });
+    expect(mocks.fetch).toHaveBeenCalledTimes(8);
+    expect(result.content.sources.map((source) => source.provider)).toEqual(["hdhub", "4khdhub", "moviesmod", "uhdmovies", "movies4u", "rogmovies", "moviesdrive"]);
+    expect(result).toMatchObject({ status: "partial", importedPages: 7, errors: 1 });
   });
   it("honors disabling the secondary catalog", async () => {
     vi.stubEnv("WATCH_4KHDHUB_ENABLED", "false");

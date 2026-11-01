@@ -4,8 +4,8 @@ import { sourcePageId } from "./store";
 const config = { baseUrl: "https://new8.hdhub4u.cl", batchSize: 20, concurrency: 3, discoveryPages: 2, refreshHours: 24, budgetMs: 210_000 };
 afterEach(() => vi.unstubAllEnvs());
 describe("catalog configuration", () => {
-  it("enables five independent catalogs and retains stable IDs across domain rotations", () => {
-    expect(getCatalogConfigs(config).map((catalog) => catalog.provider || "hdhub")).toEqual(["hdhub", "4khdhub", "moviesmod", "bollyflix", "uhdmovies"]);
+  it("enables eight independent catalogs and retains stable IDs across domain rotations", () => {
+    expect(getCatalogConfigs(config).map((catalog) => catalog.provider || "hdhub")).toEqual(["hdhub", "4khdhub", "moviesmod", "bollyflix", "uhdmovies", "movies4u", "rogmovies", "moviesdrive"]);
     expect(sourcePageId("https://old.example/same/", "moviesmod")).toBe(sourcePageId("https://new.example/same/", "moviesmod"));
     expect(sourcePageId("https://old.example/same/", "moviesmod")).not.toBe(sourcePageId("https://old.example/same/", "bollyflix"));
   });
@@ -14,6 +14,12 @@ describe("catalog configuration", () => {
     vi.stubEnv("MOVIESMOD_BASE_URL", "https://new.example/");
     expect(getCatalogConfigs(config).find((c) => c.provider === "moviesmod")?.baseUrl).toBe("https://new.example");
     expect(getCatalogConfigs(config).some((c) => c.provider === "bollyflix")).toBe(false);
+  });
+  it("allows MoviesDrive domain rotation and independent disabling", () => {
+    vi.stubEnv("MOVIESDRIVE_BASE_URL", "https://new.example/");
+    expect(getCatalogConfigs(config).find((c) => c.provider === "moviesdrive")?.baseUrl).toBe("https://new.example");
+    vi.stubEnv("WATCH_MOVIESDRIVE_ENABLED", "false");
+    expect(getCatalogConfigs(config).some((c) => c.provider === "moviesdrive")).toBe(false);
   });
   it.each(["http://example.com", "https://127.0.0.1", "https://localhost", "https://example.com/path/", "https://user:password@example.com"])("rejects unsafe or non-origin catalog settings: %s", (value) => {
     vi.stubEnv("MOVIESMOD_BASE_URL", value);

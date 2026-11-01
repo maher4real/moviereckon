@@ -1,4 +1,4 @@
-export type WatchCatalogProvider = "hdhub" | "4khdhub" | "moviesmod" | "bollyflix" | "uhdmovies";
+export type WatchCatalogProvider = "hdhub" | "4khdhub" | "moviesmod" | "bollyflix" | "uhdmovies" | "moviesdrive" | "movies4u" | "rogmovies";
 
 export type SourceMediaType = "movie" | "tv";
 

@@ -8,9 +8,9 @@ export function watchLinkScope(link: WatchSourceLink): string | null {
   return null;
 }
 
-/** Compact facts about a source (scope, codec, size, languages, host) as chips instead of a sentence. */
+/** Compact facts about a source (scope, codec, size, languages) as chips instead of a sentence. */
 export default function WatchMetaChips({ link, skip = [], className }: { link: WatchSourceLink; skip?: Array<string | null | undefined>; className?: string }) {
-  const values = [watchLinkScope(link), link.codec, link.size, ...(link.languages || []), link.host]
+  const values = [watchLinkScope(link), link.codec, link.size, ...(link.languages || [])]
     .filter((value): value is string => !!value && !skip.includes(value));
   const chips = [...new Set(values)];
   if (!chips.length) return null;

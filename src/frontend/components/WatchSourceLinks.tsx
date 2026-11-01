@@ -11,16 +11,16 @@ import type { ReactNode } from "react";
 export function WatchSourceOptions({ links, context, identity }: { links: WatchSourceLink[]; context: string; identity?: WatchSourceIdentity }) {
   const working = useWorkingWatchLinks(links, identity);
   return <>
-    {working.isChecking && <LoadingIndicator label="Checking links…" />}
-    {working.isError && <p role="status" className="text-sm text-muted-foreground">Could not finish checking links. Try again.</p>}
-    {!working.isChecking && working.confirmed.length === 0 && <p className="text-sm text-muted-foreground">No working links found.</p>}
+    {working.isChecking && <LoadingIndicator label="Making sure the links work…" />}
+    {working.isError && <p role="status" className="text-sm text-muted-foreground">Couldn’t check every link. Give it another go.</p>}
+    {!working.isChecking && working.confirmed.length === 0 && <p className="text-sm text-muted-foreground">No links just yet. Try again soon.</p>}
     <div className="space-y-3">{working.confirmed.map(({ link, check }) => <div key={`${link.id}:${check.checkedAt}`}>
       {(link.scope === "movie" || link.scope === "episode") && (directMediaFormat(link.url) || isResolvablePlayer(link)) &&
         <WatchLinkButton link={link} context={context} />}
       {identity && check.downloads.length > 0 && (isResolvableDownload(link) ? <ResolveDownloadButton link={link} identity={identity}
         initialFiles={check.downloads} onUnavailable={() => working.reject(link)} /> : check.downloads.map((file) =>
           <a key={file.url} href={file.url} download target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer"
-            className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm text-primary-foreground">Download file · {link.label}</a>))}
+            className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm text-primary-foreground">Download · {link.quality || "Standard"}</a>))}
     </div>)}</div>
   </>;
 }
@@ -38,16 +38,16 @@ interface SectionProps {
 }
 
 export function WatchLinksSection({ heading, context, links, identity, isLoading, isError, onRetry, actions,
-  emptyMessage = "No watch links available yet." }: SectionProps) {
+  emptyMessage = "Nothing to watch here just yet. Try again soon." }: SectionProps) {
   return <section aria-label={heading} className="mb-8 min-w-0 rounded-xl border border-border bg-card p-4 sm:p-6">
     <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
       <h2 className="flex items-center gap-2 text-lg font-semibold"><Play className="h-5 w-5 text-primary" aria-hidden="true" />{heading}</h2>
       {actions && <div className="w-full min-w-0 sm:w-auto sm:max-w-sm">{actions}</div>}
     </div>
-    {isLoading ? <LoadingIndicator label="Loading watch links…" large className="min-h-24 justify-center" /> :
+    {isLoading ? <LoadingIndicator label="Gathering your options…" large className="min-h-24 justify-center" /> :
       isError ? <div className="flex flex-wrap items-center gap-3">
-        <p role="status" className="text-sm text-muted-foreground">Watch links are temporarily unavailable.</p>
-        {onRetry && <Button type="button" variant="outline" size="sm" onClick={onRetry}>Retry watch links</Button>}
+        <p role="status" className="text-sm text-muted-foreground">Links are taking a break. Try again in a moment.</p>
+        {onRetry && <Button type="button" variant="outline" size="sm" onClick={onRetry}>Try again</Button>}
       </div> : links.length === 0 ? <p className="text-sm text-muted-foreground">{emptyMessage}</p> :
         <WatchSourceOptions links={links} context={context} identity={identity} />}
   </section>;

@@ -5,6 +5,15 @@ const base = "https://source.example";
 afterEach(() => vi.unstubAllGlobals());
 
 describe("bounded source fetch", () => {
+  it("accepts JSON only in explicit search mode and rejects HTML challenges", async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(Response.json({ found: 0, hits: [] }))
+      .mockResolvedValueOnce(new Response("<html>Challenge</html>", { headers: { "content-type": "text/html" } }));
+    vi.stubGlobal("fetch", fetch);
+    expect(await fetchSourceDocument(`${base}/search.php?q=Example`, base, {}, { format: "json" }))
+      .toMatchObject({ html: JSON.stringify({ found: 0, hits: [] }) });
+    expect(fetch.mock.calls[0][1].headers.Accept).toBe("application/json");
+    await expect(fetchSourceDocument(`${base}/search.php?q=Example`, base, {}, { format: "json" })).rejects.toThrow("JSON");
+  });
   it("honors a caller's cancellation signal across a multi-page resolution", async () => {
     const controller = new AbortController();
     const fetch = vi.fn((_url: string, options: RequestInit) => new Promise<Response>((_resolve, reject) => {

@@ -202,7 +202,7 @@ Live verification on 2026-10-17 found all nine published Prahaar entries: seven 
 
 ### Additional providers
 
-The popup also searches **MoviesMod**, **BollyFlix**, and **UHDMovies**. Each catalog
+The popup also searches **MoviesMod**, **BollyFlix**, **UHDMovies**, **MoviesDrive**, **Movies4U**, and **RogMovies**. Each catalog
 has its own queue identity and lease, runs independently, and must pass the same
 IMDb/TMDB or exact title/year matching checks before its links are saved. The
 WordPress adapters read published release rows, retain quality/codec/size and
@@ -216,13 +216,58 @@ establishes identity. These catalogs also participate in scheduled imports.
 | `MOVIESMOD_BASE_URL` | `https://moviesmod.uk.com` |
 | `BOLLYFLIX_BASE_URL` | `https://bollyflix.co.za` |
 | `UHDMOVIES_BASE_URL` | `https://uhdmovies.us.org` |
+| `MOVIES4U_BASE_URL` | `https://movies4u.one` |
+| `ROGMOVIES_BASE_URL` | `https://rogmovies.im` |
+| `MOVIESDRIVE_BASE_URL` | `https://new1.moviesdrive.cyou` |
 | `FOUR_KHDHUB_BASE_URL` | `https://4khdhub.one` |
 
 Use `WATCH_MOVIESMOD_ENABLED=false`, `WATCH_BOLLYFLIX_ENABLED=false`,
-`WATCH_UHDMOVIES_ENABLED=false`, or `WATCH_4KHDHUB_ENABLED=false` to disable a
+`WATCH_UHDMOVIES_ENABLED=false`, `WATCH_MOVIESDRIVE_ENABLED=false`,
+`WATCH_MOVIES4U_ENABLED=false`, `WATCH_ROGMOVIES_ENABLED=false`, or `WATCH_4KHDHUB_ENABLED=false` to disable a
 catalog independently. Origin overrides must be public HTTPS origins; cross-origin
-redirects remain rejected. The origins and published movie/series layouts were
+redirects remain rejected except for the MoviesDrive policy below. The origins and published movie/series layouts were
 checked on 2026-10-23. Domain rotation requires updating the corresponding setting.
+
+MoviesDrive was checked on 2026-11-01. Its WordPress search redirects to a JavaScript
+shell, so the adapter reads the public `/search.php?q=...&page=...` JSON endpoint
+(up to five pages per title) and supplements it with recent poster cards. Failed,
+malformed, or truncated searches report partial results. Quality-only release buttons
+inside the post body retain their resolution, codec and size, including underscore
+separators. The resolver reads only `https://mdrive.lol/archive/<id>` file indexes,
+checks their title/year, and passes supported image-button mirrors to the configured
+Python or TypeScript engine. Final filename and file-header validation still applies;
+the file index itself is never offered as a verified download.
+
+A live Weapons (2025) BluRay 720p x264 release resolved through MoviesDrive and
+HubCloud to a matching 1,357,235,482-byte file. The older WEB-DL mirror returned no
+verified file. This validates discovery and file resolution, not full-film playback
+or a deployed authenticated browser session.
+
+#### MoviesDrive domain changes
+
+Catalog and file-index requests follow HTTPS redirects to the root or numbered
+`new<N>` subdomains of `moviesdrive.cyou` and `mdrive.lol`, respectively. Other
+domains must be explicitly configured; the adapter never guesses new TLDs or
+trusts a domain merely because it contains the provider name.
+
+For a new catalog domain, update `MOVIESDRIVE_BASE_URL`. Set
+`MOVIESDRIVE_FALLBACK_ORIGINS` to up to three comma-separated verified backup or
+previous origins. When the primary is unreachable, the adapter tries these origins
+with the same path and query. Trusted absolute links in returned search results and
+poster cards are rebased to the configured catalog origin, preserving queue IDs.
+
+For a file-index move, update `MOVIESDRIVE_ARCHIVE_BASE_URL` and optionally
+`MOVIESDRIVE_ARCHIVE_FALLBACK_ORIGINS` using the same format. Published archive URLs
+are normalized to the original `mdrive.lol` identity; saved links keep their IDs,
+while resolution fetches the currently configured domain. Old custom origins should
+remain in the corresponding fallback list if the provider still publishes their URLs.
+
+Working origins are remembered for five minutes per process and discarded when they
+fail. Recovery shares a 20-second budget, with an eight-second limit per candidate;
+requests retain the document size cap and redirect limit. Conditional-cache validators
+are neither forwarded nor saved across origins. Redirect loops, untrusted hosts,
+credentials, private/IP addresses and HTTPS downgrades are rejected. If no trusted
+origin works, search remains partial and retains previously saved links.
 
 External player shortcuts such as VidLink are no longer listed unconditionally.
 A successful HTML response or a valid-looking TMDB player URL does not establish
@@ -276,3 +321,31 @@ synthetic check responses to verify pending/failed/unknown-source hiding, refres
 removal, exact episode scope, and desktop/mobile layouts. This does not establish
 live authenticated MongoDB/TMDB coverage or guarantee that a provider stays online
 after a recent successful check.
+
+#### Movies4U and RogMovies
+
+Movies4U uses the public DLE `/index.php?do=search&subaction=search&story=...&search_start=...`
+search and numeric `.html` post paths. RogMovies uses `/ts-search.php?q=...&page=...`
+JSON search and poster cards. Both searches are bounded to five pages per title and
+report incomplete searches as partial. Movie and exact episode identity checks remain
+required before importing links. Only published release rows are parsed.
+
+NexDrive (`nexdrive.help` and `nexdrive.beer`) file indexes can expand to supported
+HubCloud/HubDrive/HubCDN mirrors and FastDL (`fast-dl.one/dl/<code>`). The TypeScript
+resolver handles these entries even when the Python engine is configured. It reads
+FastDL's published prepare button and JSON response, then probes only existing trusted
+storage hosts. Challenges, ads, foreign redirects, wrong filenames, and non-media
+responses are not working downloads. Up to four distinct mirrors are attempted under
+a shared 22-second deadline; one failed mirror does not hide the others.
+
+These two catalogs support explicit HTTPS base-origin overrides for domain changes;
+existing queue identities retain their post paths. Unlike MoviesDrive, they do not
+automatically discover an unknown replacement domain. NexDrive redirects are restricted
+to its two observed origins, and FastDL redirects remain same-origin.
+
+Live checks on 2026-11-01 confirmed both adapters' catalog searches and post parsing:
+five Weapons release rows from Movies4U and two Secret Weapon rows from RogMovies.
+All seven were attempted through the resolver; none produced a verified final file.
+A separately inspected FastDL preparation request was challenged. No new-provider
+final file or browser playback was confirmed. Successful file resolution, mirror fallback,
+and rejection paths are covered by mocked tests; those tests do not establish live availability.

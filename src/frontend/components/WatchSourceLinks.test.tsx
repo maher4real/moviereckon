@@ -15,6 +15,20 @@ beforeEach(() => {
     checkedAt: new Date().toISOString(), validUntil: new Date(Date.now() + 120_000).toISOString() })));
 });
 describe("saved watch links on detail pages", () => {
+  it("shows the final download destination without provider branding or release filenames", async () => {
+    const link: WatchSourceLink = { ...watch, id: "moviesdrive", kind: "download", scope: "movie", season: null, episode: null,
+      url: "https://mdrive.lol/archive/123", host: "mdrive.lol" };
+    const file = { url: "https://files.example/movie.mkv", filename: "Example.2025.720p.x264.mkv", sizeBytes: 1234,
+      contentType: "application/octet-stream", checkedAt: new Date().toISOString(), expiresAt: null };
+    mocks.check.mockResolvedValue([{ linkId: link.id, url: link.url, available: true, downloads: [file],
+      checkedAt: new Date().toISOString(), validUntil: new Date(Date.now() + 120_000).toISOString() }]);
+    render(<WatchLinksSection identity={{ contentId, contentType: "movie" }} heading="Watch movie" context="Example" links={[link]} />);
+    expect(await screen.findByRole("link", { name: "Download" })).toHaveAttribute("href", file.url);
+    expect(screen.queryByText("MoviesDrive")).not.toBeInTheDocument();
+    expect(screen.queryByText("mdrive.lol")).not.toBeInTheDocument();
+    expect(screen.queryByText(file.filename)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /mdrive/ })).not.toBeInTheDocument();
+  });
   it("checks only the exact episode and keeps other episodes and packs out", async () => {
     render(<EpisodeWatchLinks identity={{ contentId, contentType: "tv" }} season={1} episode={1} links={[watch,
       { ...watch, id: "ep2", episode: 2 }, { ...watch, id: "s2", season: 2 },
@@ -34,23 +48,23 @@ describe("saved watch links on detail pages", () => {
   });
   it("shows missing episodes without a substitute player", () => {
     render(<EpisodeWatchLinks identity={{ contentId, contentType: "tv" }} season={1} episode={9} links={[watch]} />);
-    expect(screen.getByText("No working links found.")).toBeInTheDocument(); expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.getByText("No links just yet. Try again soon.")).toBeInTheDocument(); expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
   it("does not expose saved URLs when identity or successful verification is missing", async () => {
     const view = render(<WatchLinksSection heading="Watch movie" context="Example" links={[{ ...watch, scope: "movie" }]} />);
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
     mocks.check.mockResolvedValue([]);
     view.rerender(<WatchLinksSection identity={{ contentId, contentType: "movie" }} heading="Watch movie" context="Example" links={[{ ...watch, scope: "movie" }]} />);
-    await screen.findByText("No working links found."); expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    await screen.findByText("No links just yet. Try again soon."); expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
   it("reports loading, empty and unavailable states and allows a retry", () => {
     const retry = vi.fn();
     const view = render(<WatchLinksSection heading="Watch movie" context="Example" links={[]} isLoading />);
-    expect(screen.getByRole("status")).toHaveTextContent("Loading watch links");
+    expect(screen.getByRole("status")).toHaveTextContent("Gathering your options");
     view.rerender(<WatchLinksSection heading="Watch movie" context="Example" links={[]} />);
-    expect(screen.getByText("No watch links available yet.")).toBeInTheDocument();
+    expect(screen.getByText("Nothing to watch here just yet. Try again soon.")).toBeInTheDocument();
     view.rerender(<WatchLinksSection heading="Watch movie" context="Example" links={[]} isError onRetry={retry} />);
-    fireEvent.click(screen.getByRole("button", { name: "Retry watch links" })); expect(retry).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" })); expect(retry).toHaveBeenCalledOnce();
   });
   it("deduplicates the same imported destination across multiple source pages", () => {
     const source = { provider: "hdhub" as const, sourcePage: "https://source.example/title/", title: "Example", checkedAt: null, links: [watch] };

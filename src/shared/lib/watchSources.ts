@@ -42,10 +42,26 @@ export function isGreenMotorsUrl(value: string): boolean {
   } catch { return false; }
 }
 
+export function isMoviesDriveArchive(value: string): boolean {
+  const url = mediaUrl(value);
+  return !!url && url.origin === "https://mdrive.lol" && !url.search && !url.hash && /^\/archive\/\d+\/?$/.test(url.pathname);
+}
+
+export function isNexDriveUrl(value: string): boolean {
+  const url = mediaUrl(value);
+  return !!url && ["https://nexdrive.help", "https://nexdrive.beer"].includes(url.origin) &&
+    !url.search && !url.hash && /^\/genxfm\d{6,24}\/$/.test(url.pathname);
+}
+
+export function isFastDlUrl(value: string): boolean {
+  const url = mediaUrl(value);
+  return !!url && url.origin === "https://fast-dl.one" && !url.search && !url.hash && /^\/dl\/[a-zA-Z0-9]{4,32}$/.test(url.pathname);
+}
+
 export function isResolvableDownload(link: WatchSourceLink): boolean {
   const url = mediaUrl(link.url);
   return !!url && link.kind === "download" && ["movie", "episode", "season"].includes(link.scope) &&
-    (isGreenMotorsUrl(link.url) || (!url.search && !url.hash && (
+    (isMoviesDriveArchive(link.url) || isNexDriveUrl(link.url) || isFastDlUrl(link.url) || isGreenMotorsUrl(link.url) || (!url.search && !url.hash && (
       (url.origin === "https://hubcloud.ist" && /^\/drive\/[a-z0-9]+\/?$/.test(url.pathname)) ||
       (url.origin === "https://hubdrive.pics" && /^\/file\/\d+\/?$/.test(url.pathname)) ||
       (["https://hubcdn.club", "https://hubcdn.wiki"].includes(url.origin) && /^\/file\/[a-zA-Z0-9]+\/?$/.test(url.pathname))

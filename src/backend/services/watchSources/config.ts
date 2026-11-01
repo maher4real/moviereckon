@@ -1,6 +1,7 @@
 import "server-only";
 import type { WatchCatalogProvider } from "@/shared/types/watchSources";
 import { publicLink } from "./parser";
+import { moviesDriveDomainPolicy } from "./moviesDriveDomains";
 
 export interface ImporterConfig {
   baseUrl: string;
@@ -36,8 +37,11 @@ export function getImporterConfig(): ImporterConfig {
 
 export function sourcePageUrl(value: string, config: ImporterConfig): string {
   const url = publicLink(value, config.baseUrl);
+  if (url && config.provider === "moviesdrive" && moviesDriveDomainPolicy("catalog", config.baseUrl).allows(url.origin)) {
+    url.host = new URL(config.baseUrl).host;
+  }
   if (!url || url.origin !== config.baseUrl || url.search || url.hash ||
-      !/^\/[^/]+\/$/.test(url.pathname)) throw new Error("Source page must be on the configured catalog origin with a single post path");
+      !(config.provider === "movies4u" ? /^\/\d+-[^/]+\.html$/ : /^\/[^/]+\/$/).test(url.pathname)) throw new Error("Source page must be on the configured catalog origin with a single post path");
   return url.href;
 }
 
@@ -49,6 +53,9 @@ export function getCatalogConfigs(config = getImporterConfig()): ImporterConfig[
     { provider: "moviesmod", key: "MOVIESMOD", origin: "https://moviesmod.uk.com" },
     { provider: "bollyflix", key: "BOLLYFLIX", origin: "https://bollyflix.co.za" },
     { provider: "uhdmovies", key: "UHDMOVIES", origin: "https://uhdmovies.us.org" },
+    { provider: "movies4u", key: "MOVIES4U", origin: "https://movies4u.one" },
+    { provider: "rogmovies", key: "ROGMOVIES", origin: "https://rogmovies.im" },
+    { provider: "moviesdrive", key: "MOVIESDRIVE", origin: "https://new1.moviesdrive.cyou" },
   ] as const;
   for (const { provider, key, origin } of additional) {
     if (process.env[`WATCH_${key}_ENABLED`] === "false") continue;

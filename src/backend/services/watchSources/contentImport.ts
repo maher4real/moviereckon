@@ -1,3 +1,4 @@
+import { searchAdditionalCatalog } from "./additionalCatalogs";
 import "server-only";
 import { getServerMovieDetails, getServerTVShowDetails, getServerTVExternalIds } from "@/backend/services/tmdbServer";
 import type { ContentWatchSources, FetchContentSourcesResult, ParsedSourcePage, SourceMediaType, SourceSearchEvent } from "@/shared/types/watchSources";
@@ -5,8 +6,10 @@ import { getImporterConfig, sourcePageUrl, type ImporterConfig } from "./config"
 import { fetchSourceDocument, type SourceResponse } from "./http";
 import { createContentMatcher, type MatchResult } from "./matcher";
 import { normalizeSourceTitle } from "./parser";
-import { CATALOG_NAMES, catalogProvider, catalogIndexUrl, discoverCatalogPages, parseCatalogPage } from "./catalogs";
+import { catalogProvider, catalogIndexUrl, discoverCatalogPages, parseCatalogPage } from "./catalogs";
 import { discoverArchive } from "./discovery";
+import { searchMoviesDrive } from "./moviesDrive";
+import { fetchMoviesDriveDocument } from "./moviesDriveDomains";
 import { runSourceImport } from "./importer";
 import { createSourceRepository, lookupContentSources, type SourceRepository } from "./store";
 
@@ -44,7 +47,9 @@ export async function fetchContentSources(
   onEvent?: (event: SourceSearchEvent) => void,
 ): Promise<FetchContentSourcesResult> {
   const deps = dependencies || { identity: getContentIdentity, lookup: lookupContentSources,
-    repository: () => createSourceRepository(catalogProvider(config)), fetchDocument: fetchSourceDocument, match: createContentMatcher(), run: runSourceImport, archive: discoverArchive };
+    repository: () => createSourceRepository(catalogProvider(config)),
+    fetchDocument: config.provider === "moviesdrive" ? fetchMoviesDriveDocument : fetchSourceDocument,
+    match: createContentMatcher(), run: runSourceImport, archive: discoverArchive };
   const started = Date.now();
   const emit = (event: SourceSearchEvent) => { try { onEvent?.(event); } catch { /* disconnected consumer */ } };
   // Saved links are useful even if TMDB or another provider is temporarily down.
@@ -56,7 +61,7 @@ export async function fetchContentSources(
   const [identityResult, saved] = await Promise.all([identityLookup, savedLookup]);
   if ("error" in identityResult) throw identityResult.error;
   const identity = identityResult.identity;
-  emit({ type: "progress", message: `Searching ${CATALOG_NAMES[catalogProvider(config)]} for matching releases…` });
+  emit({ type: "progress", message: "Finding your next play…" });
   const candidates = new Set<string>();
   let errors = 0;
   let repository: SourceRepository | undefined;
@@ -68,8 +73,9 @@ export async function fetchContentSources(
     const titles = [...new Set([identity.title, identity.originalTitle].map(normalizeSourceTitle).filter(Boolean))];
     const matchesTitle = (url: string) => {
       try {
-        const path = decodeURIComponent(new URL(url).pathname);
-        const slug = normalizeSourceTitle(["moviesmod", "bollyflix", "uhdmovies"].includes(catalogProvider(config)) ? path.replace(/^\/download-/i, "/") : path);
+        const rawPath = decodeURIComponent(new URL(url).pathname);
+        const path = config.provider === "movies4u" ? rawPath.replace(/^\/\d+-/, "/").replace(/\.html$/, "") : rawPath;
+        const slug = normalizeSourceTitle(["moviesmod", "bollyflix", "uhdmovies", "moviesdrive", "rogmovies"].includes(catalogProvider(config)) ? path.replace(/^\/download-/i, "/") : path);
         return titles.some((title) => slug === title || slug.startsWith(`${title} `));
       } catch { return false; }
     };
@@ -78,6 +84,16 @@ export async function fetchContentSources(
       const archive = await deps.archive(config, repository, deps.fetchDocument, Math.min(started + 90_000, started + config.budgetMs - 60_000));
       errors += archive.errors;
       archive.urls.filter(matchesTitle).forEach((url) => candidates.add(url));
+    } else if (catalogProvider(config) === "moviesdrive") {
+      const search = await searchMoviesDrive([identity.title, identity.originalTitle], config, deps.fetchDocument,
+        Math.min(started + 60_000, started + config.budgetMs - 60_000));
+      errors += search.errors;
+      search.urls.filter(matchesTitle).forEach((url) => candidates.add(url));
+    } else if (["movies4u", "rogmovies"].includes(catalogProvider(config))) {
+      const search = await searchAdditionalCatalog([identity.title, identity.originalTitle], config, deps.fetchDocument,
+        Math.min(started + 60_000, started + config.budgetMs - 60_000));
+      errors += search.errors;
+      search.urls.filter(matchesTitle).forEach((url) => candidates.add(url));
     } else {
       // This catalog publishes a bounded title search, independent of its homepage.
       for (const title of [...new Set([identity.title, identity.originalTitle])].filter(Boolean)) {
@@ -101,7 +117,7 @@ export async function fetchContentSources(
   const snapshots = new Map<string, { response: SourceResponse; parsed: ParsedSourcePage; matching: MatchResult }>();
   const urls = [...candidates].slice(0, 100);
   if (urls.length < candidates.size) errors++;
-  emit({ type: "progress", message: `Checking ${urls.length} candidate releases from ${CATALOG_NAMES[catalogProvider(config)]}…` });
+  emit({ type: "progress", message: urls.length ? "Taking a closer look…" : "Looking a little further…" });
   let cursor = 0;
   await Promise.all(Array.from({ length: Math.min(config.concurrency, urls.length) }, async () => {
     while (cursor < urls.length && Date.now() - started < config.budgetMs - 30_000) {

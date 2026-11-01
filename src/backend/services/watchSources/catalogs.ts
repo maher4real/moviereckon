@@ -1,14 +1,18 @@
+import { discoverAdditionalPages, parseAdditionalPage } from "./additionalCatalogs";
 import { load } from "cheerio";
 import { discoverWordpressPages, parseWordpressPage } from "./wordpressCatalog";
+import { discoverMoviesDrivePages, parseMoviesDrivePage } from "./moviesDrive";
 import type { ImporterConfig } from "./config";
 import { discoverSourcePages, normalizeSourceTitle, parseSourcePage, publicLink } from "./parser";
 
 export const FOUR_K_ORIGIN = "https://4khdhub.one";
-export const CATALOG_NAMES = { hdhub: "HDHub", "4khdhub": "4KHDHub", moviesmod: "MoviesMod", bollyflix: "BollyFlix", uhdmovies: "UHDMovies" } as const;
+export const CATALOG_NAMES = { hdhub: "HDHub", "4khdhub": "4KHDHub", moviesmod: "MoviesMod", bollyflix: "BollyFlix", uhdmovies: "UHDMovies", movies4u: "Movies4U", rogmovies: "RogMovies", moviesdrive: "MoviesDrive" } as const;
 export const catalogProvider = (config: ImporterConfig) => config.provider || "hdhub";
 
 export function discoverCatalogPages(html: string, config: ImporterConfig): string[] {
+  if (["movies4u", "rogmovies"].includes(catalogProvider(config))) return discoverAdditionalPages(html, config);
   if (catalogProvider(config) === "hdhub") return discoverSourcePages(html, config.baseUrl);
+  if (catalogProvider(config) === "moviesdrive") return discoverMoviesDrivePages(html, config.baseUrl);
   if (catalogProvider(config) !== "4khdhub") return discoverWordpressPages(html, config.baseUrl);
   const $ = load(html);
   return [...new Set($("a.movie-card[href]").toArray().flatMap((node) => {
@@ -19,7 +23,9 @@ export function discoverCatalogPages(html: string, config: ImporterConfig): stri
 }
 
 export function parseCatalogPage(html: string, url: string, config: ImporterConfig) {
+  if (["movies4u", "rogmovies"].includes(catalogProvider(config))) return parseAdditionalPage(html, url, config);
   if (catalogProvider(config) === "hdhub") return parseSourcePage(html, url);
+  if (catalogProvider(config) === "moviesdrive") return parseMoviesDrivePage(html, url);
   if (catalogProvider(config) !== "4khdhub") return parseWordpressPage(html, url);
   const $ = load(html);
   // Adapt only published file rows. Never include related titles or navigation.

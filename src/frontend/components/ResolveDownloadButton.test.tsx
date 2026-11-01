@@ -18,54 +18,54 @@ afterEach(() => cleanup());
 describe("final download link action", () => {
   it("distinguishes generic provider labels by resolution and codec", () => {
     render(<><ResolveDownloadButton identity={identity} link={{ ...link, label: "Instant" }} /><ResolveDownloadButton identity={identity} link={{ ...link, id: "1080p", label: "Instant", quality: "1080p", resolution: 1080 }} /></>);
-    expect(screen.getByRole("button", { name: "Get file link: S1 E1 · 720p · Instant · H.264" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Get file link: S1 E1 · 1080p · Instant · H.264" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Get link: S1 E1 · 720p · H.264" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Get link: S1 E1 · 1080p · H.264" })).toBeInTheDocument();
   });
   it("resolves only after a click for the selected content/link and shows the final file rather than opening the intermediate page", async () => {
     render(<ResolveDownloadButton identity={identity} link={link} />);
     expect(mocks.resolve).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: /Get file link/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Get link/ }));
     expect(mocks.resolve).toHaveBeenCalledWith(identity, "download-ep1", expect.any(AbortSignal));
-    const download = await screen.findByRole("link", { name: "Download file" });
+    const download = await screen.findByRole("link", { name: "Download" });
     expect(download).toHaveAttribute("href", file.url);
     expect(download).toHaveAttribute("referrerpolicy", "no-referrer");
     expect(download).toHaveAttribute("rel", "noopener noreferrer");
     expect(download).toHaveTextContent("515.4 MB");
     expect(screen.queryByRole("link", { name: /hubcdn/ })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Get file link/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Get link/ }));
     expect(mocks.resolve).toHaveBeenCalledTimes(2);
-    await screen.findByRole("link", { name: "Download file" });
+    await screen.findByRole("link", { name: "Download" });
   });
   it("removes expiring download actions and offers refresh", async () => {
     mocks.resolve.mockResolvedValue([{ ...file, expiresAt: new Date(Date.now() + 60_000).toISOString() }]);
     render(<ResolveDownloadButton identity={identity} link={link} />);
-    fireEvent.click(screen.getByRole("button", { name: /Get file link/ }));
-    await screen.findByRole("link", { name: "Download file" });
+    fireEvent.click(screen.getByRole("button", { name: /Get link/ }));
+    await screen.findByRole("link", { name: "Download" });
     const now = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 70_000);
     try {
-      await screen.findByText("File links expired. Refresh to get a new link.", {}, { timeout: 2000 });
-      expect(screen.queryByRole("link", { name: "Download file" })).not.toBeInTheDocument();
+      await screen.findByText("This link expired. Refresh for a fresh one.", {}, { timeout: 2000 });
+      expect(screen.queryByRole("link", { name: "Download" })).not.toBeInTheDocument();
     } finally { now.mockRestore(); }
   });
   it("never plays a resolved MP4 inside the app — only offers the download", async () => {
     mocks.resolve.mockResolvedValue([{ ...file, contentType: "video/mp4", filename: "The.Trap.S01E01.720p.x264.mp4" }]);
     render(<ResolveDownloadButton identity={identity} link={link} />);
-    fireEvent.click(screen.getByRole("button", { name: /Get file link/ }));
-    expect(await screen.findByRole("link", { name: "Download file" })).toHaveAttribute("href", file.url);
+    fireEvent.click(screen.getByRole("button", { name: /Get link/ }));
+    expect(await screen.findByRole("link", { name: "Download" })).toHaveAttribute("href", file.url);
     expect(screen.queryByRole("button", { name: /Play here/ })).not.toBeInTheDocument();
     expect(document.querySelector("video")).toBeNull();
   });
-  it("shows a host error and retains the explicit retry action", async () => {
+  it("shows a simple error and retains the explicit retry action", async () => {
     mocks.resolve.mockRejectedValueOnce(new Error("No matching file could be confirmed"));
     render(<ResolveDownloadButton identity={identity} link={link} />);
-    fireEvent.click(screen.getByRole("button", { name: /Get file link/ }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("No matching file");
+    fireEvent.click(screen.getByRole("button", { name: /Get link/ }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn’t get this download");
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
   it("prevents duplicate work and aborts resolution when navigating away", () => {
     mocks.resolve.mockReturnValue(new Promise(() => {}));
     const { unmount } = render(<ResolveDownloadButton identity={identity} link={link} />);
-    const button = screen.getByRole("button", { name: /Get file link/ });
+    const button = screen.getByRole("button", { name: /Get link/ });
     fireEvent.click(button); fireEvent.click(button);
     expect(button).toBeDisabled();
     expect(mocks.resolve).toHaveBeenCalledOnce();
@@ -77,15 +77,15 @@ describe("final download link action", () => {
       { ...link, id: "other", url: "https://other.example/page", host: "other.example" },
     ]} />);
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Get file link/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Get link/ })).not.toBeInTheDocument();
   });
   it("reuses checked files immediately and removes the source when refreshing fails", async () => {
     const unavailable = vi.fn();
     mocks.resolve.mockRejectedValueOnce(new Error("File removed"));
     render(<ResolveDownloadButton identity={identity} link={link} initialFiles={[file]} onUnavailable={unavailable} />);
-    expect(screen.getByRole("link", { name: "Download file" })).toHaveAttribute("href", file.url);
+    expect(screen.getByRole("link", { name: "Download" })).toHaveAttribute("href", file.url);
     expect(mocks.resolve).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: /Get file link/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Get link/ }));
     await screen.findByRole("alert"); expect(unavailable).toHaveBeenCalledOnce();
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });

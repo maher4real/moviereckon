@@ -28,6 +28,29 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe("Python resolver selection", () => {
+  it.each(["https://nexdrive.help/genxfm123456/", "https://fast-dl.one/dl/861b73"])("uses the TypeScript adapter for %s even with a Python worker configured", async (url) => {
+    vi.stubEnv("WATCH_SOURCE_RESOLVER", "python");
+    vi.stubEnv("WATCH_SOURCE_PYTHON_URL", "https://worker.example/resolve");
+    const source = { ...link, url };
+    mocks.fallback.mockResolvedValueOnce([file]);
+    expect(await resolveContentDownloads(source, "The Trap")).toEqual([file]);
+    expect(mocks.fallback).toHaveBeenCalledWith(source, "The Trap");
+    expect(mocks.spawn).not.toHaveBeenCalled();
+  });
+  it("expands MoviesDrive image buttons before using the selected resolver engine", async () => {
+    const archive = { ...link, url: "https://mdrive.lol/archive/123/", host: "mdrive.lol" };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response('<h1 class="entry-title">The Trap (Season 1)</h1><div class="entry-content"><a href="https://hubcloud.ist/drive/abc"><img alt="HubCloud"></a></div>', { headers: { "content-type": "text/html" } })));
+    const input = child({ downloads: [file] });
+    expect(await resolveContentDownloads(archive, "The Trap")).toEqual([file]);
+    expect(input().link).toEqual({ ...archive, url: "https://hubcloud.ist/drive/abc", host: "hubcloud.ist" });
+    expect(mocks.fallback).not.toHaveBeenCalled();
+  });
+  it("does not expose a MoviesDrive file when its final filename has the wrong episode", async () => {
+    const archive = { ...link, url: "https://mdrive.lol/archive/123/", host: "mdrive.lol" };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response('<h1 class="entry-title">The Trap (Season 1)</h1><div class="entry-content"><a href="https://hubcloud.ist/drive/abc">Download</a></div>', { headers: { "content-type": "text/html" } })));
+    child({ downloads: [{ ...file, filename: file.filename.replace("S01E01", "S01E02") }] });
+    expect(await resolveContentDownloads(archive, "The Trap")).toEqual([]);
+  });
   it("falls back once if the local Python executable is absent", async () => {
     mocks.spawn.mockImplementation(() => {
       const process = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough(), stdin: new PassThrough(), kill: vi.fn() });
