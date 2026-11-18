@@ -8,14 +8,15 @@ import type { SourceRepository } from "./store";
 
 const config: ImporterConfig = { baseUrl: "https://new8.hdhub4u.cl", batchSize: 20, concurrency: 3,
   discoveryPages: 1, refreshHours: 24, budgetMs: 210_000 };
-const moved = "https://new10.hdhub4u.cl";
+const moved = "https://new14.hdhub4u.cl";
 const response = (html: string, finalUrl: string) => ({ html, finalUrl, etag: '"new"', lastModified: null });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("catalog domain rotation", () => {
   it.each([
-    ["hdhub", config.baseUrl, moved], ["moviesmod", "https://moviesmod.uk.com", "https://moviesmod.tw"],
-    ["bollyflix", "https://bollyflix.co.za", "https://bollyflix.church"], ["uhdmovies", "https://uhdmovies.us.org", "https://uhdmovies.beauty"],
+    ["rogmovies", "https://rogmovies.im", "https://rogmovies.cyou"],
+    ["hdhub", config.baseUrl, moved], ["moviesmod", "https://moviesmod.uk.com", "https://moviesmod.fi"],
+    ["bollyflix", "https://bollyflix.co.za", "https://new1.bollyflix.tours"], ["uhdmovies", "https://uhdmovies.us.org", "https://uhdmovies.ceo"],
   ] as const)("accepts observed %s moves and preserves saved post identity", async (provider, baseUrl, current) => {
     const catalog = { ...config, provider, baseUrl };
     const fetchDocument = vi.fn<typeof fetchSourceDocument>().mockResolvedValue(response(`<h2 class="entry-title"><a href="${current}/weapons-2025/">Weapons</a></h2>

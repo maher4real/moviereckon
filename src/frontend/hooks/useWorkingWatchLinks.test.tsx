@@ -27,6 +27,14 @@ describe("working-only source lists", () => {
     expect(hook.current.confirmed.map((item) => item.link.id)).toEqual([base.id]);
     expect(hook.current.isChecking).toBe(false);
   });
+  it("tries a second player in the first batch when one host supplies many links", () => {
+    const first = Array.from({ length: 5 }, (_, i) => ({ ...base, id: `first${i}`, url: `https://hubcdn.club/file/first${i}` }));
+    const alternate = { ...base, id: "alternate", host: "hdstream4u.com", kind: "watch" as const,
+      url: "https://hdstream4u.com/file/abcdefghijkl" };
+    mocks.check.mockReturnValue(new Promise(() => {}));
+    renderHook(() => useWorkingWatchLinks([...first, alternate], identity()));
+    expect(mocks.check.mock.calls[0][1]).toEqual(["first0", "alternate", "first1", "first2"]);
+  });
   it("checks every batch after finding working links and continues past a failed batch", async () => {
     vi.useFakeTimers();
     const links = Array.from({ length: 12 }, (_, index) => ({ ...base, id: `mirror${index}`, url: `https://hubcdn.club/file/mirror${index}` }));

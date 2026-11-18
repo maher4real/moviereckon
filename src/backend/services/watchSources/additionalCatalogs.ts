@@ -1,6 +1,7 @@
 import { load } from "cheerio";
 import { z } from "zod";
 import type { ImporterConfig } from "./config";
+import { catalogOriginAllowed } from "./catalogDomains";
 import { fetchSourceDocument } from "./http";
 import { publicLink } from "./parser";
 import { parseWordpressPage } from "./wordpressCatalog";
@@ -8,7 +9,8 @@ import { parseWordpressPage } from "./wordpressCatalog";
 export function additionalPostUrl(value: string, config: ImporterConfig): string | null {
   const url = publicLink(value, config.baseUrl);
   const path = config.provider === "movies4u" ? /^\/\d+-[^/]+\.html$/ : /^\/download-[^/.]+\/$/;
-  return url?.origin === config.baseUrl && !url.search && !url.hash && path.test(url.pathname) ? url.href : null;
+  if (!url || !catalogOriginAllowed(config, url.origin) || url.search || url.hash || !path.test(url.pathname)) return null;
+  return new URL(url.pathname, config.baseUrl).href;
 }
 
 export function discoverAdditionalPages(html: string, config: ImporterConfig): string[] {
@@ -24,13 +26,18 @@ export function discoverAdditionalPages(html: string, config: ImporterConfig): s
 export function parseAdditionalPage(html: string, sourceUrl: string, config: ImporterConfig) {
   const $ = load(html);
   const page = load('<h1></h1><div class="entry-content"></div>');
-  const title = config.provider === "movies4u" ? $(".single-service-content h1").first().text() : $("h1.post-title").first().text();
+  const title = config.provider === "movies4u" ? $(".single-service-content h1").first().text() :
+    $("h1.post-title").first().text();
   // Movies4U prints the release year without parentheses.
   page("h1").text(title.replace(/^(.*?)\s+((?:19|20)\d{2})(?=\s|$)/, "$1 ($2)"));
   const content = $(config.provider === "movies4u" ? ".download-links-div" : "main.page-body").first().clone();
   content.find("script,style,iframe,nav,aside,footer,.related-posts,#comments").remove();
   page(".entry-content").html(content.html() || "");
-  return parseWordpressPage(page.html(), sourceUrl);
+  const parsed = parseWordpressPage(page.html(), sourceUrl);
+  if (config.provider === "rogmovies" && parsed.mediaType === "tv") {
+    parsed.title = parsed.title.replace(/\s*\((?:Hindi|English|Tamil|Telugu|Malayalam|Kannada)\)\s*[-–—]$/i, "");
+  }
+  return parsed;
 }
 
 const searchSchema = z.object({ found: z.number().int().nonnegative(),

@@ -90,7 +90,7 @@ describe("final file resolution through published provider pages", () => {
     const fetchDocument = vi.fn().mockResolvedValueOnce({ html: `<a id="download" href="${next}">Download</a>` })
       .mockResolvedValueOnce({ html: `<a id="s3" href="${file}">File</a>` });
     expect(await resolveSourceDownloads(cloud, "The Trap", { fetchDocument, request: vi.fn().mockResolvedValue(response()) })).toHaveLength(1);
-    expect(fetchDocument.mock.calls[0][0]).toBe(cloud.url);
+    expect(fetchDocument.mock.calls[0][0]).toBe("https://hubcloud.mov/drive/abc");
   });
 
   it("supports the exact Google download host published by older archive releases", async () => {
@@ -128,8 +128,8 @@ describe("final file resolution through published provider pages", () => {
   it("follows only the matching Drive -> Cloud -> published file-button chain and probes signed GET with a one-byte range", async () => {
     const drive = { ...link, url: "https://hubdrive.pics/file/123", host: "hubdrive.pics" };
     const pages = new Map([
-      [drive.url, '<a href="https://ads.example/track">Download</a><a href="https://hubcloud.ist/drive/abc123">HubCloud Server</a>'],
-      ["https://hubcloud.ist/drive/abc123", '<a id="download" href="https://gamerxyt.com/hubcloud.php?host=hubcloud&id=abc123&token=fixture">Generate Link</a>'],
+      ["https://hubdrive.blog/file/123", '<a href="https://ads.example/track">Download</a><a href="https://hubcloud.mov/drive/abc123">HubCloud Server</a>'],
+      ["https://hubcloud.mov/drive/abc123", '<a id="download" href="https://gamerxyt.com/hubcloud.php?host=hubcloud&id=abc123&token=fixture">Generate Link</a>'],
       ["https://gamerxyt.com/hubcloud.php?host=hubcloud&id=abc123&token=fixture", `<a id="s3" href="${signed}">Download</a><a href="https://ads.example/another">Download</a>`],
     ]);
     const fetchDocument = vi.fn(async (url: string) => ({ html: pages.get(url) || "", etag: null, lastModified: null }));
@@ -143,7 +143,7 @@ describe("final file resolution through published provider pages", () => {
   });
   it("does not follow a Cloud link for a different file or accept an arbitrary redirect after the probe", async () => {
     const drive = { ...link, url: "https://hubdrive.pics/file/123" };
-    const fetchDocument = vi.fn().mockResolvedValueOnce({ html: '<a href="https://hubcloud.ist/drive/abc123">Server</a>' })
+    const fetchDocument = vi.fn().mockResolvedValueOnce({ html: '<a href="https://hubcloud.mov/drive/abc123">Server</a>' })
       .mockResolvedValueOnce({ html: '<a id="download" href="https://gamerxyt.com/hubcloud.php?host=hubcloud&id=different&token=fixture">Download</a>' });
     const request = vi.fn();
     expect(await resolveSourceDownloads(drive, "The Trap", { fetchDocument, request })).toEqual([]);

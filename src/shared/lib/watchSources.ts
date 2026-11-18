@@ -68,9 +68,15 @@ export function isMoviesDriveArchive(value: string): boolean {
   return !!url && url.origin === "https://mdrive.lol" && !url.search && !url.hash && /^\/archive\/\d+\/?$/.test(url.pathname);
 }
 
+const NEXDRIVE_ORIGINS = ["https://nexdrive.help", "https://nexdrive.beer", "https://nexdrive.vip"] as const;
+
+export function isNexDriveOrigin(origin: string): boolean {
+  return NEXDRIVE_ORIGINS.some((known) => known === origin);
+}
+
 export function isNexDriveUrl(value: string): boolean {
   const url = mediaUrl(value);
-  return !!url && ["https://nexdrive.help", "https://nexdrive.beer"].includes(url.origin) &&
+  return !!url && isNexDriveOrigin(url.origin) &&
     !url.search && !url.hash && /^\/genxfm\d{6,24}\/$/.test(url.pathname);
 }
 
@@ -79,12 +85,24 @@ export function isFastDlUrl(value: string): boolean {
   return !!url && url.origin === "https://fast-dl.one" && !url.search && !url.hash && /^\/dl\/[a-zA-Z0-9]{4,32}$/.test(url.pathname);
 }
 
+/** Keep saved file IDs usable when these two providers rotate their domains. */
+export function hubFileUrl(value: string): URL | null {
+  const url = mediaUrl(value);
+  if (!url || url.search || url.hash) return null;
+  if (["hubcloud.ist", "hubcloud.mov"].includes(url.hostname) && /^\/drive\/[a-z0-9]+\/?$/.test(url.pathname)) {
+    return new URL(url.pathname.replace(/\/$/, ""), "https://hubcloud.mov");
+  }
+  if (["hubdrive.pics", "hubdrive.blog"].includes(url.hostname) && /^\/file\/\d+\/?$/.test(url.pathname)) {
+    return new URL(url.pathname, "https://hubdrive.blog");
+  }
+  return null;
+}
+
 export function isResolvableDownload(link: WatchSourceLink): boolean {
   const url = mediaUrl(link.url);
   return !!url && link.kind === "download" && ["movie", "episode", "season"].includes(link.scope) &&
     (isMoviesDriveArchive(link.url) || isNexDriveUrl(link.url) || isFastDlUrl(link.url) || isGreenMotorsUrl(link.url) || (!url.search && !url.hash && (
-      (url.origin === "https://hubcloud.ist" && /^\/drive\/[a-z0-9]+\/?$/.test(url.pathname)) ||
-      (url.origin === "https://hubdrive.pics" && /^\/file\/\d+\/?$/.test(url.pathname)) ||
+      !!hubFileUrl(link.url) ||
       (["https://hubcdn.club", "https://hubcdn.wiki"].includes(url.origin) && /^\/file\/[a-zA-Z0-9]+\/?$/.test(url.pathname))
     )));
 }

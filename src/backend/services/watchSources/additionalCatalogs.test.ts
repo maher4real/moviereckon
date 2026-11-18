@@ -27,10 +27,11 @@ describe("Movies4U and RogMovies catalogs", () => {
     expect(parsed.links.every(canCheckWatchLink)).toBe(true);
   });
   it("retains exact episode scope and excludes related posts", () => {
-    const html = `<h1 class="post-title">Download Example (Season 2)</h1><main class="page-body"><h3>Season 2 720p x264</h3>
+    const html = `<h1 class="post-title">Download Example (Hindi) – Season 2</h1><main class="page-body"><h3>Season 2 720p x264</h3>
       <p><a href="https://nexdrive.help/genxfm123456/">Episode 1</a><a href="https://nexdrive.help/genxfm123457/">Episode 2</a></p>
       <div class="related-posts">${releaseRows}</div></main>`;
     const parsed = parseAdditionalPage(html, rog.baseUrl + "/download-example/", rog);
+    expect(parsed.title).toBe("Example");
     expect(parsed.links.map((link) => [link.scope, link.season, link.episode])).toEqual([["episode", 2, 1], ["episode", 2, 2]]);
   });
   it("discovers only same-origin content cards, supporting numeric HTML paths", () => {
@@ -47,7 +48,7 @@ describe("Movies4U and RogMovies catalogs", () => {
     expect(fetchDocument.mock.calls.map(([url]) => url)).toEqual([1, 2].map((page) => `${movie.baseUrl}/index.php?do=search&subaction=search&story=Weapons&search_start=${page}`));
   });
   it("uses paginated RogMovies JSON and rejects foreign results", async () => {
-    const fetchDocument = vi.fn().mockResolvedValueOnce(response(JSON.stringify({ found: 2, hits: [{ document: { permalink: rogPath } }] })))
+    const fetchDocument = vi.fn().mockResolvedValueOnce(response(JSON.stringify({ found: 2, hits: [{ document: { permalink: "https://rogmovies.cyou" + rogPath } }] })))
       .mockResolvedValueOnce(response(JSON.stringify({ found: 2, hits: [{ document: { permalink: "https://evil.example/download-other/" } }] })));
     expect(await searchAdditionalCatalog(["Weapons"], rog, fetchDocument)).toEqual({ urls: [rog.baseUrl + rogPath], errors: 0 });
     expect(fetchDocument.mock.calls[1][0]).toBe(rog.baseUrl + "/ts-search.php?q=Weapons&page=2");

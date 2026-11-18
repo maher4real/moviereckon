@@ -7,10 +7,11 @@ import { publicLink } from "./parser";
 
 // Observed redirects, kept separate for each catalog. Never trust arbitrary TLDs.
 const ORIGINS = {
-  hdhub: ["https://new10.hdhub4u.cl", "https://new8.hdhub4u.cl"],
-  moviesmod: ["https://moviesmod.tw", "https://moviesmod.meme", "https://moviesmod.uk.com"],
-  bollyflix: ["https://bollyflix.church", "https://bollyflix.co.za"],
-  uhdmovies: ["https://uhdmovies.beauty", "https://uhdmovies.us.org"],
+  hdhub: ["https://new14.hdhub4u.cl", "https://new10.hdhub4u.cl", "https://new8.hdhub4u.cl"],
+  moviesmod: ["https://moviesmod.fi", "https://moviesmod.tw", "https://moviesmod.meme", "https://moviesmod.uk.com"],
+  bollyflix: ["https://new1.bollyflix.tours", "https://bollyflix.church", "https://bollyflix.co.za"],
+  rogmovies: ["https://rogmovies.cyou", "https://rogmovies.im"],
+  uhdmovies: ["https://uhdmovies.ceo", "https://uhdmovies.beauty", "https://uhdmovies.us.org"],
 } as const;
 
 export function catalogOriginAllowed(config: ImporterConfig, origin: string): boolean {

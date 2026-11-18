@@ -28,11 +28,18 @@ export function useWorkingWatchLinks(links: WatchSourceLink[], identity?: WatchS
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     let paceTimer: ReturnType<typeof setTimeout> | undefined;
     const current: Record<string, WatchLinkCheck> = {};
-    const queue = input.links.filter((link) => {
+    const uncached = input.links.filter((link) => {
       const key = keyFor(input.identity, link), cached = cache.get(key);
       if (!force && fresh(cached, Date.now())) { current[key] = cached!; return false; }
       return true;
     });
+    // Interleave hosts so one unavailable player cannot occupy every early batch.
+    const occurrences = new Map<string, number>();
+    const queue = uncached.map((link) => {
+      const index = occurrences.get(link.host) || 0;
+      occurrences.set(link.host, index + 1);
+      return { link, index };
+    }).sort((a, b) => a.index - b.index).map(({ link }) => link);
     setChecks(current); setError(false); setPending(queue.length > 0);
     const run = async () => {
       try {

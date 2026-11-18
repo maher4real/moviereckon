@@ -56,8 +56,8 @@ def supported(link):
     url = safe_url(link.get("url"))
     return bool(url and link.get("kind") == "download" and link.get("scope") in ("movie", "episode", "season") and (
         greenmotors_url(link.get("url")) or (not url.query and (
-            url.hostname == "hubcloud.ist" and re.fullmatch(r"/drive/[a-z0-9]+/?", url.path) or
-            url.hostname == "hubdrive.pics" and re.fullmatch(r"/file/\d+/?", url.path) or
+            url.hostname in ("hubcloud.ist", "hubcloud.mov") and re.fullmatch(r"/drive/[a-z0-9]+/?", url.path) or
+            url.hostname in ("hubdrive.pics", "hubdrive.blog") and re.fullmatch(r"/file/\d+/?", url.path) or
             url.hostname in ("hubcdn.club", "hubcdn.wiki") and re.fullmatch(r"/file/[a-zA-Z0-9]+/?", url.path)))))
 
 
@@ -81,8 +81,8 @@ def matches(filename, link, title):
                                        int(episodes[0][2]) != link.get("episode") or episodes[0][3]):
         return False
     if link["scope"] == "season":
-        season = re.search(r"\bS(\d{1,3})\b", filename, re.I)
-        if episodes or not season or int(season[1]) != link.get("season"):
+        season = re.search(r"\bS(\d{1,3})\b", filename, re.I) or re.search(r"\bSeason[. -]+(\d{1,3})[. -]+Complete\b", filename, re.I)
+        if episodes or re.search(r"\b(?:ep(?:isode)?|e)[. -]*\d+", filename, re.I) or not season or int(season[1]) != link.get("season"):
             return False
     if link["scope"] == "movie" and episodes:
         return False
@@ -175,7 +175,7 @@ def greenmotors_destination(html):
         if any(len(re.findall('"' + key + r'"\s*:', raw)) != 1 for key in ("w", "l", "o")):
             return None
         destination = strict_base64(value["o"])
-        allowed = r"https://(?:hblinks\.lol/archives/[1-9]\d*|hubcloud\.ist/drive/[a-z0-9]+/?|hubdrive\.pics/file/\d+/?|hubcdn\.(?:club|wiki)/file/[A-Za-z0-9]+/?)"
+        allowed = r"https://(?:hblinks\.lol/archives/[1-9]\d*|hubcloud\.(?:ist|mov)/drive/[a-z0-9]+/?|hubdrive\.(?:pics|blog)/file/\d+/?|hubcdn\.(?:club|wiki)/file/[A-Za-z0-9]+/?)"
         return destination if re.fullmatch(allowed, destination) else None
     except (ValueError, UnicodeError, TypeError):
         return None
@@ -350,9 +350,13 @@ def resolve(payload, network=None):
         final = cdn_file(network.document("https://hubcdn.wiki" + original.path))
         candidates = [final] if final else []
     else:
-        cloud = {link["url"].rstrip("/")} if original.hostname == "hubcloud.ist" else {
-            node["href"].rstrip("/") for node in Anchors(network.document(link["url"])).links if
-            re.fullmatch(r"https://hubcloud\.ist/drive/[a-z0-9]+/?", node.get("href", ""))}
+        if original.hostname in ("hubcloud.ist", "hubcloud.mov"):
+            cloud = {"https://hubcloud.mov" + original.path.rstrip("/")}
+        else:
+            drive = network.document("https://hubdrive.blog" + original.path)
+            cloud = {"https://hubcloud.mov" + urlsplit(node["href"]).path.rstrip("/")
+                     for node in Anchors(drive).links
+                     if re.fullmatch(r"https://hubcloud\.(?:ist|mov)/drive/[a-z0-9]+/?", node.get("href", ""))}
         if len(cloud) != 1:
             return []
         cloud = next(iter(cloud))

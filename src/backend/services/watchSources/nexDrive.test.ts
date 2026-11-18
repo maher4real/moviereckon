@@ -4,7 +4,7 @@ import { resolveSourceDownloads } from "./downloads";
 import { parseSourcePage } from "./parser";
 import type { fetchSourceDocument } from "./http";
 
-const nex = "https://nexdrive.help/genxfm175139605628678/";
+const nex = "https://nexdrive.vip/genxfm175139605628678/";
 const fast = "https://fast-dl.one/dl/861b73";
 const link = parseSourcePage(`<h1>Weapons (2025)</h1><h2>Download Links</h2><h3>720p x264</h3><p><a href="${nex}">Download</a></p>`, "https://movies4u.one/19858-weapons.html").links[0];
 const file = "https://pub-0123456789abcdef0123456789abcdef.r2.dev/file";
@@ -16,6 +16,23 @@ const response = (name = filename, type = "application/octet-stream") => new Res
 const document = (html: string) => ({ html, etag: null, lastModified: null });
 
 describe("NexDrive and FastDL", () => {
+  it("verifies a published FastDL mirror against the selected season", async () => {
+    const embed = "https://fastdl.beer/embed.php?download=fixture123";
+    const fetchDocument = vi.fn<typeof fetchSourceDocument>(async (url) => document(url === nex ?
+      `<a href="${embed}">G-Direct</a>` : `<script>var reurl = "https://fastdl.beer/dl.php?link=${file}";</script>`));
+    const season = { ...link, scope: "season" as const, season: 2 };
+    const request = vi.fn().mockResolvedValue(response("Weapons.Season.2.Complete.720p.x264.mkv"));
+    expect(await resolveSourceDownloads(season, "Weapons", { fetchDocument, request })).toMatchObject([{ url: file }]);
+    for (const wrong of ["Weapons.Season.1.Complete", "Weapons.Season.2.Complete.Episode.03"]) {
+      request.mockResolvedValue(response(wrong + ".720p.x264.mkv"));
+      expect(await resolveSourceDownloads(season, "Weapons", { fetchDocument, request })).toEqual([]);
+    }
+    fetchDocument.mockResolvedValueOnce(document(`<a href="${embed}">G-Direct</a>`))
+      .mockResolvedValueOnce(document('<script>var reurl = "https://fastdl.beer/dl.php?link=https://example.com/file";</script>'));
+    request.mockClear();
+    expect(await resolveSourceDownloads(season, "Weapons", { fetchDocument, request })).toEqual([]);
+    expect(request).not.toHaveBeenCalled();
+  });
   it("resolves published buttons, prepares JSON and verifies final headers", async () => {
     const fetchDocument = vi.fn<typeof fetchSourceDocument>(async (url) => document(url === nex ? `<a href="${fast}">G-Direct</a>` : url === fast ? fastPage : JSON.stringify({ ok: true, url: file })));
     const request = vi.fn().mockResolvedValue(response());

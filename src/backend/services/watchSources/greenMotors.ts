@@ -1,6 +1,6 @@
 import { load } from "cheerio";
 import { publicLink } from "./parser";
-import { isAdditionalWatchPlayer } from "@/shared/lib/watchSources";
+import { hubFileUrl, isAdditionalWatchPlayer } from "@/shared/lib/watchSources";
 
 const MAX_HTML = 1_000_000;
 const MAX_TOKEN = 8192;
@@ -27,8 +27,7 @@ function mirrorLink(value: string, base: string, mode: "download" | "watch" = "d
   const url = publicLink(value, base);
   if (mode === "watch") return url && isAdditionalWatchPlayer(url.href) ? url : null;
   if (!url || url.protocol !== "https:" || url.search || url.hash) return null;
-  const supported = (url.origin === "https://hubcloud.ist" && /^\/drive\/[a-z0-9]+\/?$/.test(url.pathname)) ||
-    (url.origin === "https://hubdrive.pics" && /^\/file\/\d+\/?$/.test(url.pathname)) ||
+  const supported = hubFileUrl(url.href) ||
     (["https://hubcdn.club", "https://hubcdn.wiki"].includes(url.origin) && /^\/file\/[A-Za-z0-9]+\/?$/.test(url.pathname));
   return supported ? url : null;
 }

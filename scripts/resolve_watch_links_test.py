@@ -123,13 +123,13 @@ class ResolverTests(unittest.TestCase):
     def test_drive_chain_follows_only_matching_content_and_storage_buttons(self):
         link = {**LINK, "url": "https://hubdrive.pics/file/123"}
         page = "https://gamerxyt.com/hubcloud.php?host=hubcloud&id=abc&token=fixture"
-        network = FakeNetwork(pages={link["url"]: '<a href="https://ads.example/ad">Download</a><a href="https://hubcloud.ist/drive/abc">Server</a>',
-            "https://hubcloud.ist/drive/abc": '<a id="download" href="' + page + '">Generate</a>',
+        network = FakeNetwork(pages={"https://hubdrive.blog/file/123": '<a href="https://ads.example/ad">Download</a><a href="https://hubcloud.mov/drive/abc">Server</a>',
+            "https://hubcloud.mov/drive/abc": '<a id="download" href="' + page + '">Generate</a>',
             page: '<a id="s3" href="' + SIGNED + '">Download</a><a href="https://ads.example/file">Download</a>'})
         files = resolver.resolve({"title": "The Trap", "link": link}, network)
         self.assertEqual(files[0]["url"], SIGNED)
         self.assertEqual(network.documents, list(network.pages))
-        network.pages["https://hubcloud.ist/drive/abc"] = '<a id="download" href="' + page.replace("id=abc", "id=wrong") + '">Generate</a>'
+        network.pages["https://hubcloud.mov/drive/abc"] = '<a id="download" href="' + page.replace("id=abc", "id=wrong") + '">Generate</a>'
         self.assertEqual(resolver.resolve({"title": "The Trap", "link": link}, network), [])
 
     def test_signed_probe_requests_one_byte_and_never_reads_video_body(self):
@@ -174,10 +174,10 @@ class ResolverTests(unittest.TestCase):
     def test_direct_cloud_source(self):
         link = {**LINK, "url": "https://hubcloud.ist/drive/abc"}
         next_page = "https://gamerxyt.com/hubcloud.php?host=hubcloud&id=abc&token=fixture"
-        network = FakeNetwork(pages={link["url"]: '<a id="download" href="' + next_page + '">Download</a>',
+        network = FakeNetwork(pages={"https://hubcloud.mov/drive/abc": '<a id="download" href="' + next_page + '">Download</a>',
             next_page: '<a id="s3" href="' + FILE + '">File</a>'})
         self.assertEqual(len(resolver.resolve({"title": "The Trap", "link": link}, network)), 1)
-        self.assertEqual(network.documents, [link["url"], next_page])
+        self.assertEqual(network.documents, ["https://hubcloud.mov/drive/abc", next_page])
 
     def test_release_year_rejects_other_remakes(self):
         link = {**LINK, "releaseYear": 2026, "scope": "movie", "codec": None}

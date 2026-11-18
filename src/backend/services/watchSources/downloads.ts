@@ -1,7 +1,7 @@
 import "server-only";
 import { load } from "cheerio";
 import { randomBytes } from "node:crypto";
-import { isFastDlUrl, isNexDriveUrl, isGreenMotorsUrl, isResolvableDownload } from "@/shared/lib/watchSources";
+import { hubFileUrl, isNexDriveOrigin, isFastDlUrl, isNexDriveUrl, isGreenMotorsUrl, isResolvableDownload } from "@/shared/lib/watchSources";
 import type { ResolvedDownload, WatchSourceLink } from "@/shared/types/watchSources";
 import { decodeGreenMotorsDestination, parseGreenMotorsMirrors } from "./greenMotors";
 import { fetchSourceDocument } from "./http";
@@ -44,7 +44,10 @@ export function filenameMatchesSource(filename: string, link: WatchSourceLink, t
   const episodes = [...filename.matchAll(/\bS(\d{1,3})[._ -]?E(\d{1,4})(?:\s*[-–]\s*E?(\d{1,4}))?\b/gi)];
   const se = episodes[0];
   if (link.scope === "episode" && (episodes.length !== 1 || Number(se[1]) !== link.season || Number(se[2]) !== link.episode || se[3])) return false;
-  if (link.scope === "season" && (se || Number(filename.match(/\bS(\d{1,3})\b/i)?.[1]) !== link.season)) return false;
+  if (link.scope === "season") {
+    const season = filename.match(/\bS(\d{1,3})\b/i) || filename.match(/\bSeason[. -]+(\d{1,3})[. -]+Complete\b/i);
+    if (!season || Number(season[1]) !== link.season || se || /\b(?:ep(?:isode)?|e)[. -]*\d+/i.test(filename)) return false;
+  }
   if (link.scope === "movie" && se) return false;
   if (link.resolution !== null) {
     const quality = filename.match(/\b(360|480|576|720|1080|1440|2160|4320)p\b/i);
@@ -100,6 +103,27 @@ async function checkFile(url: URL, link: WatchSourceLink, title: string, signal:
   return { url: url.href, filename, sizeBytes, contentType, checkedAt: checkedAt.toISOString(), expiresAt };
 }
 
+function isFastDlEmbed(url: URL): boolean {
+  return url.origin === "https://fastdl.beer" && url.pathname === "/embed.php" && !url.hash &&
+    /^\?download=[a-zA-Z0-9_-]{6,128}$/.test(url.search);
+}
+
+async function resolveFastDlEmbed(embed: URL, link: WatchSourceLink, title: string,
+  dependencies: { fetchDocument: typeof fetchSourceDocument; request: typeof fetch }, signal: AbortSignal) {
+  const response = await dependencies.fetchDocument(embed.href, embed.origin, {}, { signal });
+  const $ = load(response.html || "");
+  const destinations = new Set<string>();
+  for (const script of $("script:not([src])").toArray()) {
+    const target = $(script).text().match(/^\s*var reurl\s*=\s*"https:\/\/fastdl\.beer\/dl\.php\?link=([^"\\\s]{1,8192})"\s*;/)?.[1];
+    if (target) destinations.add(target);
+  }
+  if (destinations.size !== 1) return [];
+  const file = finalStorageUrl([...destinations][0]);
+  if (!file) return [];
+  const result = await checkFile(file, link, title, signal, dependencies.request);
+  return result ? [result] : [];
+}
+
 export async function resolveSourceDownloads(link: WatchSourceLink, title: string,
   dependencies = { fetchDocument: fetchSourceDocument, request: fetch },
   signal = AbortSignal.timeout(22_000)): Promise<ResolvedDownload[]> {
@@ -109,17 +133,21 @@ export async function resolveSourceDownloads(link: WatchSourceLink, title: strin
   const original = new URL(link.url);
   if (isNexDriveUrl(link.url)) {
     const response = await dependencies.fetchDocument(original.href, original.origin, {}, { signal,
-      redirectOriginAllowed: (origin) => ["https://nexdrive.help", "https://nexdrive.beer"].includes(origin) });
+      redirectOriginAllowed: isNexDriveOrigin });
     const page = load(response.html || "");
     const mirrors = page("a[href]").toArray().flatMap((node) => {
       if (page(node).closest("nav,header,footer,aside").length) return [];
       const url = publicLink(page(node).attr("href") || "", response.finalUrl || original.href);
-      if (!url || !(isFastDlUrl(url.href) || ["hubcloud.ist", "hubdrive.pics", "hubcdn.club", "hubcdn.wiki"].includes(url.hostname))) return [];
+      if (!url || !(isFastDlEmbed(url) || isFastDlUrl(url.href) || hubFileUrl(url.href) || ["hubcdn.club", "hubcdn.wiki"].includes(url.hostname))) return [];
       const mirror = { ...link, url: url.href, host: url.hostname };
-      return isResolvableDownload(mirror) ? [mirror] : [];
+      return isFastDlEmbed(url) || isResolvableDownload(mirror) ? [mirror] : [];
     });
     const unique = [...new Map(mirrors.map((mirror) => [mirror.url, mirror])).values()].slice(0, 4);
-    const results = await Promise.allSettled(unique.map((mirror) => resolveSourceDownloads(mirror, title, dependencies, signal)));
+    const results = await Promise.allSettled(unique.map((mirror) => {
+      const url = new URL(mirror.url);
+      return isFastDlEmbed(url) ? resolveFastDlEmbed(url, link, title, dependencies, signal) :
+        resolveSourceDownloads(mirror, title, dependencies, signal);
+    }));
     return [...new Map(results.flatMap((result) => result.status === "fulfilled" ? result.value : []).map((file) => [file.url, file])).values()].slice(0, 8);
   }
   if (isFastDlUrl(link.url)) {
@@ -170,12 +198,20 @@ export async function resolveSourceDownloads(link: WatchSourceLink, title: strin
     const file = parseCdnFile(await document(canonical));
     if (file) candidates = [file];
   } else {
-    const drive = load(original.hostname === "hubcloud.ist" ? "" : await document(original));
-    const cloudLinks = drive("a[href]").toArray().flatMap((node) => {
-      const url = publicLink(drive(node).attr("href") || "", original.href);
-      return url?.origin === "https://hubcloud.ist" && !url.search && !url.hash && /^\/drive\/[a-z0-9]+$/.test(url.pathname) ? [url] : [];
-    });
-    const unique = original.hostname === "hubcloud.ist" ? [new URL(original.href.replace(/\/$/, ""))] : [...new Map(cloudLinks.map((url) => [url.href, url])).values()];
+    const entry = hubFileUrl(original.href);
+    if (!entry) return [];
+    const cloudLinks: URL[] = [];
+    if (entry.hostname === "hubcloud.mov") {
+      cloudLinks.push(entry);
+    } else {
+      const drive = load(await document(entry));
+      for (const node of drive("a[href]").toArray()) {
+        const href = publicLink(drive(node).attr("href") || "", entry.href);
+        const cloud = href && hubFileUrl(href.href);
+        if (cloud?.hostname === "hubcloud.mov") cloudLinks.push(cloud);
+      }
+    }
+    const unique = [...new Map(cloudLinks.map((url) => [url.href, url])).values()];
     if (unique.length !== 1) return [];
     const cloud = unique[0];
     const page = load(await document(cloud));
